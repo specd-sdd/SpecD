@@ -37,6 +37,29 @@
 - **THEN** it is accepted
 - **AND** `default` and `root` stay reserved
 
+#### Scenario: One-character workspace name rejected
+
+- **GIVEN** `specd.yaml` declares a workspace named `a`
+- **WHEN** the configuration is loaded
+- **THEN** loading fails with `ConfigValidationError` because workspace names need two or more characters
+
+#### Scenario: Two-character workspace name accepted
+
+- **GIVEN** `specd.yaml` declares a workspace named `ab` with a valid `codeRoot`
+- **WHEN** the configuration is loaded
+- **THEN** the workspace is accepted
+
+#### Scenario: Names produced by project init are loadable
+
+- **WHEN** `specd project init --workspace <id>` accepts an id
+- **THEN** `ConfigLoader` accepts the same id
+- **AND** ids such as `a` and `nul` are rejected by init as well as by the loader
+
+#### Scenario: Existing project workspaces remain valid
+
+- **WHEN** the workspaces `core`, `cli`, `sdk`, and `plugin-agent-claude` are validated
+- **THEN** each is accepted
+
 ### Requirement: Workspace properties
 
 #### Scenario: Default workspace inherits defaults
@@ -103,13 +126,13 @@
 #### Scenario: ReadOnly workspace blocks direct spec writes
 
 - **GIVEN** a `SpecRepository` bound to a workspace with `readOnly` ownership
-- **WHEN** `save()` or `saveMetadata()` is called
+- **WHEN** `save()` or `writePersistedState()` is called
 - **THEN** `ReadOnlyWorkspaceError` is thrown before any filesystem operation
 
 #### Scenario: ReadOnly workspace allows reads
 
 - **GIVEN** a workspace with `ownership: readOnly`
-- **WHEN** `SpecRepository.get()`, `list()`, `artifact()`, or `metadata()` is called
+- **WHEN** `SpecRepository.get()`, `list()`, `artifact()`, or `readMetadataSnapshot()` is called
 - **THEN** the operation succeeds normally
 
 #### Scenario: Error messages do not suggest remediation
@@ -117,6 +140,13 @@
 - **WHEN** any `ReadOnlyWorkspaceError` is thrown
 - **THEN** the error message states the blocked operation and the workspace name
 - **AND** the message does not contain suggestions to change `specd.yaml` or modify ownership
+
+#### Scenario: ReadOnly workspace permits metadata cache writes
+
+- **GIVEN** a `SpecRepository` bound to a workspace with `readOnly` ownership
+- **WHEN** `writeMetadataSnapshot()` persists generated metadata
+- **THEN** the disposable cache write is permitted
+- **AND** the canonical spec artifacts and persisted lock remain unchanged
 
 ### Requirement: Prefix semantics
 
@@ -139,6 +169,12 @@
 - **WHEN** a workspace declares a prefix with invalid syntax
 - **THEN** a `ConfigValidationError` is thrown at startup
 
+#### Scenario: Prefix segment violating the segment rule
+
+- **GIVEN** a workspace declares `prefix: team/Shared`
+- **WHEN** the configuration is loaded
+- **THEN** loading fails with `ConfigValidationError`
+
 ### Requirement: Workspace-qualified spec IDs
 
 #### Scenario: Bare path resolves to default workspace
@@ -150,6 +186,22 @@
 
 - **WHEN** a spec ID `nonexistent:auth/login` is used
 - **THEN** an error is thrown indicating the workspace is unknown
+
+#### Scenario: Unknown workspace in a spec ID raises the typed error
+
+- **WHEN** a use case receives `nope:auth/login`
+- **THEN** it throws `WorkspaceNotFoundError`
+
+#### Scenario: Malformed spec ID raises the typed error
+
+- **WHEN** a use case receives `ws:` as a spec ID
+- **THEN** it throws `InvalidSpecIdError`
+
+#### Scenario: Adapters do not qualify IDs even for display
+
+- **WHEN** a delivery adapter prints a spec ID
+- **THEN** it prints the raw argument or the use case result
+- **AND** it does not call `parseSpecId`
 
 ### Requirement: Active workspace determination
 
@@ -165,20 +217,6 @@
 - **WHEN** context compilation determines active workspaces
 - **THEN** workspace `billing` is not active
 - **AND** its workspace-level patterns are not applied
-
-### Requirement: Primary workspace
-
-#### Scenario: Primary workspace is first spec's workspace
-
-- **GIVEN** a change with `specIds: ['billing:invoices', 'default:auth/login']`
-- **WHEN** the primary workspace is determined
-- **THEN** it is `billing`
-
-#### Scenario: Primary workspace used for archive path template
-
-- **GIVEN** a change with primary workspace `billing`
-- **WHEN** `ArchiveChange` resolves `{{change.workspace}}` in the archive path template
-- **THEN** it resolves to `billing`
 
 ### Requirement: Port-per-workspace pattern
 

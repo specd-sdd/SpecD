@@ -30,6 +30,44 @@
 - **WHEN** `GetGuideQuery.execute({ topic: "  schemas   " })` is evaluated
 - **THEN** whitespace is trimmed and the `"schemas"` guide is returned
 
+#### Scenario: A single-collection catalog accepts an unqualified shorthand
+
+- **GIVEN** a catalog port exposing exactly one collection containing `workflow`
+- **WHEN** `GetGuideQuery.execute({ topic: "workflow" })` is called
+- **THEN** the `workflow` guide in that sole collection is returned
+- **AND** the shorthand MUST NOT select or redirect to another collection
+
+#### Scenario: Collection-qualified topic resolves within its collection
+
+- **GIVEN** two collections each containing a topic named `ports`
+- **WHEN** `GetGuideQuery.execute({ topic: "core:ports" })` is called against the core collection's port
+- **THEN** the composite key MUST be passed to the port unmodified
+- **AND** the `core` collection's `ports` document MUST be returned
+- **AND** the key MUST NOT be split, slugified or prefix-matched
+
+#### Scenario: Nested topic keeps its path separator
+
+- **GIVEN** a collection containing `examples/implementing-a-port`
+- **WHEN** `GetGuideQuery.execute({ topic: "core:examples/implementing-a-port" })` is called
+- **THEN** the nested document MUST resolve
+- **AND** the `/` MUST be preserved inside the topic
+
+#### Scenario: Normalization applies trim, then extension strip, then lowercase
+
+- **GIVEN** a topic query `"  Core:Ports.MD  "`
+- **WHEN** it is resolved
+- **THEN** whitespace MUST be trimmed first
+- **AND** the trailing `.md` MUST be stripped next
+- **AND** lowercasing MUST be applied last
+- **AND** no other transformation MUST be applied
+
+#### Scenario: Section content is extracted on demand from outline spans
+
+- **GIVEN** a retrieved guide whose outline sections carry `startOffset` and `endOffset`
+- **WHEN** a section's content is requested
+- **THEN** it MUST be extracted from those spans
+- **AND** it MUST NOT come from an eagerly serialized duplicate
+
 ### Requirement: Topic Not Found Handling
 
 #### Scenario: Unknown topic throws GuideTopicNotFoundError
@@ -50,6 +88,43 @@
 #### Scenario: Empty or whitespace-only topic rejects with GuideTopicNotFoundError
 
 - **GIVEN** an empty string `""` or whitespace string `"   "`
-- **WHEN** `GetGuideQuery.execute({ topic: "" })` is called
-- **THEN** it rejects with `GuideTopicNotFoundError`
-- **AND** `error.topic` is empty
+- **WHEN** `GetGuideQuery.execute({ topic: "   " })` is called
+- **THEN** it MUST reject with `GuideTopicNotFoundError`
+- **AND** it MUST reject before delegating to the catalog port
+
+#### Scenario: Empty topic reports the untrimmed input
+
+- **GIVEN** a whitespace-only topic `"   "`
+- **WHEN** `GetGuideQuery.execute({ topic: "   " })` rejects
+- **THEN** `error.topic` MUST equal the value as supplied, `"   "`
+- **AND** it MUST NOT be the empty string
+
+#### Scenario: Available topics are collection-scoped
+
+- **GIVEN** a port serving the `core` collection
+- **WHEN** an unknown topic is requested
+- **THEN** `error.availableTopics` MUST be drawn from the `core` collection only
+
+#### Scenario: Available topics are collection-qualified and directly addressable
+
+- **GIVEN** a port serving the `core` collection containing a `ports` topic
+- **WHEN** an unknown topic is requested
+- **THEN** `error.availableTopics` MUST include `"core:ports"`
+- **AND** that reported value MUST resolve when supplied back to the query
+
+#### Scenario: A qualified miss suggests a title match in another collection without resolving it
+
+- **GIVEN** `core` has no topic titled `ArtifactDag` and `sdk` has `classes/ArtifactDag` titled `ArtifactDag`
+- **WHEN** `GetGuideQuery.execute({ topic: "core:ArtifactDag" })` is called
+- **THEN** it MUST reject rather than return the SDK topic
+- **AND** `error.availableTopics` MUST remain scoped to `core`
+- **AND** `error.availableTopics` MUST NOT include `"sdk:classes/ArtifactDag"`
+- **AND** `error.titleMatches` MUST include `"sdk:classes/ArtifactDag"`
+- **AND** `error.crossCollection` MUST be `true`
+
+#### Scenario: Candidate enumeration happens only after direct lookup misses
+
+- **GIVEN** a catalog whose direct lookup resolves `core:ports`
+- **WHEN** `GetGuideQuery.execute({ topic: "core:ports" })` is called
+- **THEN** it MUST return the direct lookup result
+- **AND** it MUST NOT enumerate all catalog topics

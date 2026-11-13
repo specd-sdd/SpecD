@@ -100,7 +100,7 @@ function makeChange(name: string, createdAt?: Date): Change {
   return new Change({
     name,
     createdAt: at,
-    specIds: ['auth/login'],
+    specIds: ['default:auth/login'],
     schemaName: '@specd/schema-std',
     schemaVersion: 1,
     history: [
@@ -108,7 +108,7 @@ function makeChange(name: string, createdAt?: Date): Change {
         type: 'created',
         at,
         by: actor,
-        specIds: ['auth/login'],
+        specIds: ['default:auth/login'],
         schemaName: '@specd/schema-std',
         schemaVersion: 1,
       },
@@ -175,7 +175,7 @@ describe('FsChangeRepository', () => {
 
       expect(loaded).not.toBeNull()
       expect(loaded?.name).toBe('add-auth')
-      expect(loaded?.specIds).toEqual(['auth/login'])
+      expect(loaded?.specIds).toEqual(['default:auth/login'])
       expect(loaded?.workspaces).toEqual(['default'])
       expect(loaded?.history).toHaveLength(1)
       expect(loaded?.history[0]?.type).toBe('created')
@@ -438,7 +438,7 @@ describe('FsChangeRepository', () => {
       const change = new Change({
         name: 'add-auth',
         createdAt: at,
-        specIds: ['auth/login'],
+        specIds: ['default:auth/login'],
         schemaName: '@specd/schema-std',
         schemaVersion: 1,
         history: [
@@ -446,7 +446,7 @@ describe('FsChangeRepository', () => {
             type: 'created',
             at,
             by: actor,
-            specIds: ['auth/login'],
+            specIds: ['default:auth/login'],
             schemaName: '@specd/schema-std',
             schemaVersion: 1,
           },
@@ -1346,13 +1346,13 @@ describe('FsChangeRepository', () => {
   describe('specDependsOn round-trip', () => {
     it('given a change with specDependsOn, when saved and loaded, then specDependsOn is preserved', async () => {
       const change = makeChange('add-auth')
-      change.setSpecDependsOn('auth/login', ['auth/shared', 'auth/jwt'])
+      change.setSpecDependsOn('default:auth/login', ['default:auth/shared', 'default:auth/jwt'])
       await persistChange(ctx.repo, change)
 
       const loaded = await ctx.repo.get('add-auth')
       expect(loaded).not.toBeNull()
       expect([...loaded!.specDependsOn.entries()]).toEqual([
-        ['auth/login', ['auth/shared', 'auth/jwt']],
+        ['default:auth/login', ['default:auth/shared', 'default:auth/jwt']],
       ])
     })
 
@@ -1377,13 +1377,13 @@ describe('FsChangeRepository', () => {
 
     it('given a change with specDependsOn, when saved, then manifest.json includes specDependsOn as a record', async () => {
       const change = makeChange('add-auth')
-      change.setSpecDependsOn('auth/login', ['auth/shared'])
+      change.setSpecDependsOn('default:auth/login', ['default:auth/shared'])
       await persistChange(ctx.repo, change)
 
       const dir = path.join(ctx.changesPath, '20240115-100000-add-auth')
       const raw = await fs.readFile(path.join(dir, 'manifest.json'), 'utf8')
       const parsed = JSON.parse(raw) as Record<string, unknown>
-      expect(parsed['specDependsOn']).toEqual({ 'auth/login': ['auth/shared'] })
+      expect(parsed['specDependsOn']).toEqual({ 'default:auth/login': ['default:auth/shared'] })
     })
   })
 
@@ -1588,7 +1588,7 @@ describe('FsChangeRepository', () => {
       return new Change({
         name,
         createdAt: at,
-        specIds: ['auth/login'],
+        specIds: ['default:auth/login'],
         schemaName: '@specd/schema-std',
         schemaVersion: 1,
         history: [
@@ -1596,7 +1596,7 @@ describe('FsChangeRepository', () => {
             type: 'created',
             at,
             by: actor,
-            specIds: ['auth/login'],
+            specIds: ['default:auth/login'],
             schemaName: '@specd/schema-std',
             schemaVersion: 1,
           },
@@ -1741,7 +1741,7 @@ describe('FsChangeRepository', () => {
       const change = new Change({
         name: 'c1',
         createdAt: at,
-        specIds: ['auth/login'],
+        specIds: ['default:auth/login'],
         schemaName: '@specd/schema-std',
         schemaVersion: 1,
         history: [
@@ -1749,7 +1749,7 @@ describe('FsChangeRepository', () => {
             type: 'created',
             at,
             by: actor,
-            specIds: ['auth/login'],
+            specIds: ['default:auth/login'],
             schemaName: '@specd/schema-std',
             schemaVersion: 1,
           },
@@ -1845,7 +1845,7 @@ describe('FsChangeRepository', () => {
       const change = new Change({
         name: 'c2',
         createdAt: at,
-        specIds: ['auth/login'],
+        specIds: ['default:auth/login'],
         schemaName: '@specd/schema-std',
         schemaVersion: 1,
         history: [
@@ -1853,7 +1853,7 @@ describe('FsChangeRepository', () => {
             type: 'created',
             at,
             by: actor,
-            specIds: ['auth/login'],
+            specIds: ['default:auth/login'],
             schemaName: '@specd/schema-std',
             schemaVersion: 1,
           },
@@ -1944,7 +1944,7 @@ describe('FsChangeRepository', () => {
       const change = new Change({
         name: 'c3',
         createdAt: at,
-        specIds: ['auth/login'],
+        specIds: ['default:auth/login'],
         schemaName: '@specd/schema-std',
         schemaVersion: 1,
         history: [
@@ -1952,7 +1952,7 @@ describe('FsChangeRepository', () => {
             type: 'created',
             at,
             by: actor,
-            specIds: ['auth/login'],
+            specIds: ['default:auth/login'],
             schemaName: '@specd/schema-std',
             schemaVersion: 1,
           },
@@ -2001,7 +2001,7 @@ describe('FsChangeRepository', () => {
       const change = new Change({
         name: 'drift-lock-test',
         createdAt: at,
-        specIds: ['auth/login'],
+        specIds: ['default:auth/login'],
         schemaName: '@specd/schema-std',
         schemaVersion: 1,
         history: [
@@ -2009,7 +2009,7 @@ describe('FsChangeRepository', () => {
             type: 'created',
             at,
             by: actor,
-            specIds: ['auth/login'],
+            specIds: ['default:auth/login'],
             schemaName: '@specd/schema-std',
             schemaVersion: 1,
           },
@@ -2160,10 +2160,11 @@ describe('FsChangeRepository', () => {
       await persistChange(ctx.repo, change)
 
       const dir = path.join(ctx.changesPath, '20240115-100000-remove-test')
-      await fs.mkdir(path.join(dir, 'specs', 'default'), { recursive: true })
+      await fs.mkdir(path.join(dir, 'specs', 'default', 'auth'), { recursive: true })
 
-      await ctx.repo.unscaffold(change, ['default:'])
+      await ctx.repo.unscaffold(change, ['default:auth'])
 
+      await expect(fs.access(path.join(dir, 'specs', 'default', 'auth'))).rejects.toThrow()
       await expect(fs.access(dir)).resolves.toBeUndefined()
     })
   })
@@ -2181,7 +2182,7 @@ describe('FsChangeRepository', () => {
       const change = new Change({
         name: 'c1',
         createdAt: new Date('2024-01-15T10:00:00.000Z'),
-        specIds: ['auth/login'],
+        specIds: ['default:auth/login'],
         schemaName: '@specd/schema-std',
         schemaVersion: 1,
         history: [
@@ -2189,7 +2190,7 @@ describe('FsChangeRepository', () => {
             type: 'created',
             at: new Date('2024-01-15T10:00:00.000Z'),
             by: actor,
-            specIds: ['auth/login'],
+            specIds: ['default:auth/login'],
             schemaName: '@specd/schema-std',
             schemaVersion: 1,
           },
@@ -2207,7 +2208,7 @@ describe('FsChangeRepository', () => {
       const change = new Change({
         name: 'c1',
         createdAt: new Date('2024-01-15T10:00:00.000Z'),
-        specIds: ['auth/login'],
+        specIds: ['default:auth/login'],
         schemaName: '@specd/schema-std',
         schemaVersion: 1,
         history: [
@@ -2215,7 +2216,7 @@ describe('FsChangeRepository', () => {
             type: 'created',
             at: new Date('2024-01-15T10:00:00.000Z'),
             by: actor,
-            specIds: ['auth/login'],
+            specIds: ['default:auth/login'],
             schemaName: '@specd/schema-std',
             schemaVersion: 1,
           },
@@ -2233,7 +2234,7 @@ describe('FsChangeRepository', () => {
       const change = new Change({
         name: 'c1',
         createdAt: new Date('2024-01-15T10:00:00.000Z'),
-        specIds: ['auth/login'],
+        specIds: ['default:auth/login'],
         schemaName: '@specd/schema-std',
         schemaVersion: 1,
         history: [
@@ -2241,7 +2242,7 @@ describe('FsChangeRepository', () => {
             type: 'created',
             at: new Date('2024-01-15T10:00:00.000Z'),
             by: actor,
-            specIds: ['auth/login'],
+            specIds: ['default:auth/login'],
             schemaName: '@specd/schema-std',
             schemaVersion: 1,
           },
@@ -2362,7 +2363,7 @@ describe('FsChangeRepository', () => {
       const change = new Change({
         name: 'c1',
         createdAt: at,
-        specIds: ['auth/login'],
+        specIds: ['default:auth/login'],
         schemaName: '@specd/schema-std',
         schemaVersion: 1,
         history: [
@@ -2370,7 +2371,7 @@ describe('FsChangeRepository', () => {
             type: 'created',
             at,
             by: actor,
-            specIds: ['auth/login'],
+            specIds: ['default:auth/login'],
             schemaName: '@specd/schema-std',
             schemaVersion: 1,
           },
@@ -2421,7 +2422,7 @@ describe('FsChangeRepository', () => {
       const change = new Change({
         name: 'c2',
         createdAt: at,
-        specIds: ['auth/login'],
+        specIds: ['default:auth/login'],
         schemaName: '@specd/schema-std',
         schemaVersion: 1,
         history: [
@@ -2429,7 +2430,7 @@ describe('FsChangeRepository', () => {
             type: 'created',
             at,
             by: actor,
-            specIds: ['auth/login'],
+            specIds: ['default:auth/login'],
             schemaName: '@specd/schema-std',
             schemaVersion: 1,
           },
@@ -2497,7 +2498,7 @@ describe('FsChangeRepository', () => {
       const change = new Change({
         name: 'c3',
         createdAt: at,
-        specIds: ['auth/login'],
+        specIds: ['default:auth/login'],
         schemaName: '@specd/schema-std',
         schemaVersion: 1,
         history: [
@@ -2505,7 +2506,7 @@ describe('FsChangeRepository', () => {
             type: 'created',
             at,
             by: actor,
-            specIds: ['auth/login'],
+            specIds: ['default:auth/login'],
             schemaName: '@specd/schema-std',
             schemaVersion: 1,
           },
@@ -2583,7 +2584,7 @@ describe('FsChangeRepository', () => {
       const change = new Change({
         name: 'uninit-drift-test',
         createdAt: at,
-        specIds: ['auth/login'],
+        specIds: ['default:auth/login'],
         schemaName: '@specd/schema-std',
         schemaVersion: 1,
         history: [
@@ -2591,7 +2592,7 @@ describe('FsChangeRepository', () => {
             type: 'created',
             at,
             by: actor,
-            specIds: ['auth/login'],
+            specIds: ['default:auth/login'],
             schemaName: '@specd/schema-std',
             schemaVersion: 1,
           },
@@ -2954,7 +2955,7 @@ describe('FsChangeRepository', () => {
       const change = new Change({
         name: 'legacy-hydrate',
         createdAt: new Date('2024-01-15T10:00:00.000Z'),
-        specIds: ['auth/login'],
+        specIds: ['default:auth/login'],
         schemaName: 'std',
         schemaVersion: 1,
         history: [
@@ -2962,7 +2963,7 @@ describe('FsChangeRepository', () => {
             type: 'created',
             at: new Date('2024-01-15T10:00:00.000Z'),
             by: actor,
-            specIds: ['auth/login'],
+            specIds: ['default:auth/login'],
             schemaName: 'std',
             schemaVersion: 1,
           },
@@ -2986,7 +2987,7 @@ describe('FsChangeRepository', () => {
         const change = makeChange(`scope-${kind}`)
         const fingerprint = {
           version: 1 as const,
-          specIds: ['auth/login'],
+          specIds: ['default:auth/login'],
           artifacts: {
             version: 1 as const,
             algorithm: 'artifact-pre-hash-v1' as const,
@@ -3017,7 +3018,7 @@ describe('FsChangeRepository', () => {
       const change = makeChange('approval-round-trip')
       const fingerprint = {
         version: 1 as const,
-        specIds: ['auth/login'],
+        specIds: ['default:auth/login'],
         artifacts: {
           version: 1 as const,
           algorithm: 'artifact-pre-hash-v1' as const,
@@ -3131,7 +3132,7 @@ describe('FsChangeRepository', () => {
       const change = new Change({
         name: 'schema-source-test',
         createdAt: new Date('2024-01-15T10:00:00.000Z'),
-        specIds: ['auth/login'],
+        specIds: ['default:auth/login'],
         schemaName: '@specd/schema-std',
         schemaVersion: 1,
         history: [],

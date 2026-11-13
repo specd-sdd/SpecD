@@ -9,15 +9,13 @@
     "core:list-workspaces",
     "sdk:run-index-project-graph",
     "sdk:host-context",
-    "code-graph:isolated-index-worker"
+    "code-graph:isolated-index-worker",
+    "core:config-loader"
   ],
   "implementation": [
     {
       "file": "cli:src/commands/graph/index-graph.ts",
-      "symbols": ["registerGraphIndex", "formatTextIndexResult"]
-    },
-    {
-      "file": "cli:test/commands/graph-index.spec.ts"
+      "symbols": ["registerGraphIndex"]
     }
   ],
   "optimizations": {

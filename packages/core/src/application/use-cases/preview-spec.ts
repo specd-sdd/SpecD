@@ -98,10 +98,17 @@ export class PreviewSpec {
    *
    * @param input - Preview parameters
    * @returns The preview result with per-file entries and warnings
+   * @throws {InvalidSpecIdError} If `specId` is empty, blank, or malformed
+   * @throws {WorkspaceNotFoundError} If the spec ID names an unknown workspace
    * @throws {ChangeNotFoundError} If no change with the given name exists
+   * @throws {SchemaProviderIdentityMismatchError} If the provider returns a schema whose canonical name differs from `change.schemaName`
    * @throws {SpecNotInChangeError} If the specId is not in the change's specIds
    */
   async execute(input: PreviewSpecInput): Promise<PreviewSpecResult> {
+    const { workspace, capPath, specId } = parseSpecId(input.specId, {
+      workspaces: this._specs.keys(),
+    })
+
     const change = await this._changes.get(input.name)
     if (change === null) throw new ChangeNotFoundError(input.name)
 
@@ -111,11 +118,10 @@ export class PreviewSpec {
       schemaVersion: change.schemaVersion,
     })
 
-    if (!change.specIds.includes(input.specId)) {
-      throw new SpecNotInChangeError(input.specId, change.name)
+    if (!change.specIds.includes(specId)) {
+      throw new SpecNotInChangeError(specId, change.name)
     }
 
-    const { workspace, capPath } = parseSpecId(input.specId)
     const specRepo = this._specs.get(workspace)
     const spec = specRepo !== undefined ? await specRepo.get(SpecPath.parse(capPath)) : null
 
@@ -126,7 +132,7 @@ export class PreviewSpec {
       if (artifactType.scope !== 'spec') continue
 
       const artifact = change.artifacts.get(artifactType.id)
-      const file = artifact?.getFile(input.specId)
+      const file = artifact?.getFile(specId)
       const outputBasename = artifactType.filename
 
       try {
@@ -186,7 +192,7 @@ export class PreviewSpec {
 
           if (baseArtifact === null) {
             warnings.push(
-              `Base artifact '${outputBasename}' not found for '${input.specId}' — recording as missing`,
+              `Base artifact '${outputBasename}' not found for '${specId}' — recording as missing`,
             )
             files.push({
               filename: outputBasename,
@@ -293,7 +299,7 @@ export class PreviewSpec {
     }
 
     return {
-      specId: input.specId,
+      specId,
       changeName: change.name,
       files,
       warnings,

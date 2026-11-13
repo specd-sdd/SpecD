@@ -31,11 +31,11 @@ The use case SHALL select the extraction schema in this order of precedence:
 
 The use case MUST NOT fall back from step 1 or step 2 to the project default when the named lookup fails. If the provider returns a schema whose canonical name differs from the requested name, the use case MUST throw `SchemaProviderIdentityMismatchError`. Lookup failures (`SchemaNotFoundError`, `SchemaValidationError`) propagate uncaught.
 
-If the selected schema has no `metadataExtraction` declarations, the use case returns `{ metadata: {}, hasExtraction: false }` immediately — there is nothing to extract.
+When the selected schema has no `metadataExtraction` declarations, `hasExtraction` is `false`, and the use case still resolves the spec and computes artifact `contentHashes` and `sourceState` provenance.
 
 ### Requirement: Spec resolution
 
-The use case parses `specId` via `parseSpecId()` to obtain a workspace name and capability path. It looks up the workspace's `SpecRepository` from the injected map. If the workspace is unknown, it throws `WorkspaceNotFoundError`. If the spec is not found via `SpecRepository.get()`, it throws `SpecNotFoundError`.
+The use case validates and normalizes `specId` with `parseSpecId` and the configured workspaces (see `core:spec-id-format`), obtaining a workspace name and capability path and a fully-qualified ID. An invalid ID fails with `InvalidSpecIdError`. It then looks up the workspace's `SpecRepository` from the injected map. If the workspace is unknown, it throws `WorkspaceNotFoundError`. If the spec is not found via `SpecRepository.get()`, it throws `SpecNotFoundError`. Delivery adapters pass the raw string and perform no validation of their own.
 
 ### Requirement: Artifact loading and parsing
 

@@ -1,5 +1,10 @@
 import { type Command } from 'commander'
-import { createConfigWriter, createVcsAdapter, isPluginName } from '@specd/sdk'
+import {
+  createConfigWriter,
+  createVcsAdapter,
+  isPluginName,
+  isValidWorkspaceName,
+} from '@specd/sdk'
 import { output, parseFormat, type OutputFormat } from '../../formatter.js'
 import { cliError, handleError } from '../../handle-error.js'
 import { renderBanner } from '../../banner.js'
@@ -52,7 +57,16 @@ export function registerProjectInit(parent: Command): void {
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .addHelpText(
       'after',
-      `
+      `\nJSON/TOON output schema:
+  {
+    result: "ok"
+    configPath: string
+    schema: string
+    workspaces: WorkspaceConfig[]
+    metadataCachePath: string
+    plugins: PluginInstallResult[]
+  }
+
 Interactive wizard: cancelling any prompt (or declining the overwrite) writes nothing and exits with code 0.
 `,
     )
@@ -69,6 +83,9 @@ Interactive wizard: cancelling any prompt (or declining the overwrite) writes no
     ) {
       try {
         const fmt = parseFormat(opts.format)
+        if (!isValidWorkspaceName(opts.workspace)) {
+          cliError(invalidWorkspaceMessage(opts.workspace), opts.format)
+        }
         const invalid = opts.plugin.find((name) => !isPluginName(name))
         if (invalid !== undefined) {
           cliError(`plugin name '${invalid}' must be a scoped package name`, opts.format)
@@ -128,6 +145,16 @@ Interactive wizard: cancelling any prompt (or declining the overwrite) writes no
         handleError(error, opts.format)
       }
     })
+}
+
+/**
+ * Builds the error message for an invalid workspace id.
+ *
+ * @param value - Workspace id exactly as typed
+ * @returns Human-readable message quoting the value and naming the rule
+ */
+function invalidWorkspaceMessage(value: string): string {
+  return `Invalid workspace id '${value}': use two or more of a-z, 0-9 and "-", starting with a letter, and not a Windows device name`
 }
 
 /**
@@ -209,9 +236,7 @@ async function runInteractiveInit(options: {
     message: 'Default workspace ID',
     initialValue: 'default',
     validate: (value) =>
-      /^[a-z][a-z0-9-]*$/.test(value.trim())
-        ? undefined
-        : 'Use lowercase letters, numbers, and hyphens only.',
+      isValidWorkspaceName(value ?? '') ? undefined : invalidWorkspaceMessage(value ?? ''),
   })
   if (isCancel(workspace)) {
     outro('Cancelled.')

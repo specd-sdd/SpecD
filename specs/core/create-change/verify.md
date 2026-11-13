@@ -99,6 +99,11 @@ Scenarios:
 - **WHEN** creation supplies only one member of the schema override pair
 - **THEN** input validation rejects the request independently of policy input
 
+#### Scenario: specIds are recorded in the created event
+
+- **WHEN** `CreateChange.execute` is called with `specIds: ['auth/login', 'auth/register']`
+- **THEN** the created event contains `specIds: ['default:auth/login', 'default:auth/register']`
+
 ### Requirement: Active schema resolution
 
 #### Scenario: Delegates to GetActiveSchema in project mode
@@ -156,6 +161,12 @@ Scenarios:
 
 - **WHEN** the persisted policy changes after creation
 - **THEN** no retroactive drift or recovery is fabricated
+
+#### Scenario: Unknown invalidation policy rejected
+
+- **WHEN** `execute` is called with `invalidationPolicy: 'sugical'`
+- **THEN** `InvalidInputError` is thrown quoting `sugical` and listing `none`, `surgical`, `downstream`, `global`
+- **AND** no change is created
 
 ### Requirement: Persistence and scaffolding
 
@@ -263,3 +274,70 @@ Scenarios:
 - **AND** the Change uses `schema-ui` (no compat mapping to `schema-api`)
 - **WHEN** the spec is included in `specIds`
 - **THEN** the use case throws `IncompatibleSchemaError` and creation is aborted
+
+### Requirement: Spec ID validation
+
+#### Scenario: Invalid ID rejected and no change created
+
+- **WHEN** `specIds: ['Bad Id']` is provided
+- **THEN** the use case throws `InvalidSpecIdError` quoting `Bad Id`
+- **AND** no change is created
+
+#### Scenario: Empty ID rejected
+
+- **WHEN** `specIds: ['']` is provided
+- **THEN** the use case throws `InvalidSpecIdError`
+- **AND** no change is created
+
+#### Scenario: Duplicate IDs collapse
+
+- **WHEN** `specIds: ['auth/login', 'default:auth/login']` is provided
+- **THEN** the manifest stores `default:auth/login` once
+
+#### Scenario: Existing name is reported before spec ID validation
+
+- **GIVEN** a change named `my-change` already exists
+- **WHEN** create is called with name `my-change` and `specIds: ['Bad Id']`
+- **THEN** the use case throws `ChangeAlreadyExistsError`
+
+#### Scenario: Comma in an ID is not split
+
+- **WHEN** `specIds: ['auth/a,b']` is provided
+- **THEN** the use case throws `InvalidSpecIdError` quoting `auth/a,b`
+
+#### Scenario: Unknown workspace rejected
+
+- **WHEN** `specIds: ['nope:auth/login']` is provided
+- **THEN** the use case throws `WorkspaceNotFoundError`
+
+#### Scenario: Bare ID stored qualified
+
+- **WHEN** `specIds: ['auth/login']` is provided
+- **THEN** the manifest stores `default:auth/login`
+
+#### Scenario: Spec that does not exist yet accepted
+
+- **WHEN** `specIds` names a spec that does not exist yet
+- **THEN** the change is created
+
+### Requirement: ReadOnly workspace rejection
+
+#### Scenario: readOnly spec rejected
+
+- **GIVEN** workspace `platform` has `ownership: readOnly`
+- **WHEN** `specIds: ['platform:auth/tokens']` is provided
+- **THEN** the use case throws `ReadOnlyWorkspaceError` with the line `Cannot add spec "platform:auth/tokens" to change — workspace "platform" is readOnly.`
+- **AND** no change is created
+
+#### Scenario: Mixed owned and readOnly specs
+
+- **GIVEN** workspace `platform` has `ownership: readOnly` and `default` is owned
+- **WHEN** `specIds: ['default:auth/login', 'platform:auth/tokens']` is provided
+- **THEN** the use case throws `ReadOnlyWorkspaceError` with exactly one line, for `platform:auth/tokens`
+- **AND** the message ends with `ReadOnly workspaces are protected: their specs and code cannot be modified by changes.` and suggests no remediation
+- **AND** nothing is created, including no entry for `default:auth/login`
+
+#### Scenario: SDK callers are covered
+
+- **WHEN** an SDK caller creates a change with a readOnly spec
+- **THEN** the same rejection applies

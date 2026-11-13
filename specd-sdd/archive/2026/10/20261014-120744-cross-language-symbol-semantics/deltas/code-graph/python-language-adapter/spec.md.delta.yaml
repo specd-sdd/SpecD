@@ -1,0 +1,58 @@
+- op: added
+  description: 'Apply semantic containment and explicit identity classification to Python declarations.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Scoped bindings, calls, annotations, and construction$'
+  content: |
+    ### Requirement: Python caller containment and declaration classification
+
+    The adapter SHALL select the caller of an ordinary call as the innermost supported function or method whose complete parser range contains the call. For a class-level decorator invocation, the class MAY be the caller only where the existing decorator contract explicitly permits it. Line order without range containment MUST NOT establish caller identity.
+
+    Parameters, imported aliases, assignment targets inside routines, and receiver names such as `self` and `cls` SHALL be lexical bindings rather than logical targets unless a separate supported declaration rule proves otherwise. Their presence before a call MUST NOT displace the enclosing executable caller.
+
+    Module functions, classes, nested classes, and class members SHALL follow the Python ownership rules already defined by this spec. If nested functions become supported, their logical identity MUST include deterministic lexical ownership so equal names in different enclosing functions do not collapse. Python has no implicit overload grouping in ordinary source; same-name competing declarations MUST remain distinct unless a supported Python construct explicitly defines one semantic declaration group.
+
+- op: added
+  description: 'Require Python structural facts to come from Tree-sitter nodes rather than whole-source regex scans.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Supported files and deterministic analysis$'
+  content: |
+    ### Requirement: Python parser-authoritative structural extraction
+
+    The adapter SHALL derive imports and literal dynamic imports, class definitions and bases, annotations, return types, assignments and aliases, type aliases, decorators, calls, and construction from Python parser nodes whenever the grammar represents them. Indentation and lexical containment SHALL come from parser ranges and ancestry rather than line scanning or indentation reconstructed from raw source.
+
+    Token extraction MAY operate inside a parser-proven annotation or type-expression node when required by the supported reference policy. Parsing `pyproject.toml` or another declared resolution manifest MAY remain textual because it is auxiliary metadata, but that exception MUST NOT authorize regex reconstruction of Python source structure.
+
+    Static and literal dynamic imports SHALL emit dependency relations only when module-resolution evidence identifies a target. The adapter MUST NOT persist a relation to the first syntactic candidate when none resolves.
+
+    An imported base-class target SHALL emit its physical hierarchy relation together with exactly one matching shared hierarchy reference fact carrying the parser-derived range of the base-class expression, import-resolution provenance, and resolved target.
+
+- op: added
+  description: 'Move file-level IMPORTS derivation to the indexer.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Scoped bindings, calls, annotations, and construction$'
+    before:
+      type: paragraph
+      contains: 'It SHALL build .?IMPORTS.?, .?CALLS.?, .?CONSTRUCTS.?, and .?USES_TYPE'
+  content: |
+    The adapter SHALL extract decorator invocations and references on functions and classes to emit `CALLS` or `USES_TYPE` relations when resolvable. It SHALL extract type annotations on class and dataclass fields to emit `USES_TYPE` relations. It SHALL build `CALLS`, `CONSTRUCTS`, and `USES_TYPE` only where these facts identify one indexed target. Resolved imports SHALL be exposed through `resolveImports()` so the indexer derives file-level `IMPORTS`.
+
+- op: removed
+  description: 'Remove the superseded builder sentence.'
+  selector:
+    type: paragraph
+    contains: 'It SHALL build .?IMPORTS.?, .?CALLS.?, .?CONSTRUCTS.?, and .?USES_TYPE'
+    parent:
+      type: section
+      matches: '^Requirement: Scoped bindings, calls, annotations, and construction$'

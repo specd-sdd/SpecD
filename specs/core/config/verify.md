@@ -36,8 +36,8 @@
 
 - **GIVEN** a `privacy` section is present
 - **AND** `excludeActors` is omitted
-- `WHEN` config is loaded
-- `THEN` `excludeActors` contains `["specd", "system@getspecd.dev"]`
+- **WHEN** config is loaded
+- **THEN** `excludeActors` contains `["specd", "system@getspecd.dev"]`
 
 ### Requirement: Environment variable overrides
 
@@ -293,6 +293,92 @@ Scenarios:
 - **WHEN** the config is loaded
 - **THEN** `SpecdWorkspaceConfig.graph.respectGitignore` is `false`
 
+#### Scenario: Workspace testPaths and ignorePaths configured
+
+- **GIVEN** a workspace declares `graph.testPaths: ["**/*.spec.ts"]` and `graph.ignorePaths: ["fixtures/**"]`
+- **WHEN** the config is loaded
+- **THEN** `SpecdWorkspaceConfig.graph.testPaths` contains `["**/*.spec.ts"]`
+- **AND** `SpecdWorkspaceConfig.graph.ignorePaths` contains `["fixtures/**"]`
+
+### Requirement: Project-relative graph path semantics
+
+#### Scenario: Anchored workspace pattern is written against the project root
+
+- **GIVEN** a workspace `backend` with `codeRoot: app` and `graph.excludePaths: ['/app/vendors/*', 'app/tmp/']`
+- **WHEN** the file `app/vendors/lib.php` and the file `app/tmp/cache.dat` are evaluated for `backend`
+- **THEN** both are excluded
+- **AND** the file `app/other/vendors/lib.php` is not excluded by those patterns
+
+#### Scenario: Coderoot-relative form no longer matches
+
+- **GIVEN** a workspace `backend` with `codeRoot: app` and `graph.excludePaths: ['/vendors/*']`
+- **WHEN** the file `app/vendors/lib.php` is evaluated
+- **THEN** it is not excluded by that pattern, because `/vendors/*` refers to `<projectRoot>/vendors/*`
+
+#### Scenario: Same pattern means the same file in global and workspace discovery
+
+- **GIVEN** the project `graph.excludePaths` contains `/app/vendors/*` and `!/app/vendors/iccms`
+- **WHEN** project-global discovery and the discovery of workspace `backend` (`codeRoot: app`) evaluate `app/vendors/iccms/utils.php`
+- **THEN** both reach the same decision
+
+#### Scenario: Unanchored patterns keep matching at any depth
+
+- **GIVEN** `graph.testPaths: ['*.spec.ts']` at project level
+- **WHEN** `packages/core/src/a.spec.ts` is categorized
+- **THEN** it matches
+
+#### Scenario: Workspace testPaths and ignorePaths are project-relative
+
+- **GIVEN** workspace `core` with `codeRoot: packages/core` and `graph.ignorePaths: ['packages/core/fixtures/**']`
+- **WHEN** `packages/core/fixtures/a.ts` is categorized
+- **THEN** it is `ignored`
+
+#### Scenario: allowedPaths are project-relative globs
+
+- **GIVEN** workspace `core` with `codeRoot: packages/core` and `graph.allowedPaths: ['packages/core/src/**']`
+- **WHEN** `packages/core/src/a.ts` and `packages/core/test/b.ts` are discovered
+- **THEN** only `packages/core/src/a.ts` is kept
+
+#### Scenario: Global exclusion cannot be re-included by a workspace negation
+
+- **GIVEN** project `graph.excludePaths: ['app/vendors/*']` and workspace `backend` with `graph.excludePaths: ['!app/vendors/iccms']`
+- **WHEN** `app/vendors/iccms/utils.php` is evaluated for `backend`
+- **THEN** it is excluded by the global layer
+- **AND** the workspace negation has no effect on it
+
+#### Scenario: Workspace negation only reverses earlier workspace patterns
+
+- **GIVEN** workspace `backend` with `graph.excludePaths: ['app/gen/**', '!app/gen/keep.php']` and no matching global pattern
+- **WHEN** `app/gen/keep.php` and `app/gen/other.php` are evaluated
+- **THEN** `app/gen/keep.php` is not excluded
+- **AND** `app/gen/other.php` is excluded
+
+#### Scenario: Nested workspaces and the same project-relative pattern
+
+- **GIVEN** workspaces `backend` (`codeRoot: app`) and `backoffice` (`codeRoot: app/webroot`), and `app/webroot/js/astrack/` in `backoffice` `graph.excludePaths`
+- **WHEN** `app/webroot/js/astrack/a.js` is evaluated for `backoffice`
+- **THEN** it is excluded
+
+#### Scenario: Code root outside the project root
+
+- **GIVEN** a workspace whose `codeRoot` is `../shared`
+- **WHEN** its files are evaluated
+- **THEN** anchored project-relative patterns do not match them
+- **AND** unanchored patterns are matched against the path below `codeRoot`
+- **AND** no configuration error is raised
+
+#### Scenario: gitignore keeps absolute priority
+
+- **GIVEN** `respectGitignore: true` and a `.gitignore` that ignores `app/build.log`
+- **WHEN** a negation `!app/build.log` is present in either exclusion layer
+- **THEN** the file remains excluded
+
+#### Scenario: No migration of earlier semantics
+
+- **GIVEN** a configuration written for `codeRoot`-relative workspace patterns
+- **WHEN** the configuration is loaded
+- **THEN** it loads without a warning and the patterns are interpreted as project-relative
+
 ### Requirement: Project-level graph configuration
 
 #### Scenario: Project graph include paths discovered
@@ -306,6 +392,88 @@ Scenarios:
 - **GIVEN** `specd.yaml` declares `graph.excludePaths: ["specs/"]`
 - **WHEN** the config is loaded
 - **THEN** `config.graph.excludePaths` includes the `specs/` pattern
+
+#### Scenario: Project testPaths and ignorePaths configured
+
+- **GIVEN** `specd.yaml` declares `graph.testPaths: ["**/*.test.*"]` and `graph.ignorePaths: ["mock/**"]`
+- **WHEN** the config is loaded
+- **THEN** `config.graph.testPaths` contains `["**/*.test.*"]`
+- **AND** `config.graph.ignorePaths` contains `["mock/**"]`
+
+#### Scenario: Project testPaths omitted defaults applied
+
+- **GIVEN** `specd.yaml` declares `graph` without `testPaths`
+- **WHEN** the config is loaded
+- **THEN** `config.graph.testPaths` includes default patterns `**/*.spec.*`, `**/*.test.*`, `**/test/**`, `**/tests/**`, `**/__tests__/**`, and `*_test.*`
+
+#### Scenario: Project-level size fields are accepted
+
+- **GIVEN** a `specd.yaml` with `graph.maxFileBytes: 524288` and `graph.largeFilePaths: ['app/legacy.php']`
+- **WHEN** the configuration is loaded
+- **THEN** both values are exposed on the project graph configuration
+
+### Requirement: Graph file size limit
+
+#### Scenario: An omitted limit is absent in the configuration
+
+- **GIVEN** a `specd.yaml` that declares no `maxFileBytes` at any level
+- **WHEN** the configuration is loaded
+- **THEN** the field is absent and no default value is written into the configuration
+
+#### Scenario: Zero is accepted
+
+- **GIVEN** `graph.maxFileBytes: 0`
+- **WHEN** the configuration is loaded
+- **THEN** it is accepted and means that no limit applies
+
+#### Scenario: A negative limit is rejected
+
+- **GIVEN** `graph.maxFileBytes: -1`
+- **WHEN** startup validation runs
+- **THEN** a configuration error identifies `graph.maxFileBytes`
+
+#### Scenario: A fractional limit is rejected
+
+- **GIVEN** `graph.maxFileBytes: 1.5`
+- **WHEN** startup validation runs
+- **THEN** a configuration error identifies `graph.maxFileBytes`
+
+#### Scenario: A non-number limit is rejected
+
+- **GIVEN** `graph.maxFileBytes: "big"`
+- **WHEN** startup validation runs
+- **THEN** a configuration error identifies `graph.maxFileBytes`
+
+#### Scenario: A workspace value replaces the project value
+
+- **GIVEN** a project `maxFileBytes` of 1000 and a workspace `maxFileBytes` of 5000
+- **WHEN** the configuration is loaded
+- **THEN** the project graph configuration keeps 1000 and the workspace graph configuration exposes 5000
+
+#### Scenario: Exemptions are combined
+
+- **GIVEN** a project `largeFilePaths` entry and a workspace `largeFilePaths` entry
+- **WHEN** the configuration is loaded
+- **THEN** both entries are exposed, and both are interpreted relative to the project root
+
+#### Scenario: Negation within the list is supported
+
+- **GIVEN** `largeFilePaths: ['generated/**', '!generated/small/**']`
+- **WHEN** the configuration is loaded
+- **THEN** both patterns are kept in order
+
+#### Scenario: Unknown graph keys are still rejected
+
+- **GIVEN** a `graph` block with a key that is not defined
+- **WHEN** startup validation runs
+- **THEN** it is rejected as an unknown key
+
+#### Scenario: Layers merge scalars and append arrays
+
+- **GIVEN** a base layer with `maxFileBytes: 1000` and `largeFilePaths: ['a']`, and a later layer with `maxFileBytes: 2000` and `largeFilePaths: ['b']`
+- **WHEN** the layers are merged
+- **THEN** the effective `maxFileBytes` is 2000
+- **AND** the effective `largeFilePaths` are `['a', 'b']`
 
 ### Requirement: Storage configuration
 
@@ -988,3 +1156,42 @@ Scenarios:
 
 - **WHEN** `ConfigWriter.removePlugin(configPath, '@specd/plugin-agent-claude')` is called
 - **THEN** the entry is removed
+
+### Requirement: Workspace names and context patterns use the shared rules
+
+#### Scenario: Workspace name with one character rejected
+
+- **GIVEN** `workspaces` declares a workspace `x`
+- **WHEN** the configuration is loaded
+- **THEN** loading fails with `ConfigValidationError`
+
+#### Scenario: Qualifier-less pattern keeps its contextual workspace
+
+- **GIVEN** workspace `billing` declares `contextIncludeSpecs: ['auth/*']`
+- **WHEN** specs are matched for that workspace
+- **THEN** the pattern means `billing:auth/*` because the caller supplies `billing` as the default workspace
+
+#### Scenario: Unknown workspace in a pattern stays a warning
+
+- **GIVEN** a pattern `nope:*`
+- **WHEN** specs are matched
+- **THEN** an `unknown-workspace` warning is produced and no specs match
+
+#### Scenario: Programmatic malformed pattern fails loudly
+
+- **GIVEN** a pattern `a*b` passed directly to spec matching
+- **WHEN** specs are matched
+- **THEN** `InvalidSpecPatternError` is thrown quoting `a*b`
+- **AND** no `unknown-workspace` warning is produced
+
+#### Scenario: Context compilation supplies the contextual default
+
+- **GIVEN** workspace `billing` declares `contextIncludeSpecs: ['auth/*']`
+- **WHEN** context is compiled for a change in `billing`
+- **THEN** the pattern is interpreted as `billing:auth/*`
+
+#### Scenario: Prefix segment violating the rule rejected
+
+- **GIVEN** a workspace declares `prefix: Team`
+- **WHEN** the configuration is loaded
+- **THEN** loading fails with `ConfigValidationError`

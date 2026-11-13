@@ -6,12 +6,19 @@
   "dependsOn": ["core:change", "core:refresh-implementation-tracking", "core:composition-resolver"],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/update-implementation-tracking.ts",
-      "symbols": ["UpdateImplementationTracking._validateMutation"]
+      "file": "core:src/domain/services/to-logical-file-path.ts",
+      "symbols": ["toLogicalFilePath"]
     },
     {
-      "file": "core:src/composition/use-cases/update-implementation-tracking.ts",
-      "symbols": ["resolveUpdateImplementationTrackingDeps"]
+      "file": "core:src/application/use-cases/update-implementation-tracking.ts",
+      "symbols": ["UpdateImplementationTracking"]
+    },
+    {
+      "file": "core:src/domain/services/same-tracked-file.ts",
+      "symbols": ["sameTrackedFile"]
+    },
+    {
+      "file": "core:test/application/use-cases/update-implementation-tracking.spec.ts"
     }
   ],
   "optimizations": {

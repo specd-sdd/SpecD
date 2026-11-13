@@ -14,6 +14,8 @@ import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize
 export interface UpdateSpecDepsDeps {
   /** Change repository used by the use case. */
   readonly changes: ChangeRepository
+  /** Configured workspace names used to validate and normalize IDs. */
+  readonly workspaces: Iterable<string | { readonly name: string }>
 }
 
 /**
@@ -25,6 +27,7 @@ export interface UpdateSpecDepsDeps {
 export function resolveUpdateSpecDepsDeps(resolver: CompositionResolver): UpdateSpecDepsDeps {
   return {
     changes: resolver.getChangeRepository(),
+    workspaces: [...resolver.getSpecRepositories().keys()],
   }
 }
 
@@ -76,7 +79,7 @@ function createUpdateSpecDepsFromNormalized(
   input: FactoryInput<UpdateSpecDepsDeps, CompositionResolutionOptions>,
 ): UpdateSpecDeps {
   if (input.kind === 'deps') {
-    return new UpdateSpecDeps(input.deps.changes)
+    return new UpdateSpecDeps(input.deps.changes, input.deps.workspaces)
   }
 
   const resolver = createCompositionResolver(input.config, input.options)

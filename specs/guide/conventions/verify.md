@@ -4,33 +4,24 @@
 
 ### Requirement: Hexagonal Architecture and Layer Separation
 
-#### Scenario: Domain layer imports from application or infrastructure are rejected
+#### Scenario: Layer imports remain one-directional
 
-- **GIVEN** source files in `packages/guide/src/domain/`
-- **WHEN** source code is statically checked for module imports
-- **THEN** no domain file imports from `packages/guide/src/application/`, `packages/guide/src/infrastructure/`, or `packages/guide/src/composition/`
-- **AND** all domain types and errors remain pure and self-contained
+- **WHEN** source imports are statically checked
+- **THEN** domain and application layers MUST respect their declared dependency boundaries
+- **AND** infrastructure adapters MUST implement the application ports
 
-#### Scenario: Application layer imports from infrastructure or composition are rejected
+#### Scenario: Curated public barrel remains a clean package boundary
 
-- **GIVEN** source files in `packages/guide/src/application/`
-- **WHEN** source code is statically checked for module imports
-- **THEN** no application file imports from `packages/guide/src/infrastructure/` or `packages/guide/src/composition/`
-- **AND** the application layer interacts with storage and search purely through driven ports
+- **WHEN** the package `.` export is inspected
+- **THEN** it MUST expose only the documented facade, domain values, options, errors, and host utilities
+- **AND** it MUST NOT leak adapters, bundle assets, driven ports, or the SDK factory
 
-#### Scenario: Infrastructure layer implements driven ports
+#### Scenario: Internal barrel is explicitly scoped to the internal subpath
 
-- **GIVEN** adapter implementations in `packages/guide/src/infrastructure/`
-- **WHEN** TypeScript compilation is executed
-- **THEN** `PrebundledGuideCatalogAdapter` implements `GuideCatalogPort`
-- **AND** `MiniSearchGuideEngineAdapter` implements `GuideSearchPort`
-
-#### Scenario: Public entry points expose clean boundaries
-
-- **GIVEN** consumers importing from `@specd/guide`
-- **WHEN** inspecting exported symbols from `index.ts` and `public.ts`
-- **THEN** only the facade `createGuideEngine`, `GuideEngine` interface, domain models, options, and error classes are re-exported
-- **AND** internal adapter mechanics and raw bundle files are not directly leaked
+- **WHEN** the package export map is inspected
+- **THEN** `src/index.ts` MUST be reachable only through `./internal`
+- **AND** it MAY expose application and infrastructure symbols
+- **AND** it MUST NOT export the SDK factory or generated SDK catalog
 
 ### Requirement: Standalone Zero Core Dependency
 
@@ -41,18 +32,20 @@
 - **THEN** neither `@specd/core`, `@specd/cli`, nor `@specd/mcp` is present
 - **AND** only runtime dependencies strictly required (such as `minisearch`) are declared
 
-#### Scenario: AST parsers and core delta engines are not pulled at runtime
+#### Scenario: Runtime lookup uses only published pre-bundled JSON assets
 
-- **GIVEN** runtime execution of `@specd/guide`
-- **WHEN** tracing loaded modules in Node.js
-- **THEN** no MarkdownParser, AST sectionizer, or delta merge modules from `@specd/core` are loaded into memory
+- **GIVEN** an installed package with its generated JSON catalog assets
+- **WHEN** an engine resolves a guide at runtime
+- **THEN** it MAY load its packaged JSON asset
+- **AND** it MUST NOT read a documentation source root
+- **AND** it MUST NOT parse Markdown, frontmatter, TypeDoc output, or a core delta engine
 
 #### Scenario: Bundler execution happens strictly at build time
 
 - **GIVEN** `pnpm build` is executed in `packages/guide`
 - **WHEN** the build script compiles static catalog artifacts
 - **THEN** Markdown heading parsing and frontmatter extraction occur during build
-- **AND** runtime lookup executes without filesystem access or parsing latency
+- **AND** the resulting JSON assets are included in the published package
 
 ### Requirement: Error Handling Architecture
 
@@ -80,27 +73,53 @@
 
 ### Requirement: Package Deliverables and Configuration
 
-#### Scenario: Valid package.json manifest
+#### Scenario: Package manifest declares the standard scripts and type
 
-- **GIVEN** `packages/guide/package.json`
-- **WHEN** parsed as JSON
-- **THEN** `name` equals `@specd/guide`
-- **AND** `type` equals `module`
-- **AND** `main`, `types`, and `exports` correctly target `dist/`
+- **WHEN** the package manifest is inspected
+- **THEN** it MUST declare name `@specd/guide`, type `module`, and `build`, `test` and `lint` scripts
 
-#### Scenario: Full build, test, and lint scripts succeed
+#### Scenario: Entry points are declared through exports, not main or types
 
-- **GIVEN** `packages/guide`
-- **WHEN** running `pnpm build`, `pnpm test`, and `pnpm lint`
-- **THEN** all three scripts exit with code 0 without errors or unhandled rejections
+- **WHEN** the package manifest is inspected
+- **THEN** entry points MUST be declared through the `exports` field
+- **AND** the manifest MUST NOT be required to declare `main` or `types`
+- **AND** the manifest MUST NOT declare `main` or `types` as its delivery mechanism
+
+#### Scenario: All three subpaths are declared
+
+- **WHEN** the package manifest is inspected
+- **THEN** `exports` MUST declare the main entry, the `./internal` escape hatch, and the `./sdk` SDK collection entry
+- **AND** each MUST resolve to an importable file and a matching types file
+
+#### Scenario: Build runs the bundler before consuming its output
+
+- **WHEN** the `build` and `build:dev` scripts are inspected
+- **THEN** each MUST run the catalog bundler before the compilation step that consumes the generated catalogs
+
+#### Scenario: Build-time tooling is a dev dependency only
+
+- **WHEN** the package manifest is inspected
+- **THEN** the build-time documentation tooling MUST be declared under `devDependencies`
+- **AND** it MUST NOT appear under `dependencies`
 
 ### Requirement: Package README
 
-#### Scenario: README covers package architecture, catalog, and quick start
+#### Scenario: README documents the package overview and architecture
 
-- **GIVEN** `packages/guide/README.md`
-- **WHEN** the document is reviewed
-- **THEN** it contains a description of the zero-runtime-core-dependency architecture
-- **AND** it contains an ASCII or Mermaid architecture diagram of the hexagonal layers
-- **AND** it lists the pre-bundled guide catalog topics
-- **AND** it includes code examples for `createGuideEngine()` instantiation and search usage
+- **WHEN** the package README is inspected
+- **THEN** it MUST document the package overview, motivation, and the zero-runtime-core-dependency design
+- **AND** it MUST illustrate the hexagonal layers
+- **AND** it MUST document the SDK collection entry point and how to reach it
+
+#### Scenario: README documents the domain data schema
+
+- **WHEN** the package README is inspected
+- **THEN** it MUST document `GuideTopic`, `GuideSection`, `GuideOutline`, `GuideSearchHit` and `GuideSummary`
+
+#### Scenario: README topic catalog stays in parity with the generated catalog
+
+- **GIVEN** the generated user catalog
+- **WHEN** the README's documented topic list is compared against the catalog's topics
+- **THEN** every topic named in the README MUST exist in the catalog
+- **AND** every topic in the catalog MUST be documented in the README
+- **AND** any mismatch MUST be reported as a documentation defect

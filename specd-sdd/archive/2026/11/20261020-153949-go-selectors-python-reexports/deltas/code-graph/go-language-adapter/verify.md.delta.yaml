@@ -1,0 +1,191 @@
+- op: removed
+  description: Replaced by the resolved-selector scenarios below
+  selector:
+    type: section
+    matches: 'Scenario: Qualified selector across packages stays unresolved'
+
+- op: added
+  description: Namespace naming and selector resolution scenarios
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Package identity, exports, and imports'
+  content: |
+    #### Scenario: Explicit alias is the namespace name
+
+    - **GIVEN** `app` imports `m "github.com/acme/auth/models"` and the package declares `package models`
+    - **WHEN** imports are resolved
+    - **THEN** the namespace name `m` is bound for the file
+    - **AND** the name `models` is not bound by that import
+
+    #### Scenario: Declared package name wins over the path segment
+
+    - **GIVEN** `app` imports `github.com/acme/go-auth` and the indexed non-test files of that package all declare `package auth`
+    - **WHEN** imports are resolved
+    - **THEN** the namespace name is `auth`
+
+    #### Scenario: Versioned module path uses the declared name
+
+    - **GIVEN** an import path ending in `/v2` whose indexed package files declare `package models`
+    - **WHEN** imports are resolved
+    - **THEN** the namespace name is `models`
+
+    #### Scenario: Last path segment is the fallback
+
+    - **GIVEN** the target package entries are not indexed or declare different package names
+    - **WHEN** the namespace name is chosen
+    - **THEN** the last segment of the import path is used
+    - **AND** no filesystem read happens
+
+    #### Scenario: Blank and dot imports bind no namespace name
+
+    - **GIVEN** a blank import and a dot import of indexed packages
+    - **WHEN** imports are resolved
+    - **THEN** neither binds a namespace name for qualified selectors
+
+    #### Scenario: Qualified selector across packages resolves
+
+    - **GIVEN** workspace `auth` exports `User` from `models/user.go` and `app` imports that package
+    - **WHEN** `app` uses `models.User` in a type position
+    - **THEN** the selector resolves through `resolvePackageExport` to `auth`'s `User`
+    - **AND** the file-level dependency on the package files remains
+
+    #### Scenario: Unexported name stays unresolved
+
+    - **GIVEN** the package declares lowercase `helper`
+    - **WHEN** `app` uses `models.helper`
+    - **THEN** no relation is produced and the symbol is not searched by name
+
+    #### Scenario: Shadowed namespace name is not the package
+
+    - **GIVEN** a function parameter named `models` while the file also imports a package named `models`
+    - **WHEN** the body uses `models.User`
+    - **THEN** the selector is not resolved as the package
+
+    #### Scenario: Unresolved package leaves the selector unresolved
+
+    - **GIVEN** the import path is not under any known module
+    - **WHEN** `pkg.Name` is used
+    - **THEN** no relation is produced
+    - **AND** the import is counted as external, not as a failure
+
+- op: added
+  description: Qualified reference fact and relation scenarios
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Scoped bindings, selectors, construction, and types'
+  content: |
+    #### Scenario: Qualified call produces CALLS
+
+    - **GIVEN** `app` imports `models` and calls `models.NewUser()` inside `func Handle()`
+    - **WHEN** facts are extracted and relations are built
+    - **THEN** a `call` qualified reference fact has qualifier `models`, name `NewUser`, and source `Handle`
+    - **AND** a `CALLS` relation connects `Handle` to `NewUser` of the imported package
+
+    #### Scenario: Qualified composite literal keeps its qualifier
+
+    - **GIVEN** `models.User{}` appears in a function
+    - **WHEN** facts are extracted
+    - **THEN** a `construct` fact keeps qualifier `models` and name `User`
+    - **AND** a `CONSTRUCTS` relation connects the function to the imported `User`
+
+    #### Scenario: Qualified types produce USES_TYPE
+
+    - **GIVEN** `var u models.User`, a parameter `u models.User`, a result type, and a struct field of type `models.User`
+    - **WHEN** facts are extracted and relations are built
+    - **THEN** each position emits a `type` fact
+    - **AND** each resolves to a `USES_TYPE` relation to the imported `User` from its enclosing declaration
+
+    #### Scenario: Value receiver selector is not a package selector
+
+    - **GIVEN** `u.Save()` where `u` is a local variable
+    - **WHEN** relations are built
+    - **THEN** no relation is produced from the qualified reference fact
+
+    #### Scenario: Unresolved qualified call is dropped silently
+
+    - **GIVEN** `models.Missing()` for a name the package does not export
+    - **WHEN** relations are built
+    - **THEN** no relation is produced and no error is raised
+
+    #### Scenario: Selectors resolve across workspaces
+
+    - **GIVEN** the imported package belongs to another workspace
+    - **WHEN** a qualified type use is resolved
+    - **THEN** the relation targets the symbol in the other workspace
+
+- op: added
+  description: Source symbol, shadowing, and generic call scenarios from the compliance audit
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Scoped bindings, selectors, construction, and types'
+  content: |
+    #### Scenario: Package-level initializer is the source symbol
+
+    - **GIVEN** `var x = models.New()` and `var y = models.User{}` at package level
+    - **WHEN** facts are extracted and relations are built
+    - **THEN** the `call` and `construct` facts have the variable as `sourceSymbolId`
+    - **AND** `CALLS` and `CONSTRUCTS` relations connect the variables to the imported symbols
+
+    #### Scenario: Shadowing applies to every fact kind
+
+    - **GIVEN** a parameter, result, receiver, local variable, or local declaration named like a namespace name
+    - **WHEN** a `call`, `construct`, or `type` fact uses that name as qualifier inside its scope
+    - **THEN** the fact does not resolve as the package
+
+    #### Scenario: Instantiated generic call produces a fact
+
+    - **GIVEN** `models.Map[int](x)` inside a function
+    - **WHEN** facts are extracted
+    - **THEN** a `call` fact has qualifier `models` and name `Map`
+
+    #### Scenario: Type positions beyond parameters resolve
+
+    - **GIVEN** `models.User` as a result type, a constant type, a type declaration right-hand side, and a type argument
+    - **WHEN** facts are extracted and relations are built
+    - **THEN** each position produces a `USES_TYPE` relation from its enclosing declaration
+- op: added
+  description: Scoping, step anchoring, and ambiguity scenarios from the second compliance audit
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Package identity, exports, and imports'
+  content: |
+    #### Scenario: Shadowing by every Go binding form
+
+    - **GIVEN** a namespace name `auth` and, in separate functions, a named result, a grouped `var ( auth int )`, a `range` variable, an `if` initializer variable, a type-switch binding, and a local `type auth struct{}`
+    - **WHEN** the body uses `auth.A()` or `auth.T{}`
+    - **THEN** no qualified reference relation is produced in any of them
+
+    #### Scenario: Shadowing starts where the binding is visible
+
+    - **GIVEN** a body with `auth.A()` followed later in the same block by `auth := 1`
+    - **WHEN** facts are extracted and relations are built
+    - **THEN** the call before the declaration still resolves the package
+
+    #### Scenario: Parameter name does not shadow the signature types
+
+    - **GIVEN** `func F(auth int, v auth.T)` where `auth` is also a namespace name
+    - **WHEN** relations are built
+    - **THEN** the type `auth.T` in the signature resolves the package
+    - **AND** a use of `auth.X` inside the body does not
+
+    #### Scenario: Declared-name and versioned imports contribute their step
+
+    - **GIVEN** imports of `.../go-auth` (declared `package auth`) and `.../auth/v2` (declared `package auth`) whose qualified selectors resolve
+    - **WHEN** imports are resolved
+    - **THEN** each returns the helper step anchored on that import's own file-scope Namespace binding
+
+    #### Scenario: Two imports binding the same name bind neither
+
+    - **GIVEN** two imports of the same file that both yield the namespace name `models`
+    - **WHEN** `models.User` is used
+    - **THEN** the selector is not resolved
+
+    #### Scenario: Instantiated generic composite literal keeps its qualifier
+
+    - **GIVEN** `models.Box[int]{}` in a function
+    - **WHEN** facts are extracted
+    - **THEN** a `construct` fact has qualifier `models` and name `Box`

@@ -1,0 +1,751 @@
+{
+  "name": "windows-graph-path-portability",
+  "createdAt": "2026-11-03T07:07:54.354Z",
+  "updatedAt": "2026-11-03T08:41:23.011Z",
+  "description": "Introduce portable graph-path helpers (resolveGraphPath, UNC/drive absolute detection) so Windows FS resolves match forward-slash graph keys. Adopts them in PHP require/include and explain drive-letter outsides, hardens TS/Python relative imports, and unblocks Windows CI path-identity failures without test-only skips for separators.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "code-graph:graph-path-identity",
+    "code-graph:php-language-adapter",
+    "code-graph:explain-graph-path",
+    "code-graph:typescript-language-adapter",
+    "code-graph:python-language-adapter"
+  ],
+  "specDependsOn": {
+    "code-graph:graph-path-identity": ["code-graph:symbol-model"],
+    "code-graph:php-language-adapter": [
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration",
+      "code-graph:graph-path-identity"
+    ],
+    "code-graph:explain-graph-path": [
+      "core:config",
+      "code-graph:indexer",
+      "code-graph:workspace-integration",
+      "code-graph:graph-path-identity"
+    ],
+    "code-graph:typescript-language-adapter": [
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration",
+      "code-graph:graph-path-identity"
+    ],
+    "code-graph:python-language-adapter": [
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration",
+      "code-graph:graph-path-identity"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "implementationTrackingStartedAt": "2026-11-03T07:07:54.740Z",
+  "trackedImplementationFiles": [
+    {
+      "file": "EXPLORATION_CODE_GRAPH_FLOWS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_GRAPH_CLI_OUTPUT_OPTIMIZATION.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_KERNEL_PLUGINS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "SpecD — Análisis de identidad LogicalSymbol dependencias y casos de uso.md",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/graph-file-doc.js",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/spec-metadata-diff-poc/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/spec-metadata-diff-poc/vcs-spec-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/spec-metadata-diff-poc/working-copy-spec-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/symbol-inspect-poc.mjs",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/split-workspace-identity.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/explain-graph-path.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/python-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-code-graph.failed-targets.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/split-workspace-identity.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/split-workspace-identity.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/php-language-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/go-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/indexer/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/language-adapter/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/symbol-model/spec-lock.json",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "code-graph:php-language-adapter",
+      "file": "packages/code-graph/src/domain/services/split-workspace-identity.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["resolveGraphPath", "isUncPath", "isAbsoluteGraphFilesystemPath"]
+    },
+    {
+      "specId": "code-graph:explain-graph-path",
+      "file": "packages/code-graph/src/application/use-cases/explain-graph-path.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ExplainGraphPath"]
+    },
+    {
+      "specId": "code-graph:typescript-language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["resolveRelativeImportPath"]
+    },
+    {
+      "specId": "code-graph:python-language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/python-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["resolveRelativeImportPath"]
+    },
+    {
+      "specId": "code-graph:php-language-adapter",
+      "file": "packages/code-graph/test/domain/services/split-workspace-identity.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:graph-path-identity",
+      "file": "packages/code-graph/src/domain/services/split-workspace-identity.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "resolveGraphPath",
+        "isUncPath",
+        "isAbsoluteGraphFilesystemPath",
+        "toPortableGraphPath",
+        "isDriveLetterPath",
+        "splitWorkspaceIdentity"
+      ]
+    },
+    {
+      "specId": "code-graph:php-language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:graph-path-identity",
+      "file": "packages/code-graph/test/domain/services/split-workspace-identity.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:php-language-adapter",
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/php-language-adapter.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:graph-path-identity",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/go-language-adapter.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:graph-path-identity",
+      "file": "packages/code-graph/test/application/use-cases/index-code-graph.failed-targets.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:533d0dbf407f519d9e9b00cfdb7669a749c2ed89805411cd9ec572aff523ba56"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:graph-path-identity",
+          "filename": "specs/code-graph/graph-path-identity/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:a968e9c772c470b3f0fc5d9572d0349858eb4ccc5268fe3ff2dc8f85ca872083"
+        },
+        {
+          "key": "code-graph:php-language-adapter",
+          "filename": "deltas/code-graph/php-language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:60e72fe0fb827d6652ef6260745ce59828975db6f9e7eaf9272c4d5b96c81bcf"
+        },
+        {
+          "key": "code-graph:explain-graph-path",
+          "filename": "deltas/code-graph/explain-graph-path/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d5ffc1f8da6c76a490abd0d79164e5208282a49faa953dbbc357ea46e9e8307d"
+        },
+        {
+          "key": "code-graph:typescript-language-adapter",
+          "filename": "deltas/code-graph/typescript-language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:79876feaeaedb34810f5e3e274a3e1dd5a8350d09a3b28563535f42c1aa3e85f"
+        },
+        {
+          "key": "code-graph:python-language-adapter",
+          "filename": "deltas/code-graph/python-language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9b06da06f93ae6c2512813d8fb1a43865aec7a6dfa46ee5e15e12122d247464b"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:graph-path-identity",
+          "filename": "specs/code-graph/graph-path-identity/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:1ce9d270e13045a1cfc84335ce7d4fad2382c97d44d49c0166f114db9c500372"
+        },
+        {
+          "key": "code-graph:php-language-adapter",
+          "filename": "deltas/code-graph/php-language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1d3458429b09edec6ae24e4ba6549599fdf979b309a168b3cce398e2790e82b7"
+        },
+        {
+          "key": "code-graph:explain-graph-path",
+          "filename": "deltas/code-graph/explain-graph-path/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:886c2ffcf090f62535d2f04e01f5c758cb8a811b9b00afe3778852ba55c7c41b"
+        },
+        {
+          "key": "code-graph:typescript-language-adapter",
+          "filename": "deltas/code-graph/typescript-language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:df6e553bb6d10e1942b2043c513c2c6b4d181615f74a11f05a40c2f7bf3e6e17"
+        },
+        {
+          "key": "code-graph:python-language-adapter",
+          "filename": "deltas/code-graph/python-language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:df6e553bb6d10e1942b2043c513c2c6b4d181615f74a11f05a40c2f7bf3e6e17"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:02cf8e416854ca30c7747076e6603e0b1787a93fd647cb65dc379521547c3c44"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:47ecca97c0f249dafafe1492431327273967b02db28de3e350b67370249badb7"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-11-03T07:07:54.354Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-03T07:07:54.368Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-03T07:39:15.252Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-03T07:43:35.571Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": []
+        },
+        {
+          "type": "verify",
+          "files": []
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-03T07:43:35.571Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:graph-path-identity"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:graph-path-identity"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-03T07:43:36.468Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["code-graph:graph-path-identity"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:graph-path-identity"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-03T07:43:36.470Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:php-language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:php-language-adapter"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-03T07:43:37.244Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["code-graph:graph-path-identity", "code-graph:php-language-adapter"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:graph-path-identity", "code-graph:php-language-adapter"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-03T07:43:37.245Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:explain-graph-path"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:explain-graph-path"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-03T07:43:38.061Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:graph-path-identity",
+            "code-graph:php-language-adapter",
+            "code-graph:explain-graph-path"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:graph-path-identity",
+            "code-graph:php-language-adapter",
+            "code-graph:explain-graph-path"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-03T07:43:38.062Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:typescript-language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:typescript-language-adapter"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-03T07:43:38.837Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:graph-path-identity",
+            "code-graph:php-language-adapter",
+            "code-graph:explain-graph-path",
+            "code-graph:typescript-language-adapter"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:graph-path-identity",
+            "code-graph:php-language-adapter",
+            "code-graph:explain-graph-path",
+            "code-graph:typescript-language-adapter"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-03T07:43:38.838Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:python-language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:python-language-adapter"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-03T08:13:53.690Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-03T08:14:43.762Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-03T08:25:03.945Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-03T08:29:51.085Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-03T08:29:58.603Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-11-03T08:41:21.741Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Introduce portable graph-path helpers (resolveGraphPath, UNC/drive absolute detection) so Windows FS resolves match forward-slash graph keys. Adopts them in PHP require/include and explain drive-letter outsides, hardens TS/Python relative imports, and unblocks Windows CI path-identity failures without test-only skips for separators."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-03T08:41:23.010Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-11-03T08:41:23.326Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

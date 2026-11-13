@@ -1,0 +1,152 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Identity$'
+  content: |
+    Scenarios:
+
+    #### Scenario: Change name immutable after creation
+
+    - **WHEN** a Change is created with name `add-auth-flow`
+    - **THEN** the name cannot be changed by any subsequent operation
+
+    #### Scenario: Versioned new identity and legacy equality
+
+    - **GIVEN** two actors have the same fields in different insertion order and one legacy actor has no id
+    - **WHEN** identity finalization and legacy comparison run
+    - **THEN** canonical bytes yield the same v1 ID for equivalent raw data
+    - **AND** legacy comparison uses only persisted fields without fabricating an original ID
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Neutral designing self-entry$'
+  content: |
+    Scenarios:
+
+    #### Scenario: Designing self-entry preserves history and validated evidence
+
+    - **GIVEN** an application request for `designing` while a Change is already in `designing` with validated artifacts and a current spec approval
+    - **WHEN** `TransitionChange` handles the request
+    - **THEN** the state, artifact/file states, and approval projection remain unchanged
+    - **AND** no `transitioned`, `invalidated`, or `approval-invalidated` event is appended
+
+    #### Scenario: Direct entity self-transition remains invalid
+
+    - **GIVEN** a Change already in `designing`
+    - **WHEN** a caller invokes the entity's real `transition('designing')`
+    - **THEN** it rejects the self-transition without changing history
+    - **AND** the neutral application behavior does not make `verifying → verifying` legal
+
+    #### Scenario: Context on a neutral request is an error
+
+    - **GIVEN** a change is already designing with notes matching any transition
+    - **WHEN** a designing request includes reason or note
+    - **THEN** it fails without transition, note creation, cleanup or audit changes
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: History and event sourcing$'
+  content: |
+    Scenarios:
+
+    #### Scenario: History is append-only
+
+    - **WHEN** any operation is performed on a Change
+    - **THEN** new events are appended; existing events are never modified or removed
+
+    #### Scenario: Invalidated event records artifact drift details
+
+    - **GIVEN** two validated spec files drift in one reconciliation pass
+    - **WHEN** artifact drift is materialized
+    - **THEN** the `invalidated` event uses `artifact-drift` with a human-readable message
+    - **AND** `affectedArtifacts` records both file keys and their artifact types
+
+    #### Scenario: Scope consent invalidation records precise projection differences
+
+    - **GIVEN** valid spec consent and unchanged artifact bytes
+    - **WHEN** `EditChange` adds or removes a canonical spec ID
+    - **THEN** reconciliation appends `approval-invalidated` with cause `scope-change` and the precise scope difference
+    - **AND** the prior approval event and its original fingerprint remain available
+    - **AND** a broad `invalidated` event with cause `spec-change` is not required solely to represent stale consent
+
+    #### Scenario: Legacy scope helper records artifact review without lifecycle recovery
+
+    - **GIVEN** a Change in `implementing`
+    - **WHEN** the legacy entity helper `updateSpecIds` is called with a changed spec set and artifact DAG
+    - **THEN** its artifact-review event has cause `spec-change`
+    - **AND** that helper does not independently roll the lifecycle back or clear approval projections
+
+    #### Scenario: Review-required invalidation remains distinguishable from drift
+
+    - **GIVEN** explicit artifact review is requested without physical drift
+    - **WHEN** reconciliation records the review invalidation
+    - **THEN** its cause is `artifact-review-required`, not `artifact-drift`
+
+    #### Scenario: Description update appends description-updated event
+
+    - **GIVEN** a Change with description "Original"
+    - **WHEN** `updateDescription("New description", actor)` is called
+    - **THEN** a `description-updated` event contains the new description and full resolved actor identity
+
+    #### Scenario: Description update does not append invalidated event
+
+    - **GIVEN** a Change in `spec-approved` with active approval
+    - **WHEN** its description changes
+    - **THEN** no invalidated event is appended and the lifecycle remains `spec-approved`
+
+    #### Scenario: Note audit is never the current collection
+
+    - **GIVEN** a note-added and note-removed event remain after its note is deleted
+    - **WHEN** status/list/show read the change
+    - **THEN** they use only the current snapshot and do not resurrect the historical note
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Autonomous current notes
+
+    #### Scenario: Notes do not follow source changes
+
+    - **GIVEN** a persisted note references an audit path only in its text
+    - **WHEN** the artifact, audit location or fingerprint changes and the change is reloaded
+    - **THEN** note identity/text/policy stay unchanged until explicit removal or a matching lifecycle event
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Implicit note add deduplication
+
+    #### Scenario: Only current equal notes deduplicate
+
+    - **GIVEN** same text has two different actors/policies while another exact duplicate request arrives
+    - **WHEN** aggregate add runs, then one note is deleted and genuinely added again
+    - **THEN** distinct lifetimes coexist, the duplicate returns its original UUID/time, and deletion permits recreation with a new UUID
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Successful transition note transaction
+
+    #### Scenario: Failed hop preserves the old collection
+
+    - **GIVEN** old notes match the proposed destination and a new note is requested
+    - **WHEN** the edge/predicate/hook or final persistence fails
+    - **THEN** old notes remain and no requested note/audit is committed
+    - **AND** an independently committed recovery retains only its own effects
+
+    #### Scenario: Cleanup precedes duplicate lookup
+
+    - **GIVEN** an old note matches both cleanup and the newly requested note text/actor/policy
+    - **WHEN** an effective successful hop applies cleanup and add
+    - **THEN** the old ID is removed once and the new note is created after cleanup rather than reused before its deletion

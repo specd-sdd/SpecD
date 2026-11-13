@@ -1,0 +1,8 @@
+- op: modified
+  description: 'Update DocumentNode verification scenario to check projectRelativePath'
+  selector:
+    type: section
+    matches: 'Scenario: DocumentNode has required graph properties'
+  content: |
+    - **WHEN** a `DocumentNode` is created
+    - **THEN** it includes `path`, `projectRelativePath`, `contentHash`, `content`, and `workspace`

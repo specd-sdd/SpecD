@@ -14,6 +14,10 @@ The repository MUST track `.github/workflows/ci.yml`. Tracking that directory MU
 
 `ci.yml` MUST run the same job on `macos-latest`, `ubuntu-latest`, and `windows-latest`. A failure on any one of those runners MUST fail the check.
 
+### Requirement: The matrix enforces the cross-platform contract
+
+The three-operating-system job is the gate that enforces `_global/cross-platform`. A pull request MUST NOT merge while any runner fails, and a failure that only reproduces on one operating system MUST be fixed in the code under the rules of `_global/cross-platform`, not by excluding that runner, skipping the affected tests, or adding platform-specific workflow steps that mask it.
+
 ### Requirement: When the workflow runs
 
 The workflow MUST run on pull requests and on pushes to `main`. It MUST NOT call the Gemini workflows.
@@ -30,7 +34,7 @@ Each job MUST run `pnpm build`, `pnpm typecheck`, and `pnpm test`, in that order
 
 `typecheck` and `build` MUST skip `@specd/public-web`.
 
-`pnpm test` MUST run Vitest for `@specd/core`, `@specd/cli`, `@specd/code-graph`, `@specd/guide`, `@specd/sdk`, `@specd/skills`, `@specd/plugin-manager`, `@specd/plugin-agent-claude`, `@specd/plugin-agent-codex`, `@specd/plugin-agent-copilot`, `@specd/plugin-agent-opencode`, and `@specd/plugin-agent-standard`.
+`pnpm test` MUST run Vitest for `@specd/core`, `@specd/cli`, `@specd/code-graph`, `@specd/guide`, `@specd/sdk`, `@specd/skills`, `@specd/schema-std`, `@specd/plugin-manager`, `@specd/plugin-agent-claude`, `@specd/plugin-agent-codex`, `@specd/plugin-agent-copilot`, `@specd/plugin-agent-opencode`, and `@specd/plugin-agent-standard`.
 
 `pnpm test` MUST NOT include `@specd/mcp` or `@specd/public-web`.
 
@@ -44,3 +48,4 @@ The workflow MUST NOT run changeset status or publish.
 ## Spec Dependencies
 
 - [`default:_global/testing`](../testing/spec.md) — CI runs the Vitest suite those conventions describe
+- [`default:_global/cross-platform`](../cross-platform/spec.md) — the contract the three-operating-system job enforces

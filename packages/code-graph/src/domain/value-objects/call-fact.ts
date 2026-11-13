@@ -24,7 +24,11 @@ export interface CallFact {
   readonly filePath: string
   /** Enclosing scope id when the adapter can identify it. */
   readonly scopeId: string | undefined
-  /** Enclosing caller symbol id when the adapter can identify it. */
+  /**
+   * Enclosing caller symbol id when parser range containment and callable eligibility prove it.
+   * Callers must be eligible containing callable declarations only; nearest-preceding symbols
+   * and lexical bindings are forbidden as callers. When unproven, this remains undefined.
+   */
   readonly callerSymbolId: string | undefined
   /** Normalized syntactic call form. */
   readonly form: CallForm

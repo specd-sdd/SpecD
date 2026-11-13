@@ -1,0 +1,85 @@
+- op: modified
+  description: --spec values are raw whole IDs
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    ```
+    specd change create <name> [--spec <id>...] [--description <text>] [--invalidation-policy <policy>] [--format text|json|toon] [--config <path>]
+    ```
+
+    - `<name>` — required positional; the unique slug name for the new change (e.g. `add-auth-flow`)
+    - `--spec <id>` — optional repeatable flag; one or more spec IDs being created or modified. Each `<id>` follows the `[<workspace>:]<capability-path>` format of `core:spec-id-format`; when the workspace is omitted the core resolves it to `default` (e.g. `--spec auth/login` means `default:auth/login`, and an explicit workspace is `--spec billing-ws:billing/invoices`). Each value is passed to `CreateChange` unchanged, is one whole spec ID, and is never split on commas. When omitted, the change is created with an empty specIds list — specs can be added later via `change edit`.
+    - `--description <text>` — optional; a short free-text description of the change's purpose, stored in the manifest
+    - `--invalidation-policy <policy>` — optional; initial invalidation policy of the change (`none`, `surgical`, `downstream`, or `global`); when absent the project configuration's `invalidationPolicy` applies
+    - `--format text|json|toon` — optional; output format, defaults to `text`
+    - `--config <path>` — optional; path to `specd.yaml`
+
+- op: modified
+  description: Workspace resolution belongs to CreateChange
+  selector:
+    type: section
+    matches: 'Requirement: Workspace resolution'
+  content: |
+    The command MUST NOT resolve workspaces itself. `CreateChange` validates every `--spec` value, derives the workspace IDs of the new change from the normalized IDs, and rejects an unknown workspace with `WorkspaceNotFoundError` and a malformed ID with `InvalidSpecIdError`. The command maps these errors to exit code 1 and prints the `error:` message to stderr.
+
+- op: modified
+  description: ReadOnly enforcement belongs to CreateChange
+  selector:
+    type: section
+    matches: 'Requirement: ReadOnly workspace rejection'
+  content: |
+    The command MUST NOT check workspace ownership itself. `CreateChange` rejects specs in `readOnly` workspaces with `ReadOnlyWorkspaceError` before creating anything (see `core:create-change`). The command MUST map that error to exit code 1 and print its message to stderr, one line per offending spec, without remediation steps.
+
+- op: modified
+  description: Constraints updated
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - `--spec` is optional; when omitted, the change is created with an empty specIds list
+    - The change name must be a valid kebab-case slug; the core (`Change`) validates the format and the command maps the resulting error to exit code 1 — the CLI holds no name rule
+    - The workspace prefix in --spec defaults to default when omitted; workspace IDs are never a separate flag
+    - Specs targeting readOnly workspaces are rejected by `CreateChange` before anything is created
+    - The CLI does not resolve or pass schema identity — `CreateChange` owns active schema resolution
+    - The CLI holds no spec ID or ownership rule; it forwards raw values to the use case
+
+- op: modified
+  description: Complete the truncated output requirement
+  selector:
+    type: section
+    matches: 'Requirement: Output on success'
+  content: |
+    On success, output depends on `--format`:
+
+    - `text` (default): prints a single line to stdout: `created change <name>`
+    - `json` or `toon`: outputs `{ result: "ok", name: "<name>", state: "drafting", changePath: "<absolute-path>" }` to stdout, encoded in the respective format. The `changePath` is the absolute filesystem path to the change directory where artifacts should be written.
+
+    No further output is produced.
+
+- op: modified
+  description: Invalid invalidation policy error
+  selector:
+    type: section
+    matches: 'Requirement: Duplicate name error'
+  content: |
+    If a change with the given name already exists (`ChangeAlreadyExistsError`), the command exits with code 1 and prints an `error:` message to stderr.
+
+    If `--invalidation-policy` is not one of `none`, `surgical`, `downstream`, or `global`, the command exits with code 1 and prints the `InvalidInputError` message from `CreateChange`; the command itself holds no policy rule.
+
+- op: removed
+  description: Duplicate of the JSON output requirement that includes changePath
+  selector:
+    type: section
+    matches: 'Requirement: JSON output on success'
+
+- op: added
+  description: Declare the dependency on create-change
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+    after:
+      type: list
+  content: |
+    - [`core:create-change`](../../core/create-change/spec.md) — validation, `readOnly` rejection and invalidation policy rules live in the use case

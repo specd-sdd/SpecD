@@ -6,19 +6,44 @@
   "dependsOn": ["guide:conventions", "guide:guide-model"],
   "implementation": [
     {
-      "file": "guide:src/application/ports/guide-catalog-port.ts",
-      "symbols": ["GuideCatalogPort"]
-    },
-    {
-      "file": "guide:src/application/ports/index.ts"
-    },
-    {
       "file": "guide:src/application/queries/list-guides-query.ts",
-      "symbols": ["ListGuidesQuery"]
-    },
-    {
-      "file": "guide:src/infrastructure/adapters/prebundled-guide-catalog-adapter.ts",
-      "symbols": ["PrebundledGuideCatalogAdapter"]
+      "symbols": ["ListGuidesQuery", "matchesCollection", "matchesTopic", "matchesCollectionTopic"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "ListGuidesQuery returns guide summaries via GuideCatalogPort, sorted by order then topic.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:96851f19e3cfdc95aa8e9f5911e2ff8a5da999732004b96a4377df861b7408ab",
+          "lastModified": "2026-09-24T13:35:20.718Z"
+        },
+        "verify.md": {
+          "hash": "sha256:ee1f0526d1d73f456861930eba1ca834a395a6d6bcfb163e8ec56a15bbbc31ea",
+          "lastModified": "2026-09-24T13:35:20.719Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# ListGuidesQuery\n\nLists guide catalog summaries for `specd guide` / MCP directory tools.\n\n## Rules\n\n### GuideCatalogPort (driven port)\n- `listGuides(): Promise<readonly GuideSummary[]>` — all guide summaries\n- `getGuide(topic: string): Promise<GuideTopic | null>` — by topic ID, else `null`\n- `getAllGuides(): Promise<readonly GuideTopic[]>` — full entities (exists in code; spec omits it)\n\n### ListGuidesQuery\n- Ctor injects `GuideCatalogPort`\n- `execute(): Promise<readonly GuideSummary[]>` reads `catalogPort.listGuides()`\n- MUST copy before sort (`[...rawGuides]`) — never mutate catalog storage\n- Sort ascending numeric `order`; tie-break `a.topic.localeCompare(b.topic)` (locale-aware, NOT code-unit order)\n- `GuideSummary` = `topic`, `title`, `description`, `order`, `lineCount`, `byteLength`\n\n## Constraints\n- Pure application query; zero infra/framework deps\n- `order` (= frontmatter `sidebar_position`) NOT unique in existing catalog: 0..12, duplicates at 1, 2, 4, 6, 8, 10 — topic tie-break is load-bearing, not theoretical\n- Second (SDK) catalog reuses same port+query: `order` collides ACROSS catalogs, so a merged listing interleaves SDK and existing guides alphabetically unless `order` is namespaced per collection\n- `PrebundledGuideCatalogAdapter` supplies catalog + `GUIDES_INDEX`; `getGuide` normalizes topic (trim, lowercase, strip `.md`)\n",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:96851f19e3cfdc95aa8e9f5911e2ff8a5da999732004b96a4377df861b7408ab",
+          "lastModified": "2026-09-24T13:35:20.718Z"
+        },
+        "verify.md": {
+          "hash": "sha256:ee1f0526d1d73f456861930eba1ca834a395a6d6bcfb163e8ec56a15bbbc31ea",
+          "lastModified": "2026-09-24T13:35:20.719Z"
+        }
+      }
+    }
+  }
 }

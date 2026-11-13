@@ -1,28 +1,14 @@
 import { z } from 'zod'
 import { type SpecMetadataParseError } from '../errors/spec-metadata-parse-error.js'
+import { isFullyQualifiedSpecId } from './parse-spec-id.js'
 import { type PersistedSchemaIdentity } from './spec-optimization.js'
 
-/**
- * Workspace name: lowercase, starts with letter, letters/digits/hyphens.
- * Capability path segment: lowercase, starts with letter/digit/underscore, letters/digits/underscores/hyphens.
- */
-const WORKSPACE_RE = /^[a-z][a-z0-9-]*$/
-const CAP_SEGMENT_RE = /^[a-z0-9_][a-z0-9_-]*$/
 const HASH_RE = /^sha256:[0-9a-f]{64}$/
 
-/** Validates a spec ID: `capPath` or `workspace:capPath`. */
-const specIdString = z.string().refine(
-  (val) => {
-    const colonIdx = val.indexOf(':')
-    if (colonIdx >= 0) {
-      const ws = val.slice(0, colonIdx)
-      const cap = val.slice(colonIdx + 1)
-      return WORKSPACE_RE.test(ws) && cap.split('/').every((s) => CAP_SEGMENT_RE.test(s))
-    }
-    return val.split('/').every((s) => CAP_SEGMENT_RE.test(s))
-  },
-  { message: 'must be a valid spec ID (capabilityPath or workspace:capabilityPath)' },
-)
+/** Strict fully-qualified spec ID for persistence writes. */
+const qualifiedSpecIdString = z.string().refine(isFullyQualifiedSpecId, {
+  message: 'must be a fully-qualified valid spec ID (workspace:capabilityPath)',
+})
 
 /** Lenient schema for reading `metadata.json` — used by {@link parseMetadata}. */
 export const specMetadataSchema = z
@@ -88,7 +74,15 @@ export const specMetadataSchema = z
 
 /**
  * Strict schema for writing `metadata.json` — used by {@link SaveSpecMetadata}.
- * `title` and `description` are required; other fields are optional but validated when present.
+ *
+ * - `title`, `description` and `contentHashes` are required; `contentHashes` needs at least one
+ *   entry and every value must be `sha256:<64 hex chars>`.
+ * - `keywords` entries are lowercase with hyphens only (`^[a-z][a-z0-9-]*$`).
+ * - `dependsOn` and `implementation[].specId` entries must be fully-qualified spec IDs
+ *   (`workspace:capabilityPath`); bare IDs are rejected.
+ * - `scenarios` are optional; when present each needs `requirement`, `name` and a non-empty `then`.
+ * - `context` is an optional list of non-empty strings; `generatedBy` is `core` or `agent`.
+ * - Unknown fields are preserved (passthrough).
  */
 export const strictSpecMetadataSchema = z
   .object({
@@ -102,7 +96,7 @@ export const strictSpecMetadataSchema = z
           .regex(/^[a-z][a-z0-9-]*$/, { message: 'must be lowercase with hyphens only' }),
       )
       .optional(),
-    dependsOn: z.array(specIdString).optional(),
+    dependsOn: z.array(qualifiedSpecIdString).optional(),
     contentHashes: z
       .record(
         z.string(),
@@ -135,7 +129,7 @@ export const strictSpecMetadataSchema = z
         files: z
           .array(
             z.object({
-              specId: specIdString,
+              specId: qualifiedSpecIdString,
               file: z.string().min(1),
             }),
           )
@@ -143,7 +137,7 @@ export const strictSpecMetadataSchema = z
         symbols: z
           .array(
             z.object({
-              specId: specIdString,
+              specId: qualifiedSpecIdString,
               file: z.string().min(1),
               symbol: z.string().min(1),
             }),
@@ -174,7 +168,7 @@ export const permissiveSpecMetadataSchema = z
           .regex(/^[a-z][a-z0-9-]*$/, { message: 'must be lowercase with hyphens only' }),
       )
       .optional(),
-    dependsOn: z.array(specIdString).optional(),
+    dependsOn: z.array(z.string()).optional(),
     contentHashes: z
       .record(
         z.string(),
@@ -207,7 +201,7 @@ export const permissiveSpecMetadataSchema = z
         files: z
           .array(
             z.object({
-              specId: specIdString,
+              specId: z.string(),
               file: z.string().min(1),
             }),
           )
@@ -215,7 +209,7 @@ export const permissiveSpecMetadataSchema = z
         symbols: z
           .array(
             z.object({
-              specId: specIdString,
+              specId: z.string(),
               file: z.string().min(1),
               symbol: z.string().min(1),
             }),

@@ -1,3 +1,4 @@
+import { type FileCategory } from './file-node.js'
 import { type SymbolKind } from './symbol-kind.js'
 
 /**
@@ -15,4 +16,6 @@ export interface SymbolQuery {
   readonly comment?: string
   /** When true, name and comment matching is case sensitive. Defaults to false (case insensitive). */
   readonly caseSensitive?: boolean
+  /** Filter symbols by declaring file categories. */
+  readonly categories?: readonly FileCategory[] | undefined
 }

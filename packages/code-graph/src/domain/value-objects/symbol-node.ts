@@ -19,6 +19,7 @@ export interface SymbolNode {
   readonly name: string
   readonly kind: SymbolKind
   readonly filePath: string
+  readonly projectRelativePath: string
   readonly line: number
   readonly column: number
   readonly endLine: number
@@ -103,6 +104,7 @@ function computeSymbolId(
  * @param params.name - The symbol's declared name.
  * @param params.kind - The symbol kind string.
  * @param params.filePath - The file path containing the symbol.
+ * @param params.projectRelativePath - Optional project-relative path.
  * @param params.line - The 1-based line number.
  * @param params.column - The 0-based column offset.
  * @param params.endLine - The 1-based construct end line.
@@ -118,6 +120,7 @@ export function createSymbolNode(params: {
   name: string
   kind: string
   filePath: string
+  projectRelativePath?: string
   line: number
   column: number
   endLine?: number
@@ -131,6 +134,9 @@ export function createSymbolNode(params: {
   }
 
   const filePath = params.filePath.replaceAll('\\', '/')
+  const projectRelativePath = params.projectRelativePath
+    ? params.projectRelativePath.replaceAll('\\', '/')
+    : filePath
   const fallbackEndColumn = params.column + Math.max(1, params.name.length)
   const constructRange: SourceRange = {
     startLine: params.line,
@@ -160,6 +166,7 @@ export function createSymbolNode(params: {
     name: params.name,
     kind: params.kind,
     filePath,
+    projectRelativePath,
     line: params.line,
     column: params.column,
     endLine: constructRange.endLine,

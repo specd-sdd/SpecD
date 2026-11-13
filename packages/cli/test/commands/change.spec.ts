@@ -5,6 +5,7 @@ import {
   InvalidStateTransitionError,
   HistoricalImplementationGuardError,
   HookFailedError,
+  WorkspaceNotFoundError,
 } from '@specd/sdk'
 import {
   makeMockConfig,
@@ -261,8 +262,8 @@ describe('change create', () => {
     ])
 
     const call = kernel.changes.create.execute.mock.calls[0]![0]
-    expect(call.specIds).toContain('default:auth/login')
-    expect(call.specIds).toContain('default:auth/logout')
+    expect(call.specIds).toContain('auth/login')
+    expect(call.specIds).toContain('auth/logout')
     expect(call.name).toBe('feat')
   })
 
@@ -295,7 +296,7 @@ describe('change create', () => {
     expect(call.specIds).toEqual([])
   })
 
-  it('defaults to "default" workspace when prefix is omitted', async () => {
+  it('forwards bare spec IDs raw when prefix is omitted', async () => {
     const { kernel } = setup()
     kernel.changes.create.execute.mockResolvedValue({
       change: makeMockChange({ name: 'my-change', state: 'drafting' }),
@@ -316,17 +317,18 @@ describe('change create', () => {
     ])
 
     const call = kernel.changes.create.execute.mock.calls[0]![0]
-    expect(call.specIds).toContain('default:auth/login')
+    expect(call.specIds).toContain('auth/login')
   })
 
-  it('exits 1 with error when workspace prefix is unknown', async () => {
-    const { stderr } = setup()
+  it('maps WorkspaceNotFoundError for an unknown workspace', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.create.execute.mockRejectedValue(new WorkspaceNotFoundError('nonexistent-ws'))
 
     const program = makeProgram()
     registerChangeCreate(program.command('change'))
 
-    try {
-      await program.parseAsync([
+    await program
+      .parseAsync([
         'node',
         'specd',
         'change',
@@ -335,10 +337,11 @@ describe('change create', () => {
         '--spec',
         'nonexistent-ws:some/path',
       ])
-    } catch {
-      // may throw
-    }
+      .catch(() => {})
 
+    expect(kernel.changes.create.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ specIds: ['nonexistent-ws:some/path'] }),
+    )
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/i)
   })

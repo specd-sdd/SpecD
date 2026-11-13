@@ -1,3 +1,9 @@
+---
+title: 'Example: Validations'
+description: Enforcing structural constraints on artifact files and delta files.
+sidebar_position: 4
+---
+
 # Example: Validations and delta validations
 
 ## When to use validations

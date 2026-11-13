@@ -1,0 +1,126 @@
+- op: added
+  description: Spec ID validation scenarios
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Spec ID validation
+
+    #### Scenario: Empty spec ID rejected before any repository access
+
+    - **WHEN** `execute` is called with `specId: ''`
+    - **THEN** `InvalidSpecIdError` is thrown
+    - **AND** no repository is read or written
+
+    #### Scenario: Malformed spec ID rejected
+
+    - **WHEN** `execute` is called with `specId: 'Bad Id'`
+    - **THEN** `InvalidSpecIdError` is thrown quoting `Bad Id`
+
+    #### Scenario: Unknown workspace rejected
+
+    - **WHEN** `execute` is called with `specId: 'nope:auth/login'`
+    - **THEN** `WorkspaceNotFoundError` is thrown
+
+    #### Scenario: Bare spec ID resolved to the default workspace
+
+    - **WHEN** `execute` is called with `specId: '_global/architecture'`
+    - **THEN** it behaves as for `default:_global/architecture`
+    - **AND** any `specId` in the result is `default:_global/architecture`
+
+    #### Scenario: Qualified spec ID accepted unchanged
+
+    - **WHEN** `execute` is called with `specId: 'core:storage'`
+    - **THEN** it proceeds with workspace `core` and path `storage`
+
+- op: added
+  description: Boundary, link, missing-state, and conflict scenarios (audit)
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Canonical file identity and workspace confinement'
+  content: |
+    #### Scenario: Absolute path outside the codeRoot rejected
+
+    - **GIVEN** the codeRoot of `core` is `/repo/packages/core`
+    - **WHEN** `add` is called with `file: '/etc/passwd'`
+    - **THEN** `ImplementationWorkspaceBoundaryError` is thrown and nothing is written
+
+    #### Scenario: Parent traversal rejected
+
+    - **WHEN** `add` is called with `file: '../other/x.ts'`
+    - **THEN** `ImplementationWorkspaceBoundaryError` is thrown
+
+    #### Scenario: Sibling directory sharing the codeRoot prefix rejected
+
+    - **GIVEN** the codeRoot is `/repo/core`
+    - **WHEN** `add` is called with a file under `/repo/core-evil/x.ts`
+    - **THEN** `ImplementationWorkspaceBoundaryError` is thrown
+
+    #### Scenario: Qualified path leaving the codeRoot rejected
+
+    - **WHEN** `add` is called with `file: 'core:../x.ts'` or `file: 'core:../../etc/passwd'`
+    - **THEN** `ImplementationWorkspaceBoundaryError` is thrown and no existence check or write happens
+
+    #### Scenario: Qualified path naming another workspace rejected
+
+    - **GIVEN** `specId` is in workspace `core`
+    - **WHEN** `add` is called with `file: 'cli:src/x.ts'`
+    - **THEN** `ImplementationWorkspaceBoundaryError` is thrown
+
+    #### Scenario: Windows drive path is not a workspace qualifier
+
+    - **WHEN** `add` is called with `file: 'C:\\x\\y.ts'` outside the codeRoot
+    - **THEN** it is confined as an absolute host path and `ImplementationWorkspaceBoundaryError` is thrown
+
+    #### Scenario: Nested path is stored forward-slashed
+
+    - **WHEN** `add` is called with a nested file inside the codeRoot
+    - **THEN** the stored identity is `core:src/domain/x.ts` using forward slashes
+
+    #### Scenario: Add symbols to a file-level link keeps the file-level entry
+
+    - **GIVEN** a file-level entry exists for the file
+    - **WHEN** `add` is called with `symbols: ['A']`
+    - **THEN** the link carries symbol `A` and previously recorded symbols are not discarded
+
+    #### Scenario: Add without symbols keeps symbol entries
+
+    - **GIVEN** a symbol-level entry exists for the file
+    - **WHEN** `add` is called without `symbols`
+    - **THEN** a file-level entry exists and the symbol entries are unchanged
+
+    #### Scenario: Remove symbols, last symbol, and whole entry
+
+    - **WHEN** `remove` is called with some symbols, with the last remaining symbol, and with no symbols
+    - **THEN** respectively only those symbols are removed, the entry is removed unless an explicit file-level link was recorded, and the whole entry including refinements is removed
+
+    #### Scenario: Add against missing state creates it from the resolved base
+
+    - **GIVEN** the spec has no persisted state
+    - **WHEN** `add` is called with an existing file
+    - **THEN** the base comes from `resolveInitialPersistedDependsOn`, `implementation` starts at `[]`, `created` is `true`, and `expectedRevision` is `null`
+
+    #### Scenario: Remove against missing state is a no-op
+
+    - **GIVEN** the spec has no persisted state
+    - **WHEN** `remove` is called
+    - **THEN** `writePersistedState` is not called and the result is `implementation: []`, `created: false`
+
+    #### Scenario: Expected revision and conflict
+
+    - **GIVEN** the snapshot has `originalHash: 'h1'`
+    - **WHEN** a mutation is applied
+    - **THEN** `writePersistedState` receives `expectedRevision: 'h1'`
+    - **AND** an `ArtifactConflictError` from the write is rethrown without retry
+
+    #### Scenario: Unknown spec and readOnly workspace
+
+    - **WHEN** the spec does not exist, or its workspace is `readOnly`
+    - **THEN** respectively `SpecNotFoundError` or `ReadOnlyWorkspaceError` is thrown and nothing is written
+
+    #### Scenario: Factory resolves collaborators
+
+    - **WHEN** the config-based factory is invoked
+    - **THEN** its deps come from `resolveUpdatePersistedSpecImplementationDeps(resolver)` including `files`, `workspaces`, and `initializePersistedSpecState`

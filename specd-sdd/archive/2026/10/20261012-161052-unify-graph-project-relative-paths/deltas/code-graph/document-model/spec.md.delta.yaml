@@ -1,0 +1,13 @@
+- op: modified
+  description: 'Replace configRelativePath with projectRelativePath in DocumentNode'
+  selector:
+    type: section
+    matches: 'Requirement: DocumentNode properties'
+  content: |
+    A `DocumentNode` SHALL represent a textual non-code project resource. It MUST include the following properties:
+
+    - `path` — the unique identifier for the node (e.g., `core:docs/adr/0001.md` or `root:package.json`)
+    - `projectRelativePath` — the path relative to the project root used for UI rendering and filesystem access
+    - `contentHash` — SHA-256 hash of the content used for incremental indexing
+    - `content` — the raw textual content used for full-text search
+    - `workspace` — the owning workspace name, or `root` for project-global documents

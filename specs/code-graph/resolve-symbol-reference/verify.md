@@ -45,6 +45,28 @@
 - **WHEN** the text is `EditChange.execute`
 - **THEN** only the member visible in that file is returned
 
+#### Scenario: Anchor without an adapter leaves human text unresolved
+
+- **GIVEN** a request anchored to a Go package surface whose language has no `symbolReferenceSyntax` facet
+- **AND** the text is an owner-qualified spelling that is not a stored `qualified_name`
+- **WHEN** the reference is resolved
+- **THEN** the result is `unresolved`
+- **AND** no generic dotted or delimiter parser runs and no other adapter is consulted
+
+#### Scenario: Qualified name is not derived from owner and member
+
+- **GIVEN** a member whose stored `qualified_name` differs from the spelling `Owner.member` that could be derived from its owner and name
+- **WHEN** the unanchored text `Owner.member` is resolved
+- **THEN** the lookup compares only the stored `qualified_name`
+- **AND** the member is not matched through a derived name
+
+#### Scenario: Session and persisted lookup reject an unstored qualified spelling equally
+
+- **GIVEN** a logical member has an owner and name but no stored `qualified_name`
+- **WHEN** the same owner-qualified text is resolved once from the run session and once from the persisted store
+- **THEN** both lookups return the same candidate set
+- **AND** neither lookup derives a qualified spelling from the owner and member
+
 ### Requirement: Logical canonical targets
 
 #### Scenario: Overloads form one logical symbol
@@ -59,6 +81,43 @@
 - **GIVEN** two declarations do not form one language-defined symbol
 - **WHEN** both satisfy the request
 - **THEN** the result is ambiguous with both candidates
+
+#### Scenario: Selector candidate declarations of same logical symbol resolve without ambiguity
+
+- **GIVEN** selector resolution evaluates candidate declarations that all belong to the same logical symbol or overload set
+- **WHEN** selector candidates are checked
+- **THEN** status is `resolved` rather than `ambiguous`
+- **AND** all declaration occurrences are retained on the resolved logical symbol
+
+### Requirement: Resolution target kind and declaration evidence
+
+#### Scenario: Logical selector returns every contributing declaration
+
+- **GIVEN** several declarations form one canonical overload or merge target
+- **WHEN** an owner-qualified or canonical selector is resolved
+- **THEN** the result is discriminated as a logical target
+- **AND** it contains every contributing declaration in deterministic order
+
+#### Scenario: Exact location retains physical identity
+
+- **GIVEN** one declaration occurrence is selected by file and position
+- **WHEN** the reference is resolved
+- **THEN** the result is discriminated as an exact declaration
+- **AND** it also identifies the logical target when one exists
+
+#### Scenario: Competing logical targets remain ambiguous
+
+- **GIVEN** multiple declarations belong to one logical target and another competing logical target also matches
+- **WHEN** ambiguity is evaluated
+- **THEN** the declarations of the first target count as one semantic candidate
+- **AND** the competing logical targets produce an ambiguous result without arbitrary selection
+
+#### Scenario: Overload selector returns one typed logical target
+
+- **GIVEN** a bare-name selector matching three declarations of one overloaded method
+- **WHEN** the selector-level resolver runs
+- **THEN** it returns one logical-target result carrying all three declarations
+- **AND** it does not return a single arbitrary physical match as the only output
 
 ### Requirement: Public and local binding identity
 
@@ -224,3 +283,25 @@
 - **GIVEN** equivalent SQLite and supported alternative-backend contents
 - **WHEN** the same references are resolved
 - **THEN** statuses, reason codes, candidates, and provenance ordering match
+
+### Requirement: Package import bindings
+
+#### Scenario: Cross-workspace import resolves with provenance
+
+- **GIVEN** a local binding in `sdk` for `SymbolNode` with an `import:package` step to the public binding of `code-graph:src/public.ts`
+- **WHEN** the reference is resolved from that `sdk` file
+- **THEN** the target is the logical `SymbolNode` declared in `code-graph`
+- **AND** the path lists the local binding, the `import:package` step, the public binding, and the logical target
+
+#### Scenario: Unresolved package import does not guess
+
+- **GIVEN** a local binding with no target for a name that exists once in the package's workspace
+- **WHEN** the reference is resolved
+- **THEN** the outcome is unresolved
+- **AND** the same-name symbol is not chosen
+
+#### Scenario: Step is language-independent
+
+- **GIVEN** `import:package` steps from TypeScript, Python, Go, and PHP files
+- **WHEN** each reference is resolved
+- **THEN** the resolver follows each step without a language branch

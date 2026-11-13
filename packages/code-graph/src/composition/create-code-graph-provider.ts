@@ -1,4 +1,4 @@
-import { type SpecdConfig } from '@specd/core'
+import { type SpecdConfig, createVcsAdapter } from '@specd/core'
 import { AdapterRegistry } from '../infrastructure/tree-sitter/adapter-registry.js'
 import { TypeScriptLanguageAdapter } from '../infrastructure/tree-sitter/typescript-language-adapter.js'
 import { PythonLanguageAdapter } from '../infrastructure/tree-sitter/python-language-adapter.js'
@@ -14,8 +14,11 @@ import {
 import { GraphStoreRegistryError } from '../domain/errors/graph-store-registry-error.js'
 import { createSqliteGraphStoreFactory } from './create-sqlite-graph-store-factory.js'
 import { createGetGraphHealth } from './use-cases/get-graph-health.js'
+import { createExplainGraphPath } from './use-cases/explain-graph-path.js'
 import { readInstalledCodeGraphVersion } from '../application/use-cases/_shared/installed-code-graph-version.js'
 import { NodeResolutionManifestSource } from '../infrastructure/fs/node-resolution-manifest-source.js'
+import { VcsRepositoryRootSource } from '../infrastructure/vcs/vcs-repository-root-source.js'
+import { NodeWorkspaceAccessibilitySource } from '../infrastructure/fs/node-workspace-accessibility-source.js'
 import { type WorkspaceIndexTarget } from '../domain/value-objects/index-options.js'
 
 const DEFAULT_GRAPH_STORE_ID = 'sqlite'
@@ -65,7 +68,29 @@ export function createCodeGraphProvider(
   }
 
   const manifestSource = new NodeResolutionManifestSource()
-  const indexer = new IndexCodeGraph(store, registry, manifestSource)
+  const indexer = new IndexCodeGraph(
+    store,
+    registry,
+    manifestSource,
+    new VcsRepositoryRootSource(createVcsAdapter),
+    new NodeWorkspaceAccessibilitySource(),
+  )
+
+  const workspaceTargets = isSpecdConfig(options)
+    ? options.workspaces.map(
+        (workspace): WorkspaceIndexTarget => ({
+          name: workspace.name,
+          prefix: workspace.prefix ?? null,
+          codeRoot: workspace.codeRoot,
+          ownership: workspace.ownership,
+          isExternal: workspace.isExternal,
+          // Fingerprinting also derives deterministic exclusions from the spec root.
+          specRepo: {
+            specsPath: workspace.specsPath,
+          } as WorkspaceIndexTarget['specRepo'],
+        }),
+      )
+    : undefined
 
   const graphHealth = isSpecdConfig(options)
     ? {
@@ -75,24 +100,31 @@ export function createCodeGraphProvider(
           codeGraphVersion: readInstalledCodeGraphVersion(),
           adapters: registry.getAdapters(),
           manifestSource,
-          workspaces: options.workspaces.map(
-            (workspace): WorkspaceIndexTarget => ({
-              name: workspace.name,
-              prefix: workspace.prefix ?? null,
-              codeRoot: workspace.codeRoot,
-              ownership: workspace.ownership,
-              isExternal: workspace.isExternal,
-              // Fingerprinting also derives deterministic exclusions from the spec root.
-              specRepo: {
-                specsPath: workspace.specsPath,
-              } as WorkspaceIndexTarget['specRepo'],
-            }),
-          ),
+          workspaces: workspaceTargets ?? [],
         },
       }
     : undefined
 
-  return new CodeGraphProviderImpl(store, indexer, projectRoot, graphHealth, registry)
+  const explainPath = isSpecdConfig(options)
+    ? {
+        useCase: createExplainGraphPath(),
+        input: {
+          config: options,
+          workspaces: workspaceTargets ?? [],
+          adapters: registry.getAdapters(),
+        },
+      }
+    : undefined
+
+  return new CodeGraphProviderImpl(
+    store,
+    indexer,
+    projectRoot,
+    graphHealth,
+    registry,
+    graphOptions?.onWarning,
+    explainPath,
+  )
 }
 
 /**

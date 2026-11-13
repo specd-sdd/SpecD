@@ -9,5 +9,41 @@
       "file": "guide:src/application/queries/get-guide-section-query.ts",
       "symbols": ["GetGuideSectionQuery"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "GetGuideSectionQuery, sliceGuideLines, formatWithLineNumbers: topic=string (collection:topic safe), section=1-indexed int|heading|slug, 1-indexed lines.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:fb58f7bc7f9e870bfbb9c1fd0f8c4e1b712948b73cc5e7760298e8802b9b93ea",
+          "lastModified": "2026-09-29T14:17:06.109Z"
+        },
+        "verify.md": {
+          "hash": "sha256:18b37c981f0828109953c556b00240e0810cacacdc629c0efec4d2b5ad394016",
+          "lastModified": "2026-09-29T14:17:06.109Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Slice Guide Content\n\n## Rules\n\n- Pure application layer, zero external runtime deps. All line numbers 1-indexed.\n- `GetGuideSectionQuery(catalogPort: GuideCatalogPort)`; wraps `GetGuideQuery`. Input `{ topic: string, section: string | number }`.\n- Topic resolve: `trim()` → strip trailing `.md` → `toLowerCase()`. No slugify, no `:` split. `catalogPort.getGuide(normalized)` = exact `GUIDES_INDEX` dict lookup, so `collection:topic` keys (`core:ports`, `code-graph:services`) survive verbatim. Empty or not found → `GuideTopicNotFoundError` (`UNKNOWN_GUIDE_TOPIC`, `availableTopics`).\n- `section` is a SEPARATE field from `topic`; topic `:` never reaches section matching.\n- Numeric branch: `typeof section === 'number'` OR string matching `/^\\d+$/` on `section.trim()`. Anchored digits-only ⇒ any `:`-bearing string is NOT numeric. Then `parseInt(section.trim(), 10)` + `outline.find(s => s.index === idx)`; miss (incl. `0`, negative, oversized, non-integer) → `GuideSectionNotFoundError`. CLI `--section` is unparsed ⇒ always string ⇒ only regex branch reachable from CLI.\n- Heading/slug branch: hit when `heading.toLowerCase() === section.trim().toLowerCase()` OR `toSlug(heading) === toSlug(section)`; `toSlug` = lower → trim → strip `[^\\w\\s-]` → `[\\s_-]+`→`-` → trim `-`. 1 hit → return; >1 → `GuideSectionAmbiguousError` (`AMBIGUOUS_GUIDE_SECTION`, `matchingIndices`, `matchingHeadings`); 0 → `GuideSectionNotFoundError` (`UNKNOWN_GUIDE_SECTION`, `availableHeadings`).\n- `content` sliced on the fly: short-circuit when `section.content !== undefined`; else `content.slice(startOffset, endOffset)` if both set, else `split(/\\r?\\n/).slice(startLine-1, endLine).join('\\n')`. Spans heading line → `endLine` inclusive; nested `###` subheadings kept, next peer heading excluded.\n- `sliceGuideLines(content, startLine?, lineCount?)`: `startLine` undefined or `< 1` → 1; `startLine > total`, `lineCount <= 0`, or falsy content → `\"\"`; `lineCount` omitted → slice to EOF; normalize `\\r\\n`/`\\r` → `\\n`; oversized `lineCount` clamps to EOF, no padding, no throw.\n- `formatWithLineNumbers(content, startLine?)`: falsy → `\"\"`; each line → `` `${n} | ${line}` `` with `n` from `startLine < 1 ? 1 : floor(startLine)`; width = `String(baseLine + lines.length - 1).length`; `padStart` right-aligns so `|` columns align.\n\n## Constraints\n\n- Line numbers and `section` indices 1-indexed; never 0-based.\n- Ambiguous heading MUST throw, never silently take first match; duplicates resolvable only by numeric index.\n- Error codes fixed: `UNKNOWN_GUIDE_SECTION`, `AMBIGUOUS_GUIDE_SECTION`, `UNKNOWN_GUIDE_TOPIC`.\n- Pure utils MUST NOT throw on out-of-range input; return `\"\"`.\n\n## Drift (spec text vs code)\n\n- verify.md scenario 1 invokes `execute({ topic, sectionHeading })`; real field name is `section`.\n- Numeric-miss `availableHeadings` is `` `${index}: ${heading}` ``; by-name miss passes bare `heading`. Spec documents only bare form.\n- Out-of-range index enforced by `find` miss, not an explicit `index < 1 || index > total` bounds check (same error surfaced).\n- `GUIDES_INDEX` holds 22 keys, zero containing `:` ⇒ `collection:topic` addressing is NOT yet live; adapter lookup is exact-key, so `core:ports` resolves to null until generated keys carry the collection prefix.\n- Empty `topic` in `GetGuideQuery` throws `GuideTopicNotFoundError` listing all topics (spec only covers \"topic not found\").",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:fb58f7bc7f9e870bfbb9c1fd0f8c4e1b712948b73cc5e7760298e8802b9b93ea",
+          "lastModified": "2026-09-29T14:17:06.109Z"
+        },
+        "verify.md": {
+          "hash": "sha256:18b37c981f0828109953c556b00240e0810cacacdc629c0efec4d2b5ad394016",
+          "lastModified": "2026-09-29T14:17:06.109Z"
+        }
+      }
+    }
+  }
 }

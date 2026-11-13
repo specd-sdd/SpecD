@@ -3,8 +3,6 @@ import { resolveCliContext } from '../../helpers/cli-context.js'
 import { collect } from '../../helpers/collect.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
-import { parseSpecId } from '../../helpers/spec-path.js'
-
 /**
  * Registers the `spec generate-metadata` subcommand on the given parent command.
  *
@@ -47,7 +45,7 @@ JSON/TOON output schema:
             cliError('either <specPath> or --all is required', opts.format)
           }
 
-          const { config, kernel } = await resolveCliContext({ configPath: opts.config })
+          const { kernel } = await resolveCliContext({ configPath: opts.config })
           const fmt = parseFormat(opts.format)
           const force = opts.force === true
 
@@ -59,7 +57,7 @@ JSON/TOON output schema:
                 }
               : {
                   kind: 'spec' as const,
-                  specId: parseSpecId(specPath!, config).specId,
+                  specId: specPath!,
                 }
 
           const result = await kernel.specs.regenerateMetadata.execute({ target, force })

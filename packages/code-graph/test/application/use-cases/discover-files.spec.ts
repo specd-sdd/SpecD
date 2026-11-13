@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, symlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import {
+  createDiscoveryEvaluator,
   discoverFiles,
   DEFAULT_EXCLUDE_PATHS,
 } from '../../../src/application/use-cases/discover-files.js'
@@ -178,5 +179,333 @@ describe('discoverFiles', () => {
       expect(DEFAULT_EXCLUDE_PATHS).toContain('dist/')
       expect(DEFAULT_EXCLUDE_PATHS).toContain('build/')
     })
+  })
+
+  describe('project-relative path semantics', () => {
+    const find = (
+      options: Parameters<typeof discoverFiles>[2],
+      hasAdapter: (file: string) => boolean = () => true,
+    ): string[] => discoverFiles(root, hasAdapter, options).sort()
+
+    beforeEach(() => {
+      touch(root, 'vendors/iccms/utils.php')
+      touch(root, 'vendors/other/x.php')
+      touch(root, 'tmp/c.dat')
+      touch(root, 'webroot/js/astrack/a.js')
+      touch(root, 'gen/keep.php')
+      touch(root, 'gen/other.php')
+    })
+
+    it('Given an anchored global pattern and pathBase app, then it excludes inside the nested workspace', () => {
+      const files = find({
+        vcsRoot: null,
+        pathBase: 'app',
+        excludePaths: ['/app/vendors/*', '!/app/vendors/iccms', '!/app/vendors/iccms/**'],
+      })
+      expect(files).toContain('vendors/iccms/utils.php')
+      expect(files).not.toContain('vendors/other/x.php')
+    })
+
+    it('Given the code-root-relative form, then it no longer matches', () => {
+      const files = find({ vcsRoot: null, pathBase: 'app', excludePaths: ['/vendors/*'] })
+      expect(files).toContain('vendors/iccms/utils.php')
+      expect(files).toContain('vendors/other/x.php')
+    })
+
+    it('Given a directory excluded by a project-relative pattern, then the walk never reads it', () => {
+      const seen: string[] = []
+      const files = discoverFiles(root, () => true, {
+        vcsRoot: null,
+        pathBase: 'app',
+        excludePaths: ['app/tmp/'],
+        onInspectionError: (_error, path) => seen.push(path),
+      })
+      expect(files).not.toContain('tmp/c.dat')
+      expect(seen).toEqual([])
+    })
+
+    it('Given a global exclusion and a workspace negation, then the global layer wins', () => {
+      const files = find({
+        vcsRoot: null,
+        pathBase: 'app',
+        excludePaths: ['app/vendors/*'],
+        workspaceExcludePaths: ['!app/vendors/iccms'],
+      })
+      expect(files).not.toContain('vendors/iccms/utils.php')
+    })
+
+    it('Given workspace patterns with a negation, then it only reverses earlier workspace patterns', () => {
+      const files = find({
+        vcsRoot: null,
+        pathBase: 'app',
+        excludePaths: [],
+        workspaceExcludePaths: ['app/gen/**', '!app/gen/keep.php'],
+      })
+      expect(files).toContain('gen/keep.php')
+      expect(files).not.toContain('gen/other.php')
+    })
+
+    it('Given allowedPaths, then they are matched against the project-relative subject', () => {
+      const files = find({
+        vcsRoot: null,
+        pathBase: 'packages/core',
+        excludePaths: [],
+        allowedPaths: ['packages/core/gen/**'],
+      })
+      expect(files.every((file) => file.startsWith('gen/'))).toBe(true)
+      expect(files).toContain('gen/keep.php')
+    })
+
+    it('Given a nested pathBase, then the same project-relative pattern applies', () => {
+      const files = find({
+        vcsRoot: null,
+        pathBase: 'app/webroot',
+        excludePaths: ['app/webroot/js/astrack/'],
+      })
+      expect(files).not.toContain('webroot/js/astrack/a.js'.replace('webroot/', ''))
+      expect(files).toContain('vendors/other/x.php')
+    })
+
+    it('Given a .gitignore, then it keeps absolute priority over negations in both layers', () => {
+      touch(root, '.gitignore', 'build.log\n')
+      touch(root, 'build.log')
+      const files = find({
+        vcsRoot: null,
+        pathBase: 'app',
+        excludePaths: ['!app/build.log'],
+        workspaceExcludePaths: ['!app/build.log'],
+      })
+      expect(files).not.toContain('build.log')
+    })
+
+    it('Given a code root outside the project, then anchored patterns do not match and unanchored do', () => {
+      touch(root, 'out.log')
+      const files = find({
+        vcsRoot: null,
+        pathBase: '../shared',
+        excludePaths: ['shared/gen/**', '*.log'],
+      })
+      expect(files).toContain('gen/other.php')
+      expect(files).not.toContain('out.log')
+    })
+
+    it('Given default excludes, then they still exclude node_modules at depth', () => {
+      touch(root, 'node_modules/x/index.ts')
+      const files = find({ vcsRoot: null, pathBase: 'packages/core' })
+      expect(files).not.toContain('node_modules/x/index.ts')
+    })
+  })
+
+  describe('createDiscoveryEvaluator', () => {
+    it('Given a gitignore match, then the decision carries the project-relative file and line', () => {
+      touch(root, '.gitignore', '# comment\n*.log\nbuild.log\n')
+      touch(root, 'sub/build.log')
+      const evaluator = createDiscoveryEvaluator(root, { vcsRoot: null, pathBase: 'app' })
+      const decision = evaluator.evaluatePath('sub/build.log')
+      expect(decision).toMatchObject({
+        kind: 'excluded',
+        stage: 'gitignore',
+        gitignoreSource: { file: 'app/.gitignore', line: 2 },
+      })
+    })
+
+    it('Given an excluded ancestor directory, then the decision names it as viaDirectory', () => {
+      touch(root, 'tmp/deep/a.ts')
+      const evaluator = createDiscoveryEvaluator(root, {
+        vcsRoot: null,
+        pathBase: 'app',
+        excludePaths: ['app/tmp/'],
+      })
+      expect(evaluator.evaluatePath('tmp/deep/a.ts')).toMatchObject({
+        kind: 'excluded',
+        stage: 'global-exclude',
+        viaDirectory: 'app/tmp',
+      })
+    })
+
+    it('Given allowedPaths that do not match, then the decision is allowed-paths with no rule', () => {
+      touch(root, 'src/a.ts')
+      const evaluator = createDiscoveryEvaluator(root, {
+        vcsRoot: null,
+        excludePaths: [],
+        allowedPaths: ['lib/**'],
+      })
+      expect(evaluator.evaluatePath('src/a.ts')).toEqual({
+        kind: 'excluded',
+        stage: 'allowed-paths',
+        rule: null,
+      })
+    })
+
+    it('Given a workspace negation of a workspace pattern, then the file is included', () => {
+      touch(root, 'gen/keep.php')
+      const evaluator = createDiscoveryEvaluator(root, {
+        vcsRoot: null,
+        excludePaths: [],
+        workspaceExcludePaths: ['gen/**', '!gen/keep.php'],
+      })
+      expect(evaluator.evaluatePath('gen/keep.php')).toEqual({ kind: 'included' })
+    })
+  })
+})
+
+describe('discoverFiles with a .gitignore above the discovery root', () => {
+  let projectRoot: string
+
+  beforeEach(() => {
+    projectRoot = mkdtempSync(join(tmpdir(), 'discover-files-vcs-'))
+  })
+
+  afterEach(() => {
+    rmSync(projectRoot, { recursive: true, force: true })
+  })
+
+  it('Given a repository .gitignore and a codeRoot below the VCS root, then ignored files are excluded', () => {
+    touch(projectRoot, '.gitignore', '*.log\nbuild/\n')
+    touch(projectRoot, 'packages/core/a.log')
+    touch(projectRoot, 'packages/core/b.ts')
+    touch(projectRoot, 'packages/core/build/c.ts')
+    const root = join(projectRoot, 'packages/core')
+
+    const files = discoverFiles(root, () => true, {
+      vcsRoot: projectRoot,
+      pathBase: 'packages/core',
+      excludePaths: [],
+    })
+
+    expect(files).toContain('b.ts')
+    expect(files).not.toContain('a.log')
+    expect(files).not.toContain('build/c.ts')
+  })
+
+  it('Given such a match, then the decision names the repository .gitignore with a project-relative path and line', () => {
+    touch(projectRoot, '.gitignore', '# c\n*.log\n')
+    touch(projectRoot, 'packages/core/a.log')
+    const evaluator = createDiscoveryEvaluator(join(projectRoot, 'packages/core'), {
+      vcsRoot: projectRoot,
+      pathBase: 'packages/core',
+      excludePaths: [],
+    })
+
+    expect(evaluator.evaluatePath('a.log')).toMatchObject({
+      kind: 'excluded',
+      stage: 'gitignore',
+      gitignoreSource: { file: '.gitignore', line: 2 },
+    })
+  })
+
+  it('Given a .gitignore in a directory between the VCS root and the codeRoot, then it applies', () => {
+    touch(projectRoot, 'packages/.gitignore', '*.gen.ts\n')
+    touch(projectRoot, 'packages/core/a.gen.ts')
+    touch(projectRoot, 'packages/core/b.ts')
+
+    const files = discoverFiles(join(projectRoot, 'packages/core'), () => true, {
+      vcsRoot: projectRoot,
+      pathBase: 'packages/core',
+      excludePaths: [],
+    })
+
+    expect(files).toContain('b.ts')
+    expect(files).not.toContain('a.gen.ts')
+  })
+
+  it('Given a nearer .gitignore that negates a farther one, then the nearer rule wins', () => {
+    touch(projectRoot, '.gitignore', '*.log\n')
+    touch(projectRoot, 'packages/.gitignore', '!keep.log\n')
+    touch(projectRoot, 'packages/core/keep.log')
+    touch(projectRoot, 'packages/core/drop.log')
+
+    const files = discoverFiles(join(projectRoot, 'packages/core'), () => true, {
+      vcsRoot: projectRoot,
+      pathBase: 'packages/core',
+      excludePaths: [],
+    })
+
+    expect(files).toContain('keep.log')
+    expect(files).not.toContain('drop.log')
+  })
+
+  it('Given a VCS root spelled through a symlink, then the repository .gitignore still applies', () => {
+    touch(projectRoot, '.gitignore', '*.log\n')
+    touch(projectRoot, 'packages/core/a.log')
+    touch(projectRoot, 'packages/core/b.ts')
+    const link = `${projectRoot}-link`
+    symlinkSync(projectRoot, link)
+    try {
+      const files = discoverFiles(join(projectRoot, 'packages/core'), () => true, {
+        vcsRoot: link,
+        pathBase: 'packages/core',
+        excludePaths: [],
+      })
+      expect(files).toContain('b.ts')
+      expect(files).not.toContain('a.log')
+    } finally {
+      rmSync(link, { force: true })
+    }
+  })
+
+  it('Given projectRoot, then the .gitignore source is relative to it even through symlinks', () => {
+    touch(projectRoot, '.gitignore', '*.log\n')
+    touch(projectRoot, 'packages/core/a.log')
+    const link = `${projectRoot}-codelink`
+    symlinkSync(join(projectRoot, 'packages/core'), link)
+    try {
+      const evaluator = createDiscoveryEvaluator(link, {
+        vcsRoot: projectRoot,
+        projectRoot,
+        pathBase: 'packages/core',
+        excludePaths: [],
+      })
+      expect(evaluator.evaluatePath('a.log')).toMatchObject({
+        kind: 'excluded',
+        stage: 'gitignore',
+        gitignoreSource: { file: '.gitignore', line: 1 },
+      })
+    } finally {
+      rmSync(link, { force: true })
+    }
+  })
+
+  it('Given a repository .gitignore above the project, then its source is reported in the ../ form', () => {
+    const nested = join(projectRoot, 'project')
+    touch(projectRoot, '.gitignore', '# c\n*.log\n')
+    touch(nested, 'a.log')
+    const evaluator = createDiscoveryEvaluator(nested, {
+      vcsRoot: projectRoot,
+      projectRoot: nested,
+      pathBase: '',
+      excludePaths: [],
+    })
+    expect(evaluator.evaluatePath('a.log')).toMatchObject({
+      gitignoreSource: { file: '../.gitignore', line: 2 },
+    })
+  })
+
+  it('Given duplicated patterns, then the first line is the deciding one', () => {
+    touch(projectRoot, '.gitignore', '*.log\n# again\n*.log\n')
+    touch(projectRoot, 'a.log')
+    const evaluator = createDiscoveryEvaluator(projectRoot, {
+      vcsRoot: projectRoot,
+      excludePaths: [],
+    })
+    expect(evaluator.evaluatePath('a.log')).toMatchObject({
+      gitignoreSource: { line: 1 },
+    })
+  })
+
+  it('Given a nearer negation below a directory excluded farther up, then the path stays excluded', () => {
+    touch(projectRoot, '.gitignore', 'build/\n')
+    touch(projectRoot, 'packages/.gitignore', '!build/keep.txt\n')
+    touch(projectRoot, 'packages/core/build/keep.txt')
+    const root = join(projectRoot, 'packages/core')
+
+    expect(
+      discoverFiles(root, () => true, { vcsRoot: projectRoot, excludePaths: [] }),
+    ).not.toContain('build/keep.txt')
+    expect(
+      createDiscoveryEvaluator(root, { vcsRoot: projectRoot, excludePaths: [] }).evaluatePath(
+        'build/keep.txt',
+      ),
+    ).toMatchObject({ kind: 'excluded', stage: 'gitignore', viaDirectory: 'build' })
   })
 })

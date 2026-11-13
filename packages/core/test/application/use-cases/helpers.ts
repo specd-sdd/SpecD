@@ -43,6 +43,7 @@ import {
   type MetadataSnapshot,
   type SpecMetadata,
 } from '../../../src/domain/services/parse-metadata.js'
+import { parseSpecLock } from '../../../src/domain/services/parse-spec-lock.js'
 import { SpecMetadataParseError } from '../../../src/domain/errors/spec-metadata-parse-error.js'
 import {
   type PersistedSpecState,
@@ -463,18 +464,30 @@ export class StubSpecRepository extends SpecRepository {
 
   override async delete(): Promise<void> {}
 
-  override async readPersistedState(spec: Spec): Promise<PersistedSpecStateSnapshot | null> {
+  override async readPersistedState(
+    spec: Spec,
+    options?: { readonly lenientDependsOn?: boolean },
+  ): Promise<PersistedSpecStateSnapshot | null> {
     const stored = this._persistedState.get(spec.name.toString())
     if (stored !== undefined) return stored
 
     const key = `${spec.name.toString()}/spec-lock.json`
     const content = this._artifacts[key]
     if (content === undefined || content === null) return null
-    try {
-      const parsed = JSON.parse(content) as Omit<PersistedSpecStateSnapshot, 'originalHash'>
-      return { ...parsed, originalHash: 'sha256:test-lock' }
-    } catch {
-      return null
+    const parsed = parseSpecLock(
+      content,
+      {
+        specId: `${this.workspace()}:${spec.name.toString()}`,
+        location: key,
+      },
+      options,
+    )
+    return {
+      schema: parsed.schema,
+      dependsOn: parsed.dependsOn,
+      implementation: parsed.implementation,
+      ...(parsed.optimizations !== undefined ? { optimizations: parsed.optimizations } : {}),
+      originalHash: 'sha256:test-lock',
     }
   }
 
@@ -483,7 +496,7 @@ export class StubSpecRepository extends SpecRepository {
     state: PersistedSpecState,
     options: { readonly expectedRevision: string | null },
   ): Promise<PersistedSpecStateSnapshot> {
-    const current = await this.readPersistedState(spec)
+    const current = await this.readPersistedState(spec, { lenientDependsOn: true })
     if (options.expectedRevision === null) {
       if (current !== null) {
         throw new Error('persisted state already exists')
@@ -1039,10 +1052,21 @@ export function newArchiveChange(
 }
 
 /**
+ * Spec-repo map that registers the `default` workspace for `parseSpecId({ workspaces })`.
+ *
+ * Prefer this over `new Map()` in use-case tests that resolve `default:…` spec IDs.
+ */
+export function makeDefaultWorkspaceRepos(
+  repo: SpecRepository = makeSpecRepository(),
+): Map<string, SpecRepository> {
+  return new Map([['default', repo]])
+}
+
+/**
  * Creates a mock `ListWorkspaces` use case.
  */
 export function makeListWorkspaces(
-  repos: Map<string, SpecRepository> = new Map(),
+  repos: Map<string, SpecRepository> = makeDefaultWorkspaceRepos(),
   ownership: Map<string, 'owned' | 'shared' | 'readOnly'> = new Map(),
   codeRoots: Map<string, string> = new Map(),
   graph?: {

@@ -8,5 +8,17 @@
     "core:update-persisted-spec-deps",
     "cli:entrypoint"
   ],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "cli:src/handle-error.ts",
+      "symbols": ["handleError"]
+    },
+    {
+      "file": "cli:src/commands/spec/deps.ts",
+      "symbols": ["registerSpecDeps"]
+    },
+    {
+      "file": "cli:test/commands/spec-deps.spec.ts"
+    }
+  ]
 }

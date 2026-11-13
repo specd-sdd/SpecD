@@ -1,0 +1,131 @@
+- op: added
+  description: 'Verify backend-neutral logical/declaration batch mappings.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Reference and coverage persistence$'
+  content: |
+    ### Requirement: Logical and declaration batch lookup boundary
+
+    #### Scenario: Logical IDs return complete declaration sets
+
+    - **GIVEN** repeated, known, and unknown logical-symbol IDs
+    - **WHEN** declarations are loaded as one batch
+    - **THEN** every known declaration is returned in deterministic order
+    - **AND** repeated inputs are deduplicated by first occurrence and unknown inputs are omitted
+
+    #### Scenario: Declaration IDs map without inventing logical identity
+
+    - **GIVEN** mapped and physical-only declaration IDs
+    - **WHEN** logical mappings are loaded as one batch
+    - **THEN** only mapped declarations return a logical symbol
+    - **AND** the physical-only declaration remains retrievable as a physical symbol
+
+    #### Scenario: Empty identity batches do no backend work
+
+    - **GIVEN** an empty logical-ID or declaration-ID batch
+    - **WHEN** the mapping query is executed
+    - **THEN** an empty result is returned
+    - **AND** no backend operation is issued
+
+- op: added
+  description: 'Verify strict batched logical reverse-coverage lookup.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Logical-symbol coverage endpoints$'
+  content: |
+    ### Requirement: Batched logical coverage lookup
+
+    #### Scenario: Physical IDs cannot satisfy logical coverage
+
+    - **GIVEN** a physical declaration ID is passed to the logical reverse-coverage endpoint
+    - **WHEN** coverage is queried
+    - **THEN** it does not match or retarget any logical-symbol relation
+
+    #### Scenario: Impact coverage uses one bounded batch
+
+    - **GIVEN** an impact operation reaches several logical targets
+    - **WHEN** reverse coverage is loaded
+    - **THEN** all targets are queried through one bounded batch operation
+    - **AND** returned relations retain deterministic logical targets and coverage metadata
+
+- op: modified
+  description: 'Align backend identity scenario with projectRelativePath.'
+  selector:
+    type: section
+    matches: '^Scenario: Backend preserves canonical and config-relative file identity$'
+  rename: 'Scenario: Backend preserves canonical and project-relative file identity'
+  content: |
+
+    - **WHEN** indexing and query features use the abstract `GraphStore`
+    - **THEN** file nodes retain both canonical workspace-prefixed `path` values and `projectRelativePath` values needed for CLI lookup
+    - **AND** storage-agnostic consumers do not depend on backend-specific column or label names
+
+- op: modified
+  description: 'Align exact-match lookup scenario with findFilesByProjectRelativePath.'
+  selector:
+    type: section
+    matches: '^Scenario: findFilesByConfigRelativePath returns exact matches$'
+  rename: 'Scenario: findFilesByProjectRelativePath returns exact matches'
+  content: |
+
+    - **GIVEN** indexed files `core:src/index.ts` with `projectRelativePath` `packages/core/src/index.ts`
+    - **AND** `cli:src/index.ts` with `projectRelativePath` `packages/cli/src/index.ts`
+    - **WHEN** `findFilesByProjectRelativePath('packages/core/src/index.ts')` is called
+    - **THEN** only the `core:src/index.ts` file node is returned
+
+- op: modified
+  description: 'Align multi-match lookup scenario with findFilesByProjectRelativePath.'
+  selector:
+    type: section
+    matches: '^Scenario: findFilesByConfigRelativePath may return multiple canonical files$'
+  rename: 'Scenario: findFilesByProjectRelativePath may return multiple canonical files'
+  content: |
+
+    - **GIVEN** two indexed files from different workspaces share the same `projectRelativePath`
+    - **WHEN** `findFilesByProjectRelativePath('src/index.ts')` is called
+    - **THEN** both canonical file nodes are returned so the caller can raise an ambiguity error
+
+- op: added
+  description: 'Verify physical symbol IDs are rejected as COVERS_SYMBOL targets.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Logical-symbol coverage endpoints$'
+  content: |
+    #### Scenario: Physical symbol is rejected as coverage target
+
+    - **GIVEN** a `COVERS_SYMBOL` relation whose target is a location-backed physical symbol ID
+    - **WHEN** the relation is persisted through the store
+    - **THEN** the relation is rejected and is not persisted under any identity
+    - **AND** no logical reverse-coverage query returns it
+
+- op: added
+  description: 'Round 3: state the file-content search boundary without contradicting source-content search.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Search with primary-identity prioritization$'
+    before:
+      type: section
+      matches: 'Persisted file content does not introduce file search surface'
+  content: |
+    #### Scenario: Persisted file content is not a file result category
+
+    - **GIVEN** a backend persists file source content
+    - **WHEN** consumers use the `GraphStore` `searchSymbols`, `searchSpecs`, and `searchDocuments` contract
+    - **THEN** those methods return symbols, specs, and documents only, and the store adds no persisted-file result category to them
+    - **AND** matches in source text that are not symbols are served only by `searchSourceContentCandidates`, which the reference-aware search surfaces as its `files` category
+
+- op: removed
+  description: 'Replaced by the scenario above.'
+  selector:
+    type: section
+    matches: 'Persisted file content does not introduce file search surface'

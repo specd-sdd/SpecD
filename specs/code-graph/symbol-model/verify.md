@@ -6,7 +6,7 @@
 
 #### Scenario: FileNode equality still uses canonical path
 
-- **GIVEN** two `FileNode` values with the same canonical `path` but different `contentHash` and `configRelativePath`
+- **GIVEN** two `FileNode` values with the same canonical `path` but different `contentHash` and `projectRelativePath`
 - **WHEN** equality is checked
 - **THEN** they are considered equal because `path` remains the canonical graph identity
 
@@ -16,24 +16,32 @@
 - **WHEN** a `FileNode` is created
 - **THEN** `path` is stored as `core:src/domain/entities/change.ts`
 
-#### Scenario: FileNode configRelativePath is repository-style
+#### Scenario: FileNode projectRelativePath is repository-style
 
 - **GIVEN** the active `specd.yaml` lives at `/project/specd.yaml`
 - **AND** workspace `core` has codeRoot `/project/packages/core`
 - **AND** the discovered file is `/project/packages/core/src/index.ts`
 - **WHEN** a `FileNode` is created
 - **THEN** `path` is `core:src/index.ts`
-- **AND** `configRelativePath` is `packages/core/src/index.ts`
+- **AND** `projectRelativePath` is `packages/core/src/index.ts`
 - **AND** `workspace` is `core`
 
-#### Scenario: FileNode configRelativePath may include parent segments
+#### Scenario: FileNode projectRelativePath may include parent segments
 
 - **GIVEN** the active `specd.yaml` lives at `/project/apps/web/specd.yaml`
 - **AND** workspace `core` has codeRoot `/project/packages/core`
 - **AND** the discovered file is `/project/packages/core/src/index.ts`
 - **WHEN** a `FileNode` is created
-- **THEN** `configRelativePath` is `../../packages/core/src/index.ts`
+- **THEN** `projectRelativePath` is `../../packages/core/src/index.ts`
 - **AND** it does not replace the canonical `path`
+
+#### Scenario: File namespace is optional and paired
+
+- **GIVEN** a PHP file that declares `namespace App\Models;` and a Go file that declares no namespace
+- **WHEN** their file nodes are built
+- **THEN** the PHP node has `namespace` `App\Models` and `namespaceSeparator` `\`
+- **AND** the Go node has neither field
+- **AND** namespace data does not change `FileNode` equality
 
 ### Requirement: Spec node
 
@@ -109,6 +117,12 @@
 - **THEN** its symbol id is unchanged
 - **AND** `line` and `column` equal the complete construct start
 
+#### Scenario: SymbolNode carries denormalized projectRelativePath
+
+- **GIVEN** a symbol extracted from a file with `projectRelativePath` `packages/core/src/index.ts`
+- **WHEN** the `SymbolNode` is created
+- **THEN** its `projectRelativePath` equals `packages/core/src/index.ts`
+
 ### Requirement: File analysis model
 
 #### Scenario: Registered file analysis retains compact normalized facts
@@ -170,6 +184,19 @@
 - **WHEN** a `SymbolNode` is created with `kind: 'module'` (not in the enum)
 - **THEN** `InvalidSymbolKindError` is thrown
 
+#### Scenario: Property kind is valid
+
+- **WHEN** a `SymbolNode` is created with `kind: 'property'`
+- **THEN** it is accepted without error as a valid member of the closed `SymbolKind` enum
+
+#### Scenario: State declaration normalization across scopes
+
+- **GIVEN** a state declaration at module/file scope, a state declaration local to a function body, and a state declaration inside a class/struct container
+- **WHEN** symbols are extracted
+- **THEN** the module-level declaration is assigned `SymbolKind.Variable` with `parentId` undefined
+- **AND** the function-local declaration is assigned `SymbolKind.Variable` with `parentId` set to the enclosing function's symbol id
+- **AND** the container declaration is assigned `SymbolKind.Property` with `parentId` set to the enclosing container's symbol id
+
 ### Requirement: Relation types
 
 #### Scenario: Relation direction matters
@@ -208,28 +235,6 @@
 - **GIVEN** a symbol-level archived implementation link exists for a symbol and spec
 - **WHEN** graph relations are built from archived traceability
 - **THEN** a `COVERS_SYMBOL` relation connects the spec node to that symbol node
-
-### Requirement: Relation staleness
-
-#### Scenario: Missing symbol marks implementation relation as stale
-
-- **GIVEN** an archived symbol-level implementation link exists
-- **AND** the target symbol is no longer detectable in the current graph index
-- **WHEN** graph relations are rebuilt
-- **THEN** the implementation relation is retained
-- **AND** its `COVERS_SYMBOL` metadata marks it as `stale: true`
-
-#### Scenario: File-level implementation relation is never marked stale
-
-- **GIVEN** an archived file-level implementation link exists for `core:src/index.ts`
-- **WHEN** graph relations are rebuilt
-- **THEN** the `COVERS_FILE` relation is retained without stale metadata
-
-#### Scenario: Workspace-boundary materialization failure is not represented as stale
-
-- **GIVEN** an implementation link failed earlier archive-time materialization because of workspace-boundary validation
-- **WHEN** graph relations are built from archived traceability
-- **THEN** no synthetic stale relation is created for that failure
 
 ### Requirement: Relation value object
 
@@ -341,6 +346,27 @@
 - **WHEN** scoped binding resolution runs
 - **THEN** no persisted relation is emitted for that unresolved type
 
+### Requirement: Qualified reference facts
+
+#### Scenario: Absent collection equals empty
+
+- **GIVEN** an adapter that emits no `qualifiedReferenceFacts`
+- **WHEN** its draft is registered
+- **THEN** the analysis is valid and behaves as if the collection were empty
+
+#### Scenario: Fact carries syntax only
+
+- **GIVEN** `models.User` appears in a type position
+- **WHEN** the fact is emitted
+- **THEN** it carries qualifier, name, kind `type`, source symbol, and location
+- **AND** it names no target and creates no relation
+
+#### Scenario: Fact is plain data
+
+- **GIVEN** a registered analysis with qualified reference facts
+- **WHEN** it is serialized
+- **THEN** it contains no parser objects and persisted IDs and schemas are unchanged
+
 ### Requirement: Immutability
 
 #### Scenario: FileNode properties are readonly
@@ -357,11 +383,10 @@
 - **THEN** it extends `SpecdError` from `@specd/core`
 - **AND** it includes the `specd: true` discriminator
 
-#### Scenario: Duplicate symbol id detected
+#### Scenario: DuplicateSymbolIdError extends SpecdCodeGraphError
 
-- **GIVEN** two symbols in the same file produce the same ID
-- **WHEN** the symbol model validates the file
-- **THEN** `DuplicateSymbolIdError` (extending `SpecdCodeGraphError`) is thrown
+- **WHEN** `DuplicateSymbolIdError` is instantiated
+- **THEN** it extends `SpecdCodeGraphError` with code `DUPLICATE_SYMBOL_ID`
 
 ### Requirement: Document category
 
@@ -435,6 +460,38 @@
 - **THEN** its canonical id is unchanged
 - **AND** the declaration occurrence records the new line
 
+### Requirement: Declaration, binding, and logical identity layers
+
+#### Scenario: Equal local names in competing scopes remain distinct
+
+- **GIVEN** two nested scopes each declare a local callable named `same`
+- **WHEN** their declaration occurrences, bindings, and semantic identities are built
+- **THEN** each physical declaration retains its own location identity
+- **AND** the local bindings have different scope identities
+- **AND** they do not collapse into one logical target
+
+#### Scenario: Overload movement preserves one logical target
+
+- **GIVEN** several declarations form one language-defined overload group
+- **WHEN** an overload declaration moves to another line without changing the owner or semantic signature group
+- **THEN** its physical declaration ID changes
+- **AND** the logical target ID remains unchanged
+- **AND** the target still retains every declaration occurrence
+
+#### Scenario: Physical-only declaration remains navigable
+
+- **GIVEN** an adapter classifies a routine-local declaration as physical-only
+- **WHEN** graph identities are materialized
+- **THEN** the declaration remains available by physical ID and range
+- **AND** no logical symbol is fabricated for it
+
+#### Scenario: Missing group evidence does not create a group
+
+- **GIVEN** two same-name declarations have no language grouping key
+- **WHEN** logical identities are assembled
+- **THEN** the absent keys are not treated as one shared group
+- **AND** the declarations remain distinct semantic candidates
+
 ### Requirement: Member semantics and symbol spaces
 
 #### Scenario: Same-name forms remain distinct
@@ -505,6 +562,30 @@
 - **GIVEN** one surface exports the same name as a value and as a type
 - **WHEN** both routes are stored
 - **THEN** symbol space keeps them as two bindings
+
+#### Scenario: Shadowed local bindings remain distinct
+
+- **GIVEN** two local bindings with the same name and scope declared at different source ranges
+- **WHEN** their identities are built
+- **THEN** their identities differ
+- **AND** each preserves its own source range
+
+### Requirement: Evidence-preserving semantic projection
+
+#### Scenario: Several physical routes aggregate to one semantic result
+
+- **GIVEN** two declarations of one logical method have distinct incoming `CALLS` relations
+- **WHEN** the relations are projected to semantic impact
+- **THEN** the logical method appears once
+- **AND** both physical relations and caller locations remain in its evidence
+
+#### Scenario: Logical coverage is found from a reached declaration
+
+- **GIVEN** a spec has `COVERS_SYMBOL` to a logical target
+- **AND** impact traversal reaches one physical declaration of that target
+- **WHEN** reverse coverage is projected
+- **THEN** the spec is returned with the reached declaration as evidence
+- **AND** the physical declaration ID is not used as the coverage endpoint
 
 ### Requirement: Index coverage facts
 

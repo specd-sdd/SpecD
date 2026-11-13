@@ -10,7 +10,17 @@ Every spec workflow begins with a named change, so the system needs a single ent
 
 `CreateChange.execute` SHALL accept the existing name, description, spec IDs, optional paired schema override, and overlap-check fields, plus optional structured `invalidation` with `artifacts: none | surgical | downstream | global` and `workflow: preserve | redesign`.
 
-When the schema override pair is absent, the active schema is resolved through `GetActiveSchema`; supplying only one schema field is invalid. The use case receives already resolved project policy defaults from its composition boundary and MUST NOT parse legacy config aliases itself.
+Each entry of `specIds` is one whole spec ID, validated and normalized per "Spec ID validation". When the schema override pair (`schemaName` and `schemaVersion`) is absent, the active schema is resolved through `GetActiveSchema`; supplying only one schema field MUST be rejected before persistence. The use case receives already resolved project policy defaults from its composition boundary and MUST NOT parse legacy config aliases itself.
+
+### Requirement: Spec ID validation
+
+Before persistence, the use case MUST validate and normalize every entry of `specIds` with `parseSpecId` and the configured workspaces (see `core:spec-id-format`) and store the fully-qualified IDs. An invalid ID fails with `InvalidSpecIdError` and an unknown workspace with `WorkspaceNotFoundError`, quoting the full original value, and no change is created when any entry is invalid. A spec that does not exist yet is accepted; only syntax and workspace are checked.
+
+Duplicate entries (after normalization) collapse to one, keeping first-occurrence order. Validation runs after the change name and schema identity have been checked: a request that fails on an already-existing name reports `ChangeAlreadyExistsError` even when its spec IDs are also invalid.
+
+### Requirement: ReadOnly workspace rejection
+
+After normalizing `specIds` and before persistence, the use case MUST check the `ownership` of the workspace of every spec (from `ListWorkspaces`). When one or more specs belong to a `readOnly` workspace, the use case MUST throw `ReadOnlyWorkspaceError` and create nothing. The message MUST contain one line per offending spec in the form `Cannot add spec "<specId>" to change — workspace "<workspace>" is readOnly.`, followed by the sentence `ReadOnly workspaces are protected: their specs and code cannot be modified by changes.`, and MUST NOT suggest remediation steps (see `core:workspace`). This rule lives in the use case so that every delivery mechanism (CLI, MCP, SDK) enforces it.
 
 ### Requirement: Active schema resolution
 
@@ -35,6 +45,8 @@ When `includeOverlapCheck` is absent or `false`, or when `specIds` is empty, the
 ### Requirement: Initial invalidation policy
 
 `CreateChange` SHALL persist the effective structured invalidation policy in a new v2 manifest. Explicit input wins; otherwise the resolved project default is used. When neither supplies a value, the new-change default is `{ artifacts: downstream, workflow: preserve }`.
+
+Before persistence, the use case MUST reject any invalid `invalidation.artifacts` value (allowed: `none`, `surgical`, `downstream`, `global`) or `invalidation.workflow` value (allowed: `preserve`, `redesign`) with `InvalidInputError`, quoting the full original value and listing the allowed values, and it MUST create nothing. The check lives in the use case so that every delivery mechanism (CLI, MCP, SDK) enforces it; a host's type cast is not validation.
 
 The created change MUST NOT persist the legacy scalar `invalidationPolicy`. The policy becomes the change-local default for later reconciliation and may be changed through `EditChange` without retroactively inventing drift or recovery.
 
@@ -109,6 +121,8 @@ The config-based `createCreateChange(config, options?)` form MUST obtain `Create
 - [`core:get-active-schema`](../get-active-schema/spec.md)
 - [`core:spec-overlap`](../spec-overlap/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)
+- [`core:spec-id-format`](../spec-id-format/spec.md) — spec ID validation and normalization of the input IDs
+- [`core:workspace`](../workspace/spec.md) — workspace ownership (`readOnly` rejection) and workspace names
 
 ### Requirement: Schema compatibility guardrail
 

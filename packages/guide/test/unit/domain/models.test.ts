@@ -23,7 +23,9 @@ describe('Domain Models & Value Objects', () => {
     }
 
     const topic: GuideTopic = {
+      collection: 'guide',
       topic: 'test-guide',
+      sourcePath: 'test-guide.md',
       title: 'Test Guide',
       description: 'A test guide entity',
       order: 1,
@@ -44,7 +46,9 @@ describe('Domain Models & Value Objects', () => {
     expect(byteLength).toBeGreaterThan(unicodeText.length)
 
     const topic: GuideTopic = {
+      collection: 'guide',
       topic: 'unicode',
+      sourcePath: 'unicode.md',
       title: 'Unicode & Emojis',
       description: 'Unicode tests',
       order: 2,
@@ -59,6 +63,7 @@ describe('Domain Models & Value Objects', () => {
 
   it('validates GuideSearchHit contract with sectionIndex and readCommand', () => {
     const hit: GuideSearchHit = {
+      collection: 'guide',
       topic: 'workflow',
       file: 'workflow.md',
       section: 'Lifecycle States',
@@ -78,6 +83,7 @@ describe('Domain Models & Value Objects', () => {
 
   it('validates GuideOutline contract structure', () => {
     const outline: GuideOutline = {
+      collection: 'guide',
       topic: 'workflow',
       file: 'workflow.md',
       lines: 100,

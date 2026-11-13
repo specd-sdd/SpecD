@@ -60,7 +60,7 @@ export class GuideSectionAmbiguousError extends SpecdGuideError {
     super(
       `Multiple sections match '${heading}'. Matching sections: ${matchingHeadings.join(
         ', ',
-      )}. Use --section <number> to disambiguate.`,
+      )}. Select one with ${matchingIndices.map((index) => `--section ${index}`).join(' or ')}.`,
     )
     this._heading = heading
     this._matchingIndices = matchingIndices

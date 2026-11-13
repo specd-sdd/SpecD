@@ -65,10 +65,10 @@ describe('spec metadata', () => {
     await program.parseAsync(['node', 'specd', 'spec', 'metadata', 'auth/login'])
 
     expect(kernel.specs.getMetadata.execute).toHaveBeenCalledWith({
-      specId: 'default:auth/login',
+      specId: 'auth/login',
     })
     const text = stdout()
-    expect(text).toContain('spec: default:auth/login')
+    expect(text).toContain('spec: auth/login')
     expect(text).toContain('source: persisted')
     expect(text).toContain('regenerated: false')
     expect(text).toContain('metadataFingerprint: fp-abc')
@@ -133,7 +133,7 @@ describe('spec metadata', () => {
 
     const parsed = JSON.parse(stdout())
     expect(parsed).toMatchObject({
-      spec: 'default:auth/login',
+      spec: 'auth/login',
       source: 'generated',
       regenerated: true,
       metadataFingerprint: 'fp',

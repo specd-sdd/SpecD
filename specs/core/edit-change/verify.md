@@ -57,26 +57,26 @@ Scenarios:
 
 #### Scenario: Remove and add in same call
 
-- **GIVEN** a change with `specIds: ['auth/login', 'billing/invoices']`, no approval or completed verification evidence, and no separate drift
-- **WHEN** `execute` receives `removeSpecIds: ['auth/login']` and `addSpecIds: ['auth/signup']`
-- **THEN** the resulting specIds are `['billing/invoices', 'auth/signup']` and `scopeChanged` is true
+- **GIVEN** a change with `specIds: ['default:auth/login', 'default:billing/invoices']`, no approval or completed verification evidence, and no separate drift
+- **WHEN** `execute` receives `removeSpecIds: ['default:auth/login']` and `addSpecIds: ['default:auth/signup']`
+- **THEN** the resulting specIds are `['default:billing/invoices', 'default:auth/signup']` and `scopeChanged` is true
 - **AND** `validityChanged` and `invalidated` are false because no existing evidence became invalid
 
 ### Requirement: Removal of absent spec throws
 
 #### Scenario: Removing a spec not in the change
 
-- **GIVEN** a change with `specIds: ['auth/login']`
-- **WHEN** `execute` is called with `removeSpecIds: ['billing/invoices']`
+- **GIVEN** a change with `specIds: ['default:auth/login']`
+- **WHEN** `execute` is called with `removeSpecIds: ['default:billing/invoices']`
 - **THEN** it throws `SpecNotInChangeError`
 
 ### Requirement: Addition is idempotent
 
 #### Scenario: Adding a spec already present
 
-- **GIVEN** a change with `specIds: ['auth/login']`
-- **WHEN** `execute` is called with `addSpecIds: ['auth/login']`
-- **THEN** `specIds` remains `['auth/login']`
+- **GIVEN** a change with `specIds: ['default:auth/login']`
+- **WHEN** `execute` is called with `addSpecIds: ['default:auth/login']`
+- **THEN** `specIds` remains `['default:auth/login']`
 - **AND** `invalidated` is `false`
 
 ### Requirement: Seed specDependsOn for added specs
@@ -112,9 +112,9 @@ Scenarios:
 
 #### Scenario: Remove and re-add the same spec
 
-- **GIVEN** a change with `specIds: ['auth/login', 'billing/invoices']`
-- **WHEN** `execute` is called with `removeSpecIds: ['billing/invoices']` and `addSpecIds: ['billing/invoices']`
-- **THEN** the resulting `specIds` are `['auth/login', 'billing/invoices']`
+- **GIVEN** a change with `specIds: ['default:auth/login', 'default:billing/invoices']`
+- **WHEN** `execute` is called with `removeSpecIds: ['default:billing/invoices']` and `addSpecIds: ['default:billing/invoices']`
+- **THEN** the resulting `specIds` are `['default:auth/login', 'default:billing/invoices']`
 - **AND** `invalidated` is `false`
 
 ### Requirement: Approval invalidation on effective change
@@ -196,6 +196,19 @@ Scenarios:
 
 - **WHEN** an edit supplies the already persisted structured policy
 - **THEN** no persistence-worthy policy change or invalidation is reported
+
+#### Scenario: Unknown invalidation policy rejected
+
+- **GIVEN** a change exists
+- **WHEN** `execute` is called with `invalidationPolicy: 'sugical'`
+- **THEN** `InvalidInputError` is thrown quoting `sugical` and listing `none`, `surgical`, `downstream`, `global`
+- **AND** nothing is persisted
+
+#### Scenario: Invalid invalidation policy is rejected together with valid edits
+
+- **GIVEN** a change exists
+- **WHEN** `execute` is called with `description: 'x'` and `invalidationPolicy: 'bogus'`
+- **THEN** `InvalidInputError` is thrown and the description is not changed
 
 ### Requirement: Output contract
 
@@ -301,3 +314,86 @@ Scenarios:
 - **THEN** the corresponding error propagates
 - **AND** no partial scope mutation is persisted
 - **AND** persisted spec IDs, history, artifact topology, and validity remain unchanged
+
+### Requirement: Spec ID validation
+
+#### Scenario: Invalid ID rejected and nothing persisted
+
+- **WHEN** `addSpecIds: ['Bad Id']` is provided
+- **THEN** the use case throws `InvalidSpecIdError` quoting `Bad Id`
+- **AND** the change is not modified
+
+#### Scenario: Empty ID rejected
+
+- **WHEN** `addSpecIds: ['']` is provided
+- **THEN** the use case throws `InvalidSpecIdError`
+
+#### Scenario: ID containing a comma is one invalid ID
+
+- **WHEN** `addSpecIds: ['auth/a,b']` is provided
+- **THEN** the use case throws `InvalidSpecIdError` quoting `auth/a,b` and does not split it
+
+#### Scenario: Unknown workspace rejected
+
+- **WHEN** `addSpecIds: ['nope:auth/login']` is provided
+- **THEN** the use case throws `WorkspaceNotFoundError`
+
+#### Scenario: Bare ID stored qualified
+
+- **WHEN** `addSpecIds: ['auth/login']` is provided
+- **THEN** the change gains `default:auth/login`
+
+#### Scenario: One invalid entry among valid ones
+
+- **WHEN** `addSpecIds: ['core:storage', 'Bad Id']` is provided
+- **THEN** the use case throws `InvalidSpecIdError` and `core:storage` is not added
+
+#### Scenario: Spec that does not exist yet is accepted
+
+- **WHEN** `addSpecIds: ['core:brand-new-spec']` is provided and the spec does not exist
+- **THEN** the spec is added
+
+#### Scenario: Removal entry is not syntax-validated
+
+- **GIVEN** the change holds `default:auth/login`
+- **WHEN** `removeSpecIds: ['Bad Id']` is provided
+- **THEN** it fails with `SpecNotInChangeError` quoting `Bad Id`, not with `InvalidSpecIdError`
+
+#### Scenario: Duplicate removal entries collapse
+
+- **GIVEN** the change holds `default:auth/login` and `default:billing/invoices`
+- **WHEN** `removeSpecIds: ['auth/login', 'default:auth/login']` is provided
+- **THEN** `default:auth/login` is removed once
+- **AND** no `SpecNotInChangeError` is raised
+
+#### Scenario: Removal of a bare ID matches the qualified stored form
+
+- **GIVEN** the change holds `default:auth/login`
+- **WHEN** `removeSpecIds: ['auth/login']` is provided
+- **THEN** the spec is removed
+
+### Requirement: ReadOnly workspace rejection
+
+#### Scenario: Adding a readOnly spec fails with the typed error
+
+- **GIVEN** workspace `platform` has `ownership: readOnly`
+- **WHEN** `addSpecIds: ['platform:auth/tokens']` is provided
+- **THEN** the use case throws `ReadOnlyWorkspaceError`
+- **AND** the message contains `Cannot add spec "platform:auth/tokens" to change — workspace "platform" is readOnly.`
+- **AND** no remediation step is suggested
+
+#### Scenario: One line per offending spec and nothing applied
+
+- **WHEN** `addSpecIds: ['default:auth/register', 'platform:a/b', 'platform:c/d']` is provided
+- **THEN** the message has one line for each readOnly spec
+- **AND** `default:auth/register` is not added
+
+#### Scenario: Removal is not subject to ownership
+
+- **WHEN** `removeSpecIds` names a spec in a readOnly workspace
+- **THEN** the spec is removed without an ownership error
+
+#### Scenario: SDK callers are covered
+
+- **WHEN** an SDK caller adds a readOnly spec
+- **THEN** the same rejection applies without the CLI

@@ -54,6 +54,326 @@
 - **WHEN** the default TypeScript adapter reports resolution manifests
 - **THEN** the result is exactly `['package.json']`
 
+#### Scenario: Adapter is a required core plus declared facets
+
+- **GIVEN** the built-in TypeScript adapter
+- **WHEN** its members are inspected
+- **THEN** `languages`, `extensions`, `resolutionManifests`, `analyzeFile`, `resolveImports`, and `buildRelations` are present
+- **AND** it exposes `packageResolution`, `relativeImportResolution`, `symbolReferenceSyntax`, and `reExportLinking` as facet objects, and no `qualifiedNameResolution` because TypeScript has no qualified-name addressing
+- **AND** the `LanguageAdapter` interface declares none of the former loose methods `getPackageIdentity`, `resolvePackageFromSpecifier`, `resolveRelativeImportPath`, `buildQualifiedName`, `resolveQualifiedNameToPath`, `parseSymbolReference`, `renderSymbolReference`, or `linkReExports`, which a type-level test checks
+
+#### Scenario: Capability flags and facets are separate declarations
+
+- **GIVEN** an adapter that sets `capabilities().hierarchy` to true and provides no `packageResolution`
+- **WHEN** the indexer reads its declarations
+- **THEN** hierarchy resolution is supported
+- **AND** package resolution is treated as absent
+
+### Requirement: Adapter facet model
+
+#### Scenario: Facet presence is the declaration
+
+- **GIVEN** an adapter that exposes `packageResolution`
+- **WHEN** the indexer needs package identities
+- **THEN** it uses that facet
+- **AND** it does not test whether individual methods exist
+
+#### Scenario: Absent facet disables the behaviour without error
+
+- **GIVEN** an adapter that does not expose `packageResolution`
+- **WHEN** the indexer builds the package map and resolves a package-specifier import in that adapter's language
+- **THEN** no identity is contributed and the import stays unresolved
+- **AND** no error is raised and no heuristic replaces the facet
+- **AND** the run result lists the adapter in `importDiagnostics.adaptersWithoutPackageResolution`
+- **AND** that listing is not counted in `importDiagnostics.total`
+
+#### Scenario: Partial facet is rejected
+
+- **GIVEN** an adapter whose `packageResolution` facet lacks `entrySurface`
+- **WHEN** it is registered
+- **THEN** registration fails with `INVALID_LANGUAGE_ADAPTER`
+
+#### Scenario: Facet that throws does not stop the run
+
+- **GIVEN** a present facet whose per-file resolution throws for one file
+- **WHEN** the indexer resolves that file's imports
+- **THEN** the error is recorded for that file
+- **AND** other files are still indexed
+
+#### Scenario: Facet that throws in identity, prepare, or link does not stop the run
+
+- **GIVEN** an adapter whose `identity`, `prepare`, or `link` throws
+- **WHEN** the indexer executes the run
+- **THEN** the error is recorded as an indexing error
+- **AND** the adapter is treated as if it did not provide `packageResolution` for the rest of the run and is listed in `importDiagnostics.adaptersWithoutPackageResolution`
+- **AND** other adapters and workspaces are still indexed
+
+#### Scenario: New language needs no indexer change
+
+- **GIVEN** a test adapter for a made-up language with its own manifest, extension, and package layout, providing the core and `packageResolution`
+- **AND** two workspaces, one of which imports a name exported by the other through the made-up package specifier
+- **WHEN** both workspaces are indexed with the unmodified indexer
+- **THEN** the import resolves to the exported symbol in the other workspace
+- **AND** the indexer, session, resolver, and stores needed no change
+
+#### Scenario: Package resolution failure keeps relative barrel linking
+
+- **GIVEN** an adapter whose `identity` throws for one workspace
+- **AND** a barrel file in another workspace that re-exports a relative module
+- **WHEN** the run completes
+- **THEN** the relative re-export is still linked by `reExportLinking`
+- **AND** only routes that need package data stay unresolved
+
+### Requirement: Package resolution facet
+
+#### Scenario: Prepare runs once before import resolution
+
+- **GIVEN** a run with several workspaces and a present `packageResolution` facet
+- **WHEN** the indexer executes the run
+- **THEN** `prepare` is called exactly once, after every workspace is analyzed and before any import is resolved
+- **AND** it receives every configured workspace name and code root, including workspaces that were only hydrated in an incremental run
+
+#### Scenario: Entry surface performs no I/O
+
+- **GIVEN** `prepare` has stored the manifest facts
+- **WHEN** `entrySurface` is called several times during Pass 2
+- **THEN** no filesystem read happens
+- **AND** the result depends only on the request and the prepared data
+
+#### Scenario: Entry surface returns ordered workspace-prefixed files
+
+- **GIVEN** `@specd/code-graph` exports `.` to `./dist/public.js`
+- **WHEN** `entrySurface` is called for `@specd/code-graph`
+- **THEN** it returns an entry whose `filePath` is `code-graph:src/public.ts`
+
+#### Scenario: Entry surface never searches symbols by name
+
+- **GIVEN** a package whose manifest publishes no entry for the specifier
+- **AND** a workspace symbol with the imported name exists
+- **WHEN** `entrySurface` is called
+- **THEN** it returns an empty array
+
+#### Scenario: Test files are not entries
+
+- **GIVEN** a facet whose `entrySurface` returns a file classified as a test
+- **WHEN** the shared helper filters the entries
+- **THEN** the test file is not returned to the adapter
+
+#### Scenario: Match specifier is pure
+
+- **GIVEN** known packages, a specifier, and a prepared session
+- **WHEN** `matchSpecifier` is called repeatedly
+- **THEN** the result is the same and no I/O happens
+- **AND** it depends only on its arguments and on the data `prepare` stored in the session
+
+#### Scenario: Facet manifests are declared
+
+- **GIVEN** the facet reads `go.mod`
+- **WHEN** the adapter reports `resolutionManifests()`
+- **THEN** the result includes `go.mod`
+
+#### Scenario: Identity and prepare use the same package root
+
+- **GIVEN** a workspace whose code root is `/repo/packages/core/src` and whose manifest is `/repo/packages/core/package.json`
+- **WHEN** `identity` and `prepare` run for that workspace
+- **THEN** both use the manifest at `/repo/packages/core`
+- **AND** the workspace has an identity and an entry surface, not an identity followed by `no-entry-surface`
+
+#### Scenario: Search stops at the repository root of the code root
+
+- **GIVEN** a code root inside repository `/ext/repo` and a manifest at `/ext/package.json` above that repository
+- **AND** `repoRoot` is `/ext/repo`
+- **WHEN** the package root is searched
+- **THEN** the manifest above `/ext/repo` is not read
+- **AND** the workspace has no identity from it
+
+#### Scenario: External code root uses its own repository boundary
+
+- **GIVEN** a workspace whose code root is outside the project root, in another repository, with its manifest above the code root inside that repository
+- **WHEN** the package root is searched with that repository's root
+- **THEN** the manifest is found
+- **AND** the project root is not used as the boundary
+
+#### Scenario: No detected repository inspects only the code root
+
+- **GIVEN** a code root for which no VCS is detected and a manifest in its parent directory
+- **WHEN** the package root is searched without a `repoRoot`
+- **THEN** only the code root itself is inspected
+- **AND** the search never walks upward or reaches the filesystem root
+
+#### Scenario: Manifest without the identity field is skipped with a diagnostic
+
+- **GIVEN** a nearest manifest without the identity field and a named manifest further up inside the repository
+- **WHEN** the package root is searched
+- **THEN** a diagnostic is reported for the skipped manifest
+- **AND** the named manifest provides the identity
+
+#### Scenario: Terminal skipped manifest still reports its diagnostic
+
+- **GIVEN** every manifest inside the bounded search is unreadable or lacks the required identity field
+- **WHEN** `identity` exhausts the search and returns `undefined`
+- **THEN** every skipped manifest is reported through `report`
+- **AND** the final diagnostic is not lost merely because no usable manifest was found
+
+#### Scenario: Symlinked and trailing-separator code roots are canonicalized
+
+- **GIVEN** a code root given with a trailing separator, or through a symbolic link
+- **WHEN** the package root is searched
+- **THEN** the search starts at the canonical code root
+- **AND** the result equals the one for the plain path
+
+#### Scenario: Prepare reads each manifest once and keeps compact data
+
+- **GIVEN** a workspace with a manifest
+- **WHEN** `prepare` runs
+- **THEN** the manifest is read exactly once during that call
+- **AND** only the data needed by `matchSpecifier` and `entrySurface` is stored, not the whole parsed manifest
+
+#### Scenario: Prepare covers workspaces outside the run
+
+- **GIVEN** a partial run that indexes only workspace A
+- **WHEN** `prepare` runs
+- **THEN** it receives and prepares workspace B as well
+- **AND** a package published by B is not treated as external
+
+### Requirement: Relative import resolution facet
+
+#### Scenario: Relative specifier yields candidates without choosing
+
+- **GIVEN** `./utils` imported from a TypeScript file
+- **WHEN** `relativeImportResolution.resolve` is called
+- **THEN** it returns the extension and index-file candidates
+- **AND** it does not choose among them
+
+#### Scenario: Language without relative imports omits the facet
+
+- **GIVEN** the Go adapter
+- **WHEN** its members are inspected
+- **THEN** it exposes no `relativeImportResolution`
+
+### Requirement: Qualified-name resolution facet
+
+#### Scenario: Build produces the canonical qualified name
+
+- **WHEN** the PHP adapter's `qualifiedNameResolution.build` is called with namespace `App\Models` and name `User`
+- **THEN** it returns `App\Models\User`
+
+#### Scenario: Resolve to path uses prepared metadata
+
+- **GIVEN** PSR-4 metadata was prepared for the code root and the `composer.json` file was deleted afterwards
+- **WHEN** `resolveToPath` is called with the session
+- **THEN** it still maps the qualified name to its class file
+- **AND** it performs no filesystem access
+
+#### Scenario: Language without qualified-name addressing omits the facet
+
+- **GIVEN** the Go adapter
+- **WHEN** its members are inspected
+- **THEN** it exposes no `qualifiedNameResolution`
+
+### Requirement: Symbol reference syntax facet
+
+#### Scenario: Parse and render live in one facet
+
+- **GIVEN** an adapter that provides `symbolReferenceSyntax`
+- **WHEN** a consumer parses `EditChange.execute` and renders the resulting member
+- **THEN** both operations come from that facet
+
+#### Scenario: Missing facet leaves a human reference unresolved
+
+- **GIVEN** an adapter that does not provide `symbolReferenceSyntax`
+- **WHEN** a human-written reference for its language is requested
+- **THEN** the reference is unresolved
+- **AND** no other adapter's syntax is used
+
+### Requirement: Re-export linking facet
+
+#### Scenario: Linking runs before import resolution
+
+- **GIVEN** a package entry that re-exports a name through a barrel chain
+- **WHEN** the indexer runs
+- **THEN** every present `reExportLinking` facet has completed before the first import is resolved in Pass 2
+
+#### Scenario: Linking performs no I/O
+
+- **WHEN** `link` runs
+- **THEN** it reads no file from disk
+
+#### Scenario: Adapter without the facet contributes no re-export bindings
+
+- **GIVEN** an adapter that does not provide `reExportLinking`
+- **WHEN** the indexer links re-exports
+- **THEN** nothing is linked for that adapter and no error is raised
+
+### Requirement: Package import resolution context
+
+#### Scenario: Named export resolves through the entry surface
+
+- **GIVEN** `sdk` imports `SymbolNode` from `@specd/code-graph`
+- **AND** the entry surface of that package is `code-graph:src/public.ts`, which publishes `SymbolNode` through a barrel chain
+- **WHEN** the adapter calls `resolvePackageExport`
+- **THEN** the result is resolved with the logical id of `SymbolNode` declared in `code-graph`
+- **AND** it carries the entry file and the public binding id used
+
+#### Scenario: Unique internal symbol is not chosen
+
+- **GIVEN** `SymbolNode` is exported only by an internal file that is not part of the entry surface
+- **WHEN** the adapter calls `resolvePackageExport`
+- **THEN** the result is unresolved with reason `not-exported`
+
+#### Scenario: Same-name symbol in a test file is not chosen
+
+- **GIVEN** a test file in the target workspace declares a symbol with the imported name
+- **AND** the entry surface does not export that name
+- **WHEN** the adapter calls `resolvePackageExport`
+- **THEN** the result is unresolved with reason `not-exported`
+
+#### Scenario: Conflicting entry files are ambiguous
+
+- **GIVEN** two entry files export the same name with different logical targets
+- **WHEN** the adapter calls `resolvePackageExport`
+- **THEN** the result is unresolved with reason `ambiguous`
+
+#### Scenario: Unknown package reports a reason
+
+- **GIVEN** the specifier matches no known package
+- **WHEN** the adapter calls `packageEntryFiles`
+- **THEN** the helper result is unresolved with reason `package-unknown`, which the indexer counts only in `externalPackageImports`
+
+#### Scenario: Absent facet reports a reason
+
+- **GIVEN** the importing adapter does not provide `packageResolution`
+- **WHEN** a package import is resolved
+- **THEN** the result is unresolved with reason `facet-absent`
+
+#### Scenario: Resolved import carries an import:package step
+
+- **GIVEN** a package import resolved to a public binding
+- **WHEN** the adapter returns `ResolvedImports`
+- **THEN** it includes a step of kind `import:package` from the importing local binding id to the public binding id
+- **AND** the indexer persists the step
+
+#### Scenario: Unresolved import diagnostics are not persisted
+
+- **GIVEN** a package import that stayed unresolved
+- **WHEN** the run is persisted
+- **THEN** no relation, binding target, or step is stored for it
+- **AND** the diagnostic with its reason is available only as non-persisted output
+
+#### Scenario: Bindings without a target are ignored by the ambiguity check
+
+- **GIVEN** one public binding with target T and another public binding for the same name without a target
+- **WHEN** `resolvePackageExport` resolves the name
+- **THEN** the name resolves to T
+
+#### Scenario: Package-unknown is counted, never a failure
+
+- **GIVEN** an import of a package that no workspace declares
+- **WHEN** the import is resolved
+- **THEN** the result carries the reason `package-unknown`
+- **AND** the indexer increments `externalPackageImports`
+- **AND** the import is excluded from `total`, `byReason`, and `samples`
+
 ### Requirement: Full-file analysis contract
 
 #### Scenario: Adapter emits all deterministic facts in one pass
@@ -69,6 +389,95 @@
 - **WHEN** it returns that state in `FileAnalysisDraft`
 - **THEN** the retained state uses plain compact data structures
 - **AND** it does not retain AST nodes or parser-runtime objects
+
+### Requirement: Parser-owned resource registration
+
+#### Scenario: Registration happens right after parsing and before traversal
+
+- **GIVEN** a test adapter that records the order of its parse call, its registration, and its first traversal step
+- **WHEN** it analyses a file
+- **THEN** the registration happens after the parse call and before the first traversal step
+
+#### Scenario: A built-in adapter registers what it parses
+
+- **GIVEN** each built-in adapter that parses with a library holding native memory
+- **WHEN** it analyses a file
+- **THEN** the parsed resource is registered in the session's parser-resource scope and not in adapter-private state
+
+#### Scenario: An adapter keeps nothing after analysis
+
+- **GIVEN** a built-in adapter that analysed a file and the epoch has been closed
+- **WHEN** the adapter instance and the session are inspected
+- **THEN** neither refers to the parsed resource
+
+#### Scenario: The draft is plain data
+
+- **GIVEN** the draft returned by `analyzeFile`
+- **WHEN** it is serialized and compared with the registered resources
+- **THEN** it does not reference any registered resource
+
+#### Scenario: An adapter without parser resources registers nothing
+
+- **GIVEN** an adapter whose library needs no release
+- **WHEN** it analyses files
+- **THEN** it registers no resource and the indexing result is unaffected
+
+#### Scenario: A new adapter on another parser library fits the contract
+
+- **GIVEN** a test adapter on a fake library that needs explicit release and registers a disposal function
+- **WHEN** it is added to the registry without changing the indexer, session, resolver, or stores
+- **THEN** its resources are disposed at the file boundary
+
+### Requirement: Parser-authoritative structural fact extraction
+
+#### Scenario: Lookalike text creates no structural fact
+
+- **GIVEN** comments, strings, and template-like literals contain text shaped like imports, calls, declarations, and hierarchy clauses
+- **WHEN** a language adapter analyzes the file
+- **THEN** no graph fact is emitted for the lookalike text
+- **AND** facts are emitted only for corresponding parser nodes
+
+#### Scenario: Complex syntax retains exact parser structure
+
+- **GIVEN** supported calls and declarations use multiline, nested, chained, optional, computed, generic, or same-line syntax available in the language
+- **WHEN** the adapter emits facts
+- **THEN** their kinds, arguments, owners, scopes, callers, and ranges match the typed parser nodes and ancestry
+- **AND** no unbounded raw-source match supplies missing structure
+
+#### Scenario: Auxiliary manifest parsing remains bounded
+
+- **GIVEN** an adapter declares a resolution manifest for which no configured parser exists
+- **WHEN** it parses package identity or resolution metadata textually
+- **THEN** the resulting metadata is accepted
+- **AND** the exception cannot create source declarations, calls, callers, or dependency facts outside parser-proven source constructs
+
+#### Scenario: Parser cannot prove a construct
+
+- **GIVEN** source is erroneous, ambiguous, runtime-only, or unsupported by the configured grammar
+- **WHEN** a textual pattern resembles a supported structural construct
+- **THEN** the adapter emits no guessed structural fact or an explicit unresolved fact
+- **AND** textual proximity is not used as substitute evidence
+
+#### Scenario: Unresolved import emits no guessed relation
+
+- **GIVEN** a parser-proven import has several syntactic candidates but none resolves
+- **WHEN** reference facts and persisted relations are produced
+- **THEN** unresolved diagnostic evidence may be retained
+- **AND** no dependency relation targets the first candidate or raw specifier
+
+#### Scenario: Imported hierarchy relation has shared provenance
+
+- **GIVEN** an imported base or contract resolves deterministically
+- **WHEN** the adapter emits an `EXTENDS` or `IMPLEMENTS` relation
+- **THEN** exactly one matching shared hierarchy reference fact is emitted
+- **AND** it carries the parser range of the hierarchy-clause expression, resolution provenance, and same resolved target
+
+#### Scenario: Pass 2 performs no metadata I/O
+
+- **GIVEN** package and module maps were prepared in run-scoped session state
+- **WHEN** per-file relation extraction runs for several concurrent or consecutive sessions
+- **THEN** it performs no filesystem metadata reads
+- **AND** no mutable adapter-instance cache leaks resolution state between sessions
 
 ### Requirement: Unified built-in adapter migration
 
@@ -147,6 +556,75 @@
 - **WHEN** `analyzeFile()` extracts call facts and `buildRelations()` runs
 - **THEN** no `CALLS` relation is created for that call
 
+### Requirement: Qualified reference resolution
+
+#### Scenario: Resolved fact produces the relation of its kind
+
+- **GIVEN** qualified reference facts of kinds `call`, `construct`, and `type` whose qualifier is a bound namespace and whose names the helper resolves
+- **WHEN** relations are built
+- **THEN** the relations are `CALLS`, `CONSTRUCTS`, and `USES_TYPE` respectively
+- **AND** the helper's resolution step is contributed
+
+#### Scenario: Unresolved fact is dropped silently
+
+- **GIVEN** a fact for which the helper returns `not-exported`, `ambiguous`, `package-unknown`, or `no-entry-surface`
+- **WHEN** relations are built
+- **THEN** no relation is produced and no indexing failure is recorded
+
+#### Scenario: Shadowed qualifier does not resolve
+
+- **GIVEN** a lexical binding named like the namespace in scope at the reference
+- **WHEN** relations are built
+- **THEN** the fact does not resolve
+
+#### Scenario: No name search is performed
+
+- **GIVEN** a name that exists elsewhere in the target workspace but is not exported by the entry surface
+- **WHEN** the fact is resolved
+- **THEN** it stays unresolved
+
+#### Scenario: Namespace without a local binding contributes no step
+
+- **GIVEN** a resolved fact whose namespace has no file-scope local binding
+- **WHEN** imports are resolved
+- **THEN** the relation target is returned and no resolution step is contributed
+
+#### Scenario: Missing source symbol blocks every kind
+
+- **GIVEN** `call`, `construct`, and `type` facts without `sourceSymbolId`
+- **WHEN** relations are built
+- **THEN** no relation is produced for any of them
+
+#### Scenario: Repeated references produce one relation
+
+- **GIVEN** two `call` facts with the same source and the same resolved target
+- **WHEN** relations are built
+- **THEN** exactly one `CALLS` relation exists for that pair
+
+### Requirement: Semantic caller containment
+
+#### Scenario: Preceding non-callable cannot usurp the caller
+
+- **GIVEN** a function contains a local declaration followed by a call
+- **AND** the local declaration starts closer to the call than the function does
+- **WHEN** caller identity is extracted
+- **THEN** the containing function is selected
+- **AND** the local declaration is not selected
+
+#### Scenario: Same-line containment uses columns
+
+- **GIVEN** two supported callable constructs occupy the same source line
+- **WHEN** a call lies inside the second construct's half-open column range
+- **THEN** the second construct is selected as the caller
+- **AND** line order alone does not select the first construct
+
+#### Scenario: No proven container remains unresolved
+
+- **GIVEN** a call is outside every language-approved executable range
+- **WHEN** caller extraction runs
+- **THEN** `callerSymbolId` is absent
+- **AND** no speculative dependency edge is emitted
+
 ### Requirement: Scoped binding fact extraction
 
 #### Scenario: TypeScript constructor parameter type becomes binding fact
@@ -168,6 +646,13 @@
 - **GIVEN** source content fetches a service by a non-literal runtime identifier
 - **WHEN** `analyzeFile()` is called
 - **THEN** no binding fact is emitted for that service target
+
+#### Scenario: Scope boundary pops when construct line range ends
+
+- **GIVEN** a class construct followed by a top-level function on subsequent lines
+- **WHEN** `analyzeFile()` processes declarations sequentially
+- **THEN** the scope stack pops the class scope when line numbers exceed the class's `endLine`
+- **AND** the top-level function does not inherit the preceding class as an enclosing scope
 
 ### Requirement: Built-in multi-language dependency coverage
 
@@ -259,10 +744,12 @@
 
 ### Requirement: Adapter registry
 
-#### Scenario: TypeScript adapter registered by default
+#### Scenario: Adapters registered via register API
 
-- **WHEN** a new `AdapterRegistry` is created
-- **THEN** `getAdapter('typescript')` returns the `TypeScriptLanguageAdapter`
+- **GIVEN** a new `AdapterRegistry`
+- **WHEN** an adapter is registered via `register(adapter)`
+- **THEN** `getAdapter(languageId)` returns that adapter
+- **AND** `getAdapterForFile(filePath)` resolves the adapter by file extension
 
 #### Scenario: Custom adapter extends registry
 
@@ -270,7 +757,6 @@
 - **WHEN** `register(adapter)` is called
 - **THEN** `getAdapter('python')` returns that adapter
 - **AND** `getAdapterForFile('main.py')` returns that adapter
-- **AND** `getAdapter('typescript')` still returns the TypeScript adapter
 
 #### Scenario: Extension map built from adapters
 
@@ -279,55 +765,113 @@
 - **THEN** `getAdapterForFile('main.rs')` returns that adapter
 - **AND** `getLanguageForFile('main.rs')` returns `'rust'`
 
-#### Scenario: Later registration overrides earlier
+#### Scenario: Missing core member is rejected
 
-- **GIVEN** two adapters both declaring `languages(): ['typescript']`
-- **WHEN** both are registered in sequence
-- **THEN** `getAdapter('typescript')` returns the second adapter
+- **GIVEN** an adapter without `analyzeFile`
+- **WHEN** it is registered
+- **THEN** registration fails with a `SpecdError` whose code is `INVALID_LANGUAGE_ADAPTER`
+- **AND** the message names the missing member
+- **AND** the registry is unchanged
+
+#### Scenario: Facet that is not an object of functions is rejected
+
+- **GIVEN** an adapter whose `symbolReferenceSyntax` is a string
+- **WHEN** it is registered
+- **THEN** registration fails with `INVALID_LANGUAGE_ADAPTER`
+
+#### Scenario: Extension for an undeclared language is rejected
+
+- **GIVEN** an adapter whose `extensions()` maps `.rs` to `rust` but whose `languages()` does not include `rust`
+- **WHEN** it is registered
+- **THEN** registration fails with `INVALID_LANGUAGE_ADAPTER`
+
+#### Scenario: Later registration replaces the adapter for a language
+
+- **GIVEN** an adapter registered for `python` and `.py`
+- **WHEN** a second adapter that also declares `python` and `.py` is registered
+- **THEN** `getAdapter('python')` and `getAdapterForFile('main.py')` return the second adapter
+- **AND** the first adapter is no longer returned by `getAdapters()`
+
+#### Scenario: Replacement is per language
+
+- **GIVEN** an adapter registered for `typescript`, `tsx`, `javascript`, and `jsx`
+- **WHEN** a second adapter that declares only `typescript` and `.ts` is registered
+- **THEN** `typescript` and `.ts` resolve to the second adapter
+- **AND** `tsx`, `javascript`, and `jsx` still resolve to the first adapter, which `getAdapters()` still returns
+
+#### Scenario: Registering the same instance twice changes nothing
+
+- **GIVEN** an adapter that is already registered
+- **WHEN** the same instance is registered again
+- **THEN** the registry is unchanged and `getAdapters()` lists it once
+
+#### Scenario: Adapter without optional facets registers
+
+- **GIVEN** an adapter that implements only the required core
+- **WHEN** it is registered
+- **THEN** registration succeeds
+
+#### Scenario: Malformed languages result is rejected
+
+- **GIVEN** an adapter whose `languages()` returns a non-array or an array with an empty string
+- **WHEN** it is registered
+- **THEN** registration fails with `INVALID_LANGUAGE_ADAPTER` and the registry is unchanged
+
+#### Scenario: Malformed extensions result is rejected
+
+- **GIVEN** an adapter whose `extensions()` returns a non-object or maps an extension to a non-string
+- **WHEN** it is registered
+- **THEN** registration fails with `INVALID_LANGUAGE_ADAPTER` and the registry is unchanged
+
+#### Scenario: Invalid resolution manifest value is rejected
+
+- **GIVEN** an adapter whose `resolutionManifests()` returns a glob, a value with a path separator, or an empty string
+- **WHEN** it is registered
+- **THEN** registration fails with `INVALID_LANGUAGE_ADAPTER` naming `resolutionManifests`
 
 ### Requirement: Package identity extraction
 
 #### Scenario: TypeScript adapter reads package.json
 
 - **GIVEN** a directory containing `package.json` with `{"name": "@specd/core"}`
-- **WHEN** `getPackageIdentity(codeRoot)` is called on the TypeScript adapter
+- **WHEN** `packageResolution.identity(codeRoot)` is called on the TypeScript adapter
 - **THEN** it returns `'@specd/core'`
 
 #### Scenario: No manifest returns undefined
 
 - **GIVEN** a directory with no `package.json`
-- **WHEN** `getPackageIdentity(codeRoot)` is called on the TypeScript adapter
+- **WHEN** `packageResolution.identity(codeRoot)` is called on the TypeScript adapter
 - **THEN** it returns `undefined`
 
 #### Scenario: Go adapter reads go.mod
 
 - **GIVEN** a directory containing `go.mod` with `module github.com/acme/auth`
-- **WHEN** `getPackageIdentity(codeRoot)` is called on the Go adapter
+- **WHEN** `packageResolution.identity(codeRoot)` is called on the Go adapter
 - **THEN** it returns `'github.com/acme/auth'`
 
 #### Scenario: Python adapter reads pyproject.toml
 
 - **GIVEN** a directory containing `pyproject.toml` with `[project]` and `name = "acme-auth"`
-- **WHEN** `getPackageIdentity(codeRoot)` is called on the Python adapter
+- **WHEN** `packageResolution.identity(codeRoot)` is called on the Python adapter
 - **THEN** it returns `'acme-auth'`
 
 #### Scenario: PHP adapter reads composer.json
 
 - **GIVEN** a directory containing `composer.json` with `{"name": "acme/auth"}`
-- **WHEN** `getPackageIdentity(codeRoot)` is called on the PHP adapter
+- **WHEN** `packageResolution.identity(codeRoot)` is called on the PHP adapter
 - **THEN** it returns `'acme/auth'`
 
-#### Scenario: Adapter without getPackageIdentity
+#### Scenario: Adapter without the package resolution facet
 
-- **GIVEN** an adapter that does not implement `getPackageIdentity`
-- **WHEN** the indexer queries it for a workspace's package identity
-- **THEN** it returns `undefined` and cross-workspace resolution is skipped for that language
+- **GIVEN** an adapter that does not expose `packageResolution`
+- **WHEN** the indexer builds the package map for a workspace
+- **THEN** the adapter contributes no identity and cross-workspace resolution is skipped for that language
 
 #### Scenario: Manifest found above codeRoot
 
 - **GIVEN** a codeRoot at `/project/packages/core/src` with no `package.json`
 - **AND** `/project/packages/core/package.json` exists with `name: '@specd/core'`
-- **WHEN** `getPackageIdentity('/project/packages/core/src', '/project')` is called
+- **WHEN** `packageResolution.identity('/project/packages/core/src', '/project')` is called
 - **THEN** it returns `'@specd/core'`
 
 #### Scenario: Search bounded by repoRoot
@@ -335,7 +879,7 @@
 - **GIVEN** a codeRoot at `/project/packages/core`
 - **AND** `repoRoot` is `/project`
 - **AND** `/package.json` exists above the repo root
-- **WHEN** `getPackageIdentity` is called
+- **WHEN** `packageResolution.identity` is called
 - **THEN** it does not read `/package.json` — search stops at `/project`
 
 #### Scenario: Declared manifests are the files package identity reads
@@ -364,48 +908,80 @@
 - **WHEN** the Python adapter reads package identity
 - **THEN** the result is `project-name`
 
+#### Scenario: Every adapter is asked for an identity
+
+- **GIVEN** a workspace holding both `package.json` and `composer.json`
+- **WHEN** the package map is built
+- **THEN** the TypeScript identity and the PHP identity are both stored for that workspace
+
+#### Scenario: Two workspaces claiming one name resolve to neither
+
+- **GIVEN** workspaces A and B whose manifests declare the same package name
+- **WHEN** the package map is built
+- **THEN** an error naming both workspaces is reported
+- **AND** the name resolves to no workspace
+
+#### Scenario: One workspace claiming a name through several adapters is not a conflict
+
+- **GIVEN** a workspace whose two adapters return the same name
+- **WHEN** the package map is built
+- **THEN** no conflict is reported
+
+#### Scenario: Inaccessible workspace is skipped
+
+- **GIVEN** a configured workspace whose code root does not exist on this machine
+- **WHEN** the package map is built
+- **THEN** a diagnostic is reported for that workspace
+- **AND** its packages count as external and the run does not fail
+
+#### Scenario: Adapter disabled on a later workspace drops earlier sole identities
+
+- **GIVEN** an adapter that returns package identity P for workspace A and then throws in `identity` or `prepare` for workspace B
+- **WHEN** the package map is finalized
+- **THEN** P is removed from the package map if no other enabled adapter claimed P for workspace A
+
 ### Requirement: Import specifier resolution
 
 #### Scenario: TypeScript scoped package specifier
 
 - **GIVEN** known packages `['@specd/core', '@specd/cli']`
-- **WHEN** `resolvePackageFromSpecifier('@specd/core', knownPackages)` is called on the TypeScript adapter
+- **WHEN** `packageResolution.matchSpecifier('@specd/core', knownPackages)` is called on the TypeScript adapter
 - **THEN** it returns `'@specd/core'`
 
 #### Scenario: TypeScript bare package specifier
 
 - **GIVEN** known packages `['lodash']`
-- **WHEN** `resolvePackageFromSpecifier('lodash/fp', knownPackages)` is called on the TypeScript adapter
+- **WHEN** `packageResolution.matchSpecifier('lodash/fp', knownPackages)` is called on the TypeScript adapter
 - **THEN** it returns `'lodash'`
 
 #### Scenario: Go module specifier resolved by longest prefix
 
 - **GIVEN** known packages `['github.com/acme/auth']`
-- **WHEN** `resolvePackageFromSpecifier('github.com/acme/auth/models', knownPackages)` is called on the Go adapter
+- **WHEN** `packageResolution.matchSpecifier('github.com/acme/auth/models', knownPackages)` is called on the Go adapter
 - **THEN** it returns `'github.com/acme/auth'`
 
 #### Scenario: Python package specifier with hyphen normalization
 
 - **GIVEN** known packages `['acme-auth']`
-- **WHEN** `resolvePackageFromSpecifier('acme_auth.models', knownPackages)` is called on the Python adapter
+- **WHEN** `packageResolution.matchSpecifier('acme_auth.models', knownPackages)` is called on the Python adapter
 - **THEN** it returns `'acme-auth'`
 
 #### Scenario: Unknown specifier returns undefined
 
 - **GIVEN** known packages `['@specd/core']`
-- **WHEN** `resolvePackageFromSpecifier('express', knownPackages)` is called
+- **WHEN** `packageResolution.matchSpecifier('express', knownPackages)` is called
 - **THEN** it returns `undefined`
 
 #### Scenario: PSR-4 resolves qualified name to file path
 
 - **GIVEN** a `codeRoot` containing `composer.json` with `autoload.psr-4: { "App\\": "src/" }`
-- **WHEN** `resolveQualifiedNameToPath('App\\Models\\User', codeRoot)` is called on the PHP adapter
+- **WHEN** `qualifiedNameResolution.resolveToPath('App\\Models\\User', codeRoot)` is called on the PHP adapter
 - **THEN** it returns the absolute path `{codeRoot}/src/Models/User.php`
 
 #### Scenario: Qualified name with no matching prefix returns undefined
 
 - **GIVEN** `composer.json` with `autoload.psr-4: { "App\\": "src/" }`
-- **WHEN** `resolveQualifiedNameToPath('Vendor\\Lib\\Foo', codeRoot)` is called
+- **WHEN** `qualifiedNameResolution.resolveToPath('Vendor\\Lib\\Foo', codeRoot)` is called
 - **THEN** it returns `undefined`
 
 #### Scenario: Session lookups drive PHP import resolution
@@ -419,10 +995,17 @@
 #### Scenario: Pass 2 uses precomputed package metadata instead of filesystem probes
 
 - **GIVEN** the PHP adapter needs PSR-4 metadata to resolve a qualified import during Pass 2
-- **AND** that metadata was already prepared as compact per-file or run-scoped adapter state
+- **AND** that metadata was already prepared by `packageResolution.prepare` or as compact run-scoped adapter state
 - **WHEN** `resolveImports()` runs
 - **THEN** the adapter resolves the import from that retained metadata and shared session lookups
 - **AND** it does not probe the filesystem for each import candidate
+
+#### Scenario: Package-specifier import never searches symbols by name
+
+- **GIVEN** a non-relative import of a name from a package in another workspace
+- **WHEN** the adapter resolves it
+- **THEN** it uses `packageEntryFiles` and `resolvePackageExport`
+- **AND** it does not call a name search over the target workspace
 
 ### Requirement: Tree-sitter query patterns
 
@@ -445,6 +1028,12 @@
 - **GIVEN** a custom adapter omits hierarchy capability
 - **WHEN** hierarchy resolution is requested
 - **THEN** coverage is unsupported and no generic guess is emitted
+
+#### Scenario: Facet does not satisfy a capability flag
+
+- **GIVEN** an adapter provides `reExportLinking` but emits no hierarchy provenance
+- **WHEN** capabilities are recorded
+- **THEN** it cannot advertise hierarchy support because of that facet
 
 ### Requirement: Built-in adapter specialization
 
@@ -485,6 +1074,18 @@
 - **THEN** `parentId` points at that receiver's declaration
 - **AND** the indexer did not skip Go because it was absent from a language list
 
+#### Scenario: Container properties set parentId to enclosing container
+
+- **GIVEN** a class, interface, or struct declaring properties
+- **WHEN** the adapter emits declarations
+- **THEN** each property occurrence has `parentId` set to the enclosing container's symbol ID
+
+#### Scenario: Routine local variables set parentId to enclosing routine
+
+- **GIVEN** a function or method declaring local variables in its body
+- **WHEN** the adapter emits declarations
+- **THEN** each local variable occurrence has `parentId` set to the enclosing routine's symbol ID
+
 #### Scenario: Cyclic owner is not invented
 
 - **GIVEN** member ownership would cycle
@@ -497,25 +1098,25 @@
 #### Scenario: Dotted member text becomes a structured selector
 
 - **GIVEN** the anchored file is TypeScript
-- **WHEN** the adapter parses `EditChange.execute`
+- **WHEN** `symbolReferenceSyntax.parse` is called with `EditChange.execute`
 - **THEN** the result is one owner-then-member selector
 - **AND** the shared domain did not split the string on `.`
 
 #### Scenario: Ambiguous syntax stays unresolved
 
-- **WHEN** the adapter parses a dynamic or ambiguous member expression
+- **WHEN** the facet parses a dynamic or ambiguous member expression
 - **THEN** it returns no guessed candidate
 
 #### Scenario: Native and generic spellings round-trip
 
 - **GIVEN** one logical member
-- **WHEN** the adapter renders the generic spelling and the language-native spelling
+- **WHEN** the facet renders the generic spelling and the language-native spelling
 - **THEN** both parse back to that same structured member
 
 #### Scenario: PHP native spelling is not a TypeScript path
 
 - **GIVEN** the anchored file is PHP
-- **WHEN** the adapter parses `ArchiveChange::execute`
+- **WHEN** the PHP facet parses `ArchiveChange::execute`
 - **THEN** the selector is the same member as the generic `ArchiveChange.execute` spelling
 - **AND** the TypeScript adapter is not used
 
@@ -592,6 +1193,13 @@
 - **THEN** the candidate is `code-graph:src/public.ts`
 - **AND** `sdk:src/@specd/code-graph.ts` is not a candidate
 
+#### Scenario: Re-export and ordinary imports share the entry surface
+
+- **GIVEN** `@specd/code-graph` is the target of both a re-export and an ordinary import
+- **WHEN** each is resolved
+- **THEN** both use the same `packageResolution.entrySurface` result
+- **AND** neither targets a file classified as a test
+
 ### Requirement: Hierarchy evidence consistency
 
 #### Scenario: Supported hierarchy emits relations and resolver provenance
@@ -615,3 +1223,72 @@
 - **GIVEN** a third-party parser cannot provide a valid construct or selection range
 - **WHEN** the adapter translates the declaration
 - **THEN** it omits the symbol instead of fabricating coordinates
+
+### Requirement: Declaration classification policy
+
+#### Scenario: Broad kind does not determine semantic identity
+
+- **GIVEN** a property-like declaration and a callable declaration share a broad parser category and simple name
+- **WHEN** the adapter classifies them using role, scope, owner, and visibility
+- **THEN** only declarations proven to be semantic targets receive logical identities
+- **AND** lexical-only declarations remain bindings or physical evidence
+
+#### Scenario: Owners are available before member IDs
+
+- **GIVEN** two owners each declare a same-name member
+- **WHEN** member logical identities are constructed
+- **THEN** each identity contains its canonical logical owner
+- **AND** the member IDs are distinct
+
+### Requirement: Cross-language semantic conformance suite
+
+#### Scenario: Every built-in adapter runs the shared fixture matrix
+
+- **GIVEN** TypeScript, Python, Go, and PHP adapters are registered
+- **WHEN** the shared semantic adapter contract suite runs
+- **THEN** every adapter executes caller-containment, scope-isolation, ownership, physical-only, logical-resolution, coverage, and incremental-equivalence fixtures
+- **AND** adapter-specific expectations may specialize but not skip common invariants
+
+#### Scenario: New first-party adapter lacks required semantics
+
+- **GIVEN** a new adapter implements the TypeScript interface but uses nearest-preceding caller selection
+- **WHEN** the conformance suite runs
+- **THEN** the adapter fails the common caller-containment scenarios
+- **AND** it is not accepted as conformant
+
+### Requirement: Adding a language adapter
+
+#### Scenario: Guide steps are complete
+
+- **WHEN** a developer follows the seven steps of the guide for a new language
+- **THEN** the adapter indexes and resolves package imports with no change outside the adapter and its registration
+
+#### Scenario: Docs page states the same rules
+
+- **WHEN** `docs/code-graph/language-adapters.md` is compared with this spec
+- **THEN** it states the same required core, facets, members, invariants, and steps without referring the reader to the spec
+
+### Requirement: Bounded per-file structural analysis
+
+#### Scenario: Repeated semantic queries reuse structural evidence
+
+- **GIVEN** a generated file contains many members and many calls that share the same owners and lexical scopes
+- **AND** an internal deterministic counter records owner scans, scope summarizations, and callable-index builds
+- **WHEN** a built-in adapter analyzes the file
+- **THEN** each unchanged owner and lexical scope is structurally summarized once
+- **AND** callable eligibility and ordering are built once per file and policy rather than once per call
+- **AND** increasing queries within an already indexed structure does not increase the number of full-structure scans
+
+#### Scenario: Indexed and baseline semantics are equivalent
+
+- **GIVEN** representative fixtures contain nested owners, overloads, same-name declarations, same-line constructs, multiline syntax, and unresolved references
+- **WHEN** optimized analysis is compared with the established normalized facts for those fixtures
+- **THEN** symbols, ranges, parents, imports, bindings, calls, member semantics, hierarchy evidence, diagnostics, and relations are identical
+- **AND** unresolved or ambiguous inputs remain unresolved or ambiguous
+
+#### Scenario: Callable containment preserves exact boundaries
+
+- **GIVEN** nested callable ranges share lines and contain calls at their start, interior, and half-open end boundaries
+- **WHEN** indexed callable containment resolves each call position
+- **THEN** the same innermost eligible callable is selected as by the established latest-start, earliest-end, stable-ID ordering
+- **AND** a position at the exclusive end of a callable is not attributed to that callable

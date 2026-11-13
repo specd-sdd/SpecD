@@ -1,0 +1,34 @@
+- op: modified
+  description: 'Forward optional configuredWorkspaces to provider.index()'
+  selector:
+    type: section
+    matches: 'Requirement: Executes project indexing'
+  content: |
+    `IndexProjectGraph.execute(input)` MUST call `provider.index()` with an `IndexOptions` object built from:
+
+    - `projectRoot`
+    - `workspaces`
+    - optional `configuredWorkspaces`
+    - `graphConfig`
+    - `codeGraphVersion`
+    - `vcsRoot`
+    - optional `vcsRef`
+    - optional `onProgress`
+
+    and MUST return the resulting `IndexResult` unchanged.
+
+- op: modified
+  description: 'Add optional configuredWorkspaces to IndexProjectGraphInput'
+  selector:
+    type: section
+    matches: 'Requirement: Accepts open provider and prepared inputs'
+  content: |
+    `IndexProjectGraph` SHALL accept an already-open `CodeGraphProvider` and prepared
+    project inputs. `IndexProjectGraphInput` MUST include `provider`, `projectRoot`,
+    `workspaces`, optional `configuredWorkspaces`, `graphConfig`, `codeGraphVersion`,
+    `vcsRoot`, optional `vcsRef`, optional `force`, and optional `onProgress`;
+    `vcsRoot` and `configuredWorkspaces` (when provided) are forwarded unchanged.
+
+    It MUST NOT resolve workspaces, acquire locks, spawn processes, open, close, clear
+    directly, recreate, or otherwise own storage lifecycle. Its only force
+    responsibility is forwarding the force intent to provider indexing.

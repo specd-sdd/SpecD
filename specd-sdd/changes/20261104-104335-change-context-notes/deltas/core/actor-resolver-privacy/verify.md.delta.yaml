@@ -1,0 +1,53 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Privacy modes$'
+  content: |
+    Scenarios:
+
+    #### Scenario: Anonymous mode replaces all data
+
+    - **GIVEN** `privacy.mode` is `anonymous`
+    - **WHEN** `identity()` is called
+    - **THEN** it returns `{ name: "Anonymous", email: "anonymous@getspecd.dev" }`
+
+    #### Scenario: Masked collisions retain distinct IDs
+
+    - **GIVEN** two original actors mask to identical visible fields, with excluded/anonymous branches too
+    - **WHEN** privacy transforms them
+    - **THEN** different originals keep different IDs and every branch preserves ID while existing privacy rules still apply
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Excluded actors$'
+  content: |
+    Scenarios:
+
+    #### Scenario: Excluded actor keeps real data
+
+    - **GIVEN** privacy is `hash`
+    - **AND** `excludeActors` contains `["specd"]`
+    - **WHEN** current actor name is `specd`
+    - **THEN** no hashing is applied
+
+    #### Scenario: Masked collisions retain distinct IDs
+
+    - **GIVEN** two original actors mask to identical visible fields, with excluded/anonymous branches too
+    - **WHEN** privacy transforms them
+    - **THEN** different originals keep different IDs and every branch preserves ID while existing privacy rules still apply
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Pre-privacy ID preservation
+
+    #### Scenario: Distinct masked originals retain distinct IDs
+
+    - **GIVEN** two raw identities mask to identical name/email, plus an excluded and anonymous actor
+    - **WHEN** privacy resolves each identity
+    - **THEN** different canonical originals retain different IDs; excluded/anonymous branches retain mandatory IDs
+    - **AND** configured-salt email hashing remains unchanged and ID generation needs no configured salt

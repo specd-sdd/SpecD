@@ -1,0 +1,34 @@
+- op: modified
+  description: Package imports resolve through the package resolution facet and the shared context
+  selector:
+    type: section
+    matches: 'Requirement: Imports, exports, and public bindings'
+  content: |
+    The adapter SHALL extract named, default, namespace, type-only, side-effect, and aliased static imports; literal `import()` and literal `require()` dependencies; ESM declarations and export clauses; CommonJS exports; named re-exports; and star re-exports. Non-literal dynamic imports and requires SHALL be dropped.
+
+    Public bindings SHALL preserve public surface, exported name, symbol space, canonical target when known, and each independent re-export route. A named or star barrel route SHALL be linked by the `reExportLinking` facet after Pass 1 and before imports are resolved, without collapsing competing routes that occupy the same public slot. Type-only syntax SHALL not be promoted to a value binding without evidence. Relative imports SHALL consider TypeScript/JavaScript extension and index-file candidates through the `relativeImportResolution` facet.
+
+    A non-relative import SHALL resolve through the shared package import helpers: the adapter calls `packageEntryFiles` for the specifier and `resolvePackageExport` for each imported name, and it sets the local binding from the result. A default package import adds a file dependency on the entry files and binds the local name to the entry file's default export declaration when exactly one exists; otherwise it stays a file dependency only. A namespace package import adds a file dependency on the entry files and binds no declaration (its local name already exists as an unresolved local binding). Neither calls `resolvePackageExport`, because they name no export. A side-effect package import depends on the entry file. The adapter MUST NOT search symbols by name in the target workspace, and a name not published by the entry surface stays unresolved.
+
+    Imports declared type-only (`import type { X }` and `import { type X }`) SHALL be marked type-only on the import declaration, and a type-only name SHALL be looked up only in the type space. Any other named import is looked up in the value space and the type space.
+
+    A named or star re-export SHALL also be a file dependency of the re-exporting file on the module it re-exports: a relative re-export that resolves to exactly one indexed file depends on that file, and a package re-export depends on the entry files of that package. This lets the incremental closure re-link a barrel when a re-exported module changes. A relative re-export that resolves to several indexed files adds no dependency.
+
+    Resolved package imports SHALL return an `import:package` step from the importing local binding to the public binding used. Unresolved package imports SHALL return a diagnostic with the reason reported by the helper.
+
+- op: modified
+  description: Entry surface rules for package.json exports and main
+  selector:
+    type: section
+    matches: 'Requirement: Package and build-context boundary'
+  content: |
+    The adapter SHALL provide the `packageResolution` facet. `identity` SHALL derive the package identity from the nearest bounded `package.json` name. `matchSpecifier` SHALL resolve scoped and bare package specifiers by the known package name: a scoped specifier (`@scope/name[/sub]`) matches on its first two segments and a bare one on its first segment. Filesystem searches MUST stop at the supplied repository root.
+
+    `prepare` SHALL read the `package.json` of every configured workspace once per run, including hydrated workspaces, and store compact data: the package `name`, `main`, `exports`, and the workspace code root. `entrySurface` SHALL use only that data:
+
+    - A bare package specifier uses `exports["."]`, using `main` only when `exports` is absent (a defined `exports` without `"."` yields no candidates).
+    - A subpath specifier uses the matching `exports["./<subpath>"]` entry. A subpath with no matching `exports` entry yields no candidates when `exports` is defined.
+    - A published target that is a string maps to its source candidates. A published target that is a condition object uses its `import`, then `default`, alternatives; the `types` alternative is used only when no runtime alternative maps to an indexed source. Alternatives that map to different indexed sources are all returned, so the shared resolver reports an ambiguous name instead of choosing.
+    - A published `.js`, `.mjs`, `.cjs`, or `.jsx` file that is itself an indexed JavaScript source, or an extensionless path to one, maps to that source after the TypeScript candidates. A published `.js`, `.mjs`, or `.cjs` file under a `dist` directory maps to the indexed TypeScript or JavaScript source (for example `dist/public.js` to `src/public.ts` or `src/public.tsx`, or `src/public/index.ts`) in the target workspace.
+
+    The facet declares `package.json` in `resolutionManifests()`. Other conditional resolution remains unsupported: `tsconfig` inheritance, references, `baseUrl`, `paths`, platform or condition selection beyond the rules above, and package `imports`. The adapter SHALL advertise `buildContext: false`, and unresolved conditional alternatives SHALL remain unresolved or ambiguous.

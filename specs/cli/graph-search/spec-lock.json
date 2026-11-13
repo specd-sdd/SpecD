@@ -10,7 +10,8 @@
     "code-graph:document-model",
     "code-graph:graph-store",
     "cli:graph-cli-context",
-    "code-graph:resolve-symbol-reference"
+    "code-graph:resolve-symbol-reference",
+    "sdk:run-graph-search"
   ],
   "implementation": [
     {

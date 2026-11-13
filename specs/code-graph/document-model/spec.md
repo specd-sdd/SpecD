@@ -11,7 +11,7 @@ The code graph traditionally focuses on parser-recognized source code and symbol
 A `DocumentNode` SHALL represent a textual non-code project resource. It MUST include the following properties:
 
 - `path` — the unique identifier for the node (e.g., `core:docs/adr/0001.md` or `root:package.json`)
-- `configRelativePath` — the path relative to the project root used for UI rendering
+- `projectRelativePath` — the path relative to the project root used for UI rendering and filesystem access
 - `contentHash` — SHA-256 hash of the content used for incremental indexing
 - `content` — the raw textual content used for full-text search
 - `workspace` — the owning workspace name, or `root` for project-global documents

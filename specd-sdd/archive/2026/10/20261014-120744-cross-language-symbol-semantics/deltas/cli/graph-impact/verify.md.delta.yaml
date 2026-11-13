@@ -1,0 +1,39 @@
+- op: added
+  description: 'Verify CLI rendering preserves logical versus declaration impact semantics.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Symbol impact analysis$'
+  content: |
+    ### Requirement: Logical and declaration symbol-impact presentation
+
+    #### Scenario: Logical impact summarizes every declaration
+
+    - **GIVEN** a logical selector resolves to a canonical target with several declaration locations
+    - **WHEN** graph impact is rendered as text
+    - **THEN** the target is analyzed once and identified as logical impact
+    - **AND** every contributing declaration location is summarized
+
+    #### Scenario: Exact and ambiguous selectors are presented truthfully
+
+    - **GIVEN** an exact physical selector or an ambiguous semantic selector
+    - **WHEN** graph impact runs
+    - **THEN** exact impact is identified as declaration impact
+    - **AND** ambiguity lists deterministic candidates without traversing any of them
+
+    #### Scenario: Structured formats preserve the SDK contract
+
+    - **GIVEN** the SDK returns discriminated target, declarations, physical evidence, logical affected targets, coverage, explicit count units, and project-relative paths on nested locations
+    - **WHEN** JSON or TOON output is requested
+    - **THEN** those fields are preserved without CLI recomputation
+    - **AND** nested resolvedTarget declarations and evidence retain their projectRelativePath values
+    - **AND** risk, grouping, and coverage remain provider-owned results
+
+- op: removed
+  description: "Round 3: replaced by the 'Exact ambiguity is bounded and not traversed' scenario."
+  selector:
+    type: section
+    matches: '^Scenario: Multiple symbol matches$'

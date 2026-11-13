@@ -43,7 +43,8 @@
 
 #### Scenario: Non-forced or non-recoverable open failure is not retried
 
-- **WHEN** force is false or open raises a different error
+- **GIVEN** a non-forced run whose open raises a recoverable failure other than `SCHEMA_INCOMPATIBLE`, or any non-recoverable error
+- **WHEN** `runIndexProjectGraph` runs
 - **THEN** the original error propagates without recreation or retry
 
 #### Scenario: Explicit provider remains caller-owned
@@ -51,6 +52,13 @@
 - **GIVEN** an explicit already-open provider
 - **WHEN** force indexing runs
 - **THEN** the SDK does not close, recreate, or retry it
+
+#### Scenario: A non-forced run rebuilds a schema-incompatible store
+
+- **GIVEN** a transient provider whose first open raises `GraphStorageRecoveryRequiredError` with reason `SCHEMA_INCOMPATIBLE`
+- **WHEN** `runIndexProjectGraph` runs with `force` not set
+- **THEN** it closes that provider, recreates it once, opens again, and indexes
+- **AND** the result reports a full rebuild with that reason
 
 ### Requirement: Lock acquisition out of scope
 
@@ -67,12 +75,50 @@
 - **WHEN** indexing emits progress
 - **THEN** the same callback receives the events unchanged
 
+#### Scenario: The progress callback keeps its signature
+
+- **GIVEN** a caller that passes only `onProgress`
+- **WHEN** the run executes
+- **THEN** the callback receives the same `(percent, phase)` calls as before this change
+
+### Requirement: Typed event passthrough
+
+#### Scenario: Indexer events reach the receiver in order
+
+- **GIVEN** an `onEvent` receiver and a run that produces `file-activity` and `file-skipped` events
+- **WHEN** the run executes
+- **THEN** the receiver gets them in arrival order and without transformation
+
+#### Scenario: Worker events are not part of this receiver
+
+- **GIVEN** a host that passes `onEvent` to `runIndexProjectGraph` and also runs the isolated worker
+- **WHEN** the worker produces a `worker-silent` event
+- **THEN** that event is delivered through the `onEvent` of `runIsolatedGraphIndex`, not through the one of `runIndexProjectGraph`
+
+#### Scenario: Omitting the receiver changes nothing
+
+- **GIVEN** a run without `onEvent`
+- **WHEN** it completes
+- **THEN** it behaves as before and `onProgress` is unaffected
+
+#### Scenario: Event types are exported
+
+- **GIVEN** the curated public SDK surface
+- **WHEN** a host imports the indexer event types and the isolated-worker event and diagnostics types
+- **THEN** every kind is available with member-level documentation and no internal module is needed
+
 ### Requirement: Result passthrough
 
 #### Scenario: Index result fields preserved
 
 - **WHEN** indexing completes
 - **THEN** returned counts and per-workspace breakdown match `IndexProjectGraph` output
+
+#### Scenario: Size-skip fields are passed through
+
+- **GIVEN** an indexing result with `filesSkippedForSize`, `largestSkippedForSize`, and `sizeExemptAnalysed`
+- **WHEN** the SDK returns its result
+- **THEN** those fields are present with the same values
 
 ### Requirement: Repair lifecycle passthrough
 

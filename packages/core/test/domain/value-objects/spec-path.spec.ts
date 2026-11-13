@@ -43,6 +43,16 @@ describe('SpecPath', () => {
       expect(SpecPath.parse('con-foo').toString()).toBe('con-foo')
     })
 
+    it('rejects an uppercase segment', () => {
+      expect(() => SpecPath.parse('Login')).toThrow(InvalidSpecPathError)
+      expect(() => SpecPath.parse('auth/Login')).toThrow(InvalidSpecPathError)
+    })
+
+    it('accepts a digit-leading segment', () => {
+      expect(SpecPath.parse('2fa').toString()).toBe('2fa')
+      expect(SpecPath.parse('auth/2fa').toString()).toBe('auth/2fa')
+    })
+
     it('throws on dot segment', () => {
       expect(() => SpecPath.parse('auth/./oauth')).toThrow(InvalidSpecPathError)
     })

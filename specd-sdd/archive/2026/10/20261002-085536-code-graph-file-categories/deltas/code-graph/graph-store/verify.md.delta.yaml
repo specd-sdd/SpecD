@@ -1,0 +1,153 @@
+- op: modified
+  description: 'Add file category persistence scenario to Minimum graph semantics'
+  selector:
+    type: section
+    matches: 'Requirement: Minimum graph semantics'
+  content: |
+    #### Scenario: Backend preserves canonical and config-relative file identity
+
+    - **WHEN** indexing and query features use the abstract `GraphStore`
+    - **THEN** file nodes retain both canonical workspace-prefixed `path` values and `configRelativePath` values needed for CLI lookup
+    - **AND** storage-agnostic consumers do not depend on backend-specific column or label names
+
+    #### Scenario: Backend persists file source content for preview extraction
+
+    - **WHEN** a backend advertises conformance to `GraphStore`
+    - **THEN** persisted file nodes carry source content sufficient to derive symbol snippets from file-backed context
+    - **AND** consumers do not need per-symbol persisted snippet blobs to render symbol previews
+
+    #### Scenario: Backend persists scoped-binding dependency relations
+
+    - **WHEN** a backend advertises conformance to `GraphStore`
+    - **THEN** its persisted relation model includes `CALLS`, `CONSTRUCTS`, and `USES_TYPE`
+    - **AND** these relations remain queryable through the abstract dependency methods
+
+    #### Scenario: Backend persists derivation metadata
+
+    - **WHEN** a graph has been indexed successfully
+    - **THEN** the store can persist and later return `lastIndexedAt`, `lastIndexedRef`, and the graph fingerprint
+
+    #### Scenario: Backend persists spec coverage relation families
+
+    - **WHEN** a backend advertises conformance to `GraphStore`
+    - **THEN** its persisted relation model includes `COVERS_FILE` and `COVERS_SYMBOL`
+    - **AND** these relations remain queryable through the abstract coverage methods
+
+    #### Scenario: Symbol coverage metadata survives round-trip
+
+    - **GIVEN** a `COVERS_SYMBOL` relation with metadata `{ "stale": true }`
+    - **WHEN** it is persisted and loaded back through the abstract `GraphStore`
+    - **THEN** the returned relation preserves that metadata without backend-specific decoding
+
+    #### Scenario: Backend persists file category
+
+    - **GIVEN** a file node with category `'test'` or `'ignored'`
+    - **WHEN** it is persisted in the store and loaded back
+    - **THEN** the returned `FileNode` preserves its `category` attribute
+    - **AND** files without explicit category default to `'source'`
+
+- op: modified
+  description: 'Add findSymbols category filtering scenario to Query methods'
+  selector:
+    type: section
+    matches: 'Requirement: Query methods'
+  content: |
+    #### Scenario: findFilesByConfigRelativePath returns exact matches
+
+    - **GIVEN** indexed files `core:src/index.ts` with `configRelativePath` `packages/core/src/index.ts`
+    - **AND** `cli:src/index.ts` with `configRelativePath` `packages/cli/src/index.ts`
+    - **WHEN** `findFilesByConfigRelativePath('packages/core/src/index.ts')` is called
+    - **THEN** only the `core:src/index.ts` file node is returned
+
+    #### Scenario: findFilesByConfigRelativePath may return multiple canonical files
+
+    - **GIVEN** two indexed files from different workspaces share the same `configRelativePath`
+    - **WHEN** `findFilesByConfigRelativePath('src/index.ts')` is called
+    - **THEN** both canonical file nodes are returned so the caller can raise an ambiguity error
+
+    #### Scenario: getCallers includes USES_TYPE and CONSTRUCTS dependents
+
+    - **GIVEN** symbol `TemplateExpander` has one incoming `CALLS`, one incoming `CONSTRUCTS`, and one incoming `USES_TYPE` relation
+    - **WHEN** `getCallers(TemplateExpander.id)` is called
+    - **THEN** all three dependency relations are returned
+
+    #### Scenario: getCallees includes USES_TYPE and CONSTRUCTS dependencies
+
+    - **GIVEN** symbol `createKernel` has outgoing `CALLS`, `CONSTRUCTS`, and `USES_TYPE` relations
+    - **WHEN** `getCallees(createKernel.id)` is called
+    - **THEN** all three dependency relations are returned
+
+    #### Scenario: getCoveredFiles returns spec file coverage
+
+    - **GIVEN** spec `core:change` covers files `core:src/change.ts` and `core:src/state.ts`
+    - **WHEN** `getCoveredFiles('core:change')` is called
+    - **THEN** both persisted `COVERS_FILE` relations are returned
+
+    #### Scenario: getCoveringSpecsForFile returns specs covering a file
+
+    - **GIVEN** file `core:src/change.ts` is covered by specs `core:change` and `core:change-manifest`
+    - **WHEN** `getCoveringSpecsForFile('core:src/change.ts')` is called
+    - **THEN** both `COVERS_FILE` relations are returned
+
+    #### Scenario: getCoveredSymbols returns spec symbol coverage
+
+    - **GIVEN** spec `core:change` covers symbol `core:Change.transition`
+    - **WHEN** `getCoveredSymbols('core:change')` is called
+    - **THEN** the persisted `COVERS_SYMBOL` relation is returned
+
+    #### Scenario: getCoveringSpecsForSymbol returns specs covering a symbol
+
+    - **GIVEN** symbol `core:Change.transition` is covered by spec `core:change`
+    - **WHEN** `getCoveringSpecsForSymbol('core:Change.transition')` is called
+    - **THEN** the persisted `COVERS_SYMBOL` relation is returned
+
+    #### Scenario: findSymbols filters by category
+
+    - **GIVEN** symbols declared in files with category `'source'`, `'test'`, and `'ignored'`
+    - **WHEN** `findSymbols({ categories: ['source'] })` is called
+    - **THEN** only symbols declared in files with category `'source'` are returned
+
+- op: modified
+  description: 'Add physical category filtering scenario to Filtered impact query contract'
+  selector:
+    type: section
+    matches: 'Requirement: Filtered impact query contract'
+  content: |
+    #### Scenario: Store applies canonical filter precedence
+
+    - **GIVEN** candidates span included, excluded, and unrelated canonical workspaces and symbol kinds
+    - **WHEN** a filtered impact read executes
+    - **THEN** it returns only candidates admitted by type, kind, inclusion, and exclusion predicates
+    - **AND** exclusion wins when the same workspace is also included
+
+    #### Scenario: SQLite filters before crossing the adapter boundary
+
+    - **GIVEN** an SQLite graph containing both admitted and excluded impact candidates
+    - **WHEN** the store executes a filtered impact query
+    - **THEN** its physical statements include the normalized predicates before rows are materialized
+    - **AND** excluded rows are not returned to TypeScript for post-query removal
+
+    #### Scenario: Worker request preserves filters
+
+    - **GIVEN** the SQLite store runs through its worker-backed protocol
+    - **WHEN** a filtered impact request crosses the worker boundary
+    - **THEN** all normalized filter fields reach the database query unchanged
+    - **AND** the worker response contains no candidates excluded by those fields
+
+    #### Scenario: Port remains storage neutral
+
+    - **WHEN** a non-SQLite test store implements the filtered impact contract
+    - **THEN** it requires no SQLite table, statement, worker-message, or pagination type
+
+    #### Scenario: Store frontier query supports candidate resource category and depth-zero reads
+
+    - **GIVEN** a frontier of symbol or file nodes and a request for covering specs
+    - **WHEN** `queryImpactFrontier` is invoked with candidate resource category `spec` and depth `0`
+    - **THEN** it queries and hydrates the admitted spec nodes directly without requiring a positive traversal depth
+
+    #### Scenario: Category filter excludes non-admitted categories in physical query
+
+    - **GIVEN** an SQLite store with callers located in both `'source'` and `'test'` files
+    - **WHEN** `queryImpactFrontier` executes with default categories (`['source']`)
+    - **THEN** callers located in `'test'` files are excluded directly in the SQL statement
+    - **AND** only callers from `'source'` files are returned across the boundary

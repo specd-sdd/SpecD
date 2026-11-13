@@ -1,0 +1,40 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Returns lifecycle context$'
+  content: |
+    GetStatus SHALL project review as exactly required and affectedArtifacts, derived from all currently pending/drifted review artifacts, not latest invalidation events. Notes SHALL be a text-only string array from the committed current snapshot, without note IDs, author, time or policy. No overlapDetail or review reason/message/route is exposed. Canonical blockers and nextAction SHALL follow current validity, gates, topology and preserve/redesign policy; missing/stale verification boundaries and drafted read-only rules remain unchanged. Note deletion SHALL not resolve review or alter allowed transitions.
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Identifies blockers$'
+  content: |
+    `GetStatus` MUST identify explicit blockers that prevent lifecycle progression.
+
+    Blockers MUST be collected for:
+
+    - **Artifact Drift**: code `'ARTIFACT_DRIFT'` from current drift facts.
+    - **Review Required**: code `'REVIEW_REQUIRED'` from current pending-review facts.
+    - **Incomplete artifacts**: code `'INCOMPLETE_ARTIFACT'` for each required artifact whose effective status is `missing` or `in-progress`. There is no separate `MISSING_ARTIFACT` code — absence and in-progress share `INCOMPLETE_ARTIFACT`.
+      Failed predicates for candidate hops MUST appear on public `blockers` with their check codes (`INCOMPLETE_ARTIFACT`, `APPROVAL_REQUIRED`, `INCOMPLETE_TASKS`, `DEPS_INCONSISTENT`, `READ_ONLY_WORKSPACE`, `IMPLEMENTATION_STATE`, `INVALID_TRANSITION`, archive codes when in scope including `OVERLAP_CONFLICT` **only** from archive predicates while `state === 'archivable'`). A peer invalidation note MUST NOT add `OVERLAP_CONFLICT` to blockers. `GetStatus` MUST NOT drop requires or approval failures from `blockers` while omitting those hops from `availableTransitions`.
+
+    A blocker projected from a failed predicate SHALL carry `isSkippable` and `bypassFlag: '--skip-checks <checkId>'` only when the resolved binding of that check for the evaluated candidate is skippable, including skippability declared by the schema. For code `IMPLEMENTATION_STATE`, only `impl.linksInScope` failures are skippable; open-file failures from `impl.filesResolved` MUST NOT advertise a bypass even though they share the same code.
+
+    Blockers projected from a failed check MUST include that check’s gerund `label` (and SHOULD include `checkId`) alongside `code` and `message`. Review-only blockers (`ARTIFACT_DRIFT`, `REVIEW_REQUIRED`) MAY omit `label`. Agents use `label` as a human hint for what the machine code means (for example `DEPS_INCONSISTENT` → `Checking spec dependencies`).
+
+    Cause-specific human explanations SHALL be persisted notes. Note text/presence MUST NOT determine blockers or routing; review exposes only required and affectedArtifacts.
+
+    When public `blockers` include `OVERLAP_CONFLICT`, `nextAction.command` MUST remain `/specd-archive` and `targetStep` MUST remain `archivable`. `nextAction.reason` MUST NOT be `Ready to archive`. It MUST name live overlap and, only when the resolved `spec.overlap` binding is skippable, the projected bypass flag (`--skip-checks spec.overlap`). Overlap is an archive operation predicate, not a hop, so `availableTransitions` MAY still list `archiving`.
+
+    `GetStatus` MAY assemble these blockers directly or obtain them from `evaluateLifecycle`, but the blocker set MUST be derived from the same authoritative evaluation used for effective statuses and `availableTransitions`.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Notes on every inspection branch
+
+    Text-only note projection SHALL be available from the current snapshot on normal, conditional/unchanged, drafted and schema-unavailable status branches where a change is readable. Status SHALL not expose full note detail through its public notes field or serialize a raw aggregate as a substitute for that projection. Dedicated list/show queries own IDs and detail. Status SHALL not rebuild notes or historical overlap explanations.

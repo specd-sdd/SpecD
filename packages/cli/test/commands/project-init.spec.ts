@@ -42,6 +42,28 @@ vi.mock('@specd/sdk', async (importOriginal) => {
   }
 })
 
+const clackMock = vi.hoisted(() => ({
+  validators: new Map<string, (value: string | undefined) => string | undefined>(),
+}))
+
+vi.mock('@clack/prompts', () => ({
+  intro: vi.fn(),
+  outro: vi.fn(),
+  isCancel: vi.fn(() => false),
+  confirm: vi.fn().mockResolvedValue(true),
+  multiselect: vi.fn(async () => ['@specd/plugin-agent-claude']),
+  text: vi.fn(
+    async (opts: {
+      message: string
+      initialValue?: string
+      validate?: (value: string | undefined) => string | undefined
+    }) => {
+      if (opts.validate !== undefined) clackMock.validators.set(opts.message, opts.validate)
+      return opts.initialValue ?? ''
+    },
+  ),
+}))
+
 vi.mock('../../src/helpers/cli-context.js', () => ({
   resolveCliContext: vi.fn(),
 }))
@@ -52,15 +74,6 @@ vi.mock('../../src/commands/plugins/install.js', () => ({
 
 vi.mock('../../src/helpers/file-exists.js', () => ({
   fileExists: vi.fn().mockResolvedValue(false),
-}))
-
-vi.mock('@clack/prompts', () => ({
-  intro: vi.fn(),
-  text: vi.fn(async (options: { initialValue?: string }) => options.initialValue ?? ''),
-  multiselect: vi.fn(async () => ['@specd/plugin-agent-claude']),
-  confirm: vi.fn(async () => true),
-  isCancel: vi.fn(() => false),
-  outro: vi.fn(),
 }))
 
 import { createConfigWriter, createVcsAdapter } from '@specd/sdk'
@@ -104,6 +117,14 @@ afterEach(() => {
 })
 
 describe('project init', () => {
+  it('documents its structured output', () => {
+    const program = makeProgram()
+    registerProjectInit(program.command('project'))
+    const stdout = captureStdout()
+    program.commands[0]!.commands.find((c) => c.name() === 'init')!.outputHelp()
+    expect(stdout()).toContain('JSON/TOON output schema:')
+    expect(stdout()).toContain('metadataCachePath: string')
+  })
   it('supports --plugin and installs selected plugins after init', async () => {
     setup()
     const program = makeProgram()
@@ -434,7 +455,17 @@ describe('project init', () => {
       return true as never
     })
     vi.mocked(text).mockImplementation(
-      async (options: { message?: string; initialValue?: string }) => {
+      async (options: {
+        message?: string | undefined
+        initialValue?: string | undefined
+        validate?: ((value: string) => string | Error | undefined) | undefined
+      }) => {
+        if (options.validate !== undefined && options.message !== undefined) {
+          clackMock.validators.set(
+            options.message,
+            options.validate as (value: string | undefined) => string | undefined,
+          )
+        }
         order.push(String(options.message))
         return options.initialValue ?? ''
       },
@@ -760,5 +791,93 @@ describe('project init', () => {
         /too many arguments/i,
       )
     })
+  })
+})
+
+describe('project init workspace id validation (audit hardening)', () => {
+  it.each(['a', 'Core', 'nul'])('rejects --workspace %j without writing files', async (id) => {
+    setup()
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+
+    const program = makeProgram()
+    registerProjectInit(program)
+    await program
+      .parseAsync(['node', 'specd', 'init', '--workspace', id, '--workspace-path', 'specs/'])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    const err = stderr.mock.calls.map((call) => String(call[0])).join('')
+    expect(err).toContain(`'${id}'`)
+    expect(err).toContain('a-z')
+    expect(mockInitProject).not.toHaveBeenCalled()
+  })
+
+  it('does not trim the typed value', async () => {
+    setup()
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+
+    const program = makeProgram()
+    registerProjectInit(program)
+    await program
+      .parseAsync(['node', 'specd', 'init', '--workspace', ' ab ', '--workspace-path', 'specs/'])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr.mock.calls.map((call) => String(call[0])).join('')).toContain("' ab '")
+    expect(mockInitProject).not.toHaveBeenCalled()
+  })
+
+  it('accepts a two-character workspace id', async () => {
+    setup()
+
+    const program = makeProgram()
+    registerProjectInit(program)
+    await program.parseAsync([
+      'node',
+      'specd',
+      'init',
+      '--workspace',
+      'ab',
+      '--workspace-path',
+      'specs/',
+    ])
+
+    expect(mockInitProject).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: 'ab' }))
+  })
+
+  it('wizard validator rejects the same ids and accepts default/ab', async () => {
+    setup()
+    const original = Object.getOwnPropertyDescriptor(process.stdout, 'isTTY')
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+    try {
+      clackMock.validators.clear()
+      const program = makeProgram()
+      registerProjectInit(program)
+      await program.parseAsync(['node', 'specd', 'init']).catch(() => {})
+
+      const validate = clackMock.validators.get('Default workspace ID')!
+      expect(validate).toBeDefined()
+      for (const bad of ['a', 'Core', 'nul', ' ab ']) {
+        expect(validate(bad)).toContain(`'${bad}'`)
+      }
+      expect(validate('default')).toBeUndefined()
+      expect(validate('ab')).toBeUndefined()
+    } finally {
+      if (original !== undefined) Object.defineProperty(process.stdout, 'isTTY', original)
+      else delete (process.stdout as { isTTY?: boolean }).isTTY
+    }
+  })
+
+  it('has no ad hoc workspace-name regex in the CLI sources', async () => {
+    const { readdir, readFile } = await import('node:fs/promises')
+    const root = new URL('../../src/', import.meta.url)
+    const entries = await readdir(root, { recursive: true })
+    const offenders: string[] = []
+    for (const entry of entries) {
+      if (!entry.endsWith('.ts')) continue
+      const content = await readFile(new URL(entry, root), 'utf8')
+      if (content.includes('[a-z][a-z0-9-]')) offenders.push(entry)
+    }
+    expect(offenders).toEqual([])
   })
 })

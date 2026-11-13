@@ -55,6 +55,14 @@ Health fields SHALL use stable machine-readable reason codes and distinguish cur
 
 A consumer SHALL be able to determine from this result whether absence for an addressed target is trustworthy enough to declare stale.
 
+### Requirement: Coverage completeness with warnings
+
+`GetGraphHealthResult` SHALL additionally expose `coverageCompleteness` with one of the values `complete`, `complete-with-warnings`, `incomplete`, or `unknown`, and `coverageWarnings`, an ordered list of `{ code, count }` entries. The only warning code defined by this requirement is `file-too-large`, whose `count` is the number of coverage records with status `unsupported` and reason `file-too-large`.
+
+The value SHALL be derived from the existing coverage rules without changing them: `incomplete` when aggregate coverage is incomplete (`parse-failed` or `partial` targets, or an integrity mismatch); `unknown` when coverage cannot be assessed; `complete-with-warnings` when aggregate coverage is complete and `coverageWarnings` is not empty; otherwise `complete`. `coverageWarnings` is empty whenever `coverageCompleteness` is `incomplete` or `unknown`; warnings qualify only a complete graph. The boolean `coverageComplete` is unchanged: it stays `true` for `complete-with-warnings`, because a file skipped by configuration is a terminal, explicit outcome.
+
+Only gaps caused by the configured per-file size limit raise a warning. Documents or files without a language adapter (`unsupported` for other reasons) and files excluded by rules MUST NOT raise warnings. A consumer SHALL treat `complete-with-warnings` as "the graph may lack content from files skipped by configuration": absence of a symbol or reference is not proven for code that may live in those files, and the warning counts identify how many files are affected.
+
 ### Requirement: Indexed-content integrity assessment
 
 `GetGraphHealth` SHALL assess whether persisted indexed-input coverage agrees with the graph contents that coverage claims were derived from. Each coverage record whose status represents successfully indexed code or text MUST correspond to the expected persisted file or document node in the same logical generation.
@@ -78,6 +86,8 @@ Structured delivery formats SHALL retain every workspace. Text presentation SHAL
 VCS-backed workspaces SHALL be grouped by detected repository root and share one normalized modified-path evaluation. Code Graph SHALL filter complete adapter paths through effective graph visibility before stat or hashing. Excluded-only changes MUST leave workspace and aggregate latches unchanged.
 
 Non-VCS assessment SHALL compare visible membership and stored observations, hash only when mtime or size differs, refresh equal-content observations, and stop on the first proven mismatch. An inability to inspect a candidate SHALL stop or retain assessment as unknown unless another independent candidate already proves staleness. Health MUST NOT inspect every symbol or invoke targeted resource assessment across the complete graph.
+
+Visible membership already excludes files that the effective size limit skips, and the indexed side of the comparison MUST do the same: a coverage record with status `unsupported` and reason `file-too-large` is a terminal outcome of the last index, not an indexed member. A run that indexes and skips files for size MUST therefore be reported as current, not as a changed file set, until the files or the limits change. A file that grows past the limit after being indexed MUST still be reported as a membership change, because it is indexed and no longer visible.
 
 ## Constraints
 

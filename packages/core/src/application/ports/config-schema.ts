@@ -2,6 +2,9 @@ import { z } from 'zod'
 import { ConfigValidationError } from '../../domain/errors/config-validation-error.js'
 import { PLUGIN_NAME_REGEX } from '../../domain/plugin-name.js'
 import { deepMergeConfig, isRecord } from '../../domain/services/deep-merge-config.js'
+import { InvalidSpecPatternError } from '../../domain/errors/invalid-spec-pattern-error.js'
+import { parseSpecPattern } from '../../domain/services/parse-spec-pattern.js'
+import { isValidCapabilitySegment } from '../../domain/services/spec-id-rules.js'
 
 // ---------------------------------------------------------------------------
 // Zod schemas for specd.yaml validation
@@ -46,55 +49,13 @@ export const ContextEntryRawZodSchema = z.union([
  * @internal Exported only for tests.
  */
 export function validateContextPattern(pattern: string, field: string, configPath: string): void {
-  // Bare wildcard
-  if (pattern === '*') return
-
-  // Split optional workspace qualifier
-  const colonIdx = pattern.indexOf(':')
-  let workspace: string | null = null
-  let rest: string
-
-  if (colonIdx !== -1) {
-    workspace = pattern.slice(0, colonIdx)
-    rest = pattern.slice(colonIdx + 1)
-  } else {
-    rest = pattern
-  }
-
-  // Workspace qualifier must be a valid identifier (lowercase alphanumeric + hyphens)
-  if (workspace !== null && !/^[a-z][a-z0-9-]*$/.test(workspace)) {
-    throw new ConfigValidationError(
-      configPath,
-      `${field}: invalid workspace qualifier in pattern '${pattern}'`,
-    )
-  }
-
-  // After qualifier: `*`, `prefix/*`, or `path/name`
-  if (rest === '*') return
-
-  // Check for misplaced wildcards
-  if (rest.includes('*')) {
-    // Only valid position: at the very end, preceded by `/`
-    if (!rest.endsWith('/*') || rest.indexOf('*') !== rest.length - 1) {
-      throw new ConfigValidationError(
-        configPath,
-        `${field}: '*' in disallowed position in pattern '${pattern}'`,
-      )
+  try {
+    parseSpecPattern(pattern)
+  } catch (err) {
+    if (err instanceof InvalidSpecPatternError) {
+      throw new ConfigValidationError(configPath, `${field}: ${err.reason} in pattern '${pattern}'`)
     }
-    // Validate the prefix before /*
-    const prefix = rest.slice(0, -2)
-    if (!/^[a-z_][a-z0-9_-]*(?:\/[a-z_][a-z0-9_-]*)*$/.test(prefix)) {
-      throw new ConfigValidationError(
-        configPath,
-        `${field}: invalid path prefix in pattern '${pattern}'`,
-      )
-    }
-    return
-  }
-
-  // Exact path — no wildcards
-  if (!/^[a-z_][a-z0-9_-]*(?:\/[a-z_][a-z0-9_-]*)*$/.test(rest)) {
-    throw new ConfigValidationError(configPath, `${field}: invalid pattern '${pattern}'`)
+    throw err
   }
 }
 
@@ -138,20 +99,18 @@ export function validateContextPatterns(
   }
 }
 
-export const PREFIX_SEGMENT_RE = /^[a-z0-9_][a-z0-9_-]*$/
-
 export const PrefixZodSchema = z.string().refine(
   (v) => {
     if (v === '') return false
     if (v.startsWith('/') || v.endsWith('/')) return false
     const segments = v.split('/')
     return segments.every(
-      (s) => s.length > 0 && s !== '.' && s !== '..' && PREFIX_SEGMENT_RE.test(s),
+      (s) => s.length > 0 && s !== '.' && s !== '..' && isValidCapabilitySegment(s),
     )
   },
   {
     message:
-      'prefix must be one or more segments matching /^[a-z0-9_][a-z0-9_-]*$/ separated by "/", with no leading/trailing "/" or empty segments',
+      'prefix must be one or more capability-path segments separated by "/", with no leading/trailing "/" or empty segments',
   },
 )
 
@@ -160,6 +119,10 @@ export const WorkspaceGraphZodSchema = z
     respectGitignore: z.boolean().optional(),
     excludePaths: z.array(z.string()).optional(),
     allowedPaths: z.array(z.string()).optional(),
+    testPaths: z.array(z.string()).optional(),
+    ignorePaths: z.array(z.string()).optional(),
+    maxFileBytes: z.number().int().nonnegative().optional(),
+    largeFilePaths: z.array(z.string()).optional(),
   })
   .strict()
 
@@ -167,6 +130,10 @@ export const ProjectGraphZodSchema = z
   .object({
     includePaths: z.array(z.string()).optional(),
     excludePaths: z.array(z.string()).optional(),
+    testPaths: z.array(z.string()).optional(),
+    ignorePaths: z.array(z.string()).optional(),
+    maxFileBytes: z.number().int().nonnegative().optional(),
+    largeFilePaths: z.array(z.string()).optional(),
   })
   .strict()
 

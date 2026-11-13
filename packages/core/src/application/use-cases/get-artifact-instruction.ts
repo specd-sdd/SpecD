@@ -162,7 +162,9 @@ export class GetArtifactInstruction {
       // Build available outline references from existing spec artifacts.
       const availableOutlines: string[] = []
       for (const specId of change.specIds) {
-        const { workspace: specWorkspace, capPath } = parseSpecId(specId)
+        const { workspace: specWorkspace, capPath } = parseSpecId(specId, {
+          workspaces: this._specs.keys(),
+        })
         const specRepo = this._specs.get(specWorkspace)
         if (specRepo === undefined) continue
 

@@ -43,10 +43,13 @@ afterEach(() => vi.restoreAllMocks())
 describe('spec outline', () => {
   it('outputs outlines for ALL spec-scoped artifacts by default', async () => {
     const { kernel, stdout } = setup()
-    kernel.specs.getOutline.execute.mockResolvedValue([
-      { filename: 'spec.md', outline: mockOutline },
-      { filename: 'verify.md', outline: mockOutline },
-    ])
+    kernel.specs.getOutline.execute.mockResolvedValue({
+      specId: 'default:auth/login',
+      outlines: [
+        { filename: 'spec.md', outline: mockOutline },
+        { filename: 'verify.md', outline: mockOutline },
+      ],
+    })
 
     const program = makeProgram()
     registerSpecOutline(program.command('specs'))
@@ -62,9 +65,10 @@ describe('spec outline', () => {
 
   it('outputs structured data in json format', async () => {
     const { kernel, stdout } = setup()
-    kernel.specs.getOutline.execute.mockResolvedValue([
-      { filename: 'spec.md', outline: mockOutline },
-    ])
+    kernel.specs.getOutline.execute.mockResolvedValue({
+      specId: 'default:auth/login',
+      outlines: [{ filename: 'spec.md', outline: mockOutline }],
+    })
 
     const program = makeProgram()
     registerSpecOutline(program.command('specs'))
@@ -85,9 +89,10 @@ describe('spec outline', () => {
 
   it('passes artifactId to use case', async () => {
     const { kernel } = setup()
-    kernel.specs.getOutline.execute.mockResolvedValue([
-      { filename: 'verify.md', outline: mockOutline },
-    ])
+    kernel.specs.getOutline.execute.mockResolvedValue({
+      specId: 'default:auth/login',
+      outlines: [{ filename: 'verify.md', outline: mockOutline }],
+    })
     kernel.specs.getActiveSchema.execute.mockResolvedValue({
       raw: false,
       schema: {
@@ -118,9 +123,10 @@ describe('spec outline', () => {
 
   it('passes filename to use case', async () => {
     const { kernel } = setup()
-    kernel.specs.getOutline.execute.mockResolvedValue([
-      { filename: 'verify.md', outline: mockOutline },
-    ])
+    kernel.specs.getOutline.execute.mockResolvedValue({
+      specId: 'default:auth/login',
+      outlines: [{ filename: 'verify.md', outline: mockOutline }],
+    })
 
     const program = makeProgram()
     registerSpecOutline(program.command('specs'))
@@ -141,9 +147,10 @@ describe('spec outline', () => {
 
   it('passes full flag to use case', async () => {
     const { kernel } = setup()
-    kernel.specs.getOutline.execute.mockResolvedValue([
-      { filename: 'spec.md', outline: mockOutline },
-    ])
+    kernel.specs.getOutline.execute.mockResolvedValue({
+      specId: 'default:auth/login',
+      outlines: [{ filename: 'spec.md', outline: mockOutline }],
+    })
 
     const program = makeProgram()
     registerSpecOutline(program.command('specs'))
@@ -156,9 +163,10 @@ describe('spec outline', () => {
 
   it('passes hints flag to use case', async () => {
     const { kernel } = setup()
-    kernel.specs.getOutline.execute.mockResolvedValue([
-      { filename: 'spec.md', outline: mockOutline },
-    ])
+    kernel.specs.getOutline.execute.mockResolvedValue({
+      specId: 'default:auth/login',
+      outlines: [{ filename: 'spec.md', outline: mockOutline }],
+    })
 
     const program = makeProgram()
     registerSpecOutline(program.command('specs'))
@@ -242,9 +250,10 @@ describe('spec outline', () => {
 
   it('deduplicates when --artifact and --file resolve to same file', async () => {
     const { kernel, stdout } = setup()
-    kernel.specs.getOutline.execute.mockResolvedValue([
-      { filename: 'spec.md', outline: mockOutline },
-    ])
+    kernel.specs.getOutline.execute.mockResolvedValue({
+      specId: 'default:auth/login',
+      outlines: [{ filename: 'spec.md', outline: mockOutline }],
+    })
     kernel.specs.getActiveSchema.execute.mockResolvedValue({
       raw: false,
       schema: {

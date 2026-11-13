@@ -1,0 +1,388 @@
+{
+  "name": "core-validate-change-batch",
+  "createdAt": "2026-10-09T14:34:30.726Z",
+  "updatedAt": "2026-10-09T21:17:19.530Z",
+  "description": "Extract batch change validation orchestration into canonical @specd/core use case ValidateChangeBatch with existence and schema guards, topological DAG execution, and CLI delegation.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["core:validate-change-batch", "cli:change-validate"],
+  "specDependsOn": {
+    "cli:change-validate": [
+      "cli:entrypoint",
+      "core:change",
+      "core:validate-artifacts",
+      "core:spec-id-format",
+      "core:preview-spec",
+      "core:validate-change-batch"
+    ],
+    "core:validate-change-batch": ["core:change", "core:validate-artifacts", "core:schema-format"]
+  },
+  "invalidationPolicy": "downstream",
+  "implementationTrackingStartedAt": "2026-10-09T15:31:47.885Z",
+  "trackedImplementationFiles": [
+    {
+      "file": "packages/core/src/application/use-cases/validate-change-batch.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/validate-change-batch.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/kernel.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/public.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/core-reexports.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/validate.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-validate.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/helpers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/validate-change-batch.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/validate-change-batch.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/generated/guides-sdk.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/generated/guides.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/guide-sdk/guide-sdk.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/barrel-kernel-coverage.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/test/integration/sdk-catalog.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:validate-change-batch",
+      "file": "packages/core/src/application/use-cases/validate-change-batch.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "ValidateChangeBatch",
+        "ValidateChangeBatchInput",
+        "ValidateChangeBatchStepResult",
+        "ValidateChangeBatchResult"
+      ]
+    },
+    {
+      "specId": "core:validate-change-batch",
+      "file": "packages/core/src/application/use-cases/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:validate-change-batch",
+      "file": "packages/core/src/composition/use-cases/validate-change-batch.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "createValidateChangeBatch",
+        "ValidateChangeBatchDeps",
+        "resolveValidateChangeBatchDeps"
+      ]
+    },
+    {
+      "specId": "core:validate-change-batch",
+      "file": "packages/core/src/composition/use-cases/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:validate-change-batch",
+      "file": "packages/core/src/composition/kernel.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["Kernel", "createKernel"]
+    },
+    {
+      "specId": "core:validate-change-batch",
+      "file": "packages/core/src/public.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:change-validate",
+      "file": "packages/cli/src/commands/change/validate.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerChangeValidate"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:6f8702b7b5e24e481e3737778c5677cb559add6be839bbe7dd891b3a531ba07c"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:validate-change-batch",
+          "filename": "specs/core/validate-change-batch/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:928edc5e82662c46d64e025ab6ad6edcb5858d89e3d71ac1500aa6bcb78b1f85"
+        },
+        {
+          "key": "cli:change-validate",
+          "filename": "deltas/cli/change-validate/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:be1527f06104cfb236f9cada30e522b440cdc138ffae4ee581efb4d744e3edfa"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:validate-change-batch",
+          "filename": "specs/core/validate-change-batch/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:4918779f5f1f4fdfdb479cca26cecd2199ead9321c540fc7327b451c41545134"
+        },
+        {
+          "key": "cli:change-validate",
+          "filename": "deltas/cli/change-validate/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f7c727e7c6fa85e81ec0b1721f3305399645eb317a391e2ad6cbf0fcd608e2d1"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:a3212859cc871e33e301a36b3829344cf7aafc8653d2715fec4812f2ab1dfc7e"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:d68b0318f1c1a00354351e21778074899b169e8fc53a3f03b8a5a9cfc3bf912a"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-10-09T14:34:30.726Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["core:validate-change-batch", "cli:change-validate"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-09T14:34:30.744Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:validate-change-batch"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-validate"
+        },
+        {
+          "type": "verify",
+          "key": "core:validate-change-batch"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-validate"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-09T15:21:09.321Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-09T15:29:37.085Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-09T15:31:47.885Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-09T16:04:01.225Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-09T21:13:33.041Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-09T21:13:59.337Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-10-09T21:16:12.702Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Extract batch change validation orchestration into canonical @specd/core use case ValidateChangeBatch with existence and schema guards, topological DAG execution, and CLI delegation."
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-10-09T21:16:54.602Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"core:validate-change-batch\" points outside workspace \"core\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-09T21:17:19.529Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-10-09T21:17:19.654Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

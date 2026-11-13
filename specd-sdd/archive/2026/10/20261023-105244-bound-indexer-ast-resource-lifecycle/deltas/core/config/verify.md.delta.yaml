@@ -1,0 +1,85 @@
+- op: added
+  description: Size limit scenarios under the project-level graph requirement
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Project-level graph configuration'
+  content: |
+    #### Scenario: Project-level size fields are accepted
+
+    - **GIVEN** a `specd.yaml` with `graph.maxFileBytes: 524288` and `graph.largeFilePaths: ['app/legacy.php']`
+    - **WHEN** the configuration is loaded
+    - **THEN** both values are exposed on the project graph configuration
+
+- op: added
+  description: Contract scenarios of the size limit
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Project-level graph configuration'
+  content: |
+    ### Requirement: Graph file size limit
+
+    #### Scenario: An omitted limit is absent in the configuration
+
+    - **GIVEN** a `specd.yaml` that declares no `maxFileBytes` at any level
+    - **WHEN** the configuration is loaded
+    - **THEN** the field is absent and no default value is written into the configuration
+
+    #### Scenario: Zero is accepted
+
+    - **GIVEN** `graph.maxFileBytes: 0`
+    - **WHEN** the configuration is loaded
+    - **THEN** it is accepted and means that no limit applies
+
+    #### Scenario: A negative limit is rejected
+
+    - **GIVEN** `graph.maxFileBytes: -1`
+    - **WHEN** startup validation runs
+    - **THEN** a configuration error identifies `graph.maxFileBytes`
+
+    #### Scenario: A fractional limit is rejected
+
+    - **GIVEN** `graph.maxFileBytes: 1.5`
+    - **WHEN** startup validation runs
+    - **THEN** a configuration error identifies `graph.maxFileBytes`
+
+    #### Scenario: A non-number limit is rejected
+
+    - **GIVEN** `graph.maxFileBytes: "big"`
+    - **WHEN** startup validation runs
+    - **THEN** a configuration error identifies `graph.maxFileBytes`
+
+    #### Scenario: A workspace value replaces the project value
+
+    - **GIVEN** a project `maxFileBytes` of 1000 and a workspace `maxFileBytes` of 5000
+    - **WHEN** the configuration is loaded
+    - **THEN** the project graph configuration keeps 1000 and the workspace graph configuration exposes 5000
+
+    #### Scenario: Exemptions are combined
+
+    - **GIVEN** a project `largeFilePaths` entry and a workspace `largeFilePaths` entry
+    - **WHEN** the configuration is loaded
+    - **THEN** both entries are exposed, each with its own base directory
+
+    #### Scenario: Negation within the list is supported
+
+    - **GIVEN** `largeFilePaths: ['generated/**', '!generated/small/**']`
+    - **WHEN** the configuration is loaded
+    - **THEN** both patterns are kept in order
+
+    #### Scenario: Unknown graph keys are still rejected
+
+    - **GIVEN** a `graph` block with a key that is not defined
+    - **WHEN** startup validation runs
+    - **THEN** it is rejected as an unknown key
+
+    #### Scenario: Layers merge scalars and append arrays
+
+    - **GIVEN** a base layer with `maxFileBytes: 1000` and `largeFilePaths: ['a']`, and a later layer with `maxFileBytes: 2000` and `largeFilePaths: ['b']`
+    - **WHEN** the layers are merged
+    - **THEN** the effective `maxFileBytes` is 2000
+    - **AND** the effective `largeFilePaths` are `['a', 'b']`

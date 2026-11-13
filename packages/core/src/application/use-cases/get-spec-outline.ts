@@ -1,18 +1,19 @@
 import * as path from 'node:path'
 import { type OutlineEntry, type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
-import { type SpecPath } from '../../domain/value-objects/spec-path.js'
+import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type Schema } from '../../domain/value-objects/schema.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { WorkspaceNotFoundError } from '../errors/workspace-not-found-error.js'
 import { SpecNotFoundError } from '../errors/spec-not-found-error.js'
 import { ParserNotRegisteredError } from '../errors/parser-not-registered-error.js'
+import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 
 /** Input for the {@link GetSpecOutline} use case. */
 export interface GetSpecOutlineInput {
-  readonly workspace: string
-  readonly specPath: SpecPath
+  /** Raw or fully-qualified spec identifier (validated and normalized). */
+  readonly specId: string
   readonly artifactId?: string
   readonly filename?: string
   readonly full?: boolean
@@ -26,6 +27,14 @@ export interface SpecOutlineResult {
   readonly selectorHints?: Readonly<
     Record<string, { matches: string; contains?: string; level?: string }>
   >
+}
+
+/** Result returned by the {@link GetSpecOutline} use case. */
+export interface GetSpecOutlineResult {
+  /** Fully-qualified normalized spec ID. */
+  readonly specId: string
+  /** Parsed outlines grouped by filename. */
+  readonly outlines: readonly SpecOutlineResult[]
 }
 
 /**
@@ -49,17 +58,22 @@ export class GetSpecOutline {
    * Loads and outlines matching artifact files for a given spec.
    *
    * @param input - Outline query input.
-   * @returns Parsed outlines grouped by filename.
+   * @returns Parsed outlines grouped by filename, plus the normalized spec ID.
    */
-  async execute(input: GetSpecOutlineInput): Promise<readonly SpecOutlineResult[]> {
-    const specRepo = this.specs.get(input.workspace)
+  async execute(input: GetSpecOutlineInput): Promise<GetSpecOutlineResult> {
+    const { workspace, capPath, specId } = parseSpecId(input.specId, {
+      workspaces: this.specs.keys(),
+    })
+
+    const specRepo = this.specs.get(workspace)
     if (!specRepo) {
-      throw new WorkspaceNotFoundError(input.workspace)
+      throw new WorkspaceNotFoundError(workspace)
     }
 
-    const spec = await specRepo.get(input.specPath)
+    const specPath = SpecPath.parse(capPath)
+    const spec = await specRepo.get(specPath)
     if (spec === null) {
-      throw new SpecNotFoundError(`${input.workspace}:${input.specPath.toFsPath('/')}`)
+      throw new SpecNotFoundError(specId)
     }
 
     const schema = await this.schemaProvider.get()
@@ -72,9 +86,7 @@ export class GetSpecOutline {
       const artifact = await specRepo.artifact(spec, filename)
       if (artifact === null) {
         if (explicitRequest) {
-          throw new SpecNotFoundError(
-            `file '${filename}' not found for spec '${input.workspace}:${input.specPath.toFsPath('/')}'`,
-          )
+          throw new SpecNotFoundError(`file '${filename}' not found for spec '${specId}'`)
         }
         continue
       }
@@ -102,7 +114,7 @@ export class GetSpecOutline {
       })
     }
 
-    return results
+    return { specId, outlines: results }
   }
 
   /**

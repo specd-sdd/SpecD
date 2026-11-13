@@ -2,7 +2,6 @@ import { type Command } from 'commander'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
-import { parseSpecId } from '../../helpers/spec-path.js'
 import { collect } from '../../helpers/collect.js'
 import {
   parseArtifactPolicyFlag,
@@ -71,8 +70,6 @@ JSON/TOON output schema:
         const artifactPolicy = parseArtifactPolicyFlag(opts.artifactPolicy, opts.format)
         const workflowPolicy = parseWorkflowPolicyFlag(opts.workflowPolicy, opts.format)
         try {
-          const { config, kernel } = await resolveCliContext({ configPath: opts.config })
-
           const hasChanges =
             opts.addSpec.length > 0 ||
             opts.removeSpec.length > 0 ||
@@ -87,29 +84,10 @@ JSON/TOON output schema:
             )
           }
 
-          const parsedAddSpecs =
-            opts.addSpec.length > 0 ? opts.addSpec.map((s) => parseSpecId(s, config)) : undefined
+          const { kernel } = await resolveCliContext({ configPath: opts.config })
 
-          if (parsedAddSpecs) {
-            const readOnlyErrors: string[] = []
-            for (const parsed of parsedAddSpecs) {
-              const ws = config.workspaces.find((w) => w.name === parsed.workspace)
-              if (ws && ws.ownership === 'readOnly') {
-                readOnlyErrors.push(
-                  `Cannot add spec "${parsed.specId}" to change — workspace "${parsed.workspace}" is readOnly.\n\nReadOnly workspaces are protected: their specs and code cannot be modified by changes.`,
-                )
-              }
-            }
-            if (readOnlyErrors.length > 0) {
-              cliError(readOnlyErrors.join('\n'), opts.format)
-            }
-          }
-
-          const addSpecIds = parsedAddSpecs?.map((p) => p.specId)
-          const removeSpecIds =
-            opts.removeSpec.length > 0
-              ? opts.removeSpec.map((s) => parseSpecId(s, config).specId)
-              : undefined
+          const addSpecIds = opts.addSpec.length > 0 ? opts.addSpec : undefined
+          const removeSpecIds = opts.removeSpec.length > 0 ? opts.removeSpec : undefined
 
           const invalidation = resolveInvalidationOverride(artifactPolicy, workflowPolicy)
           const result = await kernel.changes.edit.execute({

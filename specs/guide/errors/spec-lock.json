@@ -6,26 +6,55 @@
   "dependsOn": ["guide:conventions", "default:_global/error-handling-conventions"],
   "implementation": [
     {
-      "file": "guide:src/domain/errors/specd-guide-error.ts",
-      "symbols": ["SpecdGuideError"]
-    },
-    {
       "file": "guide:src/domain/errors/guide-topic-not-found-error.ts",
       "symbols": ["GuideTopicNotFoundError"]
-    },
-    {
-      "file": "guide:src/domain/errors/guide-section-not-found-error.ts",
-      "symbols": ["GuideSectionNotFoundError"]
-    },
-    {
-      "file": "guide:src/domain/errors/index.ts"
     },
     {
       "file": "guide:src/domain/errors/guide-section-ambiguous-error.ts",
       "symbols": ["GuideSectionAmbiguousError"]
     },
     {
-      "file": "guide:test/unit/domain/errors.test.ts"
+      "file": "guide:src/application/queries/get-guide-query.ts",
+      "symbols": ["GetGuideQuery"]
+    },
+    {
+      "file": "guide:test/unit/application/queries.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "`@specd/guide` error hierarchy: `SpecdGuideError` base + topic-not-found, section-not-found, ambiguous-section domain errors, core-free.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:c56cde394d9e381575089504de1648eb321c7d8fe56d7b69bf6004f9b723fa59",
+          "lastModified": "2026-09-24T13:35:20.950Z"
+        },
+        "verify.md": {
+          "hash": "sha256:c8c2ec1444ceb37f1bfed2613c8cd131db155c6c5a983049dd7d3cbb9b7f48e9",
+          "lastModified": "2026-09-24T13:46:53.121Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Guide Errors\n\n`@specd/guide` error hierarchy. Core-free (no `@specd/core` import); duck-types SpecD Error Contract.\n\n## Rules\n\n### `SpecdGuideError` (abstract base, `packages/guide/src/domain/errors/`)\n- Extends native `Error`; abstract.\n- `readonly specd = true` — SpecD Error Contract discriminator.\n- `abstract readonly code: string` — `UPPER_SNAKE_CASE`, matches `/^[A-Z0-9_]+$/`; immutable (reassign throws TypeError in strict mode).\n- Descriptive `message`; `name` = concrete subclass name; `stack` preserved.\n- MUST NOT import/extend `SpecdError` from `@specd/core`.\n\n### `GuideTopicNotFoundError` extends `SpecdGuideError`\n- `code = 'UNKNOWN_GUIDE_TOPIC'`\n- `topic: string` — requested topic id, raw/unmodified (`''` allowed).\n- `availableTopics: readonly string[]` — catalog topic ids; empty allowed.\n- `message` states topic not found + enumerates/suggests available topics; empty topic ⇒ \"topic cannot be empty\".\n\n### `GuideSectionNotFoundError` extends `SpecdGuideError`\n- `code = 'UNKNOWN_GUIDE_SECTION'`\n- `heading: string` — queried heading text/slug/index, raw (whitespace, emoji, non-ASCII preserved).\n- `availableHeadings: readonly string[]` — valid headings + indices in target guide; empty allowed.\n- `message` states section not found + lists available headings.\n\n### `GuideSectionAmbiguousError` extends `SpecdGuideError`\n- `code = 'AMBIGUOUS_GUIDE_SECTION'`\n- `heading: string` — ambiguous query string.\n- `matchingIndices: readonly number[]` — 1-indexed matching section numbers.\n- `matchingHeadings: readonly string[]` — formatted titles + line spans, positionally aligned with `matchingIndices`.\n- `message` states multiple matches + instructs selection by 1-indexed section number.\n\n### CLI mapping (`packages/cli/src/commands/guide/index.ts`)\n- All 3 domain errors ⇒ `cliError(msg, format, 1, '<CODE>', { detail })`; fallthrough ⇒ `GUIDE_ERROR`.\n- `UNKNOWN_GUIDE_TOPIC` → detail `Available topics: <joined>`.\n- `UNKNOWN_GUIDE_SECTION` → detail `Available sections in guide:` + newline-indented list.\n- `AMBIGUOUS_GUIDE_SECTION` → detail `Matching sections:` lines `- [<idx>] <heading>`, then `Disambiguate with: specd guide <topic> --section <idx> or ...`.\n- `cliError`: detail → stderr; `error: <msg>` → stderr; json/toon emit `{ result:'error', code, message, exitCode }`; `process.exit(1)`.\n\n## Constraints\n- Zero runtime deps on `@specd/core`.\n- Classes MUST satisfy `readonly specd = true` + `code` contract from `default:_global/error-handling-conventions`.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:c56cde394d9e381575089504de1648eb321c7d8fe56d7b69bf6004f9b723fa59",
+          "lastModified": "2026-09-24T13:35:20.950Z"
+        },
+        "verify.md": {
+          "hash": "sha256:c8c2ec1444ceb37f1bfed2613c8cd131db155c6c5a983049dd7d3cbb9b7f48e9",
+          "lastModified": "2026-09-24T13:46:53.121Z"
+        }
+      }
+    }
+  }
 }

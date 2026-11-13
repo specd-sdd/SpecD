@@ -3,7 +3,9 @@ import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 const parseAsync = vi.fn()
-const handleErrorSpy = vi.hoisted(() => vi.fn<(err: unknown, format?: string) => never>())
+const handleErrorSpy = vi.hoisted(() =>
+  vi.fn<typeof import('../src/handle-error.js').handleError>(),
+)
 
 vi.mock('../src/program.js', () => ({
   createProgram: () => ({ parseAsync }),
@@ -265,6 +267,7 @@ describe('CLI source guards', () => {
       '/commands/change/edit.ts': 1,
       '/commands/change/verification.ts': 3,
       '/commands/graph/warn-graph-staleness.ts': 1,
+      '/commands/guide-sdk/index.ts': 3,
       '/commands/guide/index.ts': 3,
       '/commands/plugins/install.ts': 1,
       '/commands/plugins/uninstall.ts': 1,

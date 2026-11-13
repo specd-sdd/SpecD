@@ -500,9 +500,29 @@ validations:
               type: section
               matches: '^Scenario:'
             required: true
+            children:
+              - id: has-when
+                selector:
+                  type: list-item
+                  matches: '^WHEN\b'
+                required: true
+                count:
+                  min: 1
+              - id: has-then
+                selector:
+                  type: list-item
+                  matches: '^THEN\b'
+                required: true
+                count:
+                  min: 1
+              - id: has-given
+                selector:
+                  type: list-item
+                  matches: '^GIVEN\b'
+                required: false
 ```
 
-This enforces the full structure: a `Requirements` section must exist, it must contain at least one `Requirement:` subsection, and that subsection must contain at least one `Scenario:` subsection.
+This enforces the full structure: a `Requirements` section must exist, it must contain at least one `Requirement:` subsection, that subsection must contain at least one `Scenario:` subsection, and each scenario must contain at least one `WHEN` and one `THEN` list item (`GIVEN` list items are optional).
 
 ### Asserting content with `contentMatches`
 

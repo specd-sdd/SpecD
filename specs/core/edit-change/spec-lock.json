@@ -8,7 +8,9 @@
     "core:composition",
     "core:composition-resolver",
     "core:list-workspaces",
-    "core:resolve-change-schema"
+    "core:resolve-change-schema",
+    "core:spec-id-format",
+    "core:workspace"
   ],
   "implementation": [
     {

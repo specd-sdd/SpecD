@@ -1,0 +1,50 @@
+- op: added
+  description: specId is validated and normalized by the use case
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Input contract'
+  content: |
+    ### Requirement: Spec ID validation
+
+    Before resolving any repository, the use case MUST validate and normalize `specId` with `parseSpecId` and the configured workspaces (see `core:spec-id-format`). A bare path is resolved to the `default` workspace, so the input accepts a bare or fully-qualified valid ID, and every `specId` in the result is the fully-qualified form. An invalid ID fails with `InvalidSpecIdError` and an unknown workspace with `WorkspaceNotFoundError`, quoting the full original value. Delivery adapters pass the raw string and perform no validation of their own.
+
+- op: modified
+  description: Define the shape of a missing field instead of omitting it
+  selector:
+    type: section
+    matches: 'Requirement: Result contract for an initialized spec with no optimizations'
+  content: |
+    When persisted state exists but has no `optimizations` block, or a `field` filter names a field absent from it, `execute` SHALL return `initialized: true` and, for each requested field that is absent, a field entry of the form `{ freshness: 'missing', reasons: ['missing'] }` with no `value`. An absent field is therefore reported explicitly, never silently dropped, and is never treated as a validation error. When no `field` filter is given and there is no `optimizations` block, the result contains an entry for neither field and `fresh` is `false`.
+
+- op: modified
+  description: Field shape admits the missing form
+  selector:
+    type: section
+    matches: 'Requirement: Field result shape'
+  content: |
+    Each present field in the result MUST include:
+
+    - `value` — the persisted optimized string
+    - `freshness` — `'fresh' | 'stale'`
+    - `reasons` — the ordered list of staleness reasons that produced a non-fresh result (empty when fresh)
+
+    A requested field that is absent from persisted state is represented by `{ freshness: 'missing', reasons: ['missing'] }` without `value`, as defined by "Result contract for an initialized spec with no optimizations".
+
+- op: modified
+  description: Align resolveGetPersistedSpecOptimizationsDeps with specRepositories and getActiveSchema
+  selector:
+    type: section
+    matches: 'Requirement: Config-based factory delegates through resolveGetPersistedSpecOptimizationsDeps'
+  content: |
+    The config-based `createGetPersistedSpecOptimizations(config, options?)` form MUST derive `GetPersistedSpecOptimizationsDeps` through `resolveGetPersistedSpecOptimizationsDeps(resolver)` and then delegate to canonical `createGetPersistedSpecOptimizations(deps)`.
+
+    `resolveGetPersistedSpecOptimizationsDeps(resolver)` MUST resolve:
+
+    - `specRepositories: ReadonlyMap<string, SpecRepository>` — one repository instance per workspace
+    - `getActiveSchema: GetActiveSchema` — active schema resolver used to enumerate `scope: spec` artifacts
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.

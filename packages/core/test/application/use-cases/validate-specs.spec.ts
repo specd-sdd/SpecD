@@ -5,10 +5,14 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { createBuiltinExtractorTransforms } from '../../../src/composition/extractor-transforms/index.js'
 import { ValidateSpecs } from '../../../src/application/use-cases/validate-specs.js'
-import { type GetSpecMetadata } from '../../../src/application/use-cases/get-spec-metadata.js'
+import {
+  GetSpecMetadata,
+  type GetSpecMetadataResult,
+} from '../../../src/application/use-cases/get-spec-metadata.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
 import { WorkspaceNotFoundError } from '../../../src/application/errors/workspace-not-found-error.js'
 import { SpecNotFoundError } from '../../../src/application/errors/spec-not-found-error.js'
+import { InvalidSpecIdError } from '../../../src/domain/errors/invalid-spec-id-error.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import {
@@ -20,6 +24,7 @@ import {
   makeParser,
   makeContentHasher,
   makeGetSpecMetadata,
+  makeListWorkspaces,
 } from './helpers.js'
 import {
   ValidationResultCache,
@@ -39,6 +44,19 @@ import {
 import { createCompositionResolver } from '../../../src/composition/composition-resolver.js'
 import { resolveValidateSpecsDeps } from '../../../src/composition/use-cases/validate-specs.js'
 import { type SpecdConfig } from '../../../src/application/specd-config.js'
+import { GenerateSpecMetadata } from '../../../src/application/use-cases/generate-spec-metadata.js'
+import { MaterializeSpecMetadata } from '../../../src/application/use-cases/materialize-spec-metadata.js'
+import { Logger } from '../../../src/application/logger.js'
+
+function metadataResult(metadata: GetSpecMetadataResult['metadata'] = {}): GetSpecMetadataResult {
+  return {
+    metadata,
+    metadataFingerprint: 'metadata-fingerprint',
+    source: 'generated',
+    regenerated: true,
+    warnings: [],
+  }
+}
 
 function buildValidateSpecs(
   specRepos: ReadonlyMap<string, SpecRepository>,
@@ -429,6 +447,63 @@ describe('ValidateSpecs', () => {
     )
   })
 
+  it('rejects an invalid specPath before any repository call', async () => {
+    const specType = makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })
+    const schema = makeSchema([specType])
+    const repo = makeSpecRepository()
+    const getSpy = vi.spyOn(repo, 'get')
+    const uc = buildValidateSpecs(
+      new Map([['default', repo]]),
+      makeSchemaProvider(schema),
+      makeParsers(),
+    )
+
+    await expect(uc.execute({ specPath: '' })).rejects.toThrow(InvalidSpecIdError)
+    await expect(uc.execute({ specPath: 'auth/a,b' })).rejects.toThrow(InvalidSpecIdError)
+    expect(getSpy).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['Bad Id', 'Bad Id'],
+    ['', "''"],
+    ['auth/a,b', 'auth/a,b'],
+    ['ws:', 'ws:'],
+  ])(
+    'rejects specPath %j with InvalidSpecIdError quoting the whole value',
+    async (specPath, quoted) => {
+      const specType = makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })
+      const uc = buildValidateSpecs(
+        new Map([['default', makeSpecRepository()]]),
+        makeSchemaProvider(makeSchema([specType])),
+        makeParsers(),
+      )
+
+      const err = await uc.execute({ specPath }).catch((e: unknown) => e)
+
+      expect(err).toBeInstanceOf(InvalidSpecIdError)
+      expect((err as Error).message).toContain(quoted)
+    },
+  )
+
+  it('resolves a bare specPath to the default workspace', async () => {
+    const specType = makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })
+    const schema = makeSchema([specType])
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
+    const repo = makeSpecRepository({
+      specs: [spec],
+      artifacts: { 'auth/login/spec.md': '# Auth Login' },
+    })
+    const uc = buildValidateSpecs(
+      new Map([['default', repo]]),
+      makeSchemaProvider(schema),
+      makeParsers(),
+    )
+
+    const result = await uc.execute({ specPath: 'auth/login' })
+    expect(result.totalSpecs).toBe(1)
+    expect(result.passed).toBe(1)
+  })
+
   it('throws SpecNotFoundError when spec not found in workspace', async () => {
     const specType = makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })
     const schema = makeSchema([specType])
@@ -602,7 +677,53 @@ describe('ValidateSpecs', () => {
     expect(result.passed).toBe(1)
   })
 
-  it('fails when metadata dependsOn drifts from persisted dependencies', async () => {
+  it.each(['missing', 'invalid', 'stale'])(
+    'accepts authority-provided metadata when the prior cache is %s',
+    async (cacheState) => {
+      const schema = makeSchema([makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })])
+      const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
+      const repo = makeSpecRepository({
+        specs: [spec],
+        artifacts: {
+          'auth/login/spec.md': '# Auth Login',
+          'auth/login/metadata.json':
+            cacheState === 'missing'
+              ? null
+              : cacheState === 'invalid'
+                ? '{'
+                : JSON.stringify({ contentHashes: { 'spec.md': 'old' } }),
+        },
+      })
+      const repos = new Map([['default', repo]])
+      const getMetadata = makeGetSpecMetadata(repos)
+      vi.spyOn(getMetadata, 'execute').mockResolvedValue(
+        metadataResult({ dependsOn: ['core:storage'] }),
+      )
+      const snapshot = vi.spyOn(repo, 'readMetadataSnapshot').mockRejectedValue(new Error('unused'))
+      const persisted = vi.spyOn(repo, 'readPersistedState').mockRejectedValue(new Error('unused'))
+      const result = await buildValidateSpecs(
+        repos,
+        makeSchemaProvider(schema),
+        makeParsers(),
+        makeContentHasher(),
+        new Map(),
+        [],
+        new Map(),
+        getMetadata,
+      ).execute({ specPath: 'auth/login' })
+
+      expect(result.entries[0]).toEqual({
+        spec: 'default:auth/login',
+        passed: true,
+        failures: [],
+        warnings: [],
+      })
+      expect(snapshot).not.toHaveBeenCalled()
+      expect(persisted).not.toHaveBeenCalled()
+    },
+  )
+
+  it('trusts successful metadata without comparing another persisted dependency observation', async () => {
     const hasher = makeContentHasher()
     const specContent = '# Auth Login\n'
     const schema = makeSchema([makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })])
@@ -617,27 +738,42 @@ describe('ValidateSpecs', () => {
           contentHashes: { 'spec.md': hasher.hash(specContent) },
         }),
         'auth/login/spec-lock.json': JSON.stringify({
+          schema: { name: 'schema-std', version: 1 },
           dependsOn: ['default:auth/persisted'],
+          implementation: [],
         }),
       },
     })
 
+    const repos = new Map([['default', repo]])
+    const getMetadata = makeGetSpecMetadata(repos)
+    const execute = vi
+      .spyOn(getMetadata, 'execute')
+      .mockResolvedValue(metadataResult({ dependsOn: ['default:auth/metadata'] }))
+    const readPersisted = vi
+      .spyOn(repo, 'readPersistedState')
+      .mockRejectedValue(new Error('Validation must not read a second dependency baseline'))
+    const readMetadata = vi
+      .spyOn(repo, 'readMetadataSnapshot')
+      .mockRejectedValue(new Error('Validation must use the metadata authority'))
     const result = await buildValidateSpecs(
-      new Map([['default', repo]]),
+      repos,
       makeSchemaProvider(schema),
       makeParsers(),
       hasher,
-    ).execute({})
+      new Map(),
+      [],
+      new Map(),
+      getMetadata,
+    ).execute({ specPath: 'auth/login' })
 
-    expect(result.failed).toBe(1)
-    expect(
-      result.entries[0]?.failures.some((failure) =>
-        failure.description.includes('does not match persisted dependencies'),
-      ),
-    ).toBe(true)
+    expect(result.failed).toBe(0)
+    expect(execute).toHaveBeenCalledExactlyOnceWith({ specId: 'default:auth/login' })
+    expect(readPersisted).not.toHaveBeenCalled()
+    expect(readMetadata).not.toHaveBeenCalled()
   })
 
-  it('fails when extracted dependsOn mismatches persisted dependencies', async () => {
+  it('does not independently extract dependencies after successful materialization', async () => {
     const hasher = makeContentHasher()
     const schema = makeSchema({
       artifacts: [
@@ -673,7 +809,9 @@ describe('ValidateSpecs', () => {
           contentHashes: { 'spec.md': hasher.hash(specContent) },
         }),
         'auth/login/spec-lock.json': JSON.stringify({
+          schema: { name: 'schema-std', version: 1 },
           dependsOn: ['default:auth/persisted'],
+          implementation: [],
         }),
       },
     })
@@ -702,20 +840,91 @@ describe('ValidateSpecs', () => {
           .join('\n'),
     })
 
+    const repos = new Map([['default', repo]])
+    const getMetadata = makeGetSpecMetadata(repos)
+    vi.spyOn(getMetadata, 'execute').mockResolvedValue(
+      metadataResult({ dependsOn: ['default:auth/persisted'] }),
+    )
+    const parse = vi.spyOn(markdownParser, 'parse')
+    const readPersisted = vi
+      .spyOn(repo, 'readPersistedState')
+      .mockRejectedValue(new Error('Validation must not read a dependency baseline'))
     const result = await buildValidateSpecs(
-      new Map([['default', repo]]),
+      repos,
       makeSchemaProvider(schema),
       makeParsers(markdownParser),
       hasher,
       createBuiltinExtractorTransforms(),
+      [],
+      new Map(),
+      getMetadata,
     ).execute({})
 
-    expect(result.failed).toBe(1)
-    expect(
-      result.entries[0]?.failures.some((failure) =>
-        failure.description.includes("Extracted dependsOn for 'default:auth/login'"),
-      ),
-    ).toBe(true)
+    expect(result.failed).toBe(0)
+    expect(parse).not.toHaveBeenCalled()
+    expect(readPersisted).not.toHaveBeenCalled()
+  })
+
+  it('accepts schema-extracted dependencies through real lock-less metadata materialization', async () => {
+    const schema = makeSchema({
+      artifacts: [
+        makeArtifactType('specs', { scope: 'spec', output: 'spec.md', format: 'markdown' }),
+      ],
+      metadataExtraction: {
+        dependsOn: {
+          artifact: 'specs',
+          extractor: {
+            selector: { type: 'paragraph' },
+            extract: 'content',
+            capture: '(core:storage)',
+          },
+        },
+      },
+    })
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
+    const repo = makeSpecRepository({
+      specs: [spec],
+      artifacts: { 'auth/login/spec.md': 'core:storage' },
+    })
+    const repos = new Map([['default', repo]])
+    const parsers = makeParsers(
+      makeParser({
+        parse: () => ({
+          root: {
+            type: 'document',
+            children: [{ type: 'paragraph', value: 'core:storage' }],
+          },
+        }),
+        renderSubtree: () => 'core:storage',
+      }),
+    )
+    const hasher = makeContentHasher()
+    const provider = makeSchemaProvider(schema)
+    const generate = new GenerateSpecMetadata(
+      makeListWorkspaces(repos),
+      provider,
+      parsers,
+      hasher,
+      createBuiltinExtractorTransforms(),
+    )
+    const getMetadata = new GetSpecMetadata(new MaterializeSpecMetadata(repos, generate, hasher))
+    const execute = vi.spyOn(getMetadata, 'execute')
+    const result = await buildValidateSpecs(
+      repos,
+      provider,
+      parsers,
+      hasher,
+      new Map(),
+      [],
+      new Map(),
+      getMetadata,
+    ).execute({ specPath: 'auth/login' })
+
+    expect(result.passed).toBe(1)
+    expect(result.entries[0]?.failures).toEqual([])
+    expect(execute).toHaveBeenCalledExactlyOnceWith({ specId: 'default:auth/login' })
+    expect((await execute.mock.results[0]?.value)?.metadata.dependsOn).toEqual(['core:storage'])
+    expect(await repo.readPersistedState(spec)).toBeNull()
   })
 
   it('fails when metadata materialization throws instead of swallowing the error', async () => {
@@ -734,13 +943,13 @@ describe('ValidateSpecs', () => {
         }),
       },
     })
-    const failingGetMetadata = {
-      execute: async () => {
-        throw new Error(
-          "Generated metadata for 'default:auth/login' found extracted dependencies [default:auth/typo] that do not match persisted dependencies [default:auth/persisted].",
-        )
-      },
-    } as unknown as GetSpecMetadata
+    const failingGetMetadata = makeGetSpecMetadata(new Map([['default', repo]]))
+    vi.spyOn(failingGetMetadata, 'execute').mockRejectedValue(
+      new Error(
+        "Generated metadata for 'default:auth/login' found extracted dependencies [default:auth/typo] that do not match persisted dependencies [default:auth/persisted].",
+      ),
+    )
+    const readPersisted = vi.spyOn(repo, 'readPersistedState')
 
     const result = await buildValidateSpecs(
       new Map([['default', repo]]),
@@ -759,6 +968,106 @@ describe('ValidateSpecs', () => {
     expect(result.entries[0]?.failures[0]?.description).toContain(
       'extracted dependencies [default:auth/typo]',
     )
+    expect(readPersisted).not.toHaveBeenCalled()
+  })
+
+  it.each([new Error('source read failed'), 'source read failed'])(
+    'retains the reason when materialization rejects with %s',
+    async (error) => {
+      const spec = makeSpec({ workspace: 'default', name: 'auth/login' })
+      const repo = makeSpecRepository({ specs: [spec] })
+      const repos = new Map([['default', repo]])
+      const getMetadata = makeGetSpecMetadata(repos)
+      vi.spyOn(getMetadata, 'execute').mockRejectedValue(error)
+      const result = await buildValidateSpecs(
+        repos,
+        makeSchemaProvider(makeSchema([])),
+        makeParsers(),
+        makeContentHasher(),
+        new Map(),
+        [],
+        new Map(),
+        getMetadata,
+      ).execute({ specPath: 'auth/login' })
+
+      expect(result.entries[0]?.failures).toEqual([
+        {
+          artifactId: 'metadata',
+          description:
+            "Metadata for 'default:auth/login' could not be materialized: source read failed",
+        },
+      ])
+      expect(result.failed).toBe(1)
+    },
+  )
+
+  it('propagates materialization warnings without failing or logging them again', async () => {
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login' })
+    const repo = makeSpecRepository({ specs: [spec] })
+    const repos = new Map([['default', repo]])
+    const getMetadata = makeGetSpecMetadata(repos)
+    vi.spyOn(getMetadata, 'execute').mockResolvedValue({
+      ...metadataResult(),
+      warnings: [
+        { kind: 'metadata-cache-write-failed', specId: 'default:auth/login', error: 'disk full' },
+      ],
+    })
+    const warn = vi.spyOn(Logger, 'warn')
+    try {
+      const result = await buildValidateSpecs(
+        repos,
+        makeSchemaProvider(makeSchema([])),
+        makeParsers(),
+        makeContentHasher(),
+        new Map(),
+        [],
+        new Map(),
+        getMetadata,
+      ).execute({ specPath: 'auth/login' })
+
+      expect(result.entries[0]).toEqual({
+        spec: 'default:auth/login',
+        passed: true,
+        failures: [],
+        warnings: [
+          {
+            artifactId: 'metadata',
+            description: "metadata-cache-write-failed for 'default:auth/login': disk full",
+          },
+        ],
+      })
+      expect(warn).not.toHaveBeenCalled()
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('preserves artifact failures when the metadata authority succeeds', async () => {
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login' })
+    const repo = makeSpecRepository({ specs: [spec] })
+    const repos = new Map([['default', repo]])
+    const getMetadata = makeGetSpecMetadata(repos)
+    const execute = vi.spyOn(getMetadata, 'execute').mockResolvedValue(metadataResult())
+    const schema = makeSchema([makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })])
+    const result = await buildValidateSpecs(
+      repos,
+      makeSchemaProvider(schema),
+      makeParsers(),
+      makeContentHasher(),
+      new Map(),
+      [],
+      new Map(),
+      getMetadata,
+    ).execute({ specPath: 'auth/login' })
+
+    expect(execute).toHaveBeenCalledTimes(1)
+    expect(result.entries[0]?.failures).toEqual([
+      expect.objectContaining({
+        artifactId: 'specs',
+        description: expect.stringContaining('missing'),
+      }),
+    ])
+    expect(result.entries[0]?.passed).toBe(false)
   })
 
   it('passes when extraction is omitted and metadata matches persisted dependencies', async () => {
@@ -779,7 +1088,9 @@ describe('ValidateSpecs', () => {
           contentHashes: { 'spec.md': hasher.hash(specContent) },
         }),
         'auth/login/spec-lock.json': JSON.stringify({
+          schema: { name: 'schema-std', version: 1 },
           dependsOn: ['default:auth/persisted'],
+          implementation: [],
         }),
       },
     })
@@ -864,6 +1175,44 @@ describe('ValidateSpecs', () => {
     expect(result.entries[0]!.passed).toBe(true)
     expect(parseCount).toBe(0)
     expect(cache.upserts).toHaveLength(0)
+  })
+
+  it('reuses cached materialization warnings without calling the metadata authority again', async () => {
+    const schema = makeSchema([])
+    const hasher = makeContentHasher()
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login' })
+    const repo = makeSpecRepository({ specs: [spec] })
+    const repos = new Map([['default', repo]])
+    const getMetadata = makeGetSpecMetadata(repos)
+    const execute = vi.spyOn(getMetadata, 'execute').mockResolvedValue({
+      ...metadataResult(),
+      warnings: [
+        { kind: 'metadata-cache-write-failed', specId: 'default:auth/login', error: 'disk full' },
+      ],
+    })
+    const cache = new InMemoryValidationResultCache(
+      repo,
+      computeSchemaFingerprintFromSchema(schema, hasher),
+      VALIDATE_SPECS_ENGINE_VERSION,
+      (content) => hasher.hash(content),
+    )
+    const uc = buildValidateSpecs(
+      repos,
+      makeSchemaProvider(schema),
+      makeParsers(),
+      hasher,
+      new Map(),
+      [],
+      new Map([['default', cache]]),
+      getMetadata,
+    )
+    const first = await uc.execute({ specPath: 'auth/login' })
+    const second = await uc.execute({ specPath: 'auth/login' })
+
+    expect(first.entries[0]?.warnings).toHaveLength(1)
+    expect(second).toEqual(first)
+    expect(execute).toHaveBeenCalledTimes(1)
+    expect(cache.upserts).toHaveLength(1)
   })
 
   it('upserts failures and warnings on cache miss', async () => {

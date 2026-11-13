@@ -1,0 +1,46 @@
+- op: added
+  description: 'Verify provider impact preserves discriminated resolution and delegates aggregation.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Symbol-reference provider surface$'
+  content: |
+    ### Requirement: Resolution-aware impact provider surface
+
+    #### Scenario: Logical resolution reaches traversal intact
+
+    - **GIVEN** resolution returns one logical target with several declarations and ordered evidence
+    - **WHEN** provider symbol impact is requested
+    - **THEN** the complete discriminated resolution is passed to traversal
+    - **AND** no arbitrary primary declaration replaces it
+
+    #### Scenario: Exact and public-binding semantics remain distinct
+
+    - **GIVEN** an exact declaration or public binding is resolved
+    - **WHEN** provider impact is requested
+    - **THEN** exact physical or binding-route semantics are preserved
+    - **AND** canonical-target impact remains separately identifiable
+
+    #### Scenario: Provider delegates semantic aggregation
+
+    - **GIVEN** traversal returns logical aggregation, physical evidence, coverage, counts, and risk
+    - **WHEN** the provider constructs its result
+    - **THEN** it exposes those semantics without reimplementing language identity rules
+    - **AND** every compatibility field is explicitly derived
+
+- op: added
+  description: 'Verify the public barrel matches the enumerated export list.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Package exports$'
+  content: |
+    #### Scenario: Barrel contains the enumerated list and no forbidden internals
+
+    - **GIVEN** the built `@specd/code-graph` `"."` entrypoint
+    - **WHEN** its runtime export names are compared with the enumerated "Package exports" list
+    - **THEN** every enumerated export is present
+    - **AND** no concrete store class, raw IPC envelope, or index-lock helper is exported

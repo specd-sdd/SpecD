@@ -185,6 +185,13 @@
 - **AND** none of those symbols are importable from `@specd/code-graph` (`"."`)
 - **AND** `LadybugGraphStore` is not importable from either entrypoint
 
+#### Scenario: Barrel contains the enumerated list and no forbidden internals
+
+- **GIVEN** the built `@specd/code-graph` `"."` entrypoint
+- **WHEN** its runtime export names are compared with the enumerated "Package exports" list
+- **THEN** every enumerated export is present
+- **AND** no concrete store class, raw IPC envelope, or index-lock helper is exported
+
 ### Requirement: Public and internal entry points
 
 #### Scenario: package.json exports public and internal
@@ -289,6 +296,29 @@
 - **WHEN** presentation loads symbol details for those candidates
 - **THEN** exactly one exact batch symbol lookup serves all candidates
 - **AND** candidate order, missing-symbol handling, and deterministic output are preserved
+
+### Requirement: Resolution-aware impact provider surface
+
+#### Scenario: Logical resolution reaches traversal intact
+
+- **GIVEN** resolution returns one logical target with several declarations and ordered evidence
+- **WHEN** provider symbol impact is requested
+- **THEN** the complete discriminated resolution is passed to traversal
+- **AND** no arbitrary primary declaration replaces it
+
+#### Scenario: Exact and public-binding semantics remain distinct
+
+- **GIVEN** an exact declaration or public binding is resolved
+- **WHEN** provider impact is requested
+- **THEN** exact physical or binding-route semantics are preserved
+- **AND** canonical-target impact remains separately identifiable
+
+#### Scenario: Provider delegates semantic aggregation
+
+- **GIVEN** traversal returns logical aggregation, physical evidence, coverage, counts, and risk
+- **WHEN** the provider constructs its result
+- **THEN** it exposes those semantics without reimplementing language identity rules
+- **AND** every compatibility field is explicitly derived
 
 ### Requirement: Adapter-backed reference normalization
 

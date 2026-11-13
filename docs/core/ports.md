@@ -1,3 +1,9 @@
+---
+title: Ports
+description: Interfaces between the core application layer and the outside world.
+sidebar_position: 4
+---
+
 # Ports
 
 Ports are the interfaces between the application layer and the outside world. Each port represents a capability that use cases need — storing changes, reading specs, running shell hooks — without specifying how that capability is implemented.
@@ -151,6 +157,8 @@ Cheap physical observations use a shared `*Meta` family. Every Meta type exposes
 | `artifactMeta(spec, filename, options?)` | `ArtifactMeta \| null`          | One canonical artifact file     |
 | `persistedStateMeta(spec, options?)`     | `PersistedStateMeta \| null`    | `spec-lock.json` sidecar        |
 | `generatedMetadataMeta(spec, options?)`  | `GeneratedMetadataMeta \| null` | Generated `metadata.json` cache |
+
+`readPersistedState(spec, options?)` reads `spec-lock.json`. Pass `{ lenientDependsOn: true }` to tolerate invalid `dependsOn` entries so repair commands (`specs deps remove` / `set` / `clear`) can still load a corrupted lock; the default is strict and throws `InvalidSpecLockError`.
 
 The removed `persistedStateHash(spec)` method is replaced by `persistedStateMeta(spec, { includeHash: true })?.hash ?? null`. The provenance field `persistedStateHash` inside generated metadata is unrelated and remains.
 
@@ -738,6 +746,34 @@ import { type ConfigLoader } from '@specd/core'
 #### `load(): Promise<SpecdConfig>`
 
 Loads, validates, and returns the fully-resolved project configuration with all paths made absolute.
+
+##### Graph Configuration Shape
+
+`SpecdConfig` exposes optional project-level (`config.graph`) and workspace-level (`workspace.graph`) configuration blocks validated against `ProjectGraphZodSchema` and `WorkspaceGraphZodSchema`:
+
+```typescript
+interface ProjectGraphConfig {
+  readonly includePaths?: readonly string[]
+  readonly excludePaths?: readonly string[]
+  readonly testPaths?: readonly string[]
+  readonly ignorePaths?: readonly string[]
+  readonly maxFileBytes?: number
+  readonly largeFilePaths?: readonly string[]
+}
+
+interface WorkspaceGraphConfig {
+  readonly respectGitignore?: boolean
+  readonly excludePaths?: readonly string[]
+  readonly allowedPaths?: readonly string[]
+  readonly testPaths?: readonly string[]
+  readonly ignorePaths?: readonly string[]
+  readonly maxFileBytes?: number
+  readonly largeFilePaths?: readonly string[]
+}
+```
+
+- **`maxFileBytes`**: Non-negative integer specifying the maximum file size in bytes for indexing code and documents (default `262144` = 256 KiB). Files strictly exceeding this threshold are skipped with reason `file-too-large` unless exempt. Setting `0` disables size gating.
+- **`largeFilePaths`**: Array of gitignore-syntax patterns exempting matching files from the file size limit. At project level and at workspace level, patterns resolve relative to `projectRoot`; workspace exemptions are additive over project-level exemptions.
 
 **Throws:** `ConfigValidationError` when no config file is found or the YAML is invalid.
 

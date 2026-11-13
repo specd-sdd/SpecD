@@ -1,0 +1,23 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Reason sources and optional note policy
+
+    Accept mutually exclusive --reason and --reason-input <path|-> as UTF-8 plain-text reason sources. --note additionally requests a current note using that text; it requires non-blank reason. Without --note, store only transitioned.reason. Removal flags require --note: repeated --note-remove parsed by Core and simple --note-remove-on-enter/--note-remove-on-leave shortcuts contribute anyOf alternatives. Reuse shared file/stdin I/O; reject conflicts/read errors before invoking a mutating use case. Do not implement grammar or policy equality in CLI. Failed/no-op transitions SHALL neither create requested notes nor clean existing notes. Update all relevant help/docs and maintain existing check progress behavior.
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`cli:entrypoint`](../entrypoint/spec.md) — CLI config discovery, exit codes, and output conventions
+    - [`core:change`](../../core/change/spec.md) — change lifecycle state model
+    - [`core:transition-change`](../../core/transition-change/spec.md) — transition execution and default refresh orchestration
+    - [`core:hook-execution-model`](../../core/hook-execution-model/spec.md) — hook ordering and failure semantics
+    - [`core:get-status`](../../core/get-status/spec.md) — pre-transition and repair-guide status reads
+    - [`core:transition-checks`](../../core/transition-checks/spec.md) — check progress bus; no pending rewrite
+    - [`core:lifecycle-engine`](../../core/lifecycle-engine/spec.md) — lifecycle evaluation and available transition routing
+    - `core:note-auto-removal-policy` — note policy or application capability used by this contract.

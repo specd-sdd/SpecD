@@ -1,20 +1,21 @@
 import { type Spec } from '../../domain/entities/spec.js'
 import { type SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
+import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
-import { type SpecPath } from '../../domain/value-objects/spec-path.js'
 import { WorkspaceNotFoundError } from '../errors/workspace-not-found-error.js'
 import { SpecNotFoundError } from '../errors/spec-not-found-error.js'
+import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 
 /** Input for the {@link GetSpec} use case. */
 export interface GetSpecInput {
-  /** The workspace name (e.g. `'default'`, `'billing'`). */
-  readonly workspace: string
-  /** The spec path within the workspace (e.g. `'auth/oauth'`). */
-  readonly specPath: SpecPath
+  /** Raw or fully-qualified spec identifier (validated and normalized). */
+  readonly specId: string
 }
 
 /** Result returned by the {@link GetSpec} use case. */
 export interface GetSpecResult {
+  /** Fully-qualified normalized spec ID. */
+  readonly specId: string
   /** The spec metadata. */
   readonly spec: Spec
   /** Loaded artifact file contents, keyed by filename. */
@@ -45,14 +46,18 @@ export class GetSpec {
    * @returns The spec and its loaded artifacts, or `null` if the spec does not exist
    */
   async execute(input: GetSpecInput): Promise<GetSpecResult | null> {
-    const repo = this._specRepos.get(input.workspace)
+    const { workspace, capPath, specId } = parseSpecId(input.specId, {
+      workspaces: this._specRepos.keys(),
+    })
+
+    const repo = this._specRepos.get(workspace)
     if (repo === undefined) {
-      throw new WorkspaceNotFoundError(input.workspace)
+      throw new WorkspaceNotFoundError(workspace)
     }
 
-    const spec = await repo.get(input.specPath)
+    const spec = await repo.get(SpecPath.parse(capPath))
     if (spec === null) {
-      throw new SpecNotFoundError(`${input.workspace}:${input.specPath.toFsPath('/')}`)
+      throw new SpecNotFoundError(specId)
     }
 
     const artifacts = new Map<string, SpecArtifact>()
@@ -63,6 +68,6 @@ export class GetSpec {
       }
     }
 
-    return { spec, artifacts }
+    return { specId, spec, artifacts }
   }
 }

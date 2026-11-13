@@ -28,6 +28,7 @@ import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { ArtifactConflictError } from '../../../src/domain/errors/artifact-conflict-error.js'
+import { InvalidSpecLockError } from '../../../src/domain/errors/invalid-spec-lock-error.js'
 import { SpecPublicationError } from '../../../src/domain/errors/spec-publication-error.js'
 import { FsSpecRepository } from '../../../src/infrastructure/fs/spec-repository.js'
 import { sha256 } from '../../../src/infrastructure/fs/hash.js'
@@ -1275,6 +1276,107 @@ describe('FsSpecRepository', () => {
           { expectedRevision: created.originalHash },
         ),
       ).rejects.toBeInstanceOf(ArtifactConflictError)
+    })
+
+    it('readPersistedState() rejects dependsOn:[""] as InvalidSpecLockError and leaves the file unchanged', async () => {
+      const lockContent =
+        JSON.stringify(
+          {
+            schema: { name: 'schema-std', version: 1 },
+            dependsOn: [''],
+            implementation: [],
+          },
+          null,
+          2,
+        ) + '\n'
+      await writeSpecFile(ctx, 'auth/login', 'spec.md', '# Login')
+      await writeSpecFile(ctx, 'auth/login', 'spec-lock.json', lockContent)
+      const before = await fs.readFile(
+        path.join(ctx.specsPath, 'auth', 'login', 'spec-lock.json'),
+        'utf-8',
+      )
+      const spec = (await ctx.repo.get(SpecPath.parse('auth/login')))!
+
+      await expect(ctx.repo.readPersistedState(spec)).rejects.toBeInstanceOf(InvalidSpecLockError)
+      try {
+        await ctx.repo.readPersistedState(spec)
+      } catch (err) {
+        expect(err).toBeInstanceOf(InvalidSpecLockError)
+        expect((err as InvalidSpecLockError).fieldPath).toBe('dependsOn.0')
+      }
+
+      const after = await fs.readFile(
+        path.join(ctx.specsPath, 'auth', 'login', 'spec-lock.json'),
+        'utf-8',
+      )
+      expect(after).toBe(before)
+    })
+
+    describe('lenient dependsOn reads', () => {
+      async function seedLock(lock: unknown): Promise<string> {
+        const content = JSON.stringify(lock, null, 2) + '\n'
+        await writeSpecFile(ctx, 'auth/login', 'spec.md', '# Login')
+        await writeSpecFile(ctx, 'auth/login', 'spec-lock.json', content)
+        return content
+      }
+      const lockPath = () => path.join(ctx.specsPath, 'auth', 'login', 'spec-lock.json')
+
+      it('readPersistedState({ lenientDependsOn: true }) returns an invalid dependsOn entry as stored', async () => {
+        await seedLock({
+          schema: { name: 'schema-std', version: 1 },
+          dependsOn: [''],
+          implementation: [],
+        })
+        const spec = (await ctx.repo.get(SpecPath.parse('auth/login')))!
+
+        const state = await ctx.repo.readPersistedState(spec, { lenientDependsOn: true })
+
+        expect(state?.dependsOn).toEqual([''])
+      })
+
+      it('keeps every other field strict under lenientDependsOn', async () => {
+        await seedLock({
+          schema: { name: 'schema-std', version: 1 },
+          dependsOn: [''],
+          implementation: [{ specId: 'default:auth/login', file: '', symbols: [] }],
+        })
+        const spec = (await ctx.repo.get(SpecPath.parse('auth/login')))!
+
+        await expect(
+          ctx.repo.readPersistedState(spec, { lenientDependsOn: true }),
+        ).rejects.toBeInstanceOf(InvalidSpecLockError)
+      })
+
+      it('writePersistedState() succeeds over a lock whose dependsOn is ["", "core:ok"]', async () => {
+        await seedLock({
+          schema: { name: 'schema-std', version: 1 },
+          dependsOn: ['', 'core:ok'],
+          implementation: [],
+        })
+        const spec = (await ctx.repo.get(SpecPath.parse('auth/login')))!
+        const lenient = await ctx.repo.readPersistedState(spec, { lenientDependsOn: true })
+
+        const written = await ctx.repo.writePersistedState(
+          spec,
+          defaultPersistedState({ dependsOn: ['core:ok'] }),
+          { expectedRevision: lenient!.originalHash },
+        )
+
+        expect(written.dependsOn).toEqual(['core:ok'])
+      })
+
+      it('a strict read of one valid and one invalid entry throws and leaves the bytes unchanged', async () => {
+        const content = await seedLock({
+          schema: { name: 'schema-std', version: 1 },
+          dependsOn: ['core:ok', ''],
+          implementation: [],
+        })
+        const spec = (await ctx.repo.get(SpecPath.parse('auth/login')))!
+
+        await expect(ctx.repo.readPersistedState(spec)).rejects.toBeInstanceOf(InvalidSpecLockError)
+
+        expect(await fs.readFile(lockPath(), 'utf-8')).toBe(content)
+      })
     })
 
     it('readPersistedState() parses old locks without optimizations', async () => {

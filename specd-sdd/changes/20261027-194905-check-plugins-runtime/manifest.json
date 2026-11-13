@@ -1,0 +1,1041 @@
+{
+  "manifestVersion": 2,
+  "name": "check-plugins-runtime",
+  "createdAt": "2026-10-27T19:49:05.127Z",
+  "updatedAt": "2026-11-13T17:33:48.843Z",
+  "description": "Runtime check plugins configured in specd.yaml: plugin-manager loads and registers them on the KernelBuilder, core injects a bounded CheckServices into check factories, SDK wires it",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:check-registry",
+    "core:kernel-builder",
+    "core:check-services",
+    "plugin-manager:check-plugin-type"
+  ],
+  "specDependsOn": {
+    "core:check-registry": [
+      "core:transition-checks",
+      "default:_global/architecture",
+      "core:schema-format",
+      "core:check-services"
+    ],
+    "core:kernel-builder": [
+      "core:kernel",
+      "core:composition",
+      "default:_global/architecture",
+      "core:composition-resolver",
+      "core:materialize-spec-metadata",
+      "core:check-services"
+    ],
+    "core:check-services": [
+      "core:check-registry",
+      "core:transition-checks",
+      "core:kernel",
+      "default:_global/architecture"
+    ],
+    "plugin-manager:check-plugin-type": [
+      "plugin-manager:specd-plugin-type",
+      "core:check-services",
+      "core:check-registry",
+      "plugin-manager:register-plugins-use-case"
+    ]
+  },
+  "invalidation": {
+    "artifacts": "downstream",
+    "workflow": "preserve"
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "in-progress",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "in-progress",
+          "validatedHash": "sha256:807db2f1fc0ab8d7613ece3c7c2a78ef4b9a8f2a2d8b7f25a3ec57c9fc046613"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "core:check-registry",
+          "filename": "deltas/core/check-registry/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:kernel-builder",
+          "filename": "deltas/core/kernel-builder/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:check-services",
+          "filename": "specs/core/check-services/spec.md",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "plugin-manager:check-plugin-type",
+          "filename": "specs/plugin-manager/check-plugin-type/spec.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "core:check-registry",
+          "filename": "deltas/core/check-registry/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:kernel-builder",
+          "filename": "deltas/core/kernel-builder/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:check-services",
+          "filename": "specs/core/check-services/verify.md",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "plugin-manager:check-plugin-type",
+          "filename": "specs/plugin-manager/check-plugin-type/verify.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-10-27T19:49:05.127Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "core:check-registry",
+        "core:kernel-builder",
+        "core:config",
+        "core:config-loader",
+        "plugin-manager:specd-plugin-type",
+        "plugin-manager:plugin-loader",
+        "sdk:composition",
+        "sdk:host-context"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-27T19:49:05.177Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:check-registry"
+        },
+        {
+          "type": "specs",
+          "key": "core:kernel-builder"
+        },
+        {
+          "type": "specs",
+          "key": "core:config"
+        },
+        {
+          "type": "specs",
+          "key": "core:config-loader"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:specd-plugin-type"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-loader"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:composition"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:host-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:check-registry"
+        },
+        {
+          "type": "verify",
+          "key": "core:kernel-builder"
+        },
+        {
+          "type": "verify",
+          "key": "core:config"
+        },
+        {
+          "type": "verify",
+          "key": "core:config-loader"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:specd-plugin-type"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-loader"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:composition"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:host-context"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-28T11:02:14.227Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'host-lifecycle-dispose' was archived with overlapping specs: core:kernel-builder, sdk:host-context",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:kernel-builder", "sdk:host-context"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:kernel-builder", "sdk:host-context"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-28T11:11:23.972Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-28T17:26:34.381Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:check-services"
+        },
+        {
+          "type": "verify",
+          "key": "core:check-services"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-28T17:26:34.933Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:check-plugin-type"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:check-plugin-type"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-28T17:26:35.684Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:register-plugins-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:register-plugins-use-case"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-28T17:26:36.822Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:install-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:install-plugin-use-case"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-28T17:26:37.935Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:uninstall-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:uninstall-plugin-use-case"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-28T17:26:38.937Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:update-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:update-plugin-use-case"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-28T17:26:40.075Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:list-plugins-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:list-plugins-use-case"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-28T17:26:41.189Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:plugins-install"
+        },
+        {
+          "type": "verify",
+          "key": "cli:plugins-install"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-28T17:26:42.404Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:plugins-uninstall"
+        },
+        {
+          "type": "verify",
+          "key": "cli:plugins-uninstall"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-28T17:26:43.792Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:plugins-update"
+        },
+        {
+          "type": "verify",
+          "key": "cli:plugins-update"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-28T17:26:44.891Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:plugins-list"
+        },
+        {
+          "type": "verify",
+          "key": "cli:plugins-list"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-28T17:26:46.095Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:plugins-show"
+        },
+        {
+          "type": "verify",
+          "key": "cli:plugins-show"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-28T17:26:46.756Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:config-writer-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:config-writer-port"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:07.772Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "core:config"
+        },
+        {
+          "type": "verify",
+          "key": "core:config"
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:09.191Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "core:config-loader"
+        },
+        {
+          "type": "verify",
+          "key": "core:config-loader"
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:10.449Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "core:config-writer-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:config-writer-port"
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:11.626Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:specd-plugin-type"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:specd-plugin-type"
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:12.542Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-loader"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-loader"
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:13.380Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:register-plugins-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:register-plugins-use-case"
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:14.328Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:install-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:install-plugin-use-case"
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:15.317Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:uninstall-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:uninstall-plugin-use-case"
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:16.429Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:update-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:update-plugin-use-case"
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:17.581Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:list-plugins-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:list-plugins-use-case"
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:18.711Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "cli:plugins-install"
+        },
+        {
+          "type": "verify",
+          "key": "cli:plugins-install"
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:19.278Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "cli:plugins-uninstall"
+        },
+        {
+          "type": "verify",
+          "key": "cli:plugins-uninstall"
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:19.776Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "cli:plugins-update"
+        },
+        {
+          "type": "verify",
+          "key": "cli:plugins-update"
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:20.351Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "cli:plugins-list"
+        },
+        {
+          "type": "verify",
+          "key": "cli:plugins-list"
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:20.895Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "cli:plugins-show"
+        },
+        {
+          "type": "verify",
+          "key": "cli:plugins-show"
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:21.670Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "sdk:composition"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:composition"
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:22.573Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "sdk:host-context"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:host-context"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-13T16:59:33.833Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'plugin-architecture' was archived with overlapping specs: core:check-registry",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:check-registry"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:check-registry"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-13T17:24:11.772Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'plugin-architecture' was archived with overlapping specs: core:check-registry",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:check-registry"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:check-registry"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-13T17:33:48.842Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'plugin-architecture' was archived with overlapping specs: core:check-registry",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:check-registry"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:check-registry"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    }
+  ]
+}

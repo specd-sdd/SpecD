@@ -8,6 +8,19 @@ const hash = (content: string): string => `sha256:${content.length}:${content}`
 
 describe('validate-specs cache fingerprints', () => {
   describe('computeSchemaFingerprint', () => {
+    it('invalidates outcomes when schema dependency extraction is enabled', () => {
+      const input = {
+        schemaName: 'test',
+        schemaVersion: 1,
+        specScopedArtifactValidations: [],
+        specScopedCrossRules: [],
+        declaresDependsOnExtraction: false,
+      }
+      expect(computeSchemaFingerprint(input, hash)).not.toBe(
+        computeSchemaFingerprint({ ...input, declaresDependsOnExtraction: true }, hash),
+      )
+    })
+
     it('returns identical digests for identical schema inputs', () => {
       const input = {
         schemaName: 'test',

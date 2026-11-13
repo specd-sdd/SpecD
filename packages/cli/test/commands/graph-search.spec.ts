@@ -3,6 +3,7 @@ import {
   captureStderr,
   captureStdout,
   makeMockConfig,
+  makeMockKernel,
   makeProgram,
   mockProcessExit,
 } from './helpers.js'
@@ -13,6 +14,14 @@ vi.mock('../../src/commands/graph/resolve-graph-cli-context.js', () => ({
 
 vi.mock('../../src/commands/graph/with-provider.js', () => ({
   withProvider: vi.fn(),
+}))
+
+vi.mock('../../src/commands/graph/host-context.js', () => ({
+  createGraphHostContext: vi.fn(async (config, kernel) => ({
+    config,
+    kernel,
+    dispose: async () => {},
+  })),
 }))
 
 import { resolveGraphCliContext } from '../../src/commands/graph/resolve-graph-cli-context.js'
@@ -50,7 +59,12 @@ function makeReferenceSymbolResult() {
         declaration: {
           logicalId: 'typescript:value:core:src/change.ts:Change',
           symbolId: 'core:src/change.ts:class:Change:4:0',
-          location: { filePath: 'core:src/change.ts', line: 4, column: 0 },
+          location: {
+            filePath: 'core:src/change.ts',
+            projectRelativePath: 'packages/core/src/change.ts',
+            line: 4,
+            column: 0,
+          },
           kind: 'class',
         },
       },
@@ -64,6 +78,7 @@ function makeReferenceSymbolResult() {
           name: 'Change',
           kind: 'class',
           filePath: 'core:src/change.ts',
+          projectRelativePath: 'packages/core/src/change.ts',
           line: 4,
           column: 0,
           endLine: 8,
@@ -97,11 +112,13 @@ function setup() {
       },
     ],
   })
+  const kernel = makeMockKernel()
+  kernel.project.getConfig.execute.mockReturnValue(config)
   vi.mocked(resolveGraphCliContext).mockResolvedValue({
     mode: 'configured',
     config,
     configFilePath: '/project/specd.yaml',
-    kernel: null,
+    kernel,
     host: null,
     projectRoot: '/project',
     vcsRoot: '/project',
@@ -264,7 +281,7 @@ describe('graph search', () => {
         {
           file: {
             path: 'core:src/messages.ts',
-            configRelativePath: 'src/messages.ts',
+            projectRelativePath: 'src/messages.ts',
             language: 'typescript',
             contentHash: 'sha256:file',
             workspace: 'core',
@@ -311,7 +328,7 @@ describe('graph search', () => {
   it('renders only actionable declaration and directly matched export paths in text', async () => {
     const { mockProvider, getStdout } = setup()
     mockProvider.getFile.mockImplementation(async (path: string) => ({
-      configRelativePath:
+      projectRelativePath:
         path === 'core:src/index.ts' ? 'packages/core/src/index.ts' : 'packages/core/src/change.ts',
     }))
     mockProvider.search.mockResolvedValue({
@@ -342,7 +359,7 @@ describe('graph search', () => {
         {
           file: {
             path: 'core:src/messages.ts',
-            configRelativePath: 'packages/core/src/messages.ts',
+            projectRelativePath: 'packages/core/src/messages.ts',
             language: 'typescript',
             contentHash: 'hash',
             workspace: 'core',
@@ -369,7 +386,7 @@ describe('graph search', () => {
         {
           file: {
             path: 'root:a.ts',
-            configRelativePath: 'a.ts',
+            projectRelativePath: 'a.ts',
             language: 'typescript',
             contentHash: 'hash',
             workspace: 'root',
@@ -402,9 +419,16 @@ describe('graph search', () => {
     const parsed = JSON.parse(getStdout()) as {
       readonly symbols: ReadonlyArray<{
         readonly publicBindings: readonly unknown[]
-        readonly matchedPublicBindings: ReadonlyArray<{ readonly id: string }>
+        readonly matchedPublicBindings: ReadonlyArray<{
+          readonly id: string
+          readonly projectRelativePath: string
+        }>
+        readonly hits: ReadonlyArray<{
+          readonly symbol: Record<string, unknown>
+        }>
       }>
       readonly files: ReadonlyArray<{
+        readonly projectRelativePath: string
         readonly totalMatches: number
         readonly omittedMatches: number
         readonly matches: ReadonlyArray<{ readonly range: Record<string, number> }>
@@ -412,12 +436,24 @@ describe('graph search', () => {
       readonly specs: readonly unknown[]
       readonly documents: readonly unknown[]
     }
-    expect(Object.keys(parsed)).toEqual(['symbols', 'files', 'specs', 'documents'])
+    expect(Object.keys(parsed)).toEqual(['symbols', 'files', 'specs', 'documents', 'omittedCounts'])
     expect(parsed.symbols[0]!.publicBindings).toHaveLength(1)
     expect(parsed.symbols[0]!.matchedPublicBindings).toEqual([
-      expect.objectContaining({ id: 'binding-id' }),
+      expect.objectContaining({
+        id: 'binding-id',
+        projectRelativePath: 'packages/core/src/index.ts',
+      }),
     ])
-    expect(parsed.files[0]).toMatchObject({ totalMatches: 12, omittedMatches: 11 })
+    expect(parsed.symbols[0]!.hits[0]!.symbol).toMatchObject({
+      projectRelativePath: 'packages/core/src/change.ts',
+    })
+    expect(parsed.symbols[0]!.hits[0]!.symbol).not.toHaveProperty('configRelativePath')
+    expect(parsed.files[0]).toMatchObject({
+      projectRelativePath: 'a.ts',
+      totalMatches: 12,
+      omittedMatches: 11,
+    })
+    expect(parsed.files[0]).not.toHaveProperty('configRelativePath')
     expect(parsed.files[0]!.matches[0]!.range).toEqual({
       startLine: 3,
       startColumn: 2,
@@ -435,7 +471,7 @@ describe('graph search', () => {
         {
           file: {
             path: 'root:a.ts',
-            configRelativePath: 'a.ts',
+            projectRelativePath: 'a.ts',
             language: 'typescript',
             contentHash: 'hash',
             workspace: 'root',
@@ -468,7 +504,7 @@ describe('graph search', () => {
     const rendered = getStdout()
     expect(rendered).toContain('files[1]')
     expect(rendered).toContain('matchedPublicBindings[1]')
-    expect(rendered).toContain('binding-id,core')
+    expect(rendered).toContain('packages/core/src/index.ts')
     expect(rendered).toContain('totalMatches: 12')
     expect(rendered).toContain('omittedMatches: 11')
     expect(rendered).toContain('startLine: 3')
@@ -530,5 +566,264 @@ describe('graph search', () => {
     }
     expect(getStderr()).toContain("invalid --kind value 'unknownkind'")
     expect(mockProvider.search).not.toHaveBeenCalled()
+  })
+
+  it('rejects invalid --category before opening provider', async () => {
+    const { getStderr, mockProvider } = setup()
+    try {
+      await makeSearchProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'search',
+        'target',
+        '--category',
+        'unknown',
+      ])
+    } catch {
+      // ExitSentinel
+    }
+    expect(getStderr()).toContain(
+      'invalid category "unknown". Expected one of: source, test, ignored',
+    )
+    expect(mockProvider.search).not.toHaveBeenCalled()
+  })
+
+  it('rejects --spec-content with text format', async () => {
+    const { getStderr, mockProvider } = setup()
+    try {
+      await makeSearchProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'search',
+        'hook',
+        '--spec-content',
+        '--format',
+        'text',
+      ])
+    } catch {
+      // ExitSentinel
+    }
+    expect(getStderr()).toContain('--spec-content requires --format json or --format toon')
+    expect(mockProvider.search).not.toHaveBeenCalled()
+  })
+
+  it('passes --category test to search input', async () => {
+    const { mockProvider } = setup()
+    mockProvider.search.mockResolvedValue({
+      ...EMPTY_RESULT,
+      omittedCounts: { tests: 0, ignored: 0 },
+    })
+
+    await makeSearchProgram().parseAsync([
+      'node',
+      'specd',
+      'graph',
+      'search',
+      'target',
+      '--category',
+      'test',
+    ])
+
+    expect(mockProvider.search).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fileCategories: ['test'],
+      }),
+    )
+  })
+
+  it('passes comma-separated categories to search input', async () => {
+    const { mockProvider } = setup()
+    mockProvider.search.mockResolvedValue({
+      ...EMPTY_RESULT,
+      omittedCounts: { tests: 0, ignored: 0 },
+    })
+
+    await makeSearchProgram().parseAsync([
+      'node',
+      'specd',
+      'graph',
+      'search',
+      'target',
+      '--category',
+      'source,test',
+    ])
+
+    expect(mockProvider.search).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fileCategories: ['source', 'test'],
+      }),
+    )
+  })
+
+  it('rejects invalid category within comma-separated list', async () => {
+    const { mockProvider, getStderr } = setup()
+    try {
+      await makeSearchProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'search',
+        'target',
+        '--category',
+        'source,invalid',
+      ])
+    } catch {
+      // ExitSentinel
+    }
+    expect(getStderr()).toContain(
+      'invalid category "invalid". Expected one of: source, test, ignored',
+    )
+    expect(mockProvider.search).not.toHaveBeenCalled()
+  })
+
+  it('passes --include-tests, --include-ignored, --all to search input', async () => {
+    const { mockProvider } = setup()
+    mockProvider.search.mockResolvedValue({
+      ...EMPTY_RESULT,
+      omittedCounts: { tests: 0, ignored: 0 },
+    })
+
+    await makeSearchProgram().parseAsync([
+      'node',
+      'specd',
+      'graph',
+      'search',
+      'target',
+      '--include-tests',
+      '--include-ignored',
+    ])
+
+    expect(mockProvider.search).toHaveBeenCalledWith(
+      expect.objectContaining({
+        includeTests: true,
+        includeIgnored: true,
+      }),
+    )
+  })
+
+  it('displays omission notice in text mode when tests are excluded', async () => {
+    const { mockProvider, getStdout } = setup()
+    mockProvider.search.mockResolvedValue({
+      ...EMPTY_RESULT,
+      omittedCounts: { tests: 3, ignored: 0 },
+    })
+
+    await makeSearchProgram().parseAsync([
+      'node',
+      'specd',
+      'graph',
+      'search',
+      'target',
+      '--format',
+      'text',
+    ])
+
+    const stdout = getStdout()
+    expect(stdout).toContain('No results found.')
+    expect(stdout).toContain(
+      'ℹ Excluded from results: 3 test files. Use --include-tests, --include-ignored, or --all to view them.',
+    )
+  })
+
+  it('includes omittedCounts in JSON mode', async () => {
+    const { mockProvider, getStdout } = setup()
+    mockProvider.search.mockResolvedValue({
+      ...EMPTY_RESULT,
+      omittedCounts: { tests: 4, ignored: 1 },
+    })
+
+    await makeSearchProgram().parseAsync([
+      'node',
+      'specd',
+      'graph',
+      'search',
+      'target',
+      '--format',
+      'json',
+    ])
+
+    const parsed = JSON.parse(getStdout())
+    expect(parsed.omittedCounts).toEqual({ tests: 4, ignored: 1 })
+  })
+
+  it('includes document results with projectRelativePath and omits configRelativePath in JSON mode', async () => {
+    const { mockProvider, getStdout } = setup()
+    mockProvider.search.mockResolvedValue({
+      ...EMPTY_RESULT,
+      documents: [
+        {
+          document: {
+            workspace: 'core',
+            path: 'core:docs/architecture.md',
+            projectRelativePath: 'packages/core/docs/architecture.md',
+            contentHash: 'hash123',
+            content: '# Architecture Overview',
+          },
+          score: 85,
+          snippet: 'Architecture Overview',
+          startLine: 1,
+          endLine: 5,
+        },
+      ],
+    })
+
+    await makeSearchProgram().parseAsync([
+      'node',
+      'specd',
+      'graph',
+      'search',
+      'Architecture',
+      '--documents',
+      '--format',
+      'json',
+    ])
+
+    const parsed = JSON.parse(getStdout())
+    expect(parsed.documents).toHaveLength(1)
+    const doc = parsed.documents[0]
+    expect(doc.workspace).toBe('core')
+    expect(doc.path).toBe('core:docs/architecture.md')
+    expect(doc.projectRelativePath).toBe('packages/core/docs/architecture.md')
+    expect(doc).not.toHaveProperty('configRelativePath')
+    expect(doc).not.toHaveProperty('content')
+  })
+
+  it('renders document results grouped separately under Documents header in text mode', async () => {
+    const { mockProvider, getStdout } = setup()
+    mockProvider.search.mockResolvedValue({
+      ...EMPTY_RESULT,
+      documents: [
+        {
+          document: {
+            workspace: 'core',
+            path: 'core:docs/architecture.md',
+            projectRelativePath: 'packages/core/docs/architecture.md',
+            contentHash: 'hash123',
+            content: '# Architecture Overview',
+          },
+          score: 85,
+          snippet: 'Architecture Overview',
+          startLine: 1,
+          endLine: 5,
+        },
+      ],
+    })
+
+    await makeSearchProgram().parseAsync([
+      'node',
+      'specd',
+      'graph',
+      'search',
+      'Architecture',
+      '--documents',
+      '--format',
+      'text',
+    ])
+
+    const stdout = getStdout()
+    expect(stdout).toContain('Documents (1 shown, limit 10):')
+    expect(stdout).toContain('packages/core/docs/architecture.md')
   })
 })

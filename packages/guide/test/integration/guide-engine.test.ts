@@ -10,14 +10,15 @@ describe('GuideEngine Integration Tests', () => {
 
   it('lists all 12 prebundled guides in order', async () => {
     const list = await engine.listGuides()
-    expect(list.length).toBeGreaterThanOrEqual(12)
+    expect(list.pagination.total).toBeGreaterThanOrEqual(12)
+    expect(list.pagination.totalPages).toBe(1)
 
     // Ensure strictly ordered by order ascending
-    for (let i = 1; i < list.length; i++) {
-      expect(list[i]!.order).toBeGreaterThanOrEqual(list[i - 1]!.order)
+    for (let i = 1; i < list.topics.length; i++) {
+      expect(list.topics[i]!.order).toBeGreaterThanOrEqual(list.topics[i - 1]!.order)
     }
 
-    const topics = list.map((g) => g.topic)
+    const topics = list.topics.map((g) => g.topic)
     expect(topics).toContain('getting-started')
     expect(topics).toContain('workflow')
     expect(topics).toContain('cli')

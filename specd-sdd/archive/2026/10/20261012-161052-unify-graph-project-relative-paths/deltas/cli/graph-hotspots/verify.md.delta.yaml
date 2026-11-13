@@ -1,0 +1,36 @@
+- op: modified
+  description: 'Update Output format scenarios to verify projectRelativePath and absence of displayPath in hotspots'
+  selector:
+    type: section
+    matches: 'Requirement: Output format'
+  content: |
+    #### Scenario: Text output shows ranked hotspot table
+
+    - **GIVEN** hotspot results exist
+    - **WHEN** `specd graph hotspots` is run in text mode
+    - **THEN** stdout shows the total returned entry count and total symbol count
+    - **AND** each row includes score, risk level, cross-workspace caller count, kind, symbol name, and workspace-qualified file location
+
+    #### Scenario: Empty result set in text mode
+
+    - **GIVEN** no hotspots match the active filters
+    - **WHEN** `specd graph hotspots` is run in text mode
+    - **THEN** stdout shows `No hotspots found.`
+
+    #### Scenario: JSON output includes derived workspace field
+
+    - **WHEN** `specd graph hotspots --format json` is run
+    - **THEN** stdout is a JSON object containing `totalSymbols` and `entries`
+    - **AND** each entry includes `symbol`, `score`, `directCallers`, `crossWorkspaceCallers`, `fileImporters`, `riskLevel`, `workspace`, and `projectRelativePath`
+    - **AND** entry does not include `displayPath`
+
+    #### Scenario: Text output shows omission notice when items excluded
+
+    - **GIVEN** a hotspot run where 12 test files were excluded
+    - **WHEN** `specd graph hotspots` is run in text mode
+    - **THEN** stdout includes `Excluded from results: 12 test files`
+
+    #### Scenario: JSON output includes omittedCounts
+
+    - **WHEN** `specd graph hotspots --format json` is run
+    - **THEN** stdout JSON contains `omittedCounts` with test and ignored counts

@@ -13,6 +13,7 @@ import {
   createLocalBinding,
   createLogicalSymbol,
   createPublicBinding,
+  DeclarationOccurrenceForm,
   MemberAccessor,
   MemberDispatch,
   MemberKind,
@@ -66,7 +67,7 @@ export function graphStoreContractTests(
       it('upserts and retrieves a file', async () => {
         const file = createFileNode({
           path: 'src/main.ts',
-          configRelativePath: '',
+          projectRelativePath: '',
           language: 'typescript',
           contentHash: 'sha256:abc',
           workspace: '/project',
@@ -77,12 +78,29 @@ export function graphStoreContractTests(
         expect(retrieved).toBeDefined()
         expect(retrieved!.path).toBe('src/main.ts')
         expect(retrieved!.language).toBe('typescript')
+        expect(retrieved!.category).toBe('source')
+      })
+
+      it('persists and retrieves file category', async () => {
+        const file = createFileNode({
+          path: 'test/main.spec.ts',
+          projectRelativePath: 'test/main.spec.ts',
+          language: 'typescript',
+          contentHash: 'sha256:spec',
+          workspace: '/project',
+          category: 'test',
+        })
+        await store.upsertFile(file, [], [])
+
+        const retrieved = await store.getFile('test/main.spec.ts')
+        expect(retrieved).toBeDefined()
+        expect(retrieved!.category).toBe('test')
       })
 
       it('upserts and retrieves a document', async () => {
         const document = createDocumentNode({
           path: 'root:docs/guide.md',
-          configRelativePath: 'docs/guide.md',
+          projectRelativePath: 'docs/guide.md',
           contentHash: 'sha256:doc',
           content: '# Guide\n\nHello graph',
           workspace: 'root',
@@ -92,7 +110,7 @@ export function graphStoreContractTests(
 
         const retrieved = await store.getDocument(document.path)
         expect(retrieved).toBeDefined()
-        expect(retrieved!.configRelativePath).toBe('docs/guide.md')
+        expect(retrieved!.projectRelativePath).toBe('docs/guide.md')
       })
 
       it('persists freshness observations with guarded monotonic stale latches', async () => {
@@ -166,7 +184,7 @@ export function graphStoreContractTests(
       it('removeDocument removes document nodes', async () => {
         const document = createDocumentNode({
           path: 'root:docs/guide.md',
-          configRelativePath: 'docs/guide.md',
+          projectRelativePath: 'docs/guide.md',
           contentHash: 'sha256:doc',
           content: '# Guide\n\nHello graph',
           workspace: 'root',
@@ -181,7 +199,7 @@ export function graphStoreContractTests(
       it('upserts a file with symbols and relations', async () => {
         const file = createFileNode({
           path: 'src/main.ts',
-          configRelativePath: '',
+          projectRelativePath: '',
           language: 'typescript',
           contentHash: 'sha256:abc',
           workspace: '/project',
@@ -233,7 +251,7 @@ export function graphStoreContractTests(
       it('round-trips symbol construct and selection ranges through bulk load', async () => {
         const file = createFileNode({
           path: 'core:src/ranged.ts',
-          configRelativePath: 'src/ranged.ts',
+          projectRelativePath: 'src/ranged.ts',
           language: 'typescript',
           contentHash: 'sha256:ranged',
           workspace: 'core',
@@ -262,21 +280,21 @@ export function graphStoreContractTests(
       it('queries filtered impact frontiers deterministically without mutating its input', async () => {
         const coreFile = createFileNode({
           path: 'core:src/root.ts',
-          configRelativePath: 'src/root.ts',
+          projectRelativePath: 'src/root.ts',
           language: 'typescript',
           contentHash: 'sha256:impact-root',
           workspace: 'core',
         })
         const coreNeighborFile = createFileNode({
           path: 'core:src/neighbor.ts',
-          configRelativePath: 'src/neighbor.ts',
+          projectRelativePath: 'src/neighbor.ts',
           language: 'typescript',
           contentHash: 'sha256:impact-core-neighbor',
           workspace: 'core',
         })
         const webNeighborFile = createFileNode({
           path: 'web:src/neighbor.ts',
-          configRelativePath: 'src/neighbor.ts',
+          projectRelativePath: 'src/neighbor.ts',
           language: 'typescript',
           contentHash: 'sha256:impact-web-neighbor',
           workspace: 'web',
@@ -456,7 +474,7 @@ export function graphStoreContractTests(
       it('batches symbols and traversal relations deterministically', async () => {
         const file = createFileNode({
           path: 'core:src/batch.ts',
-          configRelativePath: 'src/batch.ts',
+          projectRelativePath: 'src/batch.ts',
           language: 'typescript',
           contentHash: 'sha256:batch',
           workspace: 'core',
@@ -531,21 +549,21 @@ export function graphStoreContractTests(
       it('batches files, documents, and specs deterministically by requested identity', async () => {
         const fileA = createFileNode({
           path: 'core:src/node-a.ts',
-          configRelativePath: 'src/node-a.ts',
+          projectRelativePath: 'src/node-a.ts',
           language: 'typescript',
           contentHash: 'sha256:node-a',
           workspace: 'core',
         })
         const fileB = createFileNode({
           path: 'core:src/node-b.ts',
-          configRelativePath: 'src/node-b.ts',
+          projectRelativePath: 'src/node-b.ts',
           language: 'typescript',
           contentHash: 'sha256:node-b',
           workspace: 'core',
         })
         const document = createDocumentNode({
           path: 'root:docs/batch.md',
-          configRelativePath: 'docs/batch.md',
+          projectRelativePath: 'docs/batch.md',
           contentHash: 'sha256:batch-doc',
           content: '# Batch',
           workspace: 'root',
@@ -599,7 +617,7 @@ export function graphStoreContractTests(
       it('stages bounded bulk-session chunks until one commit and deduplicates relations', async () => {
         const file = createFileNode({
           path: 'core:src/bulk.ts',
-          configRelativePath: 'src/bulk.ts',
+          projectRelativePath: 'src/bulk.ts',
           language: 'typescript',
           contentHash: 'sha256:bulk',
           workspace: 'core',
@@ -653,7 +671,7 @@ export function graphStoreContractTests(
       it('discards every staged bulk-session chunk on rollback', async () => {
         const file = createFileNode({
           path: 'core:src/rolled-back.ts',
-          configRelativePath: 'src/rolled-back.ts',
+          projectRelativePath: 'src/rolled-back.ts',
           language: 'typescript',
           contentHash: 'sha256:rollback',
           workspace: 'core',
@@ -676,7 +694,7 @@ export function graphStoreContractTests(
         ).map(([path, workspace]) =>
           createFileNode({
             path,
-            configRelativePath: path.substring(path.indexOf(':') + 1),
+            projectRelativePath: path.substring(path.indexOf(':') + 1),
             language: 'typescript',
             contentHash: `sha256:${path}`,
             workspace,
@@ -710,7 +728,7 @@ export function graphStoreContractTests(
       it('removeFile removes file, symbols, and relations', async () => {
         const file = createFileNode({
           path: 'src/main.ts',
-          configRelativePath: '',
+          projectRelativePath: '',
           language: 'typescript',
           contentHash: 'sha256:abc',
           workspace: '/project',
@@ -743,7 +761,7 @@ export function graphStoreContractTests(
       it('upsertFile replaces previous data atomically', async () => {
         const file = createFileNode({
           path: 'src/main.ts',
-          configRelativePath: '',
+          projectRelativePath: '',
           language: 'typescript',
           contentHash: 'sha256:v1',
           workspace: '/project',
@@ -759,7 +777,7 @@ export function graphStoreContractTests(
 
         const fileV2 = createFileNode({
           path: 'src/main.ts',
-          configRelativePath: '',
+          projectRelativePath: '',
           language: 'typescript',
           contentHash: 'sha256:v2',
           workspace: '/project',
@@ -822,7 +840,18 @@ export function graphStoreContractTests(
           localName: 'Alias',
           space: SymbolSpace.Value,
           targetId: primary.id,
+          range: { startLine: 1, startColumn: 0, endLine: 1, endColumn: 8 },
         })
+        // Same name and scope at a different range: a shadowing binding stays a distinct row.
+        const shadowingBinding = createLocalBinding({
+          filePath: 'code-graph:src/consumer.ts',
+          scopeId: 'module',
+          localName: 'Alias',
+          space: SymbolSpace.Value,
+          targetId: primary.id,
+          range: { startLine: 9, startColumn: 2, endLine: 9, endColumn: 10 },
+        })
+        expect(shadowingBinding.id).not.toBe(localBinding.id)
         const facts: ReferenceFactsWrite = {
           logicalSymbols: [member, primary],
           declarations: [
@@ -839,6 +868,8 @@ export function graphStoreContractTests(
                   endColumn: 1,
                 },
                 kind: SymbolKind.Class,
+                form: DeclarationOccurrenceForm.Definition,
+                occurrenceForm: DeclarationOccurrenceForm.Definition,
               },
             },
             {
@@ -854,11 +885,13 @@ export function graphStoreContractTests(
                   endColumn: 1,
                 },
                 kind: SymbolKind.Class,
+                form: DeclarationOccurrenceForm.Definition,
+                occurrenceForm: DeclarationOccurrenceForm.Definition,
               },
             },
           ],
           publicBindings: [parallelBinding, alternateSurfaceBinding, directBinding],
-          localBindings: [localBinding],
+          localBindings: [localBinding, shadowingBinding],
           steps: [
             { fromId: parallelBinding.id, toId: primary.id, kind: 'reexport' },
             { fromId: directBinding.id, toId: primary.id, kind: 'export' },
@@ -904,6 +937,13 @@ export function graphStoreContractTests(
           reasonCode: null,
           health: { fresh: true, complete: true, reasonCodes: [] },
           target: primary,
+          resolvedTarget: {
+            kind: 'public-binding',
+            logicalSymbol: primary,
+            binding: directBinding,
+            declarations: facts.declarations.map((entry) => entry.declaration),
+            path: [{ fromId: directBinding.id, toId: primary.id, kind: 'export' }],
+          },
           candidates: [
             {
               target: primary,
@@ -974,7 +1014,7 @@ export function graphStoreContractTests(
               space: SymbolSpace.Value,
             },
           ]),
-        ).toEqual([localBinding])
+        ).toEqual(expect.arrayContaining([localBinding, shadowingBinding]))
         expect(await store.findResolutionSteps([parallelBinding.id])).toEqual([
           { fromId: parallelBinding.id, toId: primary.id, kind: 'reexport' },
         ])
@@ -1024,24 +1064,275 @@ export function graphStoreContractTests(
         expect(await store.findDeclarations([primary.id])).toEqual([])
       })
 
+      referenceFactsIt(
+        'supports bidirectional logical declaration mapping with duplicates, unknowns, ordering, and empty batches',
+        async () => {
+          const logicalA = createLogicalSymbol({
+            workspace: 'code-graph',
+            surface: 'src/alpha.ts',
+            name: 'AlphaFunc',
+            space: SymbolSpace.Value,
+            ownerId: undefined,
+            memberSemantics: undefined,
+          })
+          const logicalB = createLogicalSymbol({
+            workspace: 'code-graph',
+            surface: 'src/beta.ts',
+            name: 'BetaFunc',
+            space: SymbolSpace.Value,
+            ownerId: undefined,
+            memberSemantics: undefined,
+          })
+
+          const declA1 = {
+            logicalSymbolId: logicalA.id,
+            declaration: {
+              symbolId: 'code-graph:src/alpha.ts:function:AlphaFunc:1:0',
+              logicalId: logicalA.id,
+              location: {
+                filePath: 'code-graph:src/alpha.ts',
+                line: 1,
+                column: 0,
+                endLine: 1,
+                endColumn: 20,
+              },
+              kind: SymbolKind.Function,
+              form: DeclarationOccurrenceForm.Signature,
+              occurrenceForm: DeclarationOccurrenceForm.Signature,
+            },
+          }
+          const declA2 = {
+            logicalSymbolId: logicalA.id,
+            declaration: {
+              symbolId: 'code-graph:src/alpha.ts:function:AlphaFunc:3:0',
+              logicalId: logicalA.id,
+              location: {
+                filePath: 'code-graph:src/alpha.ts',
+                line: 3,
+                column: 0,
+                endLine: 5,
+                endColumn: 1,
+              },
+              kind: SymbolKind.Function,
+              form: DeclarationOccurrenceForm.Implementation,
+              occurrenceForm: DeclarationOccurrenceForm.Implementation,
+            },
+          }
+          const declB1 = {
+            logicalSymbolId: logicalB.id,
+            declaration: {
+              symbolId: 'code-graph:src/beta.ts:function:BetaFunc:10:0',
+              logicalId: logicalB.id,
+              location: {
+                filePath: 'code-graph:src/beta.ts',
+                line: 10,
+                column: 0,
+                endLine: 12,
+                endColumn: 1,
+              },
+              kind: SymbolKind.Function,
+              form: DeclarationOccurrenceForm.Definition,
+              occurrenceForm: DeclarationOccurrenceForm.Definition,
+            },
+          }
+
+          await store.replaceReferenceFacts({
+            logicalSymbols: [logicalA, logicalB],
+            declarations: [declA1, declA2, declB1],
+            publicBindings: [],
+            localBindings: [],
+            steps: [],
+            coverage: [],
+          })
+
+          // 1. Empty batch
+          expect(await store.findDeclarations([])).toEqual([])
+          expect(await store.findLogicalDeclarationsByDeclarationIds([])).toEqual([])
+
+          // 2. Forward direction: findDeclarations (by logicalSymbolIds)
+          // Preserves requested order: logicalB then logicalA
+          const forwardOrdered = await store.findDeclarations([logicalB.id, logicalA.id])
+          expect(forwardOrdered.map((item) => item.declaration.symbolId)).toEqual([
+            declB1.declaration.symbolId,
+            declA1.declaration.symbolId,
+            declA2.declaration.symbolId,
+          ])
+          // Duplicates in input are ignored
+          const forwardDeduped = await store.findDeclarations([logicalA.id, logicalA.id])
+          expect(forwardDeduped.map((item) => item.declaration.symbolId)).toEqual([
+            declA1.declaration.symbolId,
+            declA2.declaration.symbolId,
+          ])
+          // Unknown IDs are omitted
+          const forwardUnknown = await store.findDeclarations(['nonexistent:logical', logicalB.id])
+          expect(forwardUnknown.map((item) => item.declaration.symbolId)).toEqual([
+            declB1.declaration.symbolId,
+          ])
+
+          // 3. Reverse direction: findLogicalDeclarationsByDeclarationIds (by declarationSymbolIds)
+          // Preserves requested order
+          const reverseOrdered = await store.findLogicalDeclarationsByDeclarationIds([
+            declB1.declaration.symbolId,
+            declA2.declaration.symbolId,
+            declA1.declaration.symbolId,
+          ])
+          expect(reverseOrdered.map((item) => item.declaration.symbolId)).toEqual([
+            declB1.declaration.symbolId,
+            declA2.declaration.symbolId,
+            declA1.declaration.symbolId,
+          ])
+          expect(reverseOrdered[0]!.declaration.form).toBe(DeclarationOccurrenceForm.Definition)
+          expect(reverseOrdered[1]!.declaration.form).toBe(DeclarationOccurrenceForm.Implementation)
+          expect(reverseOrdered[2]!.declaration.form).toBe(DeclarationOccurrenceForm.Signature)
+
+          // Duplicates in input are ignored
+          const reverseDeduped = await store.findLogicalDeclarationsByDeclarationIds([
+            declA1.declaration.symbolId,
+            declA1.declaration.symbolId,
+          ])
+          expect(reverseDeduped).toHaveLength(1)
+          expect(reverseDeduped[0]!.declaration.symbolId).toBe(declA1.declaration.symbolId)
+
+          // Unknown IDs are omitted
+          const reverseUnknown = await store.findLogicalDeclarationsByDeclarationIds([
+            'nonexistent:decl',
+            declA2.declaration.symbolId,
+          ])
+          expect(reverseUnknown.map((item) => item.declaration.symbolId)).toEqual([
+            declA2.declaration.symbolId,
+          ])
+        },
+      )
+
+      it('isolates logical symbol coverage from physical declarations and supports batch lookup invariants', async () => {
+        const file = createFileNode({
+          path: 'root:service.ts',
+          projectRelativePath: 'service.ts',
+          language: 'typescript',
+          contentHash: 'hash',
+          workspace: 'root',
+        })
+        const physicalSymbol = createSymbolNode({
+          name: 'Service',
+          kind: SymbolKind.Class,
+          filePath: file.path,
+          line: 1,
+          column: 0,
+        })
+        const logicalSymbol = createLogicalSymbol({
+          workspace: 'root',
+          surface: 'service.ts',
+          name: 'Service',
+          space: SymbolSpace.Value,
+          ownerId: undefined,
+          memberSemantics: undefined,
+        })
+        const specService = createSpecNode({
+          specId: 'spec:service',
+          path: 'specs/service',
+          title: 'Service spec',
+          contentHash: 'hash:service',
+          workspace: 'root',
+        })
+        const specPhysical = createSpecNode({
+          specId: 'spec:physical-leak',
+          path: 'specs/physical-leak',
+          title: 'Physical spec',
+          contentHash: 'hash:physical',
+          workspace: 'root',
+        })
+
+        await store.bulkLoad({
+          files: [file],
+          documents: [],
+          symbols: [physicalSymbol],
+          specs: [specService, specPhysical],
+          relations: [],
+        })
+        if (options.supportsReferenceFacts) {
+          await store.replaceReferenceFacts({
+            logicalSymbols: [logicalSymbol],
+            declarations: [
+              {
+                logicalSymbolId: logicalSymbol.id,
+                declaration: {
+                  symbolId: physicalSymbol.id,
+                  logicalId: logicalSymbol.id,
+                  location: { filePath: file.path, line: 1, column: 0, endLine: 5, endColumn: 1 },
+                  kind: SymbolKind.Class,
+                  form: DeclarationOccurrenceForm.Definition,
+                },
+              },
+            ],
+            publicBindings: [],
+            localBindings: [],
+            steps: [],
+            coverage: [],
+          })
+        }
+
+        const logicalSpecRelation = createRelation({
+          source: 'spec:service',
+          target: logicalSymbol.id,
+          type: RelationType.CoversSymbol,
+        })
+        const physicalSpecRelation = createRelation({
+          source: 'spec:physical-leak',
+          target: physicalSymbol.id,
+          type: RelationType.CoversSymbol,
+        })
+
+        await store.addRelations([logicalSpecRelation, physicalSpecRelation])
+
+        // Querying for logicalSymbol.id returns only relations targeting logicalSymbol.id
+        const logicalCovering = await store.getCoveringSpecsForSymbols([logicalSymbol.id])
+        expect(logicalCovering).toEqual([
+          expect.objectContaining({ source: 'spec:service', target: logicalSymbol.id }),
+        ])
+        expect(logicalCovering.some((rel) => rel.target === physicalSymbol.id)).toBe(false)
+
+        // The physical-target relation was rejected rather than persisted under any identity.
+        expect(await store.getCoveringSpecsForSymbols([physicalSymbol.id])).toEqual([])
+        const relationsByType = await store.getStatistics()
+        expect(relationsByType.relationCounts[RelationType.CoversSymbol] ?? 0).toBe(1)
+
+        // Single lookup matches batch lookup
+        const singleCovering = await store.getCoveringSpecsForSymbol(logicalSymbol.id)
+        expect(singleCovering).toEqual(logicalCovering)
+
+        // Duplicate inputs handled cleanly
+        const dedupedCovering = await store.getCoveringSpecsForSymbols([
+          logicalSymbol.id,
+          logicalSymbol.id,
+        ])
+        expect(dedupedCovering).toEqual(logicalCovering)
+
+        // Unknown logical IDs return empty array
+        expect(await store.getCoveringSpecsForSymbols(['nonexistent:logical:target'])).toEqual([])
+        expect(await store.getCoveringSpecsForSymbol('nonexistent:logical:target')).toEqual([])
+
+        // Empty batch returns empty array
+        expect(await store.getCoveringSpecsForSymbols([])).toEqual([])
+      })
+
       it('finds directly affected importer and symbol-dependent files in one operation', async () => {
         const targetFile = createFileNode({
           path: 'ws:target.ts',
-          configRelativePath: 'target.ts',
+          projectRelativePath: 'target.ts',
           language: 'typescript',
           contentHash: 'target',
           workspace: 'ws',
         })
         const importerFile = createFileNode({
           path: 'ws:importer.ts',
-          configRelativePath: 'importer.ts',
+          projectRelativePath: 'importer.ts',
           language: 'typescript',
           contentHash: 'importer',
           workspace: 'ws',
         })
         const callerFile = createFileNode({
           path: 'ws:caller.ts',
-          configRelativePath: 'caller.ts',
+          projectRelativePath: 'caller.ts',
           language: 'typescript',
           contentHash: 'caller',
           workspace: 'ws',
@@ -1087,7 +1378,7 @@ export function graphStoreContractTests(
       it('findSymbols by kind', async () => {
         const file = createFileNode({
           path: 'src/main.ts',
-          configRelativePath: '',
+          projectRelativePath: '',
           language: 'typescript',
           contentHash: 'sha256:abc',
           workspace: '/project',
@@ -1116,7 +1407,7 @@ export function graphStoreContractTests(
       it('distinguishes case-exact symbol lookup from explicit case-insensitive fallback', async () => {
         const file = createFileNode({
           path: 'core:src/change.ts',
-          configRelativePath: 'packages/core/src/change.ts',
+          projectRelativePath: 'packages/core/src/change.ts',
           language: 'typescript',
           contentHash: 'sha256:case-lookup',
           workspace: 'core',
@@ -1146,10 +1437,68 @@ export function graphStoreContractTests(
         ])
       })
 
+      it('findSymbols filters by category', async () => {
+        const sourceFile = createFileNode({
+          path: 'src/main.ts',
+          projectRelativePath: '',
+          language: 'typescript',
+          contentHash: 'sha256:src',
+          workspace: '/project',
+          category: 'source',
+        })
+        const testFile = createFileNode({
+          path: 'test/main.spec.ts',
+          projectRelativePath: '',
+          language: 'typescript',
+          contentHash: 'sha256:test',
+          workspace: '/project',
+          category: 'test',
+        })
+        const ignoredFile = createFileNode({
+          path: 'dist/bundle.js',
+          projectRelativePath: '',
+          language: 'javascript',
+          contentHash: 'sha256:ign',
+          workspace: '/project',
+          category: 'ignored',
+        })
+        const srcSym = createSymbolNode({
+          name: 'targetFn',
+          kind: SymbolKind.Function,
+          filePath: sourceFile.path,
+          line: 1,
+          column: 0,
+        })
+        const testSym = createSymbolNode({
+          name: 'targetFn',
+          kind: SymbolKind.Function,
+          filePath: testFile.path,
+          line: 1,
+          column: 0,
+        })
+        const ignSym = createSymbolNode({
+          name: 'targetFn',
+          kind: SymbolKind.Function,
+          filePath: ignoredFile.path,
+          line: 1,
+          column: 0,
+        })
+
+        await store.upsertFile(sourceFile, [srcSym], [])
+        await store.upsertFile(testFile, [testSym], [])
+        await store.upsertFile(ignoredFile, [ignSym], [])
+
+        const result = await store.findSymbols({ categories: ['source'] })
+        expect(result).toEqual([srcSym])
+
+        const testResult = await store.findSymbols({ categories: ['test'] })
+        expect(testResult).toEqual([testSym])
+      })
+
       it('getStatistics returns correct counts', async () => {
         const file = createFileNode({
           path: 'src/main.ts',
-          configRelativePath: '',
+          projectRelativePath: '',
           language: 'typescript',
           contentHash: 'sha256:abc',
           workspace: '/project',
@@ -1176,7 +1525,7 @@ export function graphStoreContractTests(
       it('persists and queries CONSTRUCTS and USES_TYPE as symbol dependency relations', async () => {
         const file = createFileNode({
           path: 'src/composition.ts',
-          configRelativePath: '',
+          projectRelativePath: '',
           language: 'typescript',
           contentHash: 'sha256:deps',
           workspace: '/project',
@@ -1234,7 +1583,7 @@ export function graphStoreContractTests(
       it('returns incoming EXTENDS relations via getExtenders', async () => {
         const file = createFileNode({
           path: 'src/types.ts',
-          configRelativePath: '',
+          projectRelativePath: '',
           language: 'typescript',
           contentHash: 'sha256:abc',
           workspace: '/project',
@@ -1271,7 +1620,7 @@ export function graphStoreContractTests(
       it('returns incoming IMPLEMENTS relations via getImplementors', async () => {
         const file = createFileNode({
           path: 'src/contracts.ts',
-          configRelativePath: '',
+          projectRelativePath: '',
           language: 'typescript',
           contentHash: 'sha256:def',
           workspace: '/project',
@@ -1308,7 +1657,7 @@ export function graphStoreContractTests(
       it('returns incoming OVERRIDES relations via getOverriders', async () => {
         const file = createFileNode({
           path: 'src/methods.ts',
-          configRelativePath: '',
+          projectRelativePath: '',
           language: 'typescript',
           contentHash: 'sha256:ghi',
           workspace: '/project',
@@ -1370,7 +1719,7 @@ export function graphStoreContractTests(
           documents: [
             createDocumentNode({
               path: 'root:docs/guide.md',
-              configRelativePath: 'docs/guide.md',
+              projectRelativePath: 'docs/guide.md',
               contentHash: 'sha256:doc',
               content: '# Guide',
               workspace: 'root',
@@ -1412,64 +1761,64 @@ export function graphStoreContractTests(
         expect(stats.graphFingerprint).toBeNull()
       })
 
-      it('findFilesByConfigRelativePath returns exact matches', async () => {
+      it('findFilesByProjectRelativePath returns exact matches', async () => {
         const file = createFileNode({
           path: 'core:src/model.ts',
-          configRelativePath: 'packages/core/src/model.ts',
+          projectRelativePath: 'packages/core/src/model.ts',
           language: 'typescript',
           contentHash: 'sha256:abc',
           workspace: 'core',
         })
         await store.upsertFile(file, [], [])
-        const found = await store.findFilesByConfigRelativePath('packages/core/src/model.ts')
+        const found = await store.findFilesByProjectRelativePath('packages/core/src/model.ts')
         expect(found).toHaveLength(1)
         expect(found[0]!.path).toBe('core:src/model.ts')
       })
 
-      it('findDocumentsByConfigRelativePath returns exact matches', async () => {
+      it('findDocumentsByProjectRelativePath returns exact matches', async () => {
         const document = createDocumentNode({
           path: 'root:docs/guide.md',
-          configRelativePath: 'docs/guide.md',
+          projectRelativePath: 'docs/guide.md',
           contentHash: 'sha256:doc',
           content: '# Guide\n\nHello graph',
           workspace: 'root',
         })
         await store.upsertDocument(document)
-        const found = await store.findDocumentsByConfigRelativePath('docs/guide.md')
+        const found = await store.findDocumentsByProjectRelativePath('docs/guide.md')
         expect(found).toHaveLength(1)
         expect(found[0]!.path).toBe('root:docs/guide.md')
       })
 
-      it('findFilesByConfigRelativePath returns empty for no match', async () => {
-        const found = await store.findFilesByConfigRelativePath('nonexistent/path.ts')
+      it('findFilesByProjectRelativePath returns empty for no match', async () => {
+        const found = await store.findFilesByProjectRelativePath('nonexistent/path.ts')
         expect(found).toHaveLength(0)
       })
 
-      it('findFilesByConfigRelativePath returns multiple files across workspaces', async () => {
+      it('findFilesByProjectRelativePath returns multiple files across workspaces', async () => {
         const file1 = createFileNode({
           path: 'core:src/model.ts',
-          configRelativePath: 'packages/core/src/model.ts',
+          projectRelativePath: 'packages/core/src/model.ts',
           language: 'typescript',
           contentHash: 'sha256:1',
           workspace: 'core',
         })
         const file2 = createFileNode({
           path: 'cli:src/model.ts',
-          configRelativePath: 'packages/core/src/model.ts',
+          projectRelativePath: 'packages/core/src/model.ts',
           language: 'typescript',
           contentHash: 'sha256:2',
           workspace: 'cli',
         })
         await store.upsertFile(file1, [], [])
         await store.upsertFile(file2, [], [])
-        const found = await store.findFilesByConfigRelativePath('packages/core/src/model.ts')
+        const found = await store.findFilesByProjectRelativePath('packages/core/src/model.ts')
         expect(found).toHaveLength(2)
       })
 
-      it('getFile returns configRelativePath', async () => {
+      it('getFile returns projectRelativePath', async () => {
         const file = createFileNode({
           path: 'core:src/model.ts',
-          configRelativePath: 'packages/core/src/model.ts',
+          projectRelativePath: 'packages/core/src/model.ts',
           language: 'typescript',
           contentHash: 'sha256:abc',
           workspace: 'core',
@@ -1477,7 +1826,7 @@ export function graphStoreContractTests(
         await store.upsertFile(file, [], [])
         const retrieved = await store.getFile('core:src/model.ts')
         expect(retrieved).toBeDefined()
-        expect(retrieved!.configRelativePath).toBe('packages/core/src/model.ts')
+        expect(retrieved!.projectRelativePath).toBe('packages/core/src/model.ts')
       })
 
       it('lastIndexedRef is set after bulkLoad with vcsRef', async () => {
@@ -1508,7 +1857,7 @@ export function graphStoreContractTests(
       it('clear removes everything', async () => {
         const file = createFileNode({
           path: 'src/main.ts',
-          configRelativePath: '',
+          projectRelativePath: '',
           language: 'typescript',
           contentHash: 'sha256:abc',
           workspace: '/project',
@@ -1524,14 +1873,14 @@ export function graphStoreContractTests(
       it('getAllFiles returns all files', async () => {
         const file1 = createFileNode({
           path: 'a.ts',
-          configRelativePath: '',
+          projectRelativePath: '',
           language: 'typescript',
           contentHash: 'sha256:1',
           workspace: '/project',
         })
         const file2 = createFileNode({
           path: 'b.ts',
-          configRelativePath: '',
+          projectRelativePath: '',
           language: 'typescript',
           contentHash: 'sha256:2',
           workspace: '/project',
@@ -1547,7 +1896,7 @@ export function graphStoreContractTests(
         await store.upsertDocument(
           createDocumentNode({
             path: 'root:docs/a.md',
-            configRelativePath: 'docs/a.md',
+            projectRelativePath: 'docs/a.md',
             contentHash: 'sha256:a',
             content: 'alpha',
             workspace: 'root',
@@ -1556,7 +1905,7 @@ export function graphStoreContractTests(
         await store.upsertDocument(
           createDocumentNode({
             path: 'root:docs/b.md',
-            configRelativePath: 'docs/b.md',
+            projectRelativePath: 'docs/b.md',
             contentHash: 'sha256:b',
             content: 'beta',
             workspace: 'root',
@@ -1620,7 +1969,7 @@ export function graphStoreContractTests(
           line: 1,
           column: 0,
         })
-        const metadata = { stale: true, reason: 'symbol removed' }
+        const metadata = { origin: 'implementation-link' }
         const logicalSymbol = createLogicalSymbol({
           workspace: 'test',
           surface: 'src/auth.ts',
@@ -1641,7 +1990,7 @@ export function graphStoreContractTests(
           files: [
             createFileNode({
               path: 'src/auth.ts',
-              configRelativePath: '',
+              projectRelativePath: '',
               language: 'typescript',
               contentHash: 'sha256:b',
               workspace: 'test',
@@ -1680,13 +2029,39 @@ export function graphStoreContractTests(
         const retrieved = await store.getCoveredSymbols(spec.specId)
         expect(retrieved).toHaveLength(1)
         expect(retrieved[0]!.metadata).toEqual(metadata)
+        expect(retrieved[0]!.metadata).not.toHaveProperty('stale')
+      })
+
+      it('keeps a physical-only declaration retrievable without inventing a logical mapping', async () => {
+        const physicalOnly = createSymbolNode({
+          name: '<anonymous>',
+          kind: SymbolKind.Function,
+          filePath: 'src/physical.ts',
+          line: 3,
+          column: 2,
+        })
+        await store.upsertFile(
+          createFileNode({
+            path: 'src/physical.ts',
+            projectRelativePath: 'src/physical.ts',
+            language: 'typescript',
+            contentHash: 'sha256:physical',
+            workspace: 'test',
+          }),
+          [physicalOnly],
+          [],
+        )
+
+        expect((await store.getSymbol(physicalOnly.id))?.id).toBe(physicalOnly.id)
+        expect(await store.findLogicalDeclarationsByDeclarationIds([physicalOnly.id])).toEqual([])
+        expect((await store.getAllReferenceFacts()).declarations).toEqual([])
       })
 
       it('batch-queries covering specs for files and symbols deterministically', async () => {
         const files = ['root:a.ts', 'root:b.ts'].map((path) =>
           createFileNode({
             path,
-            configRelativePath: path.slice('root:'.length),
+            projectRelativePath: path.slice('root:'.length),
             language: 'typescript',
             contentHash: `hash:${path}`,
             workspace: 'root',
@@ -1799,7 +2174,7 @@ export function graphStoreContractTests(
       it('ranks exact symbol, spec, and document matches first', async () => {
         const file = createFileNode({
           path: 'core:src/change.ts',
-          configRelativePath: 'packages/core/src/change.ts',
+          projectRelativePath: 'packages/core/src/change.ts',
           language: 'typescript',
           contentHash: 'sha256:file',
           workspace: 'core',
@@ -1838,14 +2213,14 @@ export function graphStoreContractTests(
         })
         const exactDocument = createDocumentNode({
           path: 'root:docs/change.md',
-          configRelativePath: 'docs/change.md',
+          projectRelativePath: 'docs/change.md',
           contentHash: 'sha256:doc1',
           content: 'Change guide',
           workspace: 'root',
         })
         const fuzzyDocument = createDocumentNode({
           path: 'root:docs/change-log.md',
-          configRelativePath: 'docs/change-log.md',
+          projectRelativePath: 'docs/change-log.md',
           contentHash: 'sha256:doc2',
           content: 'This references docs/change.md',
           workspace: 'root',
@@ -1906,7 +2281,7 @@ export function graphStoreContractTests(
       it('expands CamelCase symbol queries and prefers declared names over comments', async () => {
         const file = createFileNode({
           path: 'core:src/archive-change.ts',
-          configRelativePath: 'packages/core/src/archive-change.ts',
+          projectRelativePath: 'packages/core/src/archive-change.ts',
           language: 'typescript',
           contentHash: 'sha256:camel-file',
           content: 'export function ArchiveChange() {}\nexport function fallback() {}',
@@ -1943,7 +2318,7 @@ export function graphStoreContractTests(
       it('orders token strength as exact before prefix before suffix before substring', async () => {
         const file = createFileNode({
           path: 'core:src/repository.ts',
-          configRelativePath: 'packages/core/src/repository.ts',
+          projectRelativePath: 'packages/core/src/repository.ts',
           language: 'typescript',
           contentHash: 'sha256:token-strength',
           content: [
@@ -2034,7 +2409,7 @@ export function graphStoreContractTests(
         const sourceFiles = [
           createFileNode({
             path: 'root:a.ts',
-            configRelativePath: 'a.ts',
+            projectRelativePath: 'a.ts',
             language: 'typescript',
             contentHash: 'a',
             workspace: 'root',
@@ -2042,7 +2417,7 @@ export function graphStoreContractTests(
           }),
           createFileNode({
             path: 'root:b.ts',
-            configRelativePath: 'b.ts',
+            projectRelativePath: 'b.ts',
             language: 'typescript',
             contentHash: 'b',
             workspace: 'root',
@@ -2050,7 +2425,7 @@ export function graphStoreContractTests(
           }),
           createFileNode({
             path: 'other:c.ts',
-            configRelativePath: 'c.ts',
+            projectRelativePath: 'c.ts',
             language: 'typescript',
             contentHash: 'c',
             workspace: 'other',
@@ -2058,7 +2433,7 @@ export function graphStoreContractTests(
           }),
           createFileNode({
             path: 'root:excluded.spec.ts',
-            configRelativePath: 'excluded.spec.ts',
+            projectRelativePath: 'excluded.spec.ts',
             language: 'typescript',
             contentHash: 'd',
             workspace: 'root',

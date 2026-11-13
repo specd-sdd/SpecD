@@ -46,7 +46,7 @@ describe('spec schema', () => {
     await program.parseAsync(['node', 'specd', 'spec', 'schema', 'get', 'auth/login'])
 
     expect(kernel.specs.getPersistedSchema.execute).toHaveBeenCalledWith({
-      specId: 'default:auth/login',
+      specId: 'auth/login',
     })
   })
 
@@ -73,7 +73,7 @@ describe('spec schema', () => {
     ])
 
     expect(kernel.specs.updatePersistedSchema.execute).toHaveBeenCalledWith({
-      specId: 'default:auth/login',
+      specId: 'auth/login',
       schemaRef: '@specd/schema-std',
     })
   })

@@ -1,0 +1,14 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Note context and user decisions
+
+    #### Scenario: Failed full audit preserves user choice
+
+    - **GIVEN** full verify has a report and code/design findings
+    - **WHEN** the user has not chosen a repair, then explicitly chooses an advertised return
+    - **THEN** no transition happens before consent; the authorized successful hop records audit path/choice and note policy
+    - **AND** notes never override blockers or permit successful verification completion

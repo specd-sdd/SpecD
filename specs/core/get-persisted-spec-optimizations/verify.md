@@ -27,6 +27,39 @@
 - **AND** no metadata materialization or regeneration occurs
 - **AND** `spec-lock.json` is not read directly
 
+#### Scenario: Missing field has the explicit missing shape
+
+- **GIVEN** persisted state has no `optimizedContext`
+- **WHEN** `execute` is called with `field: 'optimizedContext'`
+- **THEN** the result field is `{ freshness: 'missing', reasons: ['missing'] }` with no `value`, and `fresh` is `false`
+
+#### Scenario: Filter with both fields present
+
+- **GIVEN** both fields are persisted
+- **WHEN** `execute` is called with `field: 'optimizedDescription'`
+- **THEN** only that field is returned and, without the filter, both are
+
+#### Scenario: Multiple reasons are ordered
+
+- **GIVEN** a field whose baseline lost one artifact, gained another, and whose schema changed
+- **WHEN** `execute` is called
+- **THEN** its `reasons` list contains `artifact-removed`, `artifact-added`, and `schema-changed` in a stable order and `freshness` is `stale`
+
+#### Scenario: Unknown spec throws SpecNotFoundError
+
+- **WHEN** `execute` is called for a spec that does not exist in a valid workspace
+- **THEN** `SpecNotFoundError` is thrown
+
+#### Scenario: Generated metadata is never read
+
+- **WHEN** `execute` succeeds
+- **THEN** only `readPersistedState` and `artifactMeta` are called on the repository
+
+#### Scenario: Factory derives deps from the resolver
+
+- **WHEN** the config-based factory is invoked
+- **THEN** its deps come from `resolveGetPersistedSpecOptimizationsDeps(resolver)`
+
 ### Requirement: Result contract for a spec with no persisted state
 
 #### Scenario: Uninitialized spec returns initialized false without throwing
@@ -52,7 +85,7 @@
 
 - **GIVEN** persisted state has only `optimizedDescription`
 - **WHEN** `execute({ specId, field: 'optimizedContext' })` is called
-- **THEN** the result omits `optimizedContext` and annotates it with reason `missing`
+- **THEN** the result field `optimizedContext` is `{ freshness: 'missing', reasons: ['missing'] }` with no `value`
 - **AND** no validation error is thrown
 
 ### Requirement: Per-field freshness computation
@@ -142,3 +175,32 @@
 - **AND** it derives `GetPersistedSpecOptimizationsDeps` through `resolveGetPersistedSpecOptimizationsDeps(resolver)`
 - **AND** `resolveGetPersistedSpecOptimizationsDeps(resolver)` resolves `specs: ReadonlyMap<string, SpecRepository>`
 - **AND** the factory delegates to canonical `createGetPersistedSpecOptimizations(deps)`
+
+### Requirement: Spec ID validation
+
+#### Scenario: Empty spec ID rejected before any repository access
+
+- **WHEN** `execute` is called with `specId: ''`
+- **THEN** `InvalidSpecIdError` is thrown
+- **AND** no repository is read or written
+
+#### Scenario: Malformed spec ID rejected
+
+- **WHEN** `execute` is called with `specId: 'Bad Id'`
+- **THEN** `InvalidSpecIdError` is thrown quoting `Bad Id`
+
+#### Scenario: Unknown workspace rejected
+
+- **WHEN** `execute` is called with `specId: 'nope:auth/login'`
+- **THEN** `WorkspaceNotFoundError` is thrown
+
+#### Scenario: Bare spec ID resolved to the default workspace
+
+- **WHEN** `execute` is called with `specId: '_global/architecture'`
+- **THEN** it behaves as for `default:_global/architecture`
+- **AND** any `specId` in the result is `default:_global/architecture`
+
+#### Scenario: Qualified spec ID accepted unchanged
+
+- **WHEN** `execute` is called with `specId: 'core:storage'`
+- **THEN** it proceeds with workspace `core` and path `storage`

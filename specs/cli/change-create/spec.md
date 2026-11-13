@@ -15,9 +15,10 @@ specd changes create <name>
   [--artifact-policy none|surgical|downstream|global]
   [--workflow-policy preserve|redesign]
   [--format text|json|toon]
+  [--config <path>]
 ```
 
-The name is required; spec and policy flags are optional and repeatability follows their value shape. The command validates policy values before delegating creation. It does not expose the deprecated scalar policy as a new-write option.
+The name is required; spec and policy flags are optional and repeatability follows their value shape. Each `--spec <id>` value follows `[<workspace>:]<capability-path>` (`core:spec-id-format`), is passed to `CreateChange` unchanged, is one whole spec ID, and is never split on commas. The command validates policy values before delegating creation (and `CreateChange` also enforces them). It does not expose the deprecated scalar policy as a new-write option.
 
 ### Requirement: Structured invalidation policy input
 
@@ -27,19 +28,11 @@ With no explicit or configured value, the created change uses `{ artifacts: down
 
 ### Requirement: Workspace resolution
 
-The workspace IDs for the new change are derived from the workspace prefix of each `--spec` value. If the workspace prefix is omitted, `default` is used. If a named workspace is not declared in `specd.yaml`, the command fails with exit code 1 and prints an `error:` message to stderr.
+The command MUST NOT resolve workspaces itself. `CreateChange` validates every `--spec` value, derives the workspace IDs of the new change from the normalized IDs, and rejects an unknown workspace with `WorkspaceNotFoundError` and a malformed ID with `InvalidSpecIdError`. The command maps these errors to exit code 1 and prints the `error:` message to stderr.
 
 ### Requirement: ReadOnly workspace rejection
 
-After resolving the workspace for each `--spec` value, the CLI MUST check the workspace's `ownership` from `SpecdConfig`. If any spec's workspace has `readOnly` ownership, the command MUST exit with code 1 and print an error message to stderr:
-
-```text
-error: Cannot add spec "<specId>" to change — workspace "<workspace>" is readOnly.
-
-ReadOnly workspaces are protected: their specs and code cannot be modified by changes.
-```
-
-This check MUST occur before invoking the `CreateChange` use case. If multiple specs target readOnly workspaces, one error per spec MUST be printed. The error message MUST NOT suggest remediation steps.
+The command MUST NOT check workspace ownership itself. `CreateChange` rejects specs in `readOnly` workspaces with `ReadOnlyWorkspaceError` before creating anything (see `core:create-change`). The command MUST map that error to exit code 1 and print its message to stderr, one line per offending spec, without remediation steps.
 
 ### Requirement: Schema name and version
 
@@ -68,8 +61,8 @@ Overlap warning emission MUST NOT cause a non-zero exit code.
 
 On success, output depends on `--format`:
 
-- `text` (default): prints a single line to stdout:
-- `json` or `toon`: outputs the following to stdout (encoded in the respective format): The `changePath` is the absolute filesystem path to the change directory where artifacts should be written.
+- `text` (default): prints a single line to stdout: `created change <name>`
+- `json` or `toon`: outputs `{ result: "ok", name: "<name>", state: "drafting", changePath: "<absolute-path>" }` to stdout, encoded in the respective format. The `changePath` is the absolute filesystem path to the change directory where artifacts should be written.
 
 No further output is produced.
 
@@ -80,24 +73,20 @@ When `--format json` is specified:
 - stdout is valid JSON with `result: "ok"`, `name: "<name>"`, `state: "drafting"`, and `changePath: "<absolute-path>"`
 - `changePath` points to the change directory under `.specd/changes/`
 
-### Requirement: JSON output on success
-
-When `--format json` succeeds:
-
-- stdout is valid JSON with `result: "ok"`, `state: "drafting"`, and `name: "<name>"`
-- the process exits with code 0
-
 ### Requirement: Duplicate name error
 
 If a change with the given name already exists (`ChangeAlreadyExistsError`), the command exits with code 1 and prints an `error:` message to stderr.
 
+If `--invalidation-policy` is not one of `none`, `surgical`, `downstream`, or `global`, the command exits with code 1 and prints the `InvalidInputError` message from `CreateChange`; the command itself holds no policy rule.
+
 ## Constraints
 
 - `--spec` is optional; when omitted, the change is created with an empty specIds list
-- The change name must be a valid kebab-case slug; the CLI validates the format before invoking the use case
+- The change name must be a valid kebab-case slug; the core (`Change`) validates the format and the command maps the resulting error to exit code 1 — the CLI holds no name rule
 - The workspace prefix in --spec defaults to default when omitted; workspace IDs are never a separate flag
-- Specs targeting readOnly workspaces are rejected before the use case is invoked
+- Specs targeting readOnly workspaces are rejected by `CreateChange` before anything is created
 - The CLI does not resolve or pass schema identity — `CreateChange` owns active schema resolution
+- The CLI holds no spec ID or ownership rule; it forwards raw values to the use case
 
 ## Examples
 
@@ -122,6 +111,6 @@ specd change create add-shared-api --spec shared-ws:api/contracts
 
 - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, and output conventions
 - [`core:change`](../../core/change/spec.md) — change identity and structured policy projection
-- [`core:create-change`](../../core/create-change/spec.md) — canonical creation input and v2 persistence
+- [`core:create-change`](../../core/create-change/spec.md) — canonical creation input, v2 persistence, validation, and `readOnly` rejection
 - [`core:config`](../../core/config/spec.md) — structured defaults and legacy alias adaptation
 - [`core:spec-id-format`](../../core/spec-id-format/spec.md) — canonical spec ID format and bare-path shorthand

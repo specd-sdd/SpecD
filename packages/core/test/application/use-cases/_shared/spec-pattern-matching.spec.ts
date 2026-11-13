@@ -105,6 +105,24 @@ describe('listMatchingSpecs', () => {
     expect(warnings[0]!.path).toBe('unknown')
   })
 
+  it('accepts a leading-digit capability segment', async () => {
+    const repo = makeSpecRepository({ specs: [makePatternSpec('auth/2fa')] })
+    const workspaces = await makeWorkspaceMap(new Map([['default', repo]]))
+    const warnings: ContextWarning[] = []
+
+    const results = await listMatchingSpecs('auth/2fa', 'default', false, workspaces, warnings)
+
+    expect(results).toEqual([{ workspace: 'default', capPath: 'auth/2fa' }])
+    expect(warnings).toHaveLength(0)
+  })
+
+  it('rejects a one-letter workspace qualifier', async () => {
+    const workspaces = await makeWorkspaceMap(new Map([['default', makeSpecRepository()]]))
+    const warnings: ContextWarning[] = []
+
+    await expect(listMatchingSpecs('a:*', 'default', true, workspaces, warnings)).rejects.toThrow()
+  })
+
   it('missing spec emits warning and returns empty', async () => {
     const repo = makeSpecRepository({ specs: [] })
     const specs = new Map([['default', repo]])

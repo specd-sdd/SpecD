@@ -10,6 +10,55 @@
 - **THEN** the package and complete draft are deterministic
 - **AND** no Go compiler or package command is invoked
 
+#### Scenario: The Go parse result is registered right after parsing
+
+- **GIVEN** a Go file analysed by the adapter in an indexing session whose parser-resource scope is observed
+- **WHEN** `analyzeFile` runs
+- **THEN** exactly the parse result is registered in `session.parserResources`
+- **AND** the registration happens before the adapter traverses the parse result
+
+#### Scenario: A failure during traversal still releases the parse result
+
+- **GIVEN** a Go file whose analysis throws after parsing
+- **WHEN** the indexer closes the epoch of that file
+- **THEN** the registered parse result is released and no parser object remains reachable from the session
+
+#### Scenario: Nothing outlives the file's analysis
+
+- **GIVEN** the epoch of the analysed Go file has been closed
+- **WHEN** the adapter instance, the session adapter state, and the returned draft are inspected
+- **THEN** none of them refers to the parsed resource and the draft is plain serializable data
+
+#### Scenario: No run-wide keepalive state exists
+
+- **GIVEN** an indexing run over several Go files
+- **WHEN** the run ends
+- **THEN** the session holds no adapter-state entry that collects parser objects
+
+### Requirement: Go parser-authoritative structural extraction
+
+#### Scenario: Braces and call-like text do not reconstruct Go structure
+
+- **GIVEN** Go strings and comments contain braces, selector calls, imports, and composite-literal-like text
+- **AND** real interfaces, grouped imports, calls, and composite literals span multiple lines
+- **WHEN** the adapter analyzes the file
+- **THEN** bodies, methods, imports, calls, literals, and ranges follow Go parser nodes
+- **AND** raw brace counts and textual lookalikes add no facts
+
+#### Scenario: Go module metadata remains separate
+
+- **GIVEN** module identity is parsed textually from `go.mod`
+- **WHEN** Go source facts are extracted
+- **THEN** the module identity may qualify package resolution
+- **AND** source declarations and dependencies still require Go AST evidence
+
+#### Scenario: Unresolved Go import is not a resolved target
+
+- **GIVEN** an import spec contains a raw package path that cannot be resolved under the configured module and workspace maps
+- **WHEN** dependency relations are emitted
+- **THEN** no relation uses the raw specifier as its resolved target
+- **AND** unresolved diagnostic evidence may retain the original specifier
+
 ### Requirement: Declaration extraction and ranges
 
 #### Scenario: Receiver and type declarations retain authoritative ranges
@@ -19,6 +68,13 @@
 - **THEN** each supported construct has its expected broad kind
 - **AND** its exact name selection is contained by the parser construct range
 
+#### Scenario: Struct fields extract as Property kind
+
+- **GIVEN** a Go struct definition containing named fields
+- **WHEN** symbols are extracted
+- **THEN** each struct field is assigned `SymbolKind.Property`
+- **AND** its `parentId` is set to the enclosing struct's symbol ID
+
 ### Requirement: Package identity, exports, and imports
 
 #### Scenario: Import forms and package exports remain distinct
@@ -27,6 +83,160 @@
 - **WHEN** bindings are built
 - **THEN** only exported package names create public bindings
 - **AND** blank and dot imports retain their distinct dependency and binding semantics
+
+#### Scenario: Import path resolves to the package directory
+
+- **GIVEN** workspace `auth` has `go.mod` module `github.com/acme/auth` and indexes `models/user.go` declaring exported `User`
+- **AND** workspace `app` imports `github.com/acme/auth/models`
+- **WHEN** imports are resolved
+- **THEN** the entry is the Go package of `auth:models`
+- **AND** the file depends on the indexed non-test files of that package
+
+#### Scenario: Test files are not entries
+
+- **GIVEN** the package directory contains `user_test.go`
+- **WHEN** `entrySurface` runs
+- **THEN** `user_test.go` is not in the entry
+
+#### Scenario: Module root import
+
+- **GIVEN** an import path equal to the module path
+- **WHEN** `entrySurface` runs
+- **THEN** the entry is the package at the module root
+
+#### Scenario: Longest module prefix wins
+
+- **GIVEN** known modules `github.com/acme/auth` and `github.com/acme/auth/v2`
+- **WHEN** the path `github.com/acme/auth/v2/models` is matched
+- **THEN** the package is `github.com/acme/auth/v2`
+
+#### Scenario: Unknown module is not guessed
+
+- **GIVEN** an import path that no workspace module prefixes
+- **WHEN** imports are resolved
+- **THEN** nothing is persisted and the import is counted in `importDiagnostics.externalPackageImports`, not reported as a failure
+
+#### Scenario: go.mod above the code root
+
+- **GIVEN** `go.mod` at the module directory and a workspace code root `<module>/internal`
+- **AND** an import path `example.com/mod/internal/util`
+- **WHEN** `entrySurface` runs
+- **THEN** the package directory is computed relative to the module directory and expressed relative to the code root
+- **AND** the indexed `.go` files in `util` are returned
+
+#### Scenario: Package directory outside the code root yields no entries
+
+- **GIVEN** a code root `<module>/internal` and an import path `example.com/mod/cmd/tool`
+- **WHEN** `entrySurface` runs
+- **THEN** no entry is returned
+
+#### Scenario: Quoted module path is unquoted
+
+- **GIVEN** a `go.mod` line `module "example.com/mod"`
+- **WHEN** `identity` runs
+- **THEN** the identity is `example.com/mod` without quotes
+
+#### Scenario: Module directory is located once in prepare
+
+- **GIVEN** several workspaces
+- **WHEN** `prepare` runs
+- **THEN** the `go.mod` of each workspace is located once
+- **AND** `entrySurface` performs no filesystem read
+
+#### Scenario: Explicit alias is the namespace name
+
+- **GIVEN** `app` imports `m "github.com/acme/auth/models"` and the package declares `package models`
+- **WHEN** imports are resolved
+- **THEN** the namespace name `m` is bound for the file
+- **AND** the name `models` is not bound by that import
+
+#### Scenario: Declared package name wins over the path segment
+
+- **GIVEN** `app` imports `github.com/acme/go-auth` and the indexed non-test files of that package all declare `package auth`
+- **WHEN** imports are resolved
+- **THEN** the namespace name is `auth`
+
+#### Scenario: Versioned module path uses the declared name
+
+- **GIVEN** an import path ending in `/v2` whose indexed package files declare `package models`
+- **WHEN** imports are resolved
+- **THEN** the namespace name is `models`
+
+#### Scenario: Last path segment is the fallback
+
+- **GIVEN** the target package entries are not indexed or declare different package names
+- **WHEN** the namespace name is chosen
+- **THEN** the last segment of the import path is used
+- **AND** no filesystem read happens
+
+#### Scenario: Blank and dot imports bind no namespace name
+
+- **GIVEN** a blank import and a dot import of indexed packages
+- **WHEN** imports are resolved
+- **THEN** neither binds a namespace name for qualified selectors
+
+#### Scenario: Qualified selector across packages resolves
+
+- **GIVEN** workspace `auth` exports `User` from `models/user.go` and `app` imports that package
+- **WHEN** `app` uses `models.User` in a type position
+- **THEN** the selector resolves through `resolvePackageExport` to `auth`'s `User`
+- **AND** the file-level dependency on the package files remains
+
+#### Scenario: Unexported name stays unresolved
+
+- **GIVEN** the package declares lowercase `helper`
+- **WHEN** `app` uses `models.helper`
+- **THEN** no relation is produced and the symbol is not searched by name
+
+#### Scenario: Shadowed namespace name is not the package
+
+- **GIVEN** a function parameter named `models` while the file also imports a package named `models`
+- **WHEN** the body uses `models.User`
+- **THEN** the selector is not resolved as the package
+
+#### Scenario: Unresolved package leaves the selector unresolved
+
+- **GIVEN** the import path is not under any known module
+- **WHEN** `pkg.Name` is used
+- **THEN** no relation is produced
+- **AND** the import is counted as external, not as a failure
+
+#### Scenario: Shadowing by every Go binding form
+
+- **GIVEN** a namespace name `auth` and, in separate functions, a named result, a grouped `var ( auth int )`, a `range` variable, an `if` initializer variable, a type-switch binding, and a local `type auth struct{}`
+- **WHEN** the body uses `auth.A()` or `auth.T{}`
+- **THEN** no qualified reference relation is produced in any of them
+
+#### Scenario: Shadowing starts where the binding is visible
+
+- **GIVEN** a body with `auth.A()` followed later in the same block by `auth := 1`
+- **WHEN** facts are extracted and relations are built
+- **THEN** the call before the declaration still resolves the package
+
+#### Scenario: Parameter name does not shadow the signature types
+
+- **GIVEN** `func F(auth int, v auth.T)` where `auth` is also a namespace name
+- **WHEN** relations are built
+- **THEN** the type `auth.T` in the signature resolves the package
+- **AND** a use of `auth.X` inside the body does not
+
+#### Scenario: Declared-name and versioned imports contribute their step
+
+- **GIVEN** imports of `.../go-auth` (declared `package auth`) and `.../auth/v2` (declared `package auth`) whose qualified selectors resolve
+- **WHEN** imports are resolved
+- **THEN** each returns the helper step anchored on that import's own file-scope Namespace binding
+
+#### Scenario: Two imports binding the same name bind neither
+
+- **GIVEN** two imports of the same file that both yield the namespace name `models`
+- **WHEN** `models.User` is used
+- **THEN** the selector is not resolved
+
+#### Scenario: Instantiated generic composite literal keeps its qualifier
+
+- **GIVEN** `models.Box[int]{}` in a function
+- **WHEN** facts are extracted
+- **THEN** a `construct` fact has qualifier `models` and name `Box`
 
 ### Requirement: Resolution manifests
 
@@ -45,6 +255,18 @@
 - **THEN** each method uses its receiver type's logical identity as owner
 - **AND** no syntax `parentId` collapses the methods or pointer/value evidence
 
+#### Scenario: Method receiver parsed from AST receiver parameter node
+
+- **GIVEN** a receiver method `func (s *Service) Execute()`
+- **WHEN** the method declaration is analyzed
+- **THEN** receiver type `Service` and pointer semantics are derived directly from the AST receiver parameter node rather than regular expressions
+
+#### Scenario: Struct fields own struct as logical owner and parentId
+
+- **GIVEN** a Go struct declaring fields
+- **WHEN** logical member declarations are built
+- **THEN** each struct field has the struct type as its declaring owner and `parentId`
+
 ### Requirement: Scoped bindings, selectors, construction, and types
 
 #### Scenario: Proven package selector differs from interface dispatch
@@ -53,6 +275,101 @@
 - **WHEN** relations are built
 - **THEN** the package selector may produce deterministic call/type evidence
 - **AND** the unknown dispatch produces no guessed concrete call
+
+#### Scenario: Go resolves imports and buildRelations emits CALLS relations
+
+- **GIVEN** a Go file importing a known indexed package and calling a function
+- **WHEN** `resolveImports()` and `buildRelations()` execute
+- **THEN** the resolved import is returned so the indexer can derive the file-level `IMPORTS` relation
+- **AND** a `CALLS` relation connects the caller to the resolved target function or receiver method
+
+#### Scenario: Qualified call produces CALLS
+
+- **GIVEN** `app` imports `models` and calls `models.NewUser()` inside `func Handle()`
+- **WHEN** facts are extracted and relations are built
+- **THEN** a `call` qualified reference fact has qualifier `models`, name `NewUser`, and source `Handle`
+- **AND** a `CALLS` relation connects `Handle` to `NewUser` of the imported package
+
+#### Scenario: Qualified composite literal keeps its qualifier
+
+- **GIVEN** `models.User{}` appears in a function
+- **WHEN** facts are extracted
+- **THEN** a `construct` fact keeps qualifier `models` and name `User`
+- **AND** a `CONSTRUCTS` relation connects the function to the imported `User`
+
+#### Scenario: Qualified types produce USES_TYPE
+
+- **GIVEN** `var u models.User`, a parameter `u models.User`, a result type, and a struct field of type `models.User`
+- **WHEN** facts are extracted and relations are built
+- **THEN** each position emits a `type` fact
+- **AND** each resolves to a `USES_TYPE` relation to the imported `User` from its enclosing declaration
+
+#### Scenario: Value receiver selector is not a package selector
+
+- **GIVEN** `u.Save()` where `u` is a local variable
+- **WHEN** relations are built
+- **THEN** no relation is produced from the qualified reference fact
+
+#### Scenario: Unresolved qualified call is dropped silently
+
+- **GIVEN** `models.Missing()` for a name the package does not export
+- **WHEN** relations are built
+- **THEN** no relation is produced and no error is raised
+
+#### Scenario: Selectors resolve across workspaces
+
+- **GIVEN** the imported package belongs to another workspace
+- **WHEN** a qualified type use is resolved
+- **THEN** the relation targets the symbol in the other workspace
+
+#### Scenario: Package-level initializer is the source symbol
+
+- **GIVEN** `var x = models.New()` and `var y = models.User{}` at package level
+- **WHEN** facts are extracted and relations are built
+- **THEN** the `call` and `construct` facts have the variable as `sourceSymbolId`
+- **AND** `CALLS` and `CONSTRUCTS` relations connect the variables to the imported symbols
+
+#### Scenario: Shadowing applies to every fact kind
+
+- **GIVEN** a parameter, result, receiver, local variable, or local declaration named like a namespace name
+- **WHEN** a `call`, `construct`, or `type` fact uses that name as qualifier inside its scope
+- **THEN** the fact does not resolve as the package
+
+#### Scenario: Instantiated generic call produces a fact
+
+- **GIVEN** `models.Map[int](x)` inside a function
+- **WHEN** facts are extracted
+- **THEN** a `call` fact has qualifier `models` and name `Map`
+
+#### Scenario: Type positions beyond parameters resolve
+
+- **GIVEN** `models.User` as a result type, a constant type, a type declaration right-hand side, and a type argument
+- **WHEN** facts are extracted and relations are built
+- **THEN** each position produces a `USES_TYPE` relation from its enclosing declaration
+
+### Requirement: Go caller containment and declaration classification
+
+#### Scenario: Short variable before a call is not the caller
+
+- **GIVEN** a Go function contains a short-variable declaration followed by a package function call
+- **WHEN** caller identity is extracted
+- **THEN** the containing Go function is the caller
+- **AND** the short-variable name remains a lexical binding
+
+#### Scenario: Receiver method owns calls in its body
+
+- **GIVEN** a receiver method and a package function occur on adjacent lines
+- **AND** the method body contains a call
+- **WHEN** containment is evaluated
+- **THEN** the receiver method is selected from its complete range
+- **AND** the adjacent package function is not selected by line order
+
+#### Scenario: Equal package names are not overloads
+
+- **GIVEN** competing same-name declarations cannot form a valid Go package binding
+- **WHEN** logical identity is constructed
+- **THEN** they are not grouped as an overload set
+- **AND** the conflict remains distinct or unsupported
 
 ### Requirement: Go embedding and hierarchy provenance
 
@@ -96,3 +413,30 @@
 - **WHEN** the adapter reports `hierarchy: true`
 - **THEN** shared hierarchy and ordered provenance facts are emitted
 - **AND** partial package coverage is not replaced by name-only inference
+
+### Requirement: Indexed Go declarations and method sets
+
+#### Scenario: Named and receiver declarations use direct indexes
+
+- **GIVEN** a Go file contains many structs, interfaces, fields, value receivers, pointer receivers, and repeated method names
+- **AND** deterministic instrumentation records complete-symbol searches after index construction
+- **WHEN** type and receiver information is collected
+- **THEN** each declaration is associated through the parser-backed index
+- **AND** no declaration or receiver lookup scans the complete symbol collection
+- **AND** owner IDs, pointer evidence, ranges, and package visibility remain unchanged
+
+#### Scenario: Embedded interface closure is memoized
+
+- **GIVEN** many concrete types are compared with interfaces that share local embedded-interface chains
+- **WHEN** interface satisfaction is evaluated
+- **THEN** each interface's complete local method set is expanded at most once
+- **AND** every concrete-type comparison reuses the memoized result
+- **AND** only types containing every required receiver method emit `IMPLEMENTS`
+
+#### Scenario: Unknown method set remains unknown when cached
+
+- **GIVEN** an interface embeds an unresolved package-qualified interface and another embedding path is cyclic
+- **WHEN** their method sets are requested repeatedly for several concrete types
+- **THEN** the unknown result is memoized without recursion failure
+- **AND** no concrete type is claimed to implement either interface
+- **AND** no member-level `OVERRIDES` relation is emitted

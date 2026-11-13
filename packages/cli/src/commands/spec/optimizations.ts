@@ -4,7 +4,6 @@ import { resolveCliContext } from '../../helpers/cli-context.js'
 import { collect } from '../../helpers/collect.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
-import { parseSpecId } from '../../helpers/spec-path.js'
 import { readStdin } from '../../helpers/read-stdin.js'
 import { CliExitError } from '../../helpers/cli-exit-error.js'
 
@@ -211,16 +210,15 @@ export function registerSpecOptimizations(parent: Command): void {
         if (opts.field !== undefined && !OPTIMIZATION_FIELDS.has(opts.field as OptimizationField)) {
           cliError(`--field must be optimizedDescription or optimizedContext`, opts.format)
         }
-        const { config, kernel } = await resolveCliContext({ configPath: opts.config })
-        const specId = parseSpecId(specPath, config).specId
+        const { kernel } = await resolveCliContext({ configPath: opts.config })
         const result = await kernel.specs.getPersistedOptimizations.execute({
-          specId,
+          specId: specPath,
           ...(opts.field !== undefined ? { field: opts.field as OptimizationField } : {}),
         })
         const fmt = parseFormat(opts.format)
         if (fmt === 'text') {
           if (!result.initialized) {
-            output(`spec ${specId} is not initialized — run specs init first`, 'text')
+            output(`spec ${result.specId} is not initialized — run specs init first`, 'text')
             return
           }
           const hasOptimizationFields = OPTIMIZATION_FIELD_NAMES.some(
@@ -269,9 +267,11 @@ export function registerSpecOptimizations(parent: Command): void {
     .action(async (specPath: string, opts: SetOptimizationOptions) => {
       try {
         const set = await resolveOptimizationSet(opts)
-        const { config, kernel } = await resolveCliContext({ configPath: opts.config })
-        const specId = parseSpecId(specPath, config).specId
-        const result = await kernel.specs.updatePersistedOptimizations.execute({ specId, set })
+        const { kernel } = await resolveCliContext({ configPath: opts.config })
+        const result = await kernel.specs.updatePersistedOptimizations.execute({
+          specId: specPath,
+          set,
+        })
         const fmt = parseFormat(opts.format)
         if (fmt === 'text') {
           output(`updated optimizations for ${result.specId}`, 'text')
@@ -303,10 +303,9 @@ export function registerSpecOptimizations(parent: Command): void {
     .action(async (specPath: string, opts: ClearOptimizationOptions) => {
       try {
         const clear = resolveOptimizationClear(opts)
-        const { config, kernel } = await resolveCliContext({ configPath: opts.config })
-        const specId = parseSpecId(specPath, config).specId
+        const { kernel } = await resolveCliContext({ configPath: opts.config })
         const result = await kernel.specs.updatePersistedOptimizations.execute({
-          specId,
+          specId: specPath,
           clear,
         })
         const fmt = parseFormat(opts.format)

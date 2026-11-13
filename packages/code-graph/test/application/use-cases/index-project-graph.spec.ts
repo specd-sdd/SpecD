@@ -1,10 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { IndexProjectGraph } from '../../../src/application/use-cases/index-project-graph.js'
 import { type CodeGraphHostPort } from '../../../src/application/ports/code-graph-host-port.js'
-import { type GraphStatistics } from '../../../src/domain/value-objects/graph-statistics.js'
 import { type IndexResult } from '../../../src/domain/value-objects/index-result.js'
-import { type Relation } from '../../../src/domain/value-objects/relation.js'
-import { type SpecNode } from '../../../src/domain/value-objects/spec-node.js'
+import { type ProjectWorkspace } from '../../../src/domain/value-objects/index-options.js'
 
 const INDEX_RESULT: IndexResult = {
   filesDiscovered: 1,
@@ -12,9 +10,15 @@ const INDEX_RESULT: IndexResult = {
   documentsIndexed: 0,
   filesRemoved: 0,
   filesSkipped: 0,
+  filesSkippedForSize: 0,
+  largestSkippedForSize: [],
+  sizeExemptAnalysed: [],
+  workspaceOverlaps: [],
+  workspaceOverlapCount: 0,
   specsDiscovered: 0,
   specsIndexed: 0,
   errors: [],
+  diagnostics: [],
   duration: 10,
   workspaces: [],
   vcsRef: null,
@@ -42,30 +46,38 @@ const INDEX_RESULT: IndexResult = {
     reasons: [],
   },
   coverageDiagnostics: [],
+  logicalDiagnostics: [],
+  importDiagnostics: {
+    total: 0,
+    byReason: {},
+    samples: [],
+    externalPackageImports: 0,
+    adaptersWithoutPackageResolution: [],
+  },
 }
 
-class FakeCodeGraphHostPort implements CodeGraphHostPort {
+class FakeCodeGraphHostProvider implements CodeGraphHostPort {
   readonly index = vi.fn().mockResolvedValue(INDEX_RESULT)
-
-  async getStatistics(): Promise<GraphStatistics> {
-    throw new Error('not implemented')
-  }
-
-  async getSpec(_specId: string): Promise<SpecNode | undefined> {
-    throw new Error('not implemented')
-  }
-
-  async getCoveredFiles(_specId: string): Promise<Relation[]> {
-    throw new Error('not implemented')
-  }
-
-  async getCoveredSymbols(_specId: string): Promise<Relation[]> {
-    throw new Error('not implemented')
-  }
+  readonly open = vi.fn().mockResolvedValue(undefined)
+  readonly close = vi.fn().mockResolvedValue(undefined)
+  readonly clear = vi.fn().mockResolvedValue(undefined)
+  readonly recreate = vi.fn().mockResolvedValue(undefined)
+  readonly getStatistics = vi.fn().mockResolvedValue({
+    nodes: 0,
+    relations: 0,
+    files: 0,
+    documents: 0,
+    symbols: 0,
+    specs: 0,
+    lastIndexed: null,
+  })
+  readonly getSpec = vi.fn().mockResolvedValue(undefined)
+  readonly getCoveredFiles = vi.fn().mockResolvedValue([])
+  readonly getCoveredSymbols = vi.fn().mockResolvedValue([])
 }
 
-function makeProvider(): FakeCodeGraphHostPort {
-  return new FakeCodeGraphHostPort()
+function makeProvider(): FakeCodeGraphHostProvider {
+  return new FakeCodeGraphHostProvider()
 }
 
 const baseInput = {
@@ -83,46 +95,6 @@ const baseInput = {
 } as const
 
 describe('IndexProjectGraph', () => {
-  it('forwards every prepared project input unchanged', async () => {
-    const provider = makeProvider()
-    const workspaces = [
-      {
-        name: 'fixture',
-        prefix: null,
-        codeRoot: '/project/packages/fixture',
-        specRepo: {} as never,
-        ownership: 'owned' as const,
-        isExternal: false,
-      },
-    ]
-    const onProgress = vi.fn()
-    const getSpecMetadata = { execute: vi.fn() }
-
-    await new IndexProjectGraph().execute({
-      provider,
-      ...baseInput,
-      vcsRoot: '/repo',
-      workspaces,
-      force: true,
-      onProgress,
-      getSpecMetadata: getSpecMetadata as never,
-    })
-
-    expect(provider.index).toHaveBeenCalledWith({
-      projectRoot: baseInput.projectRoot,
-      vcsRoot: '/repo',
-      workspaces: [...workspaces],
-      graphConfig: baseInput.graphConfig,
-      codeGraphVersion: baseInput.codeGraphVersion,
-      force: true,
-      onProgress,
-      getSpecMetadata,
-    })
-    expect(workspaces).toEqual([
-      expect.objectContaining({ name: 'fixture', codeRoot: '/project/packages/fixture' }),
-    ])
-  })
-
   it('calls index without recreate when force is false', async () => {
     const provider = makeProvider()
 
@@ -198,5 +170,72 @@ describe('IndexProjectGraph', () => {
     })
 
     expect(provider.index).toHaveBeenCalledWith(expect.objectContaining({ vcsRoot: null }))
+  })
+
+  it('forwards configuredWorkspaces to provider.index', async () => {
+    const provider = makeProvider()
+    const configuredWorkspaces: readonly ProjectWorkspace[] = [
+      {
+        name: 'a',
+        prefix: null,
+        codeRoot: '/project/packages/a',
+        isExternal: false,
+        ownership: 'owned',
+        specRepo: {} as unknown as ProjectWorkspace['specRepo'],
+      },
+    ]
+
+    await new IndexProjectGraph().execute({
+      provider,
+      ...baseInput,
+      configuredWorkspaces,
+    })
+
+    expect(provider.index).toHaveBeenCalledWith(expect.objectContaining({ configuredWorkspaces }))
+  })
+
+  it('Scenario: Prepared provider lifecycle remains untouched', async () => {
+    const provider = makeProvider()
+    const onProgress = vi.fn()
+
+    const result = await new IndexProjectGraph().execute({
+      provider,
+      ...baseInput,
+      vcsRoot: '/custom/vcs/root',
+      vcsRef: 'refs/heads/main',
+      onProgress,
+      force: false,
+    })
+
+    expect(provider.index).toHaveBeenCalledWith(
+      expect.objectContaining({
+        vcsRoot: '/custom/vcs/root',
+        vcsRef: 'refs/heads/main',
+        onProgress,
+      }),
+    )
+    expect(provider.open).not.toHaveBeenCalled()
+    expect(provider.close).not.toHaveBeenCalled()
+    expect(provider.clear).not.toHaveBeenCalled()
+    expect(provider.recreate).not.toHaveBeenCalled()
+    expect(result).toBe(INDEX_RESULT)
+  })
+
+  it('forwards onEvent receiver unchanged to provider.index', async () => {
+    const provider = makeProvider()
+    const onEvent = vi.fn()
+
+    await new IndexProjectGraph().execute({
+      provider,
+      ...baseInput,
+      force: false,
+      onEvent,
+    })
+
+    expect(provider.index).toHaveBeenCalledWith(
+      expect.objectContaining({
+        onEvent,
+      }),
+    )
   })
 })

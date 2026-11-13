@@ -240,4 +240,18 @@ describe('SymbolNode', () => {
       }),
     ).toThrow(RangeError)
   })
+
+  it('carries explicitly supplied denormalized projectRelativePath', () => {
+    const node = createSymbolNode({
+      name: 'createKernel',
+      kind: SymbolKind.Function,
+      filePath: 'core:src/kernel.ts',
+      projectRelativePath: 'packages/core/src/kernel.ts',
+      line: 42,
+      column: 0,
+      ...rangeAt(42, 0, 10),
+    })
+    expect(node.filePath).toBe('core:src/kernel.ts')
+    expect(node.projectRelativePath).toBe('packages/core/src/kernel.ts')
+  })
 })

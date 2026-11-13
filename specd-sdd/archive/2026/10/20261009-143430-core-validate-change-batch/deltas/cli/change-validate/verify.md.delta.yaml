@@ -1,0 +1,79 @@
+- op: modified
+  description: 'Cover explicit core delegation in the general behaviour contract'
+  selector:
+    type: section
+    matches: 'Requirement: Behaviour'
+  content: |
+    #### Scenario: File path details come from validation metadata
+
+    - **GIVEN** `ValidateArtifacts.execute` returns a file entry with filename `deltas/core/core/config/spec.md.delta.yaml`
+    - **WHEN** `specd change validate my-change core:config --artifact specs` renders output
+    - **THEN** the CLI prints or serializes that filename from the result metadata
+    - **AND** it does not recompute a replacement path in the CLI layer
+
+    #### Scenario: Single-spec validation delegates directly to ValidateArtifacts
+
+    - **WHEN** `specd changes validate <name> core:config` runs without `--all`
+    - **THEN** the command invokes `ValidateArtifacts` for that target
+    - **AND** it does not route single-spec validation through `ValidateChangeBatch`
+- op: modified
+  description: 'Align batch verification with core-owned validateBatch orchestration'
+  selector:
+    type: section
+    matches: 'Requirement: Batch mode \(\-\-all\)'
+  content: |
+    #### Scenario: Change-scoped batch step omits specPath
+
+    - **GIVEN** a change with `proposal` (change-scoped) and multiple `specIds`
+    - **WHEN** `specd changes validate <name> --all` runs
+    - **THEN** the change-scoped `proposal` step invokes `ValidateArtifacts` without a `specPath` argument
+
+    #### Scenario: --all walks DAG with change-scoped once and spec-scoped per specId
+
+    - **GIVEN** a change with specIds `["core:schema-format", "cli:change-validate"]` and valid deltas for the next incomplete DAG steps
+    - **WHEN** `specd change validate fix-validate-all-dag --all` is run
+    - **THEN** change-scoped artifacts such as `proposal` are validated once
+    - **AND** spec-scoped artifacts such as `specs` are validated once per specId
+    - **AND** validation order respects `artifactDag().topologicalOrder()` (parents before children)
+
+    #### Scenario: --all uses kernel validateBatch
+
+    - **WHEN** `specd changes validate <name> --all` runs
+    - **THEN** CLI calls `kernel.changes.validateBatch.execute({ name })` once
+    - **AND** it does not loop `specIds` with `ValidateArtifacts` directly in the CLI layer
+
+    #### Scenario: --all --artifact forwards filter
+
+    - **WHEN** `specd changes validate <name> --all --artifact specs` runs
+    - **THEN** `validateBatch.execute` receives `{ name, artifactId: "specs" }`
+
+    #### Scenario: --all with specPath is rejected
+
+    - **WHEN** `specd change validate my-change default:auth/login --all` is run
+    - **THEN** stderr contains `error: --all and <specPath> are mutually exclusive` and exit code is 1
+
+    #### Scenario: neither specPath nor --all is rejected
+
+    - **WHEN** `specd change validate my-change` is run without specPath or --all
+    - **THEN** stderr contains `error: either <specPath> or --all is required` and exit code is 1
+
+    #### Scenario: --all with --artifact filters DAG steps
+
+    - **GIVEN** a change with 2 specIds and incomplete `specs` deltas
+    - **WHEN** `specd change validate my-change --all --artifact specs` is run
+    - **THEN** only `specs` validation steps run (once per specId)
+    - **AND** other artifact types are not validated in that batch
+
+    #### Scenario: --all with partial failures exits 1
+
+    - **GIVEN** a batch where one scheduled step fails and another passes
+    - **WHEN** `specd change validate my-change --all` is run
+    - **THEN** all scheduled steps still run
+    - **AND** exit code is 1
+
+    #### Scenario: --all JSON output lists scheduled steps
+
+    - **GIVEN** a batch where all scheduled steps pass
+    - **WHEN** `specd change validate my-change --all --format json` is run
+    - **THEN** output includes `passed`, `total`, and `results[]` with `artifact`, `spec`, `failures`, `warnings`, and `files` per entry
+    - **AND** change-scoped steps serialize `spec` as `null`

@@ -1,0 +1,36 @@
+- op: modified
+  description: Per-spec workspace derivation goes through the validator without assigning a workspace to the change
+  selector:
+    type: section
+    matches: 'Requirement: Index entry fields'
+  content: |
+    An `ArchiveListEntry` MUST include the following **required** fields:
+
+    - `name` (string) — original change name (lookup key)
+    - `archivedName` (string) — archive directory name
+    - `archivedAt` (Date) — archive timestamp
+    - `specIds` (string\[]) — spec IDs associated with the change at archive time
+    - `schemaName` (string) and `schemaVersion` (number) — governing schema identity
+
+    When `includeArchivedBy` is set on archive list options, the entry MAY include:
+
+    - `archivedBy` (`ActorIdentity`) — actor identity when recorded at archive time
+
+    When `includeArchivedBy` is not set, `archivedBy` MUST NOT appear on the entry.
+
+    `ArchiveListEntry` MUST NOT include `artifacts`. Artifact detail belongs on `get(name)`.
+
+    `ArchiveListEntry` MUST NOT include a `workspaces` field. Callers that need the workspaces of associated specs MUST derive the plural set from `specIds`; they MUST NOT assign a singular or primary workspace to the change. If `workspacesFromSpecIds` is used for that derivation, it MUST obtain each workspace through `parseSpecId` (see `core:spec-id-format`), MUST NOT split an ID on the first `:` without validating it, and MUST return the unique workspace names in encounter order. An invalid ID in its input raises `InvalidSpecIdError` instead of yielding a partial or wrong workspace; archived change `specIds` are fully qualified and valid because the manifest rejects anything else on load.
+
+    The public type name `ArchiveListEntry` replaces `ArchivedChangeIndexEntry`. Implementations MAY retain the old name as a deprecated alias during migration, but new code MUST use `ArchiveListEntry`.
+
+- op: added
+  description: Declare the dependency on spec-id-format
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+    after:
+      type: list
+  content: |
+    - [`core:spec-id-format`](../spec-id-format/spec.md) — `parseSpecId` is the only way workspaces are derived from spec IDs

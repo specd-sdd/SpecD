@@ -1,0 +1,72 @@
+- op: modified
+  description: 'Add semantic category to minimum graph semantics for file nodes'
+  selector:
+    type: section
+    matches: 'Requirement: Minimum graph semantics'
+  content: |
+    Every `GraphStore` implementation SHALL support the code-graph package's minimum persisted semantics, regardless of its backend-specific physical schema or file layout.
+
+    At minimum, the abstract store contract MUST support:
+
+    - file nodes carrying the `FileNode` data needed by indexing, traversal, and CLI queries, including both canonical workspace-prefixed paths and config-relative file paths, the full textual **content**, and semantic **category** (`source` | `test` | `ignored`)
+    - symbol nodes carrying the `SymbolNode` data needed by indexing, traversal, and CLI queries
+    - spec nodes carrying the `SpecNode` data needed by spec indexing and search
+    - **document nodes** carrying the `DocumentNode` data (textual non-code resources)
+    - persisted relations for the relation families used by the package: `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`
+    - store-level metadata sufficient to satisfy abstract statistics and derivation-freshness fields such as `lastIndexedAt`, `lastIndexedRef`, and the persisted graph fingerprint
+
+    `COVERS_FILE` and `COVERS_SYMBOL` are the abstract relation families used for requirement-aware graph linkage. `COVERS_FILE` links a spec to a covered implementation file. `COVERS_SYMBOL` links a spec to a covered implementation symbol and MAY carry `metadata.stale` when the archived symbol-level link no longer resolves to a live indexed symbol.
+
+    The `files` storage SHALL persist the full textual content of indexed source files to enable match-aware snippet extraction without re-reading from disk at query time. It SHALL also persist and index the `category` attribute (defaulting to `'source'`) to support low-latency filtering during graph traversal and search.
+
+    The store MUST provide operations for upserting and removing `DocumentNode` entries, as well as searching them via full-text search.
+
+    The store SHALL support incremental indexing by matching `contentHash` values before updating node properties or relations.
+
+    Backends MAY represent those concepts differently internally, but they MUST preserve the observable semantics exposed by the `GraphStore` API. Storage-agnostic consumers MUST rely on these abstract semantics rather than any backend-specific table, label, or index shape.
+
+- op: modified
+  description: 'Add categories filter to Query methods SymbolQuery'
+  selector:
+    type: section
+    matches: 'Requirement: Query methods'
+  content: |
+    `GraphStore` SHALL provide the following query methods:
+
+    - **`getFile(path: string): Promise<FileNode | undefined>`** — retrieve a file node by canonical workspace-prefixed path
+    - **`findFilesByConfigRelativePath(path: string): Promise<FileNode[]>`** — retrieve all file nodes whose `configRelativePath` exactly matches the given normalized config-relative path
+    - **`getSymbol(id: string): Promise<SymbolNode | undefined>`** — retrieve a symbol by id
+    - **`getCallers(symbolId: string): Promise<Relation[]>`** — all incoming symbol dependency relations where `target` matches. At minimum this includes `CALLS`, `CONSTRUCTS`, and `USES_TYPE`.
+    - **`getCallees(symbolId: string): Promise<Relation[]>`** — all outgoing symbol dependency relations where `source` matches. At minimum this includes `CALLS`, `CONSTRUCTS`, and `USES_TYPE`.
+    - **`getImporters(filePath: string): Promise<Relation[]>`** — all `IMPORTS` relations where `target` matches
+    - **`getImportees(filePath: string): Promise<Relation[]>`** — all `IMPORTS` relations where `source` matches
+    - **`getExtenders(symbolId: string): Promise<Relation[]>`** — all `EXTENDS` relations where `target` matches
+    - **`getExtendedTargets(symbolId: string): Promise<Relation[]>`** — all `EXTENDS` relations where `source` matches
+    - **`getImplementors(symbolId: string): Promise<Relation[]>`** — all `IMPLEMENTS` relations where `target` matches
+    - **`getImplementedTargets(symbolId: string): Promise<Relation[]>`** — all `IMPLEMENTS` relations where `source` matches
+    - **`getOverriders(symbolId: string): Promise<Relation[]>`** — all `OVERRIDES` relations where `target` matches
+    - **`getOverriddenTargets(symbolId: string): Promise<Relation[]>`** — all `OVERRIDES` relations where `source` matches
+    - **`getSpec(specId: string): Promise<SpecNode | undefined>`** — retrieve a spec node by id
+    - **`getSpecDependencies(specId: string): Promise<Relation[]>`** — all `DEPENDS_ON` relations where `source` matches
+    - **`getSpecDependents(specId: string): Promise<Relation[]>`** — all `DEPENDS_ON` relations where `target` matches
+    - **`getCoveredFiles(specId: string): Promise<Relation[]>`** — all `COVERS_FILE` relations where `source` matches
+    - **`getCoveringSpecsForFile(filePath: string): Promise<Relation[]>`** — all `COVERS_FILE` relations where `target` matches
+    - **`getCoveredSymbols(specId: string): Promise<Relation[]>`** — all `COVERS_SYMBOL` relations where `source` matches
+    - **`getCoveringSpecsForSymbol(symbolId: string): Promise<Relation[]>`** — all `COVERS_SYMBOL` relations where `target` matches
+    - **`findSymbols(query: SymbolQuery): Promise<SymbolNode[]>`** — search symbols by name pattern, kind, file path, or category
+
+    `SymbolQuery` is a value object with optional fields: `name` (glob or regex), `kinds` (array of `SymbolKind` for filtering by one or more kinds), `filePath` (exact match or glob), `comment` (substring match for full-text search within symbol comments), `caseSensitive` (boolean, defaults to `false` — when `false`, `name` and `comment` matching is case insensitive), and `categories` (array of `FileCategory` for filtering symbols by the category of their declaring file).
+
+- op: modified
+  description: 'Add category filters and physical execution requirement to Filtered impact query contract'
+  selector:
+    type: section
+    matches: 'Requirement: Filtered impact query contract'
+  content: |
+    `GraphStore` SHALL expose backend-neutral impact-query inputs that carry requested result types, symbol kinds, included workspaces, excluded workspaces, and admitted file categories (`categories?: readonly FileCategory[]`, `includeTests?: boolean`, `includeIgnored?: boolean`) together with the target, relation direction, candidate resource category, and traversal depth needed by impact analysis.
+
+    Filtered impact reads SHALL return only nodes and relations admitted by the normalized predicates. By default, when categories are unspecified, only files with category `'source'` and their contained symbols SHALL be admitted. The query `resource` field SHALL identify the candidate or neighbor resource category to expand towards or hydrate. Traversal reads SHALL support depth-zero queries for direct coverage lookups. Workspace matching SHALL use canonical workspace identity, an empty inclusion set SHALL admit every workspace, and exclusions SHALL take precedence. Symbol-kind predicates SHALL be applied to symbol candidates before those candidates are returned from the store.
+
+    Store implementations SHALL apply supported type, kind, category, inclusion, and exclusion predicates in their physical query execution (e.g. SQL joins and where clauses). An implementation MUST NOT load an unrestricted impact candidate set across the adapter boundary and then remove excluded rows in TypeScript. Batch and worker-backed implementations SHALL preserve the filters through their request protocol without widening the query.
+
+    The contract SHALL remain backend-neutral: it defines predicate and result semantics but MUST NOT expose SQLite statements, worker messages, table names, or storage-specific pagination details.

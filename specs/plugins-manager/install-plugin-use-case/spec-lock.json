@@ -17,5 +17,41 @@
     {
       "file": "plugin-manager:test/application/install-plugin.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "InstallPlugin loads and validates AgentPlugin, delegates installation, and returns a generic result without config mutation.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:f850f6e629ae676c3a951d12e5b1fec407efc9652e8a44b27cafdaf5cf322223",
+          "lastModified": "2026-07-27T18:02:24.268Z"
+        },
+        "verify.md": {
+          "hash": "sha256:464b0f88596daf190e514e9f20baafae02cffe3f602496c6d881e743d21b7e30",
+          "lastModified": "2026-07-27T18:02:24.268Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# InstallPlugin\n\n## Rules\n- `InstallPluginInput`: readonly `pluginName: string` (npm package), `config: SpecdConfig`, optional `options?: Record<string, unknown>`.\n- `InstallPluginOutput`: readonly `success: boolean`, `message: string`, optional `data?: unknown`.\n- Load via `PluginLoader`; `isAgentPlugin` guard required; non-`AgentPlugin` → `PluginValidationError`.\n- `InstallPlugin.execute()` calls `plugin.install(input.config, input.options)`; return generic result.\n- Unresolvable package → `PluginNotFoundError`; failed guard or thrown `install()` → `PluginValidationError`.\n- Delegate prompt initialization, block injection, native asset deployment to `AgentPlugin.install()`.\n- Each `AgentPlugin.install()` / `uninstall()` uses `@specd/skills` `renderBaseAgentInstruction`, `injectSpecdBlock`, `removeSpecdBlock`.\n- Shared `AGENTS.md` cleanup reference-counted: base `<!-- <specd> -->` block persists until all targeting agent plugins uninstalled.\n\n## Constraints\n- No config mutation; CLI persists through `ConfigWriter`.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:f850f6e629ae676c3a951d12e5b1fec407efc9652e8a44b27cafdaf5cf322223",
+          "lastModified": "2026-07-27T18:02:24.268Z"
+        },
+        "verify.md": {
+          "hash": "sha256:464b0f88596daf190e514e9f20baafae02cffe3f602496c6d881e743d21b7e30",
+          "lastModified": "2026-07-27T18:02:24.268Z"
+        }
+      }
+    }
+  }
 }

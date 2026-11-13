@@ -57,7 +57,7 @@ describe('spec init', () => {
     await program.parseAsync(['node', 'specd', 'spec', 'init', 'auth/login'])
 
     expect(kernel.specs.initializePersistedState.execute).toHaveBeenCalledWith({
-      target: { kind: 'spec', specId: 'default:auth/login' },
+      target: { kind: 'spec', specId: 'auth/login' },
     })
     expect(stdout()).toContain('initialized default:auth/login')
   })

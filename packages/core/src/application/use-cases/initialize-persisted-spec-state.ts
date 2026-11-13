@@ -157,13 +157,15 @@ export class InitializePersistedSpecState {
     schema: Schema,
     schemaIdentity: { readonly name: string; readonly version: number },
   ): Promise<InitializePersistedSpecStateSpecResult> {
-    const { workspace, capPath } = parseSpecId(specId)
+    const { workspace, capPath } = parseSpecId(specId, {
+      workspaces: this.specRepositories.keys(),
+    })
     const repo = this.specRepositories.get(workspace)
     if (repo === undefined) {
       throw new WorkspaceNotFoundError(workspace)
     }
     if (repo.ownership() === 'readOnly') {
-      throw new ReadOnlyWorkspaceError(workspace)
+      throw ReadOnlyWorkspaceError.forSpec(specId, workspace)
     }
 
     const spec = await repo.get(SpecPath.parse(capPath))

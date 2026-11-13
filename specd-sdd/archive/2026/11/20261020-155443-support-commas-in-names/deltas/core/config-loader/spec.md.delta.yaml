@@ -1,0 +1,46 @@
+- op: modified
+  description: Pattern validation uses the shared parseSpecPattern and workspace rule
+  selector:
+    type: section
+    matches: 'Requirement: contextIncludeSpecs and contextExcludeSpecs pattern validation'
+  content: |
+    The loader MUST validate all `contextIncludeSpecs` and `contextExcludeSpecs` patterns at both project level and workspace level, using `parseSpecPattern` from `core:spec-id-format`, the same parser later used to match specs. Valid pattern forms are:
+
+    - `*` — bare wildcard
+    - `workspace:*` — wildcard qualified by workspace name
+    - `prefix/*` — wildcard after a path prefix ending in `/`
+    - `workspace:prefix/*` — qualified wildcard after path prefix
+    - `path/name` — exact spec path (no wildcard)
+    - `workspace:path/name` — qualified exact spec path
+
+    `*` SHALL only appear alone, after `workspace:`, or after a path prefix ending in `/`. Any other position MUST produce `ConfigValidationError`.
+
+    Workspace qualifiers MUST satisfy the workspace name rule (`^[a-z][a-z0-9-]+$`) and every path segment MUST satisfy the capability path segment rule (`^[a-z0-9_][a-z0-9_-]*$`, never a Windows device name), both defined once by `core:spec-id-format`. The loader MUST NOT keep its own copy of these expressions. Invalid qualifiers or segments MUST produce `ConfigValidationError`.
+
+- op: added
+  description: Workspace names validated with the shared rule
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Default workspace is required'
+  content: |
+    ### Requirement: Workspace names use the shared rule
+
+    The loader MUST validate every declared workspace name with `isValidWorkspaceName` from `core:spec-id-format` (`^[a-z][a-z0-9-]+$`, two or more characters, never a Windows device name) and MUST reject an invalid name with a `ConfigValidationError`. The loader MUST NOT keep its own copy of the expression, so that a workspace declared in `specd.yaml` can always be referenced by a valid spec ID.
+
+- op: modified
+  description: Declare the dependency on spec-id-format
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:config`](../config/spec.md) — `SpecdConfig` structure, field semantics, YAML format, and validation rules
+    - [`core:composition`](../composition/spec.md) — composition layer design and factory conventions
+    - [`core:schema-merge`](../schema-merge/spec.md) — schema merge operations and `schemaOverrides` structure
+    - [`core:vcs-adapter-port`](../vcs-adapter-port/spec.md) — default factory resolves the repository root from the VCS adapter contract
+    - [`core:vcs-adapter`](../vcs-adapter/spec.md) — built-in adapters normalize the repository root before it is used as `rootPath`
+    - [`default:_global/architecture`](../../_global/architecture/spec.md) — port and adapter design
+    - [`core:spec-id-format`](../spec-id-format/spec.md) — workspace name rule, capability path segment rule, and `parseSpecPattern` used for validation

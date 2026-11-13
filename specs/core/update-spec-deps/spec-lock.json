@@ -13,7 +13,11 @@
   ],
   "implementation": [
     {
-      "file": "core:src/composition/use-cases/update-spec-deps.ts"
+      "file": "core:src/application/use-cases/update-spec-deps.ts",
+      "symbols": ["UpdateSpecDeps"]
+    },
+    {
+      "file": "core:test/application/use-cases/update-spec-deps.spec.ts"
     }
   ],
   "optimizations": {

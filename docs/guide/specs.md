@@ -117,7 +117,7 @@ SpecD automatically parses spec files and builds an AST-based metadata index wit
 
 - **Requirements Indexing:** Every `### Requirement: <Name>` is indexed as a discrete requirement node.
 - **Scenarios Indexing:** Every `#### Scenario: <Name>` is linked to its parent requirement.
-- **Dependency Resolution:** Relative links in `## Spec Dependencies` are normalized into canonical spec IDs (e.g. `core:kernel`, `default:auth/login`).
+- **Dependency Resolution:** Relative links in `## Spec Dependencies` are normalized into canonical spec IDs (e.g. `core:kernel`, `default:auth/login`). Spec ID grammar, the two-character workspace rule, bare-ID defaults, and codes `INVALID_SPEC_ID` / `INVALID_SPEC_PATTERN` / `INVALID_SPEC_LOCK` are documented in [Workspaces — Spec IDs](./workspaces.md#spec-ids-and-the-prefix-field).
 - **Full-Text BM25 Search:** Requirements and scenarios are indexed for high-speed semantic retrieval via CLI (`specd graph search "<query>" --specs`) and agent context compilers.
 
 ---
@@ -204,8 +204,8 @@ The lock file manages four key dimensions of semantic metadata:
   ```
 - **Inspect and Update Dependencies**:
   ```bash
-  specd specs deps default:auth/login
-  specd specs deps default:auth/login --add default:auth/session
+  specd specs deps list default:auth/login
+  specd specs deps add default:auth/login --dep default:auth/session
   ```
 - **Track Implementation Links**:
   ```bash

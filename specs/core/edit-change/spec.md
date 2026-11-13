@@ -11,13 +11,28 @@ As a change evolves, its spec scope often needs to grow or shrink — but modify
 `EditChange.execute` SHALL accept an `EditChangeInput` with the following fields:
 
 - `name` (required, string) — the change slug to edit
-- `addSpecIds` (optional, string array) — spec IDs to add to the change's `specIds`
-- `removeSpecIds` (optional, string array) — spec IDs to remove from the change's `specIds`
+- `addSpecIds` (optional, string array) — spec IDs to add to the change's `specIds`; each entry is one whole spec ID, validated and normalized per "Spec ID validation"
+- `removeSpecIds` (optional, string array) — spec IDs to remove from the change's `specIds`; each entry is one whole spec ID and is never split
 - `description` (optional, string) — new description for the change
+- `invalidationPolicy` (optional, string) — new invalidation policy for the change, see "Invalidation policy edits"
+
+### Requirement: Spec ID validation
+
+Before any mutation, the use case MUST validate and normalize every entry of `addSpecIds` with `parseSpecId` and the configured workspaces (see `core:spec-id-format`) and store the fully-qualified IDs. An invalid ID fails with `InvalidSpecIdError` and an unknown workspace with `WorkspaceNotFoundError`, quoting the full original value, and nothing is persisted when any entry is invalid.
+
+Entries of `removeSpecIds` are not validated for syntax: an entry that is not in the change's `specIds` fails with `SpecNotInChangeError`, never with `InvalidSpecIdError`. A change manifest that already holds an invalid stored ID cannot be loaded (it fails as corrupted), so removal of such an ID is not offered by this use case. A valid entry is normalized to its fully-qualified form before matching; an entry that cannot be normalized is compared as given. Duplicate entries in `removeSpecIds` (after normalization) collapse to one removal, the same way duplicate `addSpecIds` entries collapse to one addition; a duplicate never raises `SpecNotInChangeError`. Validation checks syntax and workspace only; the spec may not exist yet.
+
+### Requirement: ReadOnly workspace rejection
+
+After normalizing `addSpecIds` and before any mutation, the use case MUST check the `ownership` of the workspace of every added spec (from the injected workspaces). When one or more added specs belong to a `readOnly` workspace, the use case MUST throw `ReadOnlyWorkspaceError` and persist nothing. The message MUST contain one line per offending spec in the form `Cannot add spec "<specId>" to change — workspace "<workspace>" is readOnly.`, followed by the sentence `ReadOnly workspaces are protected: their specs and code cannot be modified by changes.`, and MUST NOT suggest remediation steps (see `core:workspace`).
+
+`removeSpecIds` is not subject to ownership checks: removing a spec from a change does not write to the workspace. This rule lives in the use case so that every delivery mechanism (CLI, MCP, SDK) enforces it.
 
 ### Requirement: Invalidation policy edits
 
 `EditChange.execute` SHALL accept an optional structured `invalidation` update whose `artifacts` value is `none | surgical | downstream | global` and whose `workflow` value is `preserve | redesign`.
+
+Before any mutation the use case MUST reject any other value for `invalidation.artifacts` (allowed: `none`, `surgical`, `downstream`, `global`) or `invalidation.workflow` (allowed: `preserve`, `redesign`) with `InvalidInputError`, quoting the full original value and listing the allowed values, and it MUST persist nothing. The check lives in the use case so that every delivery mechanism (CLI, MCP, SDK) enforces it; a host's type cast is not validation.
 
 Updating either dimension is persistence-worthy even when scope and description are unchanged. It changes the default used by later reconciliation but MUST NOT invent drift, reopen files, restore validity, or move lifecycle state by itself. The v2 manifest SHALL persist only the structured shape.
 
@@ -141,8 +156,9 @@ A workspace default that differs from `change.schemaName` MUST NOT affect compat
 ## Constraints
 
 - The use case MUST NOT modify workspaces directly — they are always derived from `specIds`
-- The use case MUST NOT validate spec IDs against the filesystem — specs may not yet exist
-- Actor identity is only resolved when a persistence-worthy change occurs
+- The use case MUST NOT validate that a spec exists in the filesystem — specs may not yet exist; it does validate spec ID syntax and workspace
+- The use case never splits a spec ID on commas or any other character
+- Actor identity is resolved only when the request contains an edit to apply (a description, an invalidation policy, or spec changes); a request with nothing to apply does not resolve it and does not mutate
 
 ## Spec Dependencies
 
@@ -151,3 +167,5 @@ A workspace default that differs from `change.schemaName` MUST NOT affect compat
 - [`core:composition-resolver`](../composition-resolver/spec.md)
 - [`core:list-workspaces`](../list-workspaces/spec.md) — workspace-owned repository views used by edit orchestration
 - [core:resolve-change-schema](../resolve-change-schema/spec.md) — named sovereign lookup, provider identity validation, and same-name version advisory
+- [`core:spec-id-format`](../spec-id-format/spec.md) — spec ID validation and normalization of the input IDs
+- [`core:workspace`](../workspace/spec.md) — workspace ownership (`readOnly` rejection) and workspace names

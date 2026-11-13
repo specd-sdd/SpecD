@@ -1,3 +1,9 @@
+---
+title: GetConfig
+description: Access to the `SpecdConfig` snapshot a kernel was built from.
+sidebar_position: 11
+---
+
 # GetConfig
 
 `GetConfig` exposes the `SpecdConfig` snapshot a kernel was built from. Hosts (CLI, SDK, API, MCP) use it when they receive a `Kernel` but no parallel config object.

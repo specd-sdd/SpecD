@@ -1,3 +1,9 @@
+---
+title: Implementing a Port
+description: Step-by-step walkthrough of implementing and wiring `@specd/core` ports.
+sidebar_position: 8
+---
+
 # Example: Implementing a port
 
 This guide walks through implementing several ports from scratch: `ChangeRepository` (an abstract class), `VcsAdapter` (a plain interface), `ActorResolver` (a plain interface), and `ExternalHookRunner` (a plain interface). It shows the full pattern for both kinds of port and how to wire them into a use case or the kernel.

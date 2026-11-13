@@ -1,7 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { compileGuide, extractSections, parseFrontmatter } from '../../../scripts/bundle-guides.js'
+import {
+  CATALOG_OUTPUT_DIR,
+  COLLECTIONS,
+  REPO_ROOT,
+  USER_COLLECTION,
+  compileCollections,
+  compileGuide,
+  extractSections,
+  parseFrontmatter,
+} from '../../../scripts/bundle-guides.js'
+import * as path from 'node:path'
 
 describe('Bundle Script Unit Tests', () => {
+  it('emits the runtime and published catalogs into the package-root generated directory', () => {
+    expect(CATALOG_OUTPUT_DIR).toBe(path.join(REPO_ROOT, 'packages/guide/generated'))
+    expect(CATALOG_OUTPUT_DIR).not.toContain(path.join('src', 'infrastructure', 'generated'))
+  })
+
   describe('parseFrontmatter', () => {
     it('successfully parses valid YAML frontmatter', () => {
       const markdown = `---
@@ -144,8 +159,10 @@ sidebar_position: 2
 # Main
 Content.`
 
-      const topic = compileGuide('/path/to/my-guide.md', content)
+      const topic = compileGuide('guide', '/path/to/my-guide.md', 'my-guide.md', content)
+      expect(topic.collection).toBe('guide')
       expect(topic.topic).toBe('my-guide')
+      expect(topic.sourcePath).toBe('my-guide.md')
       expect(topic.title).toBe('Full Guide')
       expect(topic.order).toBe(2)
       expect(topic.content).not.toContain('---')
@@ -153,6 +170,23 @@ Content.`
       expect(topic.outline).toHaveLength(1)
       expect(topic.outline[0]!.index).toBe(1)
       expect(topic.outline[0]!.startLine).toBe(1)
+    })
+  })
+
+  describe('collection compilation isolation', () => {
+    it('emits the user collection identically with and without SDK collections configured', () => {
+      const userOnly = compileCollections([COLLECTIONS[0]!]).get(USER_COLLECTION) ?? []
+      const all = compileCollections(COLLECTIONS)
+      const withSdk = all.get(USER_COLLECTION) ?? []
+
+      expect(userOnly).toEqual(withSdk)
+      expect(userOnly.length).toBeGreaterThan(0)
+      expect(userOnly.every((t) => t.collection === USER_COLLECTION)).toBe(true)
+    })
+
+    it('keeps the user catalog free of generated API topics', () => {
+      const userOnly = compileCollections([COLLECTIONS[0]!]).get(USER_COLLECTION) ?? []
+      expect(userOnly.some((t) => t.collection !== USER_COLLECTION)).toBe(false)
     })
   })
 })

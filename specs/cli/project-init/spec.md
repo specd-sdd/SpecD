@@ -22,6 +22,14 @@ specd init [--schema <ref>] [--workspace <id>] [--workspace-path <path>] [--plug
 - `--force` — optional; overwrite an existing config without prompting.
 - `--format text|json|toon` — optional; forces non-interactive mode; defaults to `text`.
 
+### Requirement: Workspace id validation
+
+The default workspace id, whether given with `--workspace` or typed in the interactive wizard, MUST be validated with `isValidWorkspaceName` from `core:spec-id-format` (`^[a-z][a-z0-9-]+$`, two or more characters, never a Windows device name) before anything is written. The command MUST NOT keep its own copy of the expression, so `specd init` can never produce a `specd.yaml` that `ConfigLoader` rejects.
+
+- In non-interactive mode an invalid id exits with code 1, prints an `error:` message to stderr that quotes the full value and names the rule, and writes no file.
+- In interactive mode the prompt rejects an invalid id with the same message and asks again.
+- The default `default` is valid. An id is never trimmed, lowercased, or otherwise altered to make it valid.
+
 ### Requirement: Interactive mode
 
 The command enters interactive mode when **all** of the following are true:
@@ -126,3 +134,4 @@ specd init --format json
 - [`plugin-manager:specd-plugin-type`](../../plugin-manager/specd-plugin-type/spec.md) — plugin name rule
 - [`core:composition`](../../core/composition/spec.md) — `createConfigWriter()` factory
 - [`core:config-writer-port`](../../core/config-writer-port/spec.md) — `initProject` operation
+- [`core:spec-id-format`](../../core/spec-id-format/spec.md) — workspace name rule (`isValidWorkspaceName`) used to validate the workspace id

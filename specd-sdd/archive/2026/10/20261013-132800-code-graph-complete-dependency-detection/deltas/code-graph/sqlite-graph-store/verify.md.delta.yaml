@@ -1,0 +1,143 @@
+- op: modified
+  description: 'Add kind-tiered ranking tie-breaker verification scenario to SQLite full-text search'
+  selector:
+    type: section
+    matches: 'Requirement: SQLite full-text search'
+  content: |
+    #### Scenario: Symbol and spec search use SQLite full-text search
+
+    - **GIVEN** symbols and specs have been indexed into SQLite
+    - **WHEN** abstract search methods are called
+    - **THEN** results come back in descending relevance order from SQLite-backed full-text search structures
+
+    #### Scenario: Multi-token search uses OR logic for discovery
+
+    - **GIVEN** symbols "effectiveStatus" and "findBlockingParent" exist in different files
+    - **WHEN** `searchSymbols({ query: 'effectiveStatus findBlockingParent' })` is called
+    - **THEN** both symbols are returned in the results
+    - **AND** the FTS5 MATCH clause uses the `OR` operator between tokens
+
+    #### Scenario: BM25 ranking prioritizes multiple matches for precision
+
+    - **GIVEN** symbol A contains "status", symbol B contains "effective status"
+    - **WHEN** `searchSymbols({ query: 'effective status' })` is called
+    - **THEN** symbol B has a higher relevance score than symbol A
+    - **AND** symbol B appears first in the results
+
+    #### Scenario: Symbol result derives snippet from file content even for comment-driven hit
+
+    - **GIVEN** a symbol search hit is returned because of matched comment text
+    - **WHEN** `searchSymbols(...)` returns the symbol
+    - **THEN** the result snippet is derived from persisted file source content at the symbol location
+
+    #### Scenario: FTS structures can be refreshed after bulk writes
+
+    - **GIVEN** the backend has inserted symbols and specs through bulk-loading operations
+    - **WHEN** `rebuildFtsIndexes()` is invoked
+    - **THEN** subsequent abstract search queries see the newly indexed data
+
+    #### Scenario: Queries with hyphens do not crash FTS5
+
+    - **GIVEN** symbols and specs have been indexed into SQLite
+    - **WHEN** `searchSymbols({ query: 'pending-parent-artifact-review' })` is called
+    - **THEN** no `SqliteError` is thrown
+    - **AND** results matching the literal search term are returned
+
+    #### Scenario: Queries with FTS5 operators are treated as literal text
+
+    - **GIVEN** symbols and specs have been indexed into SQLite
+    - **WHEN** `searchSpecs({ query: 'AND OR NOT' })` is called
+    - **THEN** the query does not perform boolean logic
+    - **AND** results matching the literal terms are returned
+
+    #### Scenario: Exact identity matches boosted in SQLite FTS
+
+    - **GIVEN** a spec with ID `core:change`
+    - **WHEN** searching for `core:change` in the SQLite backend
+    - **THEN** that spec is the first result returned
+
+    #### Scenario: Persisted file content does not create SQLite file search category
+
+    - **GIVEN** SQLite persists file source content for snippet extraction
+    - **WHEN** search APIs are used through the current graph-store contract
+    - **THEN** there is still no separate file full-text result category introduced by this change
+
+    #### Scenario: Spec-id segment outranks content-only hit in SQLite
+
+    - **GIVEN** a spec with ID `default:_global/architecture`
+    - **AND** another spec contains `architecture` more times only in its body content
+    - **WHEN** `searchSpecs({ query: 'architecture' })` is called on the SQLite backend
+    - **THEN** `default:_global/architecture` is ranked ahead of the body-only hit
+
+    #### Scenario: Symbol declared name outranks comment-only hit in SQLite
+
+    - **GIVEN** one symbol is named `SearchSpecs`
+    - **AND** another symbol contains `search specs` only in comment text
+    - **WHEN** `searchSymbols({ query: 'SearchSpecs' })` is called on the SQLite backend
+    - **THEN** the declared-name hit is ranked ahead of the comment-only hit
+
+    #### Scenario: Config-relative document path participates in identity ranking
+
+    - **GIVEN** a document whose canonical path or `configRelativePath` contains `docs/cli/graph-search.md`
+    - **AND** another document mentions `graph search` only in body text
+    - **WHEN** `searchDocuments({ query: 'graph-search' })` is called on the SQLite backend
+    - **THEN** the document-path hit is ranked ahead of the body-only hit
+
+    #### Scenario: SQLite expands specd-shaped tokens before identity ranking
+
+    - **GIVEN** a spec with ID `core:change`
+    - **AND** another spec mentions `core change` only in body content
+    - **WHEN** `searchSpecs({ query: 'core:change' })` is called on the SQLite backend
+    - **THEN** the backend treats `core:change`, `core`, and `change` as usable identity-ranking tokens
+    - **AND** the spec-id hit is ranked ahead of the body-only hit
+
+    #### Scenario: SQLite expands CamelCase tokens before identity ranking
+
+    - **GIVEN** a symbol named `ArchiveChange`
+    - **AND** another symbol contains `archive change` only in comment text
+    - **WHEN** `searchSymbols({ query: 'ArchiveChange' })` is called on the SQLite backend
+    - **THEN** the backend treats `archivechange`, `archive`, and `change` as usable identity-ranking tokens
+    - **AND** the declared-name hit is ranked ahead of the comment-only hit
+
+    #### Scenario: SQLite exact token match outranks prefix token match
+
+    - **GIVEN** one candidate identity matches token `change` exactly
+    - **AND** another candidate identity matches `change` only by prefix
+    - **WHEN** `searchSymbols({ query: 'change' })` is called on the SQLite backend
+    - **THEN** the exact-token hit is ranked ahead of the prefix-only hit
+
+    #### Scenario: SQLite prefix token match outranks suffix token match
+
+    - **GIVEN** one candidate identity matches token `repo` by prefix
+    - **AND** another candidate identity matches `repo` only by suffix
+    - **WHEN** `searchSymbols({ query: 'repo' })` is called on the SQLite backend
+    - **THEN** the prefix-token hit is ranked ahead of the suffix-only hit
+
+    #### Scenario: SQLite suffix token match outranks arbitrary substring token match
+
+    - **GIVEN** one candidate identity matches token `repository` by suffix
+    - **AND** another candidate identity matches `repository` only as an arbitrary substring
+    - **WHEN** `searchDocuments({ query: 'repository' })` is called on the SQLite backend
+    - **THEN** the suffix-token hit is ranked ahead of the arbitrary-substring hit
+
+    #### Scenario: SQLite real component match outranks arbitrary substring match
+
+    - **GIVEN** one spec ID is `core:change`
+    - **AND** another spec ID contains substring `core` only inside a larger token such as `score`
+    - **WHEN** `searchSpecs({ query: 'core' })` is called on the SQLite backend
+    - **THEN** the real component match is ranked ahead of the arbitrary-substring hit
+
+    #### Scenario: SQLite supplements FTS discovery for a strong suffix identity hit
+
+    - **GIVEN** one symbol identity matches token `change` by suffix
+    - **AND** SQLite FTS tokenization alone would not surface that symbol through the default `MATCH` candidate set
+    - **WHEN** `searchSymbols({ query: 'change' })` is called on the SQLite backend
+    - **THEN** the backend still returns that symbol as a candidate
+    - **AND** it is ordered by the same identity-strength ladder instead of being omitted for lack of FTS coverage
+
+    #### Scenario: Kind-tiered ranking acts as tie-breaker for equal relevance matches
+
+    - **GIVEN** a query matches a class, a function, a type, and a property with identical identity and relevance scores
+    - **WHEN** `searchSymbols()` is executed on the SQLite backend
+    - **THEN** the class (Tier 4) ranks above the function (Tier 3), which ranks above the type (Tier 2), which ranks above the property (Tier 1)
+    - **AND** fine-grained property and variable symbols do not displace foundational classes and functions in equal-relevance rankings

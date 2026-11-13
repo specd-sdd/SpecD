@@ -1,0 +1,42 @@
+- op: added
+  description: 'Preserve logical versus physical symbol resolution through SDK impact orchestration.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: runGraphImpact orchestration$'
+  content: |
+    ### Requirement: Resolution-preserving symbol impact orchestration
+
+    For a symbol target, `runGraphImpact` SHALL preserve the discriminated provider resolution through impact execution. A logical-target resolution MUST be passed to the provider impact operation with its canonical logical symbol, complete declaration set, and ordered resolution evidence. The SDK MUST NOT load one declaration and invoke impact using only that declaration's physical ID. It MUST NOT retain a compatibility branch that selects `declarations[0]` or calls a physical-only provider method for a logical target; provider implementations used by this API SHALL implement the typed discriminated operation.
+
+    Deprecated legacy summary fields such as `symbol` and `impact.target` MAY remain in `RunGraphImpactResult` only as display projections derived from the typed result after traversal. They MUST NOT select, widen, or narrow what is traversed. For a logical target, `impact.target` SHALL carry the canonical logical identity, not a physical declaration ID, and a human-readable name SHALL come from the canonical logical symbol rather than from parsing a physical ID.
+
+    An exact-declaration selector SHALL retain physical impact semantics. A public export selector SHALL continue to retain the exact binding route separately from canonical-target impact. Ambiguous or unresolved results MUST NOT start traversal.
+
+    `RunGraphImpactResult` SHALL expose the resolved target kind, canonical logical identity when present, contributing declaration locations, physical dependency evidence, logical affected targets, declaration-only affected evidence, and covering specs. Aggregate count and risk fields MUST document whether they count unique logical targets or physical occurrences.
+
+    Path projection SHALL project every retained declaration and evidence location to `projectRelativePath` without additional graph reads. This includes locations nested under `resolvedTarget`, resolution evidence, declaration sets, affected logical targets, declaration-only evidence, public-binding surfaces, and covering-spec evidence. No nested location returned by the public result MAY expose only a canonical workspace path when a project-relative projection is part of the result contract.
+
+- op: added
+  description: 'Replace the stale symbol-target orchestration step with the typed discriminated operation.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: runGraphImpact orchestration$'
+    before:
+      type: list-item
+      matches: 'For symbol targets: resolve selector'
+  content: |
+    6. For symbol targets: resolve the selector through the provider and execute the typed discriminated `provider.analyzeResolvedSymbolImpact` operation, as required by "Resolution-preserving symbol impact orchestration".
+
+- op: removed
+  description: 'Remove the stale provider.analyzeImpact reference.'
+  selector:
+    type: list-item
+    matches: 'resolve selector using .?provider.resolveSymbolSelector'
+    parent:
+      type: section
+      matches: '^Requirement: runGraphImpact orchestration$'

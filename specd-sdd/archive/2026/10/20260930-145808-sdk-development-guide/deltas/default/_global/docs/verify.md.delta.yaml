@@ -1,0 +1,149 @@
+- op: added
+  description: 'guide-sdk ships a CLI command, so it needs the same CLI documentation coverage as every other command.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: SDK documentation'
+  content: |
+    ### Requirement: SDK guide documentation and discoverability
+
+    The SDK documentation collection is surfaced through a dedicated CLI command, so it MUST be documented with the same rigour as every other command surface.
+
+    - `docs/cli/guide-sdk.md` MUST exist and document the `specd guide-sdk` command, including its catalog listing, topic inspection, `--section`, `--meta`, `--scope`, pagination and search behaviour.
+    - `docs/cli/index.md` MUST index `guide-sdk` alongside every other CLI command, so the directory remains complete.
+    - `docs/guide/cli.md` MUST document `specd guide-sdk` as a scenario-based recipe, so users and AI agents can discover it from the guide rather than only from the CLI directory.
+    - `docs/cli/guide-sdk.md` MUST document the difference between `specd guide` and `specd guide-sdk`, including which collection each serves.
+    - The Docusaurus sidebar MUST expose the guide CLI reference, so the new page is reachable from the rendered site.
+
+    #### Scenario: New command without docs
+
+    - **WHEN** a new `specd` command is added to `@specd/cli`
+    - **THEN** a corresponding `docs/cli/<command>.md` file must be created in the same change
+
+    #### Scenario: Output contract changes without doc update
+
+    - **WHEN** an existing `specd` command changes its output semantics, caching behavior, or other documented response contract
+    - **THEN** the corresponding `docs/cli/` reference must be updated in the same change
+
+    #### Scenario: docs/cli/index.md serves as complete CLI directory
+
+    - **WHEN** inspecting `docs/cli/`
+    - **THEN** `docs/cli/index.md` exists and indexes every available CLI command and subcommand group
+    - **AND** every CLI command has a dedicated reference file in `docs/cli/`
+
+    #### Scenario: User-facing CLI recipes and workflows maintained in docs/guide/cli.md
+
+    - **WHEN** reviewing CLI user documentation
+    - **THEN** `docs/guide/cli.md` provides scenario-based usage recipes, flags, and examples for end users and AI agents
+
+    #### Scenario: guide-sdk ships its own CLI reference
+
+    - **WHEN** `specd guide-sdk` is added
+    - **THEN** `docs/cli/guide-sdk.md` MUST exist
+    - **AND** it MUST document the catalog listing, topic inspection, `--section`, `--meta`, `--scope`, pagination and search behaviour
+
+    #### Scenario: guide-sdk is indexed in the CLI directory
+
+    - **WHEN** `docs/cli/index.md` is inspected
+    - **THEN** `guide-sdk` MUST be indexed alongside every other CLI command
+
+    #### Scenario: guide-sdk is documented as a guide recipe
+
+    - **WHEN** `docs/guide/cli.md` is reviewed
+    - **THEN** it MUST contain scenario-based usage recipes for `specd guide-sdk`
+
+    #### Scenario: Guide landing page links integrators to the SDK guide
+
+    - **WHEN** `docs/guide/index.md` is reviewed
+    - **THEN** it MUST point readers to `specd guide-sdk`
+    - **AND** it MUST distinguish the SDK/integrator collection from the user-facing `specd guide` collection
+
+    #### Scenario: guide-sdk reference explains which command serves which collection
+
+    - **WHEN** `docs/cli/guide-sdk.md` is reviewed
+    - **THEN** it MUST state the difference between `specd guide` and `specd guide-sdk`
+    - **AND** it MUST name the collection each command serves
+
+    #### Scenario: guide-sdk page is reachable from the rendered site
+
+    - **WHEN** the Docusaurus sidebar is inspected
+    - **THEN** the guide CLI reference MUST expose the `guide-sdk` page
+
+- op: added
+  description: 'docs/core/sdk.md duplicates docs/sdk/index.md and has never been in a sidebar, so it must be deleted rather than maintained.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: SDK guide CLI documentation'
+  content: |
+    ### Requirement: SDK documentation tombstone removal
+
+    `docs/core/sdk.md` duplicates the host guide that already lives at `docs/sdk/index.md` and has never been referenced from any sidebar. It MUST NOT be maintained as a separate copy.
+
+    - `docs/core/sdk.md` MUST be deleted from the repository.
+    - No sidebar entry, internal link or cross-reference MUST be left pointing at `docs/core/sdk.md`.
+    - `docs/core/index.md` MUST NOT be modified to compensate for the deletion, because it never linked the file.
+    - Deleting the file MUST NOT remove any host integration guidance: that guidance remains owned by `docs/sdk/`.
+
+    #### Scenario: Tombstone file is deleted
+
+    - **WHEN** the repository is inspected after this change
+    - **THEN** `docs/core/sdk.md` MUST NOT exist
+
+    #### Scenario: No reference is left dangling
+
+    - **WHEN** sidebars and Markdown documents are searched for a link to `docs/core/sdk.md`
+    - **THEN** no reference MUST remain
+
+    #### Scenario: docs/core/index.md is untouched
+
+    - **WHEN** the diff for this change is inspected
+    - **THEN** `docs/core/index.md` MUST NOT be modified as part of the deletion
+
+    #### Scenario: Host integration guidance survives the deletion
+
+    - **WHEN** `docs/sdk/` is reviewed
+    - **THEN** it MUST continue to own the host integration guidance
+    - **AND** nothing from that guidance MUST be lost with the tombstone
+
+- op: added
+  description: 'The SDK collection compiles hand-written package-reference documents, so they must obey the same frontmatter conventions.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: SDK documentation tombstone removal'
+  content: |
+    ### Requirement: SDK collection source documents
+
+    The SDK collection compiles hand-written package-reference documents alongside generated API topics, so its sources MUST obey the same documentation conventions as every other collection.
+
+    - Every hand-written document under `docs/sdk/`, `docs/core/`, `docs/code-graph/`, `docs/skills/` and `docs/schemas/` MUST carry valid frontmatter with non-empty `title`, non-empty `description` and a positive integer `sidebar_position`.
+    - A hand-written SDK collection document MUST NOT be added without its frontmatter, and the bundler MUST reject it when it is missing or invalid.
+    - The SDK collection MUST NOT be populated from `docs/cli/` or `docs/public-web/`, so command-reference pages and site-only content stay out of the package-reference collection.
+
+    #### Scenario: Hand-written SDK collection document carries valid frontmatter
+
+    - **WHEN** a document under `docs/sdk/`, `docs/core/`, `docs/code-graph/`, `docs/skills/` or `docs/schemas/` is added or updated
+    - **THEN** it MUST carry YAML frontmatter with non-empty `title`, non-empty `description` and a positive integer `sidebar_position`
+    - **AND** it MUST NOT contain developer-internal package implementation details
+
+    #### Scenario: SDK collection document without frontmatter fails compilation
+
+    - **WHEN** a document in the SDK collection source roots is missing `title`, `description` or `sidebar_position`
+    - **THEN** the bundler MUST reject it as malformed
+    - **AND** it MUST NOT fall back to deriving the value from the document's first paragraph
+
+    #### Scenario: Command references stay out of the SDK collection
+
+    - **WHEN** the SDK collection source roots are enumerated
+    - **THEN** `docs/cli/` MUST NOT be among them
+    - **AND** `docs/public-web/` MUST NOT be among them

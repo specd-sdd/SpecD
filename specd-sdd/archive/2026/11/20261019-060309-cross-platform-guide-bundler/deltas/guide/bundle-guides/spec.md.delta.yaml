@@ -1,0 +1,25 @@
+- op: modified
+  description: 'Add cross-platform POSIX normalization requirements for TypeDoc entrypoints and topic identifiers'
+  selector:
+    type: section
+    matches: 'Requirement: Build-Time Compilation Script'
+  content: |
+    The package MUST provide a build-time script (`scripts/bundle-guides.ts`) that runs during `pnpm build` of `@specd/guide`:
+
+    - The script MUST compile a configured set of source roots, each mapped to a collection identifier. At minimum the user guide (`docs/guide/`) and the SDK collection MUST be configured, where the SDK collection source roots are `docs/sdk/`, `docs/core/`, `docs/code-graph/`, `docs/skills/` and `docs/schemas/`.
+    - The script MUST NOT hardcode a single documentation directory.
+    - The script MUST recurse into subdirectories of each source root. Non-Markdown files and Docusaurus category metadata files (e.g. `_category_.json`) MUST be ignored.
+    - A nested source document MUST produce a topic equal to its path relative to the collection root, without extension, lowercased, retaining subdirectory separators as POSIX forward slashes (e.g. `examples/implementing-a-port`).
+    - All topic identifiers, collection-qualified topic references, and repository-relative source paths MUST strictly use POSIX forward slashes (`/`) across all platforms and operating systems.
+    - The script MUST parse YAML frontmatter and Markdown headings.
+    - The script MUST emit the user collection as a static JSON asset at `generated/guides.json` and the SDK collection as a separate static JSON asset at `generated/guides-sdk.json`.
+    - These package-root JSON assets MUST be the sole generated catalog format. The build MUST NOT emit or consume generated TypeScript catalog modules.
+    - A normal package build MUST refresh the exact JSON assets used by both source and compiled runtimes and included in the published package; it MUST NOT write a duplicate catalog beneath `src/`.
+    - The script MUST invoke TypeDoc as a library, over the entry points declared by the public site's curated API entry-point list (`apiPackageEntryPoints`), to generate the public API reference. The script MUST NOT consume a pre-generated or gitignored artifact from another workspace.
+    - The script MUST normalize all TypeDoc entrypoint paths to POSIX format (replacing Windows backslashes `\` with `/`) before passing them to TypeDoc, ensuring that platform path separators do not cause TypeDoc glob parser escape errors on Windows.
+    - Classifying a reflection as declared inside a workspace package MUST compare the declaration path against the package root after normalizing both to POSIX format, independently of the host path separator. The comparison MUST match only paths located inside the root (a sibling directory sharing the root as a name prefix, e.g. `packages/sdk-extra` for `packages/sdk`, MUST NOT match) and MUST ignore the case of a leading drive letter.
+    - A repository-relative `sourcePath` MUST be derived from the declaration path in POSIX format. When the declaration lies outside the repository, the fallback `sourcePath` MUST still be normalized to forward slashes.
+    - Intermediate ordering of discovered source files MUST NOT depend on the host path separator; files MUST be ordered over their POSIX-relative paths so that the emitted catalog is identical on every platform.
+    - TypeDoc MUST run with options equivalent to the public site's `typedoc.json` (`skipErrorChecking`, `excludePrivate`, `excludeInternal`).
+    - The script MUST emit one addressable topic per documented symbol, grouped by symbol kind, producing collection-qualified topics of the form `<collection>:<kind-dir>/<symbol>` (e.g. `sdk:classes/ArtifactDag`).
+    - Because the `@specd/sdk` entry point is the package barrel, the re-exported `@specd/core` surface MUST be reachable transitively through it.

@@ -40,7 +40,7 @@ describe('SearchCodeGraph', () => {
     await store.upsertFile(
       createFileNode({
         path: 'code-graph:src/api.ts',
-        configRelativePath: 'src/api.ts',
+        projectRelativePath: 'src/api.ts',
         language: 'typescript',
         contentHash: 'hash',
         workspace: 'code-graph',
@@ -147,7 +147,7 @@ describe('SearchCodeGraph', () => {
     await store.upsertFile(
       createFileNode({
         path: 'code-graph:a.ts',
-        configRelativePath: 'a.ts',
+        projectRelativePath: 'a.ts',
         language: 'typescript',
         contentHash: 'hash',
         workspace: 'code-graph',
@@ -314,7 +314,7 @@ describe('SearchCodeGraph', () => {
     await store.upsertFile(
       createFileNode({
         path: 'code-graph:src/impact.ts',
-        configRelativePath: 'src/impact.ts',
+        projectRelativePath: 'src/impact.ts',
         language: 'typescript',
         contentHash: 'hash',
         workspace: 'code-graph',
@@ -352,11 +352,48 @@ describe('SearchCodeGraph', () => {
     expect(result.files[0]).toMatchObject({ totalMatches: 4, omittedMatches: 0 })
   })
 
+  it('serves non-symbol source text only through the files category', async () => {
+    const holder = createSymbolNode({
+      name: 'Holder',
+      kind: SymbolKind.Class,
+      filePath: 'code-graph:src/note.ts',
+      line: 1,
+      column: 0,
+    })
+    await store.upsertFile(
+      createFileNode({
+        path: 'code-graph:src/note.ts',
+        projectRelativePath: 'src/note.ts',
+        language: 'typescript',
+        contentHash: 'hash',
+        workspace: 'code-graph',
+        content: 'class Holder {}\nconst note = "zebrafinch"\n',
+      }),
+      [holder],
+      [],
+    )
+    const sourceContent = vi.spyOn(store, 'searchSourceContentCandidates')
+
+    const result = await new SearchCodeGraph(store).execute({
+      query: 'zebrafinch',
+      categories: ['symbols', 'files', 'specs', 'documents'],
+      limit: 10,
+      includeSnippet: false,
+    })
+
+    expect(result.files.map((file) => file.file.path)).toEqual(['code-graph:src/note.ts'])
+    expect(result.symbols).toEqual([])
+    expect(sourceContent).toHaveBeenCalled()
+    // The GraphStore search contract itself has no persisted-file result method.
+    expect('searchFiles' in store).toBe(false)
+    expect(await store.searchSymbols({ query: 'zebrafinch', limit: 10 })).toEqual([])
+  })
+
   it('expands multi-word and CamelCase queries inside Code Graph', async () => {
     await store.upsertFile(
       createFileNode({
         path: 'code-graph:src/messages.ts',
-        configRelativePath: 'src/messages.ts',
+        projectRelativePath: 'src/messages.ts',
         language: 'typescript',
         contentHash: 'hash',
         workspace: 'code-graph',
@@ -382,7 +419,7 @@ describe('SearchCodeGraph', () => {
   it('requests subsequent candidate pages until the post-suppression limit is filled', async () => {
     const declarationFile = createFileNode({
       path: 'code-graph:a.ts',
-      configRelativePath: 'a.ts',
+      projectRelativePath: 'a.ts',
       language: 'typescript',
       contentHash: 'a',
       workspace: 'code-graph',
@@ -390,7 +427,7 @@ describe('SearchCodeGraph', () => {
     })
     const retainedFile = createFileNode({
       path: 'code-graph:b.ts',
-      configRelativePath: 'b.ts',
+      projectRelativePath: 'b.ts',
       language: 'typescript',
       contentHash: 'b',
       workspace: 'code-graph',
@@ -489,7 +526,7 @@ describe('SearchCodeGraph', () => {
     ).join('\n')
     const file = createFileNode({
       path: 'code-graph:src/matches.ts',
-      configRelativePath: 'packages/code-graph/src/matches.ts',
+      projectRelativePath: 'packages/code-graph/src/matches.ts',
       language: 'typescript',
       contentHash: 'matches',
       workspace: 'code-graph',
@@ -523,7 +560,7 @@ describe('SearchCodeGraph', () => {
     const content = [...Array.from({ length: 12 }, () => '// Spec'), '// SpecRepository'].join('\n')
     const file = createFileNode({
       path: 'code-graph:src/spec-repository.ts',
-      configRelativePath: 'packages/code-graph/src/spec-repository.ts',
+      projectRelativePath: 'packages/code-graph/src/spec-repository.ts',
       language: 'typescript',
       contentHash: 'spec-repository',
       workspace: 'code-graph',
@@ -572,7 +609,7 @@ describe('SearchCodeGraph', () => {
   it('ranks later source candidate pages before applying the file limit', async () => {
     const early = createFileNode({
       path: 'code-graph:src/early.ts',
-      configRelativePath: 'packages/code-graph/src/early.ts',
+      projectRelativePath: 'packages/code-graph/src/early.ts',
       language: 'typescript',
       contentHash: 'early',
       workspace: 'code-graph',
@@ -580,7 +617,7 @@ describe('SearchCodeGraph', () => {
     })
     const later = createFileNode({
       path: 'code-graph:src/later.ts',
-      configRelativePath: 'packages/code-graph/src/later.ts',
+      projectRelativePath: 'packages/code-graph/src/later.ts',
       language: 'typescript',
       contentHash: 'later',
       workspace: 'code-graph',
@@ -608,7 +645,7 @@ describe('SearchCodeGraph', () => {
   it('consumes a repeated backend cursor at most once', async () => {
     const file = createFileNode({
       path: 'code-graph:src/repeated.ts',
-      configRelativePath: 'packages/code-graph/src/repeated.ts',
+      projectRelativePath: 'packages/code-graph/src/repeated.ts',
       language: 'typescript',
       contentHash: 'repeated',
       workspace: 'code-graph',
@@ -633,7 +670,7 @@ describe('SearchCodeGraph', () => {
     const content = Array.from({ length: 11 }, () => 'function target() {}').join('\n')
     const file = createFileNode({
       path: 'code-graph:src/overloads.ts',
-      configRelativePath: 'packages/code-graph/src/overloads.ts',
+      projectRelativePath: 'packages/code-graph/src/overloads.ts',
       language: 'typescript',
       contentHash: 'overloads',
       workspace: 'code-graph',
@@ -853,6 +890,75 @@ describe('SearchCodeGraph', () => {
     expect(results[0]?.logicalTarget?.id).toBe(member.id)
     expect(results[0]?.matchTier).toBe('exact-logical-identity')
   })
+
+  it('filters symbols and files by category and tracks omission counts', async () => {
+    const prodSymbol = createSymbolNode({
+      name: 'formatHelper',
+      kind: SymbolKind.Function,
+      filePath: 'code-graph:src/helper.ts',
+      line: 1,
+      column: 0,
+    })
+    const testSymbol = createSymbolNode({
+      name: 'formatHelper',
+      kind: SymbolKind.Function,
+      filePath: 'code-graph:test/helper.spec.ts',
+      line: 1,
+      column: 0,
+    })
+
+    await store.upsertFile(
+      fileNode('code-graph:src/helper.ts', 'code-graph', 'source'),
+      [prodSymbol],
+      [],
+    )
+    await store.upsertFile(
+      fileNode('code-graph:test/helper.spec.ts', 'code-graph', 'test'),
+      [testSymbol],
+      [],
+    )
+
+    const search = new SearchCodeGraph(store)
+
+    // Default search: only production symbol returned, test symbol omitted
+    const defaultResult = await search.execute({
+      query: 'formatHelper',
+      categories: ['symbols'],
+      limit: 10,
+      includeSnippet: false,
+    })
+
+    expect(defaultResult.symbols).toHaveLength(1)
+    expect(defaultResult.symbols[0]?.hits[0]?.symbol.filePath).toBe('code-graph:src/helper.ts')
+    expect(defaultResult.omittedCounts).toEqual({ tests: 1, ignored: 0 })
+
+    // With includeTests: true, both symbols returned
+    const withTestsResult = await search.execute({
+      query: 'formatHelper',
+      categories: ['symbols'],
+      limit: 10,
+      includeSnippet: false,
+      includeTests: true,
+    })
+
+    expect(withTestsResult.symbols).toHaveLength(2)
+    expect(withTestsResult.omittedCounts).toEqual({ tests: 0, ignored: 0 })
+
+    // Category restriction to 'test': only test symbol returned
+    const testOnlyResult = await search.execute({
+      query: 'formatHelper',
+      categories: ['symbols'],
+      limit: 10,
+      includeSnippet: false,
+      fileCategories: ['test'],
+    })
+
+    expect(testOnlyResult.symbols).toHaveLength(1)
+    expect(testOnlyResult.symbols[0]?.hits[0]?.symbol.filePath).toBe(
+      'code-graph:test/helper.spec.ts',
+    )
+    expect(testOnlyResult.omittedCounts).toEqual({ tests: 0, ignored: 0 })
+  })
 })
 
 function declaration(
@@ -873,12 +979,17 @@ function declaration(
   }
 }
 
-function fileNode(path: string, workspace: string) {
+function fileNode(
+  path: string,
+  workspace: string,
+  category: 'source' | 'test' | 'ignored' = 'source',
+) {
   return createFileNode({
     path,
-    configRelativePath: path.slice(path.indexOf(':') + 1),
+    projectRelativePath: path.slice(path.indexOf(':') + 1),
     language: 'typescript',
     contentHash: `hash:${path}`,
     workspace,
+    category,
   })
 }

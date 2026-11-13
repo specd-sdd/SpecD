@@ -12,7 +12,7 @@ import {
   type StorageGenerationSnapshot,
 } from '../../domain/ports/graph-store.js'
 import { type DocumentNode } from '../../domain/value-objects/document-node.js'
-import { type FileNode } from '../../domain/value-objects/file-node.js'
+import { type FileCategory, type FileNode } from '../../domain/value-objects/file-node.js'
 import { type GraphStatistics } from '../../domain/value-objects/graph-statistics.js'
 import { type Relation } from '../../domain/value-objects/relation.js'
 import { type RelationType } from '../../domain/value-objects/relation-type.js'
@@ -268,24 +268,24 @@ export class SQLiteGraphStore extends GraphStore {
   /**
    * Finds files matching a config-relative path.
    *
-   * @param configRelativePath - Workspace/config relative path.
+   * @param projectRelativePath - Project-relative path.
    * @returns Promise resolving to matching file nodes.
    */
-  async findFilesByConfigRelativePath(configRelativePath: string): Promise<FileNode[]> {
-    return this.client.sendRequest('findFilesByConfigRelativePath', {
-      configRelativePath,
+  async findFilesByProjectRelativePath(projectRelativePath: string): Promise<FileNode[]> {
+    return this.client.sendRequest('findFilesByProjectRelativePath', {
+      projectRelativePath,
     })
   }
 
   /**
-   * Finds documents matching a config-relative path.
+   * Finds documents matching a project-relative path.
    *
-   * @param configRelativePath - Workspace/config relative path.
+   * @param projectRelativePath - Project-relative path.
    * @returns Promise resolving to matching document nodes.
    */
-  async findDocumentsByConfigRelativePath(configRelativePath: string): Promise<DocumentNode[]> {
-    return this.client.sendRequest('findDocumentsByConfigRelativePath', {
-      configRelativePath,
+  async findDocumentsByProjectRelativePath(projectRelativePath: string): Promise<DocumentNode[]> {
+    return this.client.sendRequest('findDocumentsByProjectRelativePath', {
+      projectRelativePath,
     })
   }
 
@@ -440,6 +440,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to affected file paths.
    */
   override async findDirectlyAffectedFiles(filePaths: readonly string[]): Promise<string[]> {
+    if (filePaths.length === 0) return []
     return this.client.sendRequest('findDirectlyAffectedFiles', { filePaths })
   }
 
@@ -550,6 +551,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to covering spec relations.
    */
   async getCoveringSpecsForFiles(filePaths: readonly string[]): Promise<Relation[]> {
+    if (filePaths.length === 0) return []
     return this.client.sendRequest('getCoveringSpecsForFiles', { filePaths })
   }
 
@@ -564,23 +566,25 @@ export class SQLiteGraphStore extends GraphStore {
   }
 
   /**
-   * Retrieves specs covering the given symbol.
+   * Retrieves specs covering the given logical symbol.
    *
-   * @param symbolId - Symbol ID.
+   * @param logicalSymbolId - Logical symbol ID.
    * @returns Promise resolving to covering spec relations.
    */
-  async getCoveringSpecsForSymbol(symbolId: string): Promise<Relation[]> {
-    return this.client.sendRequest('getCoveringSpecsForSymbol', { symbolId })
+  async getCoveringSpecsForSymbol(logicalSymbolId: string): Promise<Relation[]> {
+    return this.client.sendRequest('getCoveringSpecsForSymbol', { logicalSymbolId })
   }
 
   /**
-   * Retrieves specs covering any of the given symbols.
+   * Retrieves specs covering any of the given logical symbols.
    *
-   * @param symbolIds - Symbol IDs.
+   * @param logicalSymbolIds - Logical symbol IDs.
    * @returns Promise resolving to covering spec relations.
    */
-  async getCoveringSpecsForSymbols(symbolIds: readonly string[]): Promise<Relation[]> {
-    return this.client.sendRequest('getCoveringSpecsForSymbols', { symbolIds })
+  async getCoveringSpecsForSymbols(logicalSymbolIds: readonly string[]): Promise<Relation[]> {
+    if (logicalSymbolIds.length === 0) return []
+    const deduped = [...new Set(logicalSymbolIds)]
+    return this.client.sendRequest('getCoveringSpecsForSymbols', { logicalSymbolIds: deduped })
   }
 
   /**
@@ -722,10 +726,14 @@ export class SQLiteGraphStore extends GraphStore {
   /**
    * Retrieves incoming importer counts per file.
    *
+   * @param options - Optional category filtering options.
+   * @param options.categories - Optional file categories to restrict importers to.
    * @returns Promise resolving to a map from file path to count.
    */
-  async getFileImporterCounts(): Promise<Map<string, number>> {
-    return this.client.sendRequest('getFileImporterCounts', {})
+  async getFileImporterCounts(options?: {
+    categories?: readonly FileCategory[]
+  }): Promise<Map<string, number>> {
+    return this.client.sendRequest('getFileImporterCounts', options ?? {})
   }
 
   /**
@@ -858,6 +866,7 @@ export class SQLiteGraphStore extends GraphStore {
   override async findLogicalSymbolsByQualifiedNames(
     qualifiedNames: readonly string[],
   ): Promise<LogicalSymbol[]> {
+    if (qualifiedNames.length === 0) return []
     return this.client.sendRequest('findLogicalSymbolsByQualifiedNames', { qualifiedNames })
   }
 
@@ -877,6 +886,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to found logical symbols.
    */
   override async findLogicalSymbolsByIds(ids: readonly string[]): Promise<LogicalSymbol[]> {
+    if (ids.length === 0) return []
     return this.client.sendRequest('findLogicalSymbolsByIds', { ids })
   }
 
@@ -889,7 +899,25 @@ export class SQLiteGraphStore extends GraphStore {
   override async findDeclarations(
     logicalSymbolIds: readonly string[],
   ): Promise<LogicalDeclaration[]> {
-    return this.client.sendRequest('findDeclarations', { logicalSymbolIds })
+    if (logicalSymbolIds.length === 0) return []
+    const deduped = [...new Set(logicalSymbolIds)]
+    return this.client.sendRequest('findDeclarations', { logicalSymbolIds: deduped })
+  }
+
+  /**
+   * Finds logical declarations by physical declaration symbol IDs.
+   *
+   * @param declarationSymbolIds - Physical declaration symbol IDs.
+   * @returns Promise resolving to logical declarations.
+   */
+  override async findLogicalDeclarationsByDeclarationIds(
+    declarationSymbolIds: readonly string[],
+  ): Promise<LogicalDeclaration[]> {
+    if (declarationSymbolIds.length === 0) return []
+    const deduped = [...new Set(declarationSymbolIds)]
+    return this.client.sendRequest('findLogicalDeclarationsByDeclarationIds', {
+      declarationSymbolIds: deduped,
+    })
   }
 
   /**
@@ -901,6 +929,7 @@ export class SQLiteGraphStore extends GraphStore {
   override async findPublicBindings(
     lookups: readonly PublicBindingLookup[],
   ): Promise<PublicBinding[]> {
+    if (lookups.length === 0) return []
     return this.client.sendRequest('findPublicBindings', { lookups })
   }
 
@@ -913,6 +942,7 @@ export class SQLiteGraphStore extends GraphStore {
   override async findPublicBindingsByExportedNames(
     exportedNames: readonly string[],
   ): Promise<PublicBinding[]> {
+    if (exportedNames.length === 0) return []
     return this.client.sendRequest('findPublicBindingsByExportedNames', {
       exportedNames,
     })
@@ -937,6 +967,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to resolution steps.
    */
   override async findResolutionSteps(fromIds: readonly string[]): Promise<ResolutionStep[]> {
+    if (fromIds.length === 0) return []
     return this.client.sendRequest('findResolutionSteps', { fromIds })
   }
 
@@ -947,6 +978,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to index coverage records.
    */
   override async findIndexCoverage(filePaths: readonly string[]): Promise<IndexCoverage[]> {
+    if (filePaths.length === 0) return []
     return this.client.sendRequest('findIndexCoverage', { filePaths })
   }
 

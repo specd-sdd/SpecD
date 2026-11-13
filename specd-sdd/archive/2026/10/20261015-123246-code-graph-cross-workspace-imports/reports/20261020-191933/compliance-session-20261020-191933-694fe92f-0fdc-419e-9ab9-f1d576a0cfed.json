@@ -1,0 +1,693 @@
+{
+  "schema": "https://specd.dev/schemas/compliance-session-v1.schema.json",
+  "schemaVersion": "1.4.0",
+  "sessionId": "694fe92f-0fdc-419e-9ab9-f1d576a0cfed",
+  "sessionTimestamp": "20261020-191933",
+  "sessionFile": "specd-sdd/changes/20261015-123246-code-graph-cross-workspace-imports/reports/20261020-191933/compliance-session-20261020-191933-694fe92f-0fdc-419e-9ab9-f1d576a0cfed.json",
+  "changeName": "code-graph-cross-workspace-imports",
+  "createdAt": "2026-10-20T17:26:00.417Z",
+  "updatedAt": "2026-10-20T17:37:26.838Z",
+  "createdBy": {
+    "id": "opencode-coordinator",
+    "name": "Change Compliance Coordinator"
+  },
+  "finalReport": "specd-sdd/changes/20261015-123246-code-graph-cross-workspace-imports/reports/20261020-191933/specs-compliance-change-lite-code-graph-cross-workspace-imports-20261020-191933-694fe92f-0fdc-419e-9ab9-f1d576a0cfed.md",
+  "commonContext": {
+    "step": "verifying",
+    "fingerprint": "sha256:1823052f0fd34f922fdec85d2b7238824a2829c721e163a411392c8bf1828789",
+    "capturedAt": "2026-10-20T17:26:08.475Z",
+    "capturedBy": {
+      "id": "opencode-coordinator",
+      "name": "Change Compliance Coordinator"
+    },
+    "contentHash": "1823052f0fd34f922fdec85d2b7238824a2829c721e163a411392c8bf1828789",
+    "entries": [
+      {
+        "source": "instruction",
+        "content": "# Project Context (LLM-optimized)\n\n## Directives\n- GRAPH-FIRST: explore code via `specd graph`; grep/glob only non-code or last resort. Stale/missing graph → `specd graph index`.\n- `specs/` = requirements SoT; never edit directly. Workflow: draft → implement → review → approve → merge → archive. No code without spec; read/update existing specs; avoid duplicates.\n- Artifacts, code, comments, docs English. Full spec: `specd specs context <id>`; include globals with `default:*`.\n- TypeScript pnpm ESM monorepo. Hexagonal+DDD: domain no I/O; application ports; infrastructure adapters; rich entities enforce invariants; pure stateless services; manual DI.\n\n## Global Specs — load full via `specd specs context <id>`\n\n### default:_global/architecture\n- Business packages: domain → application → infrastructure; inner layers never import outer. Domain no I/O; application uses ports; infrastructure excludes composition.\n- Entities own invariants/typed transition errors; value objects expose behavior; stateless domain services are exported functions.\n- Ports abstract classes with explicit methods. Constructor DI; no IoC/singletons. Validate external YAML at infrastructure boundary; typed `SpecdError`.\n- Composition alone imports infrastructure. `createKernel`, `createKernelBuilder`, capability factories share resolver; canonical `createX(deps)`. Public barrels exclude concrete adapters.\n- Adapter packages contain no business logic. Dependencies: plugin-* → skills → core; cli/mcp → sdk; sdk → core|code-graph; schema-* standalone; no cycles. Cross core/graph hosts use `@specd/sdk`.\n\n### default:_global/conventions\n- Strict TypeScript; `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, ESM NodeNext. Named exports; kebab-case; explicit public returns; no `any`; expected errors use `SpecdError`; immutable domain.\n\n### default:_global/testing\n- Vitest; test tree mirrors src; `.spec.ts`; Given/When/Then; no snapshots. Domain/application unit tests mock I/O. Integration uses unique `os.tmpdir()` dirs and cleanup. Ensure cross-platform paths, fixtures, line endings.\n\n### default:_global/docs\n- Docs only under `docs/{adr,cli,code-graph,core,guide,mcp,schemas,sdk,skills}`; exceptions: root README, AGENTS, CLAUDE.\n- `docs/guide`: title/description/sidebar_position frontmatter; user usage only; configuration/workflows match core; begin with What is SpecD; cover skills, project update, plugins, graph. Keep SDK/package internals outside guide.\n- ADR: sequential `NNNN-kebab-case`, MADR, Decision Outcome Confirmation + More Information/Spec; link source specs only.\n- Every CLI command needs docs/cli page, index, sidebar; MCP schemas/examples in docs/mcp. Public symbols need full JSDoc.\n- Hosts document/import `@specd/sdk` only. SDK collections under `docs/sdk/{core,code-graph,skills,schemas}` require frontmatter. Update affected docs for public composition, template/config cascades, list-contract changes.\n\n### default:_global/eslint\n- Type-aware TypeScript: forbid any/default exports; require explicit returns, kebab-case, JSDoc, layer boundaries. Lint before commit.\n\n### default:_global/continuous-integration\n- CI on macOS/Ubuntu/Windows for PR+main; pnpm 10.6.5, Node 22, frozen install; build → typecheck → test.\n\n### default:_global/error-handling-conventions\n- Expected user failures: `SpecdError`, `specd=true`, UPPER_SNAKE code, actionable message, JSON/TOON metadata.\n\n### default:_global/logging\n- Console-compatible `log/info/debug/warn/error`; info for normal events; fatal/trace through error/debug prefixes; abstraction over raw console."
+      }
+    ],
+    "warnings": []
+  },
+  "queue": {
+    "sealedAt": "2026-10-20T17:30:17.804Z",
+    "sealedBy": {
+      "id": "opencode-coordinator",
+      "name": "Change Compliance Coordinator"
+    },
+    "planDigest": "eeafa8980a41aea9e6b5a8d832641e86a56604c02b83dee80a1d882c9b741927",
+    "specCount": 8,
+    "batchCount": 16,
+    "targetCount": 207
+  },
+  "workers": [
+    {
+      "id": "worker-1",
+      "name": "code-graph-indexer-a",
+      "registeredAt": "2026-10-20T17:27:00.979Z",
+      "registeredBy": {
+        "id": "opencode-coordinator",
+        "name": "Change Compliance Coordinator"
+      }
+    },
+    {
+      "id": "worker-2",
+      "name": "code-graph-indexer-b",
+      "registeredAt": "2026-10-20T17:27:02.813Z",
+      "registeredBy": {
+        "id": "opencode-coordinator",
+        "name": "Change Compliance Coordinator"
+      }
+    },
+    {
+      "id": "worker-3",
+      "name": "code-graph-integration-reference",
+      "registeredAt": "2026-10-20T17:27:04.214Z",
+      "registeredBy": {
+        "id": "opencode-coordinator",
+        "name": "Change Compliance Coordinator"
+      }
+    },
+    {
+      "id": "worker-4",
+      "name": "code-graph-language-adapters",
+      "registeredAt": "2026-10-20T17:27:05.530Z",
+      "registeredBy": {
+        "id": "opencode-coordinator",
+        "name": "Change Compliance Coordinator"
+      }
+    },
+    {
+      "id": "worker-5",
+      "name": "code-graph-language-adapter-1",
+      "registeredAt": "2026-10-20T17:27:07.033Z",
+      "registeredBy": {
+        "id": "opencode-coordinator",
+        "name": "Change Compliance Coordinator"
+      }
+    },
+    {
+      "id": "worker-6",
+      "name": "code-graph-language-adapter-2",
+      "registeredAt": "2026-10-20T17:27:08.418Z",
+      "registeredBy": {
+        "id": "opencode-coordinator",
+        "name": "Change Compliance Coordinator"
+      }
+    },
+    {
+      "id": "worker-7",
+      "name": "code-graph-language-adapter-3",
+      "registeredAt": "2026-10-20T17:27:10.432Z",
+      "registeredBy": {
+        "id": "opencode-coordinator",
+        "name": "Change Compliance Coordinator"
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "specId": "code-graph:indexer",
+      "batchId": "batch-001",
+      "assignedWorkerId": "worker-1",
+      "planFingerprint": "ad7103de631746f51ef649ccd1ac6c2b4e47e80d7bf670db257598e105823b1f",
+      "auditWeight": 8,
+      "targetIds": [
+        "requirement:added:0001",
+        "requirement:added:0002",
+        "requirement:modified:0001",
+        "requirement:modified:0002",
+        "requirement:modified:0003",
+        "constraint:added:0001",
+        "constraint:added:0002",
+        "constraint:added:0003"
+      ],
+      "expectedTargetCount": 8,
+      "status": "clean",
+      "checkedTargetCount": 8,
+      "registeredAt": "2026-10-20T17:28:08.807Z",
+      "registeredBy": {
+        "id": "opencode-coordinator",
+        "name": "Change Compliance Coordinator"
+      },
+      "completedAt": "2026-10-20T17:35:14.876Z",
+      "completedBy": {
+        "id": "worker-1",
+        "name": "code-graph-indexer-a"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:indexer",
+      "batchId": "batch-002",
+      "assignedWorkerId": "worker-1",
+      "planFingerprint": "ad7103de631746f51ef649ccd1ac6c2b4e47e80d7bf670db257598e105823b1f",
+      "auditWeight": 8,
+      "targetIds": [
+        "constraint:added:0004",
+        "constraint:removed:0001",
+        "constraint:removed:0002",
+        "constraint:removed:0003",
+        "constraint:removed:0004",
+        "constraint:removed:0005",
+        "constraint:removed:0006",
+        "constraint:removed:0007"
+      ],
+      "expectedTargetCount": 8,
+      "status": "clean",
+      "checkedTargetCount": 8,
+      "registeredAt": "2026-10-20T17:28:10.797Z",
+      "registeredBy": {
+        "id": "opencode-coordinator",
+        "name": "Change Compliance Coordinator"
+      },
+      "completedAt": "2026-10-20T17:35:26.945Z",
+      "completedBy": {
+        "id": "worker-1",
+        "name": "code-graph-indexer-a"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:indexer",
+      "batchId": "batch-003",
+      "assignedWorkerId": "worker-2",
+      "planFingerprint": "ad7103de631746f51ef649ccd1ac6c2b4e47e80d7bf670db257598e105823b1f",
+      "auditWeight": 8,
+      "targetIds": [
+        "constraint:removed:0008",
+        "constraint:removed:0009",
+        "constraint:removed:0010",
+        "constraint:removed:0011",
+        "constraint:removed:0012",
+        "constraint:removed:0013",
+        "scenario:added:0001",
+        "scenario:added:0002",
+        "scenario:added:0003",
+        "scenario:added:0004",
+        "scenario:added:0005",
+        "scenario:added:0006",
+        "scenario:added:0007",
+        "scenario:added:0008"
+      ],
+      "expectedTargetCount": 14,
+      "status": "clean",
+      "checkedTargetCount": 14,
+      "registeredAt": "2026-10-20T17:28:13.450Z",
+      "registeredBy": {
+        "id": "opencode-coordinator",
+        "name": "Change Compliance Coordinator"
+      },
+      "completedAt": "2026-10-20T17:35:28.181Z",
+      "completedBy": {
+        "id": "worker-2",
+        "name": "code-graph-indexer-b"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:indexer",
+      "batchId": "batch-004",
+      "assignedWorkerId": "worker-2",
+      "planFingerprint": "ad7103de631746f51ef649ccd1ac6c2b4e47e80d7bf670db257598e105823b1f",
+      "auditWeight": 4.5,
+      "targetIds": [
+        "scenario:added:0009",
+        "scenario:added:0010",
+        "scenario:added:0011",
+        "scenario:added:0012",
+        "scenario:added:0013",
+        "scenario:added:0014",
+        "scenario:added:0015",
+        "scenario:added:0016",
+        "scenario:added:0017",
+        "scenario:added:0018",
+        "scenario:added:0019",
+        "scenario:added:0020",
+        "scenario:added:0021",
+        "scenario:added:0022",
+        "scenario:added:0023",
+        "scenario:added:0024",
+        "scenario:added:0025",
+        "scenario:added:0026"
+      ],
+      "expectedTargetCount": 18,
+      "status": "clean",
+      "checkedTargetCount": 18,
+      "registeredAt": "2026-10-20T17:28:16.775Z",
+      "registeredBy": {
+        "id": "opencode-coordinator",
+        "name": "Change Compliance Coordinator"
+      },
+      "completedAt": "2026-10-20T17:35:30.052Z",
+      "completedBy": {
+        "id": "worker-2",
+        "name": "code-graph-indexer-b"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:workspace-integration",
+      "batchId": "batch-001",
+      "assignedWorkerId": "worker-3",
+      "planFingerprint": "c21e72f84d566583516c9260750049ffc510ca22c5e919f6e14f09e476b3a2ee",
+      "auditWeight": 5,
+      "targetIds": [
+        "requirement:modified:0001",
+        "requirement:modified:0002",
+        "scenario:added:0001",
+        "scenario:added:0002",
+        "scenario:added:0003",
+        "scenario:added:0004",
+        "scenario:added:0005",
+        "scenario:added:0006",
+        "scenario:added:0007",
+        "scenario:added:0008",
+        "scenario:added:0009",
+        "scenario:added:0010",
+        "scenario:added:0011",
+        "scenario:added:0012"
+      ],
+      "expectedTargetCount": 14,
+      "status": "clean",
+      "checkedTargetCount": 14,
+      "registeredAt": "2026-10-20T17:28:21.212Z",
+      "registeredBy": {
+        "id": "opencode-coordinator",
+        "name": "Change Compliance Coordinator"
+      },
+      "completedAt": "2026-10-20T17:35:38.349Z",
+      "completedBy": {
+        "id": "worker-3",
+        "name": "code-graph-integration-reference"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:resolve-symbol-reference",
+      "batchId": "batch-001",
+      "assignedWorkerId": "worker-3",
+      "planFingerprint": "45d432a7a901748b93a459834247ccf3e37a03dcfcab958af1bbd0fa056ac4f1",
+      "auditWeight": 1.75,
+      "targetIds": [
+        "requirement:added:0001",
+        "scenario:added:0001",
+        "scenario:added:0002",
+        "scenario:added:0003"
+      ],
+      "expectedTargetCount": 4,
+      "status": "clean",
+      "checkedTargetCount": 4,
+      "registeredAt": "2026-10-20T17:28:23.082Z",
+      "registeredBy": {
+        "id": "opencode-coordinator",
+        "name": "Change Compliance Coordinator"
+      },
+      "completedAt": "2026-10-20T17:35:32.259Z",
+      "completedBy": {
+        "id": "worker-3",
+        "name": "code-graph-integration-reference"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:typescript-language-adapter",
+      "batchId": "batch-001",
+      "assignedWorkerId": "worker-3",
+      "planFingerprint": "87fbad176d5d7b29fff7b1a8e828438c63197020a9f590d131fd91e18497d11e",
+      "auditWeight": 7.25,
+      "targetIds": [
+        "requirement:modified:0001",
+        "requirement:modified:0002",
+        "scenario:added:0001",
+        "scenario:added:0002",
+        "scenario:added:0003",
+        "scenario:added:0004",
+        "scenario:added:0005",
+        "scenario:added:0006",
+        "scenario:added:0007",
+        "scenario:added:0008",
+        "scenario:added:0009",
+        "scenario:added:0010",
+        "scenario:added:0011",
+        "scenario:added:0012",
+        "scenario:added:0013",
+        "scenario:added:0014",
+        "scenario:added:0015",
+        "scenario:added:0016",
+        "scenario:added:0017",
+        "scenario:added:0018",
+        "scenario:added:0019",
+        "scenario:added:0020",
+        "scenario:modified:0001"
+      ],
+      "expectedTargetCount": 23,
+      "status": "clean",
+      "checkedTargetCount": 23,
+      "registeredAt": "2026-10-20T17:28:27.293Z",
+      "registeredBy": {
+        "id": "opencode-coordinator",
+        "name": "Change Compliance Coordinator"
+      },
+      "completedAt": "2026-10-20T17:35:33.401Z",
+      "completedBy": {
+        "id": "worker-3",
+        "name": "code-graph-integration-reference"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:python-language-adapter",
+      "batchId": "batch-001",
+      "assignedWorkerId": "worker-4",
+      "planFingerprint": "b08f92b62184589ed5340a4ee390745f09af0f155f7885b30274776e566883dc",
+      "auditWeight": 4,
+      "targetIds": [
+        "requirement:modified:0001",
+        "requirement:modified:0002",
+        "scenario:added:0001",
+        "scenario:added:0002",
+        "scenario:added:0003",
+        "scenario:added:0004",
+        "scenario:added:0005",
+        "scenario:added:0006",
+        "scenario:added:0007",
+        "scenario:added:0008"
+      ],
+      "expectedTargetCount": 10,
+      "status": "clean",
+      "checkedTargetCount": 10,
+      "registeredAt": "2026-10-20T17:28:29.772Z",
+      "registeredBy": {
+        "id": "opencode-coordinator",
+        "name": "Change Compliance Coordinator"
+      },
+      "completedAt": "2026-10-20T17:37:10.851Z",
+      "completedBy": {
+        "id": "worker-4",
+        "name": "code-graph-language-adapters"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:go-language-adapter",
+      "batchId": "batch-001",
+      "assignedWorkerId": "worker-4",
+      "planFingerprint": "30aa59d834605323e5f3cf54d17345e07935d27a5324812ea36ce3bd3481fce1",
+      "auditWeight": 3.5,
+      "targetIds": [
+        "requirement:modified:0001",
+        "requirement:modified:0002",
+        "scenario:added:0001",
+        "scenario:added:0002",
+        "scenario:added:0003",
+        "scenario:added:0004",
+        "scenario:added:0005",
+        "scenario:added:0006"
+      ],
+      "expectedTargetCount": 8,
+      "status": "clean",
+      "checkedTargetCount": 8,
+      "registeredAt": "2026-10-20T17:28:41.127Z",
+      "registeredBy": {
+        "id": "opencode-coordinator",
+        "name": "Change Compliance Coordinator"
+      },
+      "completedAt": "2026-10-20T17:35:41.790Z",
+      "completedBy": {
+        "id": "worker-4",
+        "name": "code-graph-language-adapters"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:php-language-adapter",
+      "batchId": "batch-001",
+      "assignedWorkerId": "worker-4",
+      "planFingerprint": "f50dd28e6459dbaa970f93e7a784dd029445de9c3513fb9d5a79e3e99467916c",
+      "auditWeight": 3.5,
+      "targetIds": [
+        "requirement:modified:0001",
+        "requirement:modified:0002",
+        "scenario:added:0001",
+        "scenario:added:0002",
+        "scenario:added:0003",
+        "scenario:added:0004",
+        "scenario:added:0005",
+        "scenario:added:0006"
+      ],
+      "expectedTargetCount": 8,
+      "status": "clean",
+      "checkedTargetCount": 8,
+      "registeredAt": "2026-10-20T17:28:47.122Z",
+      "registeredBy": {
+        "id": "opencode-coordinator",
+        "name": "Change Compliance Coordinator"
+      },
+      "completedAt": "2026-10-20T17:35:43.157Z",
+      "completedBy": {
+        "id": "worker-4",
+        "name": "code-graph-language-adapters"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-001",
+      "assignedWorkerId": "worker-5",
+      "planFingerprint": "4e407f3c47071b75dc74f770d28ca7caee7ac67e0c1bfb37031ea40d3cef8e0c",
+      "auditWeight": 8,
+      "targetIds": [
+        "requirement:added:0001",
+        "requirement:added:0002",
+        "requirement:added:0003",
+        "requirement:added:0004",
+        "requirement:added:0005",
+        "requirement:added:0006",
+        "requirement:added:0007",
+        "requirement:added:0008"
+      ],
+      "expectedTargetCount": 8,
+      "status": "clean",
+      "checkedTargetCount": 8,
+      "registeredAt": "2026-10-20T17:28:49.343Z",
+      "registeredBy": {
+        "id": "opencode-coordinator",
+        "name": "Change Compliance Coordinator"
+      },
+      "completedAt": "2026-10-20T17:35:44.479Z",
+      "completedBy": {
+        "id": "worker-5",
+        "name": "code-graph-language-adapter-1"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-006",
+      "assignedWorkerId": "worker-5",
+      "planFingerprint": "4e407f3c47071b75dc74f770d28ca7caee7ac67e0c1bfb37031ea40d3cef8e0c",
+      "auditWeight": 4.5,
+      "targetIds": [
+        "scenario:modified:0003",
+        "scenario:modified:0004",
+        "scenario:modified:0005",
+        "scenario:modified:0006",
+        "scenario:modified:0007",
+        "scenario:modified:0008",
+        "scenario:modified:0009",
+        "scenario:modified:0010",
+        "scenario:modified:0011",
+        "scenario:modified:0012",
+        "scenario:modified:0013",
+        "scenario:modified:0014",
+        "scenario:modified:0015",
+        "scenario:modified:0016",
+        "scenario:modified:0017",
+        "scenario:modified:0018",
+        "scenario:modified:0019",
+        "scenario:removed:0001"
+      ],
+      "expectedTargetCount": 18,
+      "status": "clean",
+      "checkedTargetCount": 18,
+      "registeredAt": "2026-10-20T17:28:52.337Z",
+      "registeredBy": {
+        "id": "opencode-coordinator",
+        "name": "Change Compliance Coordinator"
+      },
+      "completedAt": "2026-10-20T17:35:54.386Z",
+      "completedBy": {
+        "id": "worker-5",
+        "name": "code-graph-language-adapter-1"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-002",
+      "assignedWorkerId": "worker-6",
+      "planFingerprint": "4e407f3c47071b75dc74f770d28ca7caee7ac67e0c1bfb37031ea40d3cef8e0c",
+      "auditWeight": 8,
+      "targetIds": [
+        "requirement:modified:0001",
+        "requirement:modified:0002",
+        "requirement:modified:0003",
+        "requirement:modified:0004",
+        "requirement:modified:0005",
+        "requirement:modified:0006",
+        "requirement:modified:0007",
+        "constraint:added:0001"
+      ],
+      "expectedTargetCount": 8,
+      "status": "clean",
+      "checkedTargetCount": 8,
+      "registeredAt": "2026-10-20T17:28:54.856Z",
+      "registeredBy": {
+        "id": "opencode-coordinator",
+        "name": "Change Compliance Coordinator"
+      },
+      "completedAt": "2026-10-20T17:35:56.160Z",
+      "completedBy": {
+        "id": "worker-6",
+        "name": "code-graph-language-adapter-2"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-005",
+      "assignedWorkerId": "worker-6",
+      "planFingerprint": "4e407f3c47071b75dc74f770d28ca7caee7ac67e0c1bfb37031ea40d3cef8e0c",
+      "auditWeight": 6.25,
+      "targetIds": [
+        "scenario:added:0024",
+        "scenario:added:0025",
+        "scenario:added:0026",
+        "scenario:added:0027",
+        "scenario:added:0028",
+        "scenario:added:0029",
+        "scenario:added:0030",
+        "scenario:added:0031",
+        "scenario:added:0032",
+        "scenario:added:0033",
+        "scenario:added:0034",
+        "scenario:added:0035",
+        "scenario:added:0036",
+        "scenario:added:0037",
+        "scenario:added:0038",
+        "scenario:added:0039",
+        "scenario:added:0040",
+        "scenario:added:0041",
+        "scenario:added:0042",
+        "scenario:added:0043",
+        "scenario:added:0044",
+        "scenario:added:0045",
+        "scenario:added:0046",
+        "scenario:modified:0001",
+        "scenario:modified:0002"
+      ],
+      "expectedTargetCount": 25,
+      "status": "clean",
+      "checkedTargetCount": 25,
+      "registeredAt": "2026-10-20T17:29:13.683Z",
+      "registeredBy": {
+        "id": "opencode-coordinator",
+        "name": "Change Compliance Coordinator"
+      },
+      "completedAt": "2026-10-20T17:35:58.094Z",
+      "completedBy": {
+        "id": "worker-6",
+        "name": "code-graph-language-adapter-2"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-003",
+      "assignedWorkerId": "worker-7",
+      "planFingerprint": "4e407f3c47071b75dc74f770d28ca7caee7ac67e0c1bfb37031ea40d3cef8e0c",
+      "auditWeight": 8,
+      "targetIds": [
+        "constraint:added:0002",
+        "constraint:added:0003",
+        "constraint:added:0004",
+        "constraint:added:0005",
+        "constraint:added:0006",
+        "constraint:added:0007",
+        "constraint:removed:0001",
+        "constraint:removed:0002"
+      ],
+      "expectedTargetCount": 8,
+      "status": "clean",
+      "checkedTargetCount": 8,
+      "registeredAt": "2026-10-20T17:29:16.401Z",
+      "registeredBy": {
+        "id": "opencode-coordinator",
+        "name": "Change Compliance Coordinator"
+      },
+      "completedAt": "2026-10-20T17:35:59.416Z",
+      "completedBy": {
+        "id": "worker-7",
+        "name": "code-graph-language-adapter-3"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-004",
+      "assignedWorkerId": "worker-7",
+      "planFingerprint": "4e407f3c47071b75dc74f770d28ca7caee7ac67e0c1bfb37031ea40d3cef8e0c",
+      "auditWeight": 7.75,
+      "targetIds": [
+        "constraint:removed:0003",
+        "constraint:removed:0004",
+        "scenario:added:0001",
+        "scenario:added:0002",
+        "scenario:added:0003",
+        "scenario:added:0004",
+        "scenario:added:0005",
+        "scenario:added:0006",
+        "scenario:added:0007",
+        "scenario:added:0008",
+        "scenario:added:0009",
+        "scenario:added:0010",
+        "scenario:added:0011",
+        "scenario:added:0012",
+        "scenario:added:0013",
+        "scenario:added:0014",
+        "scenario:added:0015",
+        "scenario:added:0016",
+        "scenario:added:0017",
+        "scenario:added:0018",
+        "scenario:added:0019",
+        "scenario:added:0020",
+        "scenario:added:0021",
+        "scenario:added:0022",
+        "scenario:added:0023"
+      ],
+      "expectedTargetCount": 25,
+      "status": "clean",
+      "checkedTargetCount": 25,
+      "registeredAt": "2026-10-20T17:30:03.806Z",
+      "registeredBy": {
+        "id": "opencode-coordinator",
+        "name": "Change Compliance Coordinator"
+      },
+      "completedAt": "2026-10-20T17:36:00.950Z",
+      "completedBy": {
+        "id": "worker-7",
+        "name": "code-graph-language-adapter-3"
+      },
+      "completionReason": null
+    }
+  ],
+  "findings": [],
+  "report": {
+    "generatedAt": "2026-10-20T17:37:26.838Z",
+    "generatedBy": {
+      "id": "opencode-coordinator",
+      "name": "Change Compliance Coordinator"
+    }
+  }
+}

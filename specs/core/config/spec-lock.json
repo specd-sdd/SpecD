@@ -3,7 +3,12 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:vcs-adapter-port", "default:_global/architecture", "core:transition-checks"],
+  "dependsOn": [
+    "core:vcs-adapter-port",
+    "default:_global/architecture",
+    "core:transition-checks",
+    "core:spec-id-format"
+  ],
   "implementation": [
     {
       "file": "core:src/domain/plugin-name.ts",

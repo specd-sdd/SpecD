@@ -1,3 +1,9 @@
+---
+title: 'Example: Full schema'
+description: Proposal → specs → design → tasks artifact chain as a starting schema.
+sidebar_position: 2
+---
+
 # Example: Full schema — proposal → specs → design → tasks
 
 ## When to use this schema as a starting point

@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ResolveSymbolReference } from '../../../src/application/use-cases/resolve-symbol-reference.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
+import { type SymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
+import { type FileNode } from '../../../src/domain/value-objects/file-node.js'
 import {
+  DeclarationOccurrenceForm,
   MemberAccessor,
   MemberDispatch,
   MemberKind,
@@ -16,8 +19,10 @@ import {
 import { IndexCoverageStatus } from '../../../src/domain/value-objects/index-session.js'
 import { InMemoryGraphStore } from '../../helpers/in-memory-graph-store.js'
 import { AdapterRegistry } from '../../../src/infrastructure/tree-sitter/adapter-registry.js'
+import { GoLanguageAdapter } from '../../../src/infrastructure/tree-sitter/go-language-adapter.js'
 import { PhpLanguageAdapter } from '../../../src/infrastructure/tree-sitter/php-language-adapter.js'
 import { TypeScriptLanguageAdapter } from '../../../src/infrastructure/tree-sitter/typescript-language-adapter.js'
+import { type LanguageAdapter } from '../../../src/domain/value-objects/language-adapter.js'
 import {
   FreshnessState,
   IndexedResourceKind,
@@ -31,7 +36,12 @@ async function makeStore(options: {
   declarations?: readonly {
     logicalSymbolId: string
     filePath: string
+    symbolId?: string
+    line?: number
+    column?: number
+    form?: (typeof DeclarationOccurrenceForm)[keyof typeof DeclarationOccurrenceForm]
   }[]
+  physicalSymbols?: readonly SymbolNode[]
   publicBindings?: ReturnType<typeof createPublicBinding>[]
   localBindings?: ReturnType<typeof createLocalBinding>[]
   steps?: readonly ResolutionStep[]
@@ -43,23 +53,31 @@ async function makeStore(options: {
 }): Promise<InMemoryGraphStore> {
   const store = new InMemoryGraphStore()
   await store.open()
-  await store.replaceReferenceFacts({
-    logicalSymbols: options.symbols,
-    declarations: (options.declarations ?? []).map((item, index) => ({
+  const declarations = (options.declarations ?? []).map((item, index) => {
+    const symbolId = item.symbolId ?? `symbol-${String(index)}`
+    const line = item.line ?? index + 1
+    const column = item.column ?? 0
+    return {
       logicalSymbolId: item.logicalSymbolId,
       declaration: {
         logicalId: item.logicalSymbolId,
-        symbolId: `symbol-${String(index)}`,
+        symbolId,
         kind: SymbolKind.Function,
+        form: item.form ?? DeclarationOccurrenceForm.Declaration,
         location: {
           filePath: item.filePath,
-          line: index + 1,
-          column: 0,
-          endLine: index + 1,
-          endColumn: 1,
+          line,
+          column,
+          endLine: line,
+          endColumn: column + 1,
         },
       },
-    })),
+    }
+  })
+
+  await store.replaceReferenceFacts({
+    logicalSymbols: options.symbols,
+    declarations,
     publicBindings: options.publicBindings ?? [],
     localBindings: options.localBindings ?? [],
     steps: options.steps ?? [],
@@ -70,6 +88,67 @@ async function makeStore(options: {
       capabilities: entry.capabilities ?? ['declarations'],
     })),
   })
+
+  if (options.physicalSymbols !== undefined) {
+    const symbolsByFile = new Map<string, SymbolNode[]>()
+    for (const sym of options.physicalSymbols) {
+      const list = symbolsByFile.get(sym.filePath) ?? []
+      list.push(sym)
+      symbolsByFile.set(sym.filePath, list)
+    }
+    for (const [filePath, syms] of symbolsByFile) {
+      await store.upsertFile(
+        {
+          path: filePath,
+          workspace: 'core',
+          category: 'source',
+          extension: '.ts',
+          contentHash: 'hash',
+        } as unknown as FileNode,
+        syms,
+        [],
+      )
+    }
+  } else {
+    const declarationsByFile = new Map<string, typeof declarations>()
+    for (const d of declarations) {
+      const list = declarationsByFile.get(d.declaration.location.filePath) ?? []
+      list.push(d)
+      declarationsByFile.set(d.declaration.location.filePath, list)
+    }
+    for (const [filePath, decls] of declarationsByFile) {
+      await store.upsertFile(
+        {
+          path: filePath,
+          workspace: 'core',
+          category: 'source',
+          extension: '.ts',
+          contentHash: 'hash',
+        } as unknown as FileNode,
+        decls.map((d) => ({
+          id: d.declaration.symbolId,
+          name: 'fn',
+          kind: d.declaration.kind,
+          filePath: d.declaration.location.filePath,
+          projectRelativePath: d.declaration.location.filePath,
+          line: d.declaration.location.line,
+          column: d.declaration.location.column,
+          endLine: d.declaration.location.endLine,
+          endColumn: d.declaration.location.endColumn,
+          selectionRange: {
+            startLine: d.declaration.location.line,
+            startColumn: d.declaration.location.column,
+            endLine: d.declaration.location.endLine,
+            endColumn: d.declaration.location.endColumn,
+          },
+          parentId: undefined,
+          comment: undefined,
+        })),
+        [],
+      )
+    }
+  }
+
   return store
 }
 
@@ -478,6 +557,7 @@ describe('ResolveSymbolReference', () => {
       localName: 'Alias',
       space: SymbolSpace.Type,
       targetId: target.id,
+      range: { startLine: 1, startColumn: 0, endLine: 1, endColumn: 8 },
     })
     const store = await makeStore({ symbols: [target], localBindings: [local] })
 
@@ -585,6 +665,151 @@ describe('ResolveSymbolReference', () => {
     expect(nearest.target?.id).toBe(near.id)
   })
 
+  describe('hierarchy precedence, coverage gating and qualified spellings', () => {
+    const method = { kind: MemberKind.Method, dispatch: MemberDispatch.Instance } as const
+    const member = (surface: string, owner: string): LogicalSymbol =>
+      createLogicalSymbol({
+        workspace: 'core',
+        surface,
+        name: 'run',
+        space: SymbolSpace.Value,
+        ownerId: owner,
+        memberSemantics: method,
+      })
+
+    it('resolves an MRO tie to the base with the earlier extends precedence', async () => {
+      const first = member('src/a.py', 'A')
+      const second = member('src/b.py', 'B')
+      const store = await makeStore({
+        symbols: [first, second],
+        steps: [
+          { fromId: 'C', toId: 'A', kind: 'extends:0' },
+          { fromId: 'C', toId: 'B', kind: 'extends:1' },
+        ],
+      })
+
+      const result = await new ResolveSymbolReference(store, async () => freshHealth).execute({
+        workspace: 'core',
+        requested: 'run',
+        ownerId: 'C',
+        memberSemantics: method,
+      })
+
+      expect(result.status).toBe('resolved')
+      expect(result.target?.id).toBe(first.id)
+    })
+
+    it('keeps equal-precedence bases ambiguous', async () => {
+      const first = member('src/a.py', 'A')
+      const second = member('src/b.py', 'B')
+      const store = await makeStore({
+        symbols: [first, second],
+        steps: [
+          { fromId: 'C', toId: 'A', kind: 'extends:0' },
+          { fromId: 'C', toId: 'B', kind: 'extends:0' },
+        ],
+      })
+
+      const result = await new ResolveSymbolReference(store, async () => freshHealth).execute({
+        workspace: 'core',
+        requested: 'run',
+        ownerId: 'C',
+        memberSemantics: method,
+      })
+
+      expect(result.status).toBe('ambiguous')
+    })
+
+    it('claims absence in an indexed file despite unrelated incomplete coverage', async () => {
+      const store = await makeStore({
+        symbols: [],
+        coverage: [{ filePath: 'core:src/api.ts', status: IndexCoverageStatus.Indexed }],
+      })
+
+      const result = await new ResolveSymbolReference(store, async () => ({
+        fresh: true,
+        complete: false,
+        reasonCodes: ['COVERAGE_PARTIAL'],
+      })).execute({ workspace: 'core', requested: 'gone', filePath: 'core:src/api.ts' })
+
+      expect(result.status).toBe('missing')
+      expect(result.reasonCode).toBe('REFERENCE_ABSENT')
+    })
+
+    it('does not claim absence for a logical id while the graph coverage is incomplete', async () => {
+      const store = await makeStore({ symbols: [] })
+
+      const result = await new ResolveSymbolReference(store, async () => ({
+        fresh: true,
+        complete: false,
+        reasonCodes: ['COVERAGE_PARTIAL'],
+      })).execute({ workspace: 'core', requested: 'x', logicalId: symbol('x').id })
+
+      expect(result.status).toBe('unresolved')
+    })
+
+    it('does not answer an unanchored qualified name from a stale graph', async () => {
+      const owner = createLogicalSymbol({
+        workspace: 'core',
+        surface: 'src/a.ts',
+        name: 'Owner',
+        space: SymbolSpace.Type,
+        ownerId: undefined,
+        memberSemantics: undefined,
+      })
+      const run = { ...member('src/a.ts', owner.id), qualifiedName: 'Owner.run' }
+      const store = await makeStore({
+        symbols: [owner, run],
+        declarations: [{ logicalSymbolId: run.id, filePath: 'core:src/a.ts' }],
+      })
+      const stale = async (): Promise<ResolutionHealth> => ({
+        fresh: false,
+        complete: true,
+        reasonCodes: ['CONTENT_DIRTY'],
+      })
+
+      const result = await new ResolveSymbolReference(store, stale).execute({
+        workspace: 'core',
+        requested: 'Owner.run',
+      })
+
+      expect(result.status).toBe('unresolved')
+      expect(result.reasonCode).toBe('CONTENT_DIRTY')
+    })
+
+    it('resolves a qualified spelling with several owner segments', async () => {
+      const outer = createLogicalSymbol({
+        workspace: 'core',
+        surface: 'src/a.ts',
+        name: 'Outer',
+        space: SymbolSpace.Type,
+        ownerId: undefined,
+        memberSemantics: undefined,
+      })
+      const inner = createLogicalSymbol({
+        workspace: 'core',
+        surface: 'src/a.ts',
+        name: 'Inner',
+        space: SymbolSpace.Type,
+        ownerId: outer.id,
+        memberSemantics: undefined,
+      })
+      const run = member('src/a.ts', inner.id)
+      const store = await makeStore({
+        symbols: [outer, inner, run],
+        declarations: [{ logicalSymbolId: run.id, filePath: 'core:src/a.ts' }],
+      })
+
+      const result = await new ResolveSymbolReference(store, async () => freshHealth).execute({
+        workspace: 'core',
+        requested: 'Outer.Inner.run',
+      })
+
+      expect(result.status).toBe('resolved')
+      expect(result.target?.id).toBe(run.id)
+    })
+  })
+
   it('shares one health snapshot across a batch', async () => {
     const store = await makeStore({ symbols: [] })
     const health = vi.fn().mockResolvedValue({
@@ -676,7 +901,7 @@ describe('ResolveSymbolReference', () => {
       ],
     })
     const php = new PhpLanguageAdapter()
-    const phpParse = vi.spyOn(php, 'parseSymbolReference')
+    const phpParse = vi.spyOn(php.symbolReferenceSyntax, 'parse')
     const registry = new AdapterRegistry()
     registry.register(php)
     const resolver = new ResolveSymbolReference(store, async () => freshHealth, undefined, registry)
@@ -702,6 +927,53 @@ describe('ResolveSymbolReference', () => {
     expect(native.target?.id).toBe(member.id)
     expect(elsewhere.status).toBe('unresolved')
     expect(phpParse).not.toHaveBeenCalled()
+  })
+
+  it('never borrows the syntax of another adapter when the anchored adapter has no symbolReferenceSyntax facet', async () => {
+    const owner = symbol('EditChange', 'src/edit.pseudo')
+    const member = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'src/edit.pseudo',
+      name: 'execute',
+      space: SymbolSpace.Value,
+      ownerId: owner.id,
+      memberSemantics: { kind: MemberKind.Method, dispatch: MemberDispatch.Instance },
+    })
+    const store = await makeStore({
+      symbols: [owner, member],
+      declarations: [{ logicalSymbolId: member.id, filePath: 'core:src/edit.pseudo' }],
+    })
+    const typescript = new TypeScriptLanguageAdapter()
+    const tsParse = vi.spyOn(typescript.symbolReferenceSyntax, 'parse')
+    const coreOnly: LanguageAdapter = {
+      languages: () => ['pseudo'],
+      extensions: () => ({ '.pseudo': 'pseudo' }),
+      resolutionManifests: () => [],
+      analyzeFile: () => ({
+        language: 'pseudo',
+        symbols: [],
+        imports: [],
+        bindingFacts: [],
+        callFacts: [],
+      }),
+      resolveImports: () => ({ importMap: new Map(), fileImports: [], steps: [], diagnostics: [] }),
+      buildRelations: () => [],
+    }
+    const registry = new AdapterRegistry()
+    registry.register(typescript)
+    registry.register(coreOnly)
+    const resolver = new ResolveSymbolReference(store, async () => freshHealth, undefined, registry)
+
+    const result = await resolver.execute({
+      workspace: 'core',
+      requested: 'EditChange.execute',
+      filePath: 'core:src/edit.pseudo',
+    })
+
+    // The exact qualified name still resolves; the facet-less adapter must not borrow another
+    // adapter's syntax to parse the spelling.
+    expect(result.status).toBe('resolved')
+    expect(tsParse).not.toHaveBeenCalled()
   })
 
   it('returns every equal qualified name and does not borrow a missing member', async () => {
@@ -745,8 +1017,8 @@ describe('ResolveSymbolReference', () => {
   it('uses the PHP adapter for syntax that is not a single qualified spelling', async () => {
     const php = new PhpLanguageAdapter()
     const typescript = new TypeScriptLanguageAdapter()
-    const phpParse = vi.spyOn(php, 'parseSymbolReference')
-    const tsParse = vi.spyOn(typescript, 'parseSymbolReference')
+    const phpParse = vi.spyOn(php.symbolReferenceSyntax, 'parse')
+    const tsParse = vi.spyOn(typescript.symbolReferenceSyntax, 'parse')
     const registry = new AdapterRegistry()
     registry.register(typescript)
     registry.register(php)
@@ -897,7 +1169,443 @@ describe('ResolveSymbolReference', () => {
 
     expect(byLogical.status).toBe('resolved')
     expect(byLogical.target?.id).toBe(target.id)
+    expect(byLogical.resolvedTarget?.kind).toBe('logical-target')
     expect(byLocation.status).not.toBe('resolved')
     expect(byLocation.target?.id).not.toBe(target.id)
+  })
+
+  it('discriminates logical target with all contributing declarations', async () => {
+    const target = symbol('overloaded')
+    const store = await makeStore({
+      symbols: [target],
+      declarations: [
+        {
+          logicalSymbolId: target.id,
+          filePath: 'core:src/api.ts',
+          symbolId: 'sym-sig-1',
+          line: 10,
+          column: 0,
+          form: DeclarationOccurrenceForm.Signature,
+        },
+        {
+          logicalSymbolId: target.id,
+          filePath: 'core:src/api.ts',
+          symbolId: 'sym-sig-2',
+          line: 15,
+          column: 0,
+          form: DeclarationOccurrenceForm.Signature,
+        },
+        {
+          logicalSymbolId: target.id,
+          filePath: 'core:src/api.ts',
+          symbolId: 'sym-impl',
+          line: 20,
+          column: 0,
+          form: DeclarationOccurrenceForm.Implementation,
+        },
+      ],
+    })
+
+    const result = await new ResolveSymbolReference(store, async () => freshHealth).execute({
+      workspace: 'core',
+      requested: 'overloaded',
+      filePath: 'core:src/api.ts',
+    })
+
+    expect(result.status).toBe('resolved')
+    expect(result.resolvedTarget?.kind).toBe('logical-target')
+    if (result.resolvedTarget?.kind === 'logical-target') {
+      expect(result.resolvedTarget.logicalSymbol.id).toBe(target.id)
+      expect(result.resolvedTarget.declarations).toHaveLength(3)
+      expect(result.resolvedTarget.declarations.map((d) => d.symbolId)).toEqual([
+        'sym-sig-1',
+        'sym-sig-2',
+        'sym-impl',
+      ])
+      expect(result.resolvedTarget.declarations[0]!.form).toBe(DeclarationOccurrenceForm.Signature)
+      expect(result.resolvedTarget.declarations[2]!.form).toBe(
+        DeclarationOccurrenceForm.Implementation,
+      )
+    }
+  })
+
+  it('discriminates public-binding target with export binding and logical declarations', async () => {
+    const target = symbol('internalExport', 'src/internal.ts')
+    const binding = createPublicBinding({
+      surface: 'core:src/index.ts',
+      exportedName: 'exportedFunc',
+      space: SymbolSpace.Value,
+      targetId: target.id,
+    })
+    const store = await makeStore({
+      symbols: [target],
+      declarations: [{ logicalSymbolId: target.id, filePath: 'core:src/internal.ts' }],
+      publicBindings: [binding],
+    })
+
+    const result = await new ResolveSymbolReference(store, async () => freshHealth).execute({
+      workspace: 'core',
+      requested: 'exportedFunc',
+      publicSurface: 'core:src/index.ts',
+      symbolSpace: SymbolSpace.Value,
+    })
+
+    expect(result.status).toBe('resolved')
+    expect(result.resolvedTarget?.kind).toBe('public-binding')
+    if (result.resolvedTarget?.kind === 'public-binding') {
+      expect(result.resolvedTarget.binding.id).toBe(binding.id)
+      expect(result.resolvedTarget.logicalSymbol.id).toBe(target.id)
+      expect(result.resolvedTarget.declarations).toHaveLength(1)
+    }
+  })
+
+  it('resolves exact declaration by declarationSymbolId', async () => {
+    const target = symbol('exactTarget')
+    const store = await makeStore({
+      symbols: [target],
+      declarations: [
+        {
+          logicalSymbolId: target.id,
+          filePath: 'core:src/api.ts',
+          symbolId: 'exact-sym-id',
+          line: 42,
+          column: 4,
+        },
+      ],
+    })
+
+    const result = await new ResolveSymbolReference(store, async () => freshHealth).execute({
+      workspace: 'core',
+      requested: 'exactTarget',
+      declarationSymbolId: 'exact-sym-id',
+    })
+
+    expect(result.status).toBe('resolved')
+    expect(result.resolvedTarget?.kind).toBe('declaration')
+    if (result.resolvedTarget?.kind === 'declaration') {
+      expect(result.resolvedTarget.declaration.symbolId).toBe('exact-sym-id')
+      expect(result.resolvedTarget.declaration.location.line).toBe(42)
+      expect(result.resolvedTarget.logicalSymbol?.id).toBe(target.id)
+    }
+    expect(result.target?.id).toBe(target.id)
+  })
+
+  it('resolves exact declaration by file and position', async () => {
+    const target = symbol('posTarget')
+    const store = await makeStore({
+      symbols: [target],
+      declarations: [
+        {
+          logicalSymbolId: target.id,
+          filePath: 'core:src/foo.ts',
+          symbolId: 'pos-sym-id',
+          line: 25,
+          column: 6,
+        },
+      ],
+    })
+
+    const result = await new ResolveSymbolReference(store, async () => freshHealth).execute({
+      workspace: 'core',
+      requested: 'posTarget',
+      filePath: 'core:src/foo.ts',
+      position: { line: 25, column: 6 },
+    })
+
+    expect(result.status).toBe('resolved')
+    expect(result.resolvedTarget?.kind).toBe('declaration')
+    if (result.resolvedTarget?.kind === 'declaration') {
+      expect(result.resolvedTarget.declaration.symbolId).toBe('pos-sym-id')
+      expect(result.resolvedTarget.logicalSymbol?.id).toBe(target.id)
+    }
+  })
+
+  it('resolves physical-only declaration without logical target mapping', async () => {
+    const physicalSym: SymbolNode = {
+      id: 'physical-only-id',
+      name: '<anonymous>',
+      kind: SymbolKind.Function,
+      filePath: 'core:src/anon.ts',
+      projectRelativePath: 'src/anon.ts',
+      line: 30,
+      column: 12,
+      endLine: 35,
+      endColumn: 1,
+      selectionRange: { startLine: 30, startColumn: 12, endLine: 35, endColumn: 1 },
+      parentId: undefined,
+      comment: undefined,
+    }
+    const store = await makeStore({
+      symbols: [],
+      declarations: [],
+      physicalSymbols: [physicalSym],
+    })
+
+    const result = await new ResolveSymbolReference(store, async () => freshHealth).execute({
+      workspace: 'core',
+      requested: '<anonymous>',
+      declarationSymbolId: 'physical-only-id',
+    })
+
+    expect(result.status).toBe('resolved')
+    expect(result.resolvedTarget?.kind).toBe('declaration')
+    if (result.resolvedTarget?.kind === 'declaration') {
+      expect(result.resolvedTarget.declaration.symbolId).toBe('physical-only-id')
+      expect(result.resolvedTarget.logicalSymbol).toBeUndefined()
+    }
+    expect(result.target).toBeNull()
+  })
+
+  it('validates selector exclusivity and coordinate ranges', async () => {
+    const store = await makeStore({ symbols: [] })
+    const resolver = new ResolveSymbolReference(store, async () => freshHealth)
+
+    // combining declarationSymbolId and position
+    const combo1 = await resolver.execute({
+      workspace: 'core',
+      requested: 'test',
+      filePath: 'core:src/api.ts',
+      declarationSymbolId: 'sym-1',
+      position: { line: 1, column: 0 },
+    })
+    expect(combo1.status).toBe('unresolved')
+    expect(combo1.reasonCode).toBe('INVALID_SELECTOR')
+
+    // combining declarationSymbolId and logicalId
+    const combo2 = await resolver.execute({
+      workspace: 'core',
+      requested: 'test',
+      declarationSymbolId: 'sym-1',
+      logicalId: 'logical|2|core|src/api.ts|test|val',
+    })
+    expect(combo2.status).toBe('unresolved')
+    expect(combo2.reasonCode).toBe('INVALID_SELECTOR')
+
+    // position with line < 1
+    const badLine = await resolver.execute({
+      workspace: 'core',
+      requested: 'test',
+      filePath: 'core:src/api.ts',
+      position: { line: 0, column: 0 },
+    })
+    expect(badLine.status).toBe('unresolved')
+    expect(badLine.reasonCode).toBe('INVALID_SELECTOR')
+
+    // position with column < 0
+    const badCol = await resolver.execute({
+      workspace: 'core',
+      requested: 'test',
+      filePath: 'core:src/api.ts',
+      position: { line: 1, column: -1 },
+    })
+    expect(badCol.status).toBe('unresolved')
+    expect(badCol.reasonCode).toBe('INVALID_SELECTOR')
+
+    // position without filePath
+    const noFile = await resolver.execute({
+      workspace: 'core',
+      requested: 'test',
+      position: { line: 1, column: 0 },
+    })
+    expect(noFile.status).toBe('unresolved')
+    expect(noFile.reasonCode).toBe('INVALID_SELECTOR')
+  })
+
+  it('reports DECLARATION_NOT_FOUND when exact declaration does not exist', async () => {
+    const store = await makeStore({ symbols: [] })
+    const resolver = new ResolveSymbolReference(store, async () => freshHealth)
+
+    const result = await resolver.execute({
+      workspace: 'core',
+      requested: 'test',
+      declarationSymbolId: 'missing-sym-id',
+    })
+    expect(result.status).toBe('missing')
+    expect(result.reasonCode).toBe('DECLARATION_NOT_FOUND')
+
+    const posResult = await resolver.execute({
+      workspace: 'core',
+      requested: 'test',
+      filePath: 'core:src/api.ts',
+      position: { line: 99, column: 0 },
+    })
+    expect(posResult.status).toBe('missing')
+    expect(posResult.reasonCode).toBe('DECLARATION_NOT_FOUND')
+  })
+
+  it('reports AMBIGUOUS_DECLARATION when multiple physical declarations match position', async () => {
+    const sym1: SymbolNode = {
+      id: 'sym-1',
+      name: 'dup1',
+      kind: SymbolKind.Variable,
+      filePath: 'core:src/api.ts',
+      projectRelativePath: 'src/api.ts',
+      line: 5,
+      column: 10,
+      endLine: 5,
+      endColumn: 15,
+      selectionRange: { startLine: 5, startColumn: 10, endLine: 5, endColumn: 15 },
+      parentId: undefined,
+      comment: undefined,
+    }
+    const sym2: SymbolNode = {
+      id: 'sym-2',
+      name: 'dup2',
+      kind: SymbolKind.Variable,
+      filePath: 'core:src/api.ts',
+      projectRelativePath: 'src/api.ts',
+      line: 5,
+      column: 10,
+      endLine: 5,
+      endColumn: 20,
+      selectionRange: { startLine: 5, startColumn: 10, endLine: 5, endColumn: 20 },
+      parentId: undefined,
+      comment: undefined,
+    }
+    const store = await makeStore({
+      symbols: [],
+      declarations: [],
+      physicalSymbols: [sym1, sym2],
+    })
+
+    const result = await new ResolveSymbolReference(store, async () => freshHealth).execute({
+      workspace: 'core',
+      requested: 'dup',
+      filePath: 'core:src/api.ts',
+      position: { line: 5, column: 10 },
+    })
+
+    expect(result.status).toBe('ambiguous')
+    expect(result.reasonCode).toBe('AMBIGUOUS_DECLARATION')
+  })
+
+  it('reports LOGICAL_TARGET_NOT_FOUND when requested logicalId does not exist', async () => {
+    const store = await makeStore({ symbols: [] })
+    const resolver = new ResolveSymbolReference(store, async () => freshHealth)
+
+    const result = await resolver.execute({
+      workspace: 'core',
+      requested: 'missingFunc',
+      logicalId: 'logical|2|core|src/api.ts|missingFunc|val',
+    })
+
+    expect(result.status).toBe('missing')
+    expect(result.reasonCode).toBe('LOGICAL_TARGET_NOT_FOUND')
+  })
+
+  it('reports AMBIGUOUS_LOGICAL_TARGET with competing semantic targets', async () => {
+    const first = symbol('competing')
+    const second = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'src/other.ts',
+      name: 'competing',
+      space: SymbolSpace.Value,
+      ownerId: undefined,
+      memberSemantics: undefined,
+    })
+    const store = await makeStore({
+      symbols: [first, second],
+      declarations: [
+        { logicalSymbolId: first.id, filePath: 'core:src/api.ts' },
+        { logicalSymbolId: second.id, filePath: 'core:src/api.ts' },
+      ],
+    })
+
+    const result = await new ResolveSymbolReference(store, async () => freshHealth).execute({
+      workspace: 'core',
+      requested: 'competing',
+      filePath: 'core:src/api.ts',
+      symbolSpace: SymbolSpace.Value,
+    })
+
+    expect(result.status).toBe('ambiguous')
+    expect(result.reasonCode).toBe('AMBIGUOUS_LOGICAL_TARGET')
+    expect(result.candidates).toHaveLength(2)
+  })
+
+  it('Scenario: Anchor without an adapter leaves human text unresolved', async () => {
+    // GIVEN a request anchored to a Go package surface whose language has no symbolReferenceSyntax facet
+    // AND the text is an owner-qualified spelling that is not a stored qualified_name
+    const typescript = new TypeScriptLanguageAdapter()
+    const php = new PhpLanguageAdapter()
+    const tsParse = vi.spyOn(typescript.symbolReferenceSyntax, 'parse')
+    const phpParse = vi.spyOn(php.symbolReferenceSyntax, 'parse')
+    const go = new GoLanguageAdapter()
+    const registry = new AdapterRegistry()
+    registry.register(typescript)
+    registry.register(php)
+    registry.register(go)
+
+    const owner = symbol('Calculator', 'core:pkg/math/calc.go')
+    const member = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'core:pkg/math/calc.go',
+      name: 'Add',
+      space: SymbolSpace.Value,
+      ownerId: owner.id,
+      memberSemantics: { kind: MemberKind.Method, dispatch: MemberDispatch.Instance },
+    })
+    const store = await makeStore({
+      symbols: [owner, member],
+      declarations: [
+        { logicalSymbolId: owner.id, filePath: 'core:pkg/math/calc.go' },
+        { logicalSymbolId: member.id, filePath: 'core:pkg/math/calc.go' },
+      ],
+    })
+    const resolver = new ResolveSymbolReference(store, async () => freshHealth, undefined, registry)
+
+    // WHEN the reference is resolved
+    const result = await resolver.execute({
+      workspace: 'core',
+      requested: 'Calculator.Add()',
+      filePath: 'core:pkg/math/calc.go',
+      publicSurface: 'core:pkg/math',
+      language: 'go',
+    })
+
+    // THEN the result is unresolved
+    // AND no generic dotted or delimiter parser runs and no other adapter is consulted
+    expect(result.status).toBe('unresolved')
+    expect(tsParse).not.toHaveBeenCalled()
+    expect(phpParse).not.toHaveBeenCalled()
+  })
+
+  it('Scenario: Qualified name is not derived from owner and member', async () => {
+    // GIVEN a member whose stored qualified_name differs from the spelling Owner.member that could be derived from its owner and name
+    const owner = symbol('Owner', 'src/types.ts')
+    const member = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'src/types.ts',
+      name: 'member',
+      space: SymbolSpace.Value,
+      ownerId: owner.id,
+      memberSemantics: { kind: MemberKind.Method, dispatch: MemberDispatch.Instance },
+      qualifiedName: 'Custom.different',
+    })
+    const store = await makeStore({
+      symbols: [owner, member],
+      declarations: [
+        { logicalSymbolId: owner.id, filePath: 'core:src/types.ts' },
+        { logicalSymbolId: member.id, filePath: 'core:src/types.ts' },
+      ],
+    })
+    const resolver = new ResolveSymbolReference(store, async () => freshHealth)
+
+    // WHEN the unanchored text Owner.member is resolved
+    const result = await resolver.execute({
+      workspace: 'core',
+      requested: 'Owner.member',
+    })
+
+    // THEN the lookup compares only the stored qualified_name
+    // AND the member is not matched through a derived name
+    expect(result.status).toBe('unresolved')
+
+    const storedResult = await resolver.execute({
+      workspace: 'core',
+      requested: 'Custom.different',
+    })
+    expect(storedResult.status).toBe('resolved')
+    expect(storedResult.target?.id).toBe(member.id)
   })
 })

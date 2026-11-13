@@ -80,6 +80,7 @@ The function produces an `ImpactResult` containing:
 - **`affectedFiles`** — unique file paths containing any affected symbol
 - **`affectedSymbols`** — array of `AffectedSymbol` entries with depth information
 - **`affectedProcesses`** — execution flows that include the target or any affected symbol (when process data is available)
+- **`omittedCounts`** — record `{ tests: number, ignored: number }` indicating how many test and ignored files were encountered during reachability traversal but omitted from the result
 
 `AffectedSymbol` SHALL contain:
 
@@ -88,6 +89,10 @@ The function produces an `ImpactResult` containing:
 - **`filePath`** (`string`) — workspace-prefixed file path
 - **`line`** (`number`) — 1-based line number
 - **`depth`** (`number`) — distance from the target: 1 = direct dependent, 2 = indirect, 3+ = transitive
+
+Impact analysis MUST compute `directDependents`, `indirectDependents`, `transitiveDependents`, and the derived `riskLevel` solely over admitted category nodes (`source` by default). Dependents in `test` or `ignored` files SHALL NOT inflate dependent counts or risk level unless explicitly admitted by the caller.
+
+When the analysis target is itself explicitly located in a `test` or `ignored` file (e.g. diagnosing the impact of a test file or fixture), downstream dependencies of that anchored target SHALL be traversed.
 
 Impact analysis MUST include hierarchy relations in addition to existing call/import reachability:
 
@@ -107,13 +112,15 @@ Risk level thresholds:
 
 ### Requirement: Filtered impact results
 
-Symbol, file, multi-file, spec, and public-binding impact operations SHALL accept one optional typed filter containing requested result types, symbol kinds, included workspaces, and excluded workspaces. Result types SHALL use the closed vocabulary `files | symbols | specs`; omitted filters SHALL preserve the existing unfiltered result contract.
+Symbol, file, multi-file, spec, and public-binding impact operations SHALL accept one optional typed filter containing requested result types, symbol kinds, included workspaces, excluded workspaces, and admitted file categories (`categories?: readonly FileCategory[]`, `includeTests?: boolean`, `includeIgnored?: boolean`). Result types SHALL use the closed vocabulary `files | symbols | specs`; omitted filters SHALL preserve the existing unfiltered result contract.
+
+Categories default to `['source']` when omitted. Traversal operations SHALL express category eligibility via `GraphStore` impact queries and MUST halt BFS expansion at non-admitted file boundaries during upstream and bidirectional walks. Pruning non-admitted files ensures test and auxiliary files do not act as transitive relational bridges connecting unrelated production symbols.
 
 Workspace inclusion and exclusion SHALL use canonical graph workspace identities. An empty inclusion set SHALL admit every workspace, and exclusions SHALL take precedence over inclusions. Symbol-kind predicates SHALL apply only to symbol results. A filter that requests no symbol result category MAY still use admitted symbol reachability to compute requested file or spec results.
 
-Code Graph SHALL apply kind and workspace eligibility before it builds returned category collections and aggregate dependent counts. Risk, depth counts, affected-file aggregation, covering-spec evidence, and deterministic ordering SHALL be derived from the admitted traversal evidence. A result-type selection SHALL control which of the `files`, `symbols`, and `specs` collections are materialized without causing the CLI to reconstruct or post-filter another category.
+Code Graph SHALL apply kind, category, and workspace eligibility before it builds returned category collections and aggregate dependent counts. Risk, depth counts, affected-file aggregation, covering-spec evidence, and deterministic ordering SHALL be derived from the admitted traversal evidence. A result-type selection SHALL control which of the `files`, `symbols`, and `specs` collections are materialized without causing the CLI to reconstruct or post-filter another category.
 
-Every `ImpactResult`, including symbol and public-binding impact, SHALL contain a required deterministic `affectedSpecs` collection. When `specs` is requested, Code Graph SHALL populate it from specs covering admitted impacted symbols and files through `COVERS_SYMBOL` and `COVERS_FILE` evidence. When `specs` is not requested, `affectedSpecs` SHALL be an empty array. A specs-only filter MUST still traverse admitted symbol and file evidence needed to discover coverage.
+Every `ImpactResult`, including symbol and public-binding impact, SHALL contain a required deterministic `affectedSpecs` collection and `omittedCounts` record. When `specs` is requested, Code Graph SHALL populate it from specs covering admitted impacted symbols and files through `COVERS_SYMBOL` and `COVERS_FILE` evidence. When `specs` is not requested, `affectedSpecs` SHALL be an empty array. A specs-only filter MUST still traverse admitted symbol and file evidence needed to discover coverage.
 
 Filtering MUST occur before any final result limit. Traversal services MUST express eligible node and relation reads through the `GraphStore` filtered-impact query contract and MUST NOT fetch an unrestricted backend result set solely to discard excluded nodes in the service or delivery layer.
 
@@ -201,6 +208,16 @@ Hierarchy traversal SHALL preserve edge direction and language precedence for co
 
 Traversal ordering SHALL be deterministic across backends and SHALL use indexed lookups and bounded cycle-safe traversal.
 
+### Requirement: Logical-target impact aggregation
+
+When symbol impact targets a logical symbol, traversal SHALL seed the requested direction from every physical declaration occurrence belonging to that logical target. It MUST NOT select one primary declaration and discard the remaining declaration routes.
+
+Dependency reachability SHALL continue over physical `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations. The result SHALL aggregate affected declarations by logical identity when a mapping exists, retain every contributing physical edge and location as evidence, and preserve declaration-only results when no logical mapping exists.
+
+One logical target SHALL appear once at its shallowest semantic depth even when several declarations or routes reach it. Physical occurrence counts and unique logical-target counts MUST use distinct result fields or explicitly named units. Risk SHALL be computed from the documented semantic unit and MUST NOT vary merely because one logical target has additional equivalent declarations.
+
+Exact public-binding impact SHALL continue to distinguish consumers of the selected route from dependents of the canonical logical target. Exact declaration impact SHALL remain available as a physical operation and MUST NOT be widened implicitly to every declaration of the logical target.
+
 ### Requirement: Owner-qualified impact target
 
 Symbol impact SHALL select its start symbol by calling the shared symbol resolver before traversal. An owner-qualified reference SHALL match stored `qualified_name` without requiring a file. Exactly one logical member SHALL traverse only that member. Several equal matches MUST all be reported and MUST NOT traverse one of them. Zero matches MUST NOT fall through to a terminal-name search. Public-binding and legacy location-backed selectors SHALL keep their existing exact outcomes.
@@ -216,6 +233,16 @@ The input file and its defined symbols have depth `0`. Files and symbols reached
 File coverage SHALL remain independently visible when no symbol-coverage relations exist. Symbol coverage SHALL augment, not gate or replace, file coverage. Reverse coverage retrieval MUST be batched over deduplicated file and symbol sets and MUST NOT issue one store query per affected result.
 
 Traversal remains read-only. It SHALL project the coverage present in the open graph; graph-health and freshness consumers remain responsible for reporting whether corpus-wide coverage is complete.
+
+### Requirement: Logical symbol coverage during impact
+
+Reverse `COVERS_SYMBOL` lookup SHALL use logical-symbol IDs. Before coverage lookup, traversal SHALL map every reached physical declaration to its logical target, deduplicate the logical IDs, and issue a bounded batch reverse-coverage query. It MUST NOT query logical coverage using a location-backed `SymbolNode.id`.
+
+The impact target's own declarations are part of the coverage frontier at depth 0: a spec that covers the target's logical symbol SHALL be reported for symbol impact, exactly as file impact reports a spec covering the target file at depth 0.
+
+A covering-spec result SHALL retain evidence connecting the spec's logical coverage target to each reached physical declaration that contributed the match. File coverage SHALL remain independent and visible.
+
+A physical declaration without a logical target SHALL be excluded from the logical coverage frontier before the store query and SHALL not be reported as uncovered merely because no logical lookup is applicable. Its physical ID MUST NOT be used as a fallback logical ID. If no declaration in the coverage frontier (the target's own declarations at depth 0 plus every reached declaration) maps to a logical target, traversal MUST skip the reverse logical-coverage store operation entirely and classify the evidence explicitly as physical-only or coverage-not-applicable unless a separate physical-coverage contract is introduced.
 
 ## Constraints
 

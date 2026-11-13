@@ -1,0 +1,4 @@
+releases:
+  cli:graph-index: patch
+  code-graph:isolated-index-worker: patch
+  core:config-loader: patch

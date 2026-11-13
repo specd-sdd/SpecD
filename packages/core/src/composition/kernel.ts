@@ -29,6 +29,10 @@ import { type GetSpec } from '../application/use-cases/get-spec.js'
 import { type GetSpecContext } from '../application/use-cases/get-spec-context.js'
 import { type GetSpecOutline } from '../application/use-cases/get-spec-outline.js'
 import { type GetSpecsHealth } from '../application/use-cases/get-specs-health.js'
+import {
+  type GetChangeSpecDeps,
+  GetChangeSpecDeps as GetChangeSpecDepsClass,
+} from '../application/use-cases/get-change-spec-deps.js'
 import { type GetStatus } from '../application/use-cases/get-status.js'
 import { type InvalidateChange } from '../application/use-cases/invalidate-change.js'
 import { type MaterializeSpecMetadata } from '../application/use-cases/materialize-spec-metadata.js'
@@ -61,6 +65,7 @@ import { type UpdateImplementationTracking } from '../application/use-cases/upda
 import { type UpdateProjectMetadata } from '../application/use-cases/update-project-metadata.js'
 import { type UpdateSpecDeps } from '../application/use-cases/update-spec-deps.js'
 import { type ValidateArtifacts } from '../application/use-cases/validate-artifacts.js'
+import { type ValidateChangeBatch } from '../application/use-cases/validate-change-batch.js'
 import { type ValidateSchema } from '../application/use-cases/validate-schema.js'
 import { type ValidateSpecs } from '../application/use-cases/validate-specs.js'
 import { type ArchiveRepository } from '../application/ports/archive-repository.js'
@@ -183,6 +188,10 @@ import {
   createValidateArtifacts,
   resolveValidateArtifactsDeps,
 } from './use-cases/validate-artifacts.js'
+import {
+  createValidateChangeBatch,
+  resolveValidateChangeBatchDeps,
+} from './use-cases/validate-change-batch.js'
 import { createValidateSchema, resolveValidateSchemaDeps } from './use-cases/validate-schema.js'
 import { createValidateSpecs, resolveValidateSpecsDeps } from './use-cases/validate-specs.js'
 import { type CompositionRegistryView } from './composition-registries.js'
@@ -216,6 +225,7 @@ export interface Kernel extends AsyncDisposable {
     discard: DiscardChange
     archive: ArchiveChange
     validate: ValidateArtifacts
+    validateBatch: ValidateChangeBatch
     compile: CompileContext
     list: ListChanges
     listDrafts: ListDrafts
@@ -226,6 +236,7 @@ export interface Kernel extends AsyncDisposable {
     invalidate: InvalidateChange
     skipArtifact: SkipArtifact
     updateSpecDeps: UpdateSpecDeps
+    getSpecDeps: GetChangeSpecDeps
     listArchived: ListArchived
     getArchived: GetArchivedChange
     runStepHooks: RunStepHooks
@@ -425,11 +436,15 @@ async function buildKernel(
   const discard = createDiscardChange(resolveDiscardChangeDeps(resolver))
   const archive = createArchiveChange(resolveArchiveChangeDeps(resolver))
   const validate = createValidateArtifacts(resolveValidateArtifactsDeps(resolver))
+  const validateBatch = createValidateChangeBatch(
+    resolveValidateChangeBatchDeps(resolver, { validateArtifacts: validate }),
+  )
   const compile = createCompileContext(resolveCompileContextDeps(resolver))
   const edit = createEditChange(resolveEditChangeDeps(resolver))
   const invalidate = createInvalidateChange(resolveInvalidateChangeDeps(resolver))
   const skipArtifact = createSkipArtifact(resolveSkipArtifactDeps(resolver))
   const updateSpecDeps = createUpdateSpecDeps(resolveUpdateSpecDepsDeps(resolver))
+  const getSpecDeps = new GetChangeSpecDepsClass(status, [...specsRepos.keys()])
   const getHookInstructions = createGetHookInstructions(resolveGetHookInstructionsDeps(resolver))
   const getArtifactInstruction = createGetArtifactInstruction(
     resolveGetArtifactInstructionDeps(resolver),
@@ -489,6 +504,7 @@ async function buildKernel(
       discard,
       archive,
       validate,
+      validateBatch,
       compile,
       list: listChanges,
       listDrafts,
@@ -499,6 +515,7 @@ async function buildKernel(
       invalidate,
       skipArtifact,
       updateSpecDeps,
+      getSpecDeps,
       listArchived,
       getArchived,
       runStepHooks,

@@ -188,13 +188,23 @@
 - **THEN** each logical batch is sent as one worker RPC
 - **AND** the worker executes set-based lookup rather than one RPC per symbol or relation type
 
-#### Scenario: Large batches are chunked transparently inside the worker
+#### Scenario: Collection-binding batch reads are chunked transparently inside the worker
 
-- **GIVEN** a batch exceeds SQLite's safe parameter count
-- **WHEN** the worker executes the batch query
-- **THEN** it divides the query into deterministic bounded SQL parameter chunks
-- **AND** the merged result preserves the abstract contract's deterministic order
-- **AND** no valid requested symbol or relation is lost or duplicated
+- **GIVEN** each set-based batch-read family receives a caller collection larger than the configured safe parameter budget
+- **AND** the collection includes duplicate and unknown values
+- **WHEN** the worker executes each logical batch
+- **THEN** every SQL statement remains within the configured safe parameter budget
+- **AND** the merged result preserves the abstract contract's deterministic order, de-duplication, and unknown-value behavior
+- **AND** no SQLite variable limit error is raised
+
+#### Scenario: Fixed and repeated parameters count toward the chunk budget
+
+- **GIVEN** a set-based lookup has fixed parameters or references each caller-provided value more than once
+- **AND** the unchunked statement would exceed the configured safe parameter budget even though the input collection alone would not
+- **WHEN** the worker executes the logical batch
+- **THEN** it chooses chunks small enough for the complete statement parameter count
+- **AND** it returns the same deterministic result as the equivalent smaller lookups
+- **AND** no SQLite variable limit error is raised
 
 #### Scenario: Empty batch avoids worker and SQLite work
 
@@ -258,6 +268,28 @@
 - **WHEN** an exact batch node query has no paths, ids, or spec ids
 - **THEN** it returns an empty array without dispatching a worker RPC or executing SQL
 
+### Requirement: Worker-backed logical declaration mapping
+
+#### Scenario: Mapping batch crosses the worker boundary once
+
+- **GIVEN** multiple logical symbols or declarations require mapping
+- **WHEN** the SQLite store executes the batch lookup
+- **THEN** one typed RPC crosses the worker boundary
+- **AND** SQL parameter chunking does not create per-identity worker calls
+
+#### Scenario: Chunked results preserve abstract-store semantics
+
+- **GIVEN** a batch larger than the SQLite parameter bound with duplicates and unknown IDs
+- **WHEN** worker results are merged
+- **THEN** first-request and declaration ordering remain deterministic
+- **AND** duplicates and unknowns follow the abstract store contract
+
+#### Scenario: Empty mapping batch sends no RPC
+
+- **GIVEN** an empty mapping input
+- **WHEN** the host store handles it
+- **THEN** an empty result is returned without contacting the worker
+
 ### Requirement: Config-derived persistence layout
 
 #### Scenario: Graph and tmp directories are derived from configPath
@@ -309,6 +341,13 @@
 - **GIVEN** an opened healthy SQLite store
 - **WHEN** force indexing runs
 - **THEN** it uses logical clear and full reanalysis without physical recreation
+
+#### Scenario: Recreation preserves lock and rotates the epoch
+
+- **GIVEN** a closed store whose graph directory contains the database, `-wal`, `-shm`, `index.lock` and `storage.epoch`
+- **WHEN** `recreate()` runs
+- **THEN** only the database, `-wal` and `-shm` files are removed
+- **AND** `index.lock` is untouched and `storage.epoch` holds a new generation
 
 ### Requirement: Locked recreation preserves the index lease
 
@@ -372,6 +411,17 @@
 - **THEN** the persisted file record includes source content sufficient to derive symbol snippets from file-backed context
 - **AND** symbol preview extraction does not require a separate persisted snippet field per symbol
 
+#### Scenario: File and document tables store project_relative_path
+
+- **WHEN** files and documents are persisted by `SQLiteGraphStore`
+- **THEN** their table records persist `project_relative_path` and do not contain `config_relative_path`
+
+#### Scenario: Symbols table stores denormalized project_relative_path
+
+- **WHEN** symbols are persisted by `SQLiteGraphStore`
+- **THEN** the `symbols` table record stores `project_relative_path` matching the owning file's project-relative path
+- **AND** symbol retrieval does not require a join against the `files` table
+
 ### Requirement: Persisted relation storage
 
 #### Scenario: All required relation families are stored
@@ -404,6 +454,22 @@
 - **THEN** the invalid relation is absent from SQLite
 - **AND** the indexing result identifies the rejected source and target
 - **AND** no physical symbol row is substituted as the relation target
+
+### Requirement: SQLite batched logical coverage reads
+
+#### Scenario: Reverse coverage joins committed logical targets
+
+- **GIVEN** a physical row and a logical target have equal-looking identifiers
+- **WHEN** reverse logical coverage is queried
+- **THEN** only the committed logical target can satisfy the relation
+- **AND** the physical row neither shadows nor widens the result
+
+#### Scenario: Coverage batch remains one worker operation
+
+- **GIVEN** many logical IDs require SQL parameter chunking
+- **WHEN** reverse coverage is loaded
+- **THEN** the host sends one serializable worker request
+- **AND** merged results preserve deterministic abstract-store ordering
 
 ### Requirement: SQLite full-text search
 
@@ -459,11 +525,12 @@
 - **WHEN** searching for `core:change` in the SQLite backend
 - **THEN** that spec is the first result returned
 
-#### Scenario: Persisted file content does not create SQLite file search category
+#### Scenario: Persisted file content is not a SQLite file result category
 
-- **GIVEN** SQLite persists file source content for snippet extraction
-- **WHEN** search APIs are used through the current graph-store contract
-- **THEN** there is still no separate file full-text result category introduced by this change
+- **GIVEN** SQLite persists file source content
+- **WHEN** symbol, spec, and document search runs
+- **THEN** no file result category is introduced
+- **AND** source-content search is served by its own substring-capable index
 
 #### Scenario: Spec-id segment outranks content-only hit in SQLite
 
@@ -538,13 +605,29 @@
 - **THEN** the backend still returns that symbol as a candidate
 - **AND** it is ordered by the same identity-strength ladder instead of being omitted for lack of FTS coverage
 
+#### Scenario: Kind-tiered ranking acts as tie-breaker for equal relevance matches
+
+- **GIVEN** a query matches a class, a function, a type, and a property with identical identity and relevance scores
+- **WHEN** `searchSymbols()` is executed on the SQLite backend
+- **THEN** the class (Tier 4) ranks above the function (Tier 3), which ranks above the type (Tier 2), which ranks above the property (Tier 1)
+- **AND** fine-grained property and variable symbols do not displace foundational classes and functions in equal-relevance rankings
+
 ### Requirement: Transactional mutation model
 
-#### Scenario: File upsert is all-or-nothing
+#### Scenario: File upsert and removal are all-or-nothing
 
-- **WHEN** `upsertFile()` is invoked
-- **THEN** the complete file-level graph replacement executes within a single worker-side transaction
-- **AND** if an error occurs during replacement, previous graph state remains intact
+- **WHEN** `upsertFile()` or `removeFile()` is invoked
+- **THEN** the complete file-level mutation executes within a single worker-side transaction
+- **AND** if an error occurs after cleanup begins, the previously committed file, symbols, and relations remain intact
+
+#### Scenario: Direct file upsert rolls back a failure after cleanup begins
+
+- **GIVEN** a committed file has symbols, incoming and outgoing relations, and searchable content
+- **AND** a replacement `upsertFile()` is constructed to fail after the existing file-local state has been cleaned up
+- **WHEN** the direct upsert is attempted
+- **THEN** the operation rejects
+- **AND** the previously committed file, symbols, incoming and outgoing relations, and searchable content remain intact
+- **AND** none of the failed replacement state becomes visible
 
 #### Scenario: Bulk indexing batch is all-or-nothing
 
@@ -552,6 +635,23 @@
 - **WHEN** the batch commit is requested
 - **THEN** the complete session becomes visible atomically within a single worker transaction
 - **AND** a failure before or during commit leaves previously committed graph state intact
+
+#### Scenario: Direct file mutations clean up a file with a large symbol count
+
+- **GIVEN** a file has enough symbols and associated incoming and outgoing relations that expanding every symbol id into the cleanup statement would exceed SQLite's host parameter limit
+- **WHEN** `upsertFile()` or `removeFile()` replaces or removes the file
+- **THEN** the mutation completes without a SQLite variable-limit error
+- **AND** none of the file's previous symbols or their incoming or outgoing relations remain
+- **AND** an upsert exposes only the replacement file state
+
+#### Scenario: Bulk commit cleans up a file with a large symbol count
+
+- **GIVEN** a committed file has enough symbols and associated relations that expanding every symbol id into the cleanup statement would exceed SQLite's host parameter limit
+- **AND** a bulk index session stages replacement state for that file
+- **WHEN** the session commits
+- **THEN** the commit completes without a SQLite variable-limit error
+- **AND** none of the file's previous symbols or their incoming or outgoing relations remain
+- **AND** the replacement state becomes visible atomically
 
 ### Requirement: Bulk indexing support
 
@@ -571,6 +671,13 @@
 - **THEN** it may require a destructive rebuild instead of applying an incremental
   migration
 
+#### Scenario: Version 15 database missing a required column is recreated
+
+- **GIVEN** a database persisted as schema version 15 whose `local_bindings` table lacks `start_line`
+- **WHEN** the adapter opens it
+- **THEN** open fails with `GraphSchemaIncompatibleError` and reason `SCHEMA_INCOMPATIBLE`
+- **AND** `graph index`, with or without `--force`, recreates the database and completes without a raw SQLite error
+
 ### Requirement: Backend-specific companion files
 
 #### Scenario: SQLite companion files stay under graph persistence root
@@ -583,41 +690,36 @@
 
 ### Requirement: Reference schema upgrade
 
-#### Scenario: SQLite old schema rebuilds safely
+#### Scenario: SQLite schema 14 rebuilds safely as 15
 
-- **GIVEN** schema version 10 or 11 and the reference schema expects 12
-- **WHEN** normal read and then graph index are attempted
-- **THEN** read rejects with `GraphSchemaIncompatibleError` without empty recreation
-- **AND** index rotates generation, rebuilds fields and FTS, and opens version 12
+- **GIVEN** `meta.schemaVersion` is 14 and the reference schema expects 15
+- **WHEN** a normal read and then `graph index` are attempted
+- **THEN** the read rejects with `GraphSchemaIncompatibleError` and recovery reason `SCHEMA_INCOMPATIBLE` without empty recreation
+- **AND** indexing rotates the storage epoch, rebuilds fields and search indexes, and opens schema 15
+- **AND** no in-place `ALTER TABLE` migration is executed
 
-#### Scenario: member_form is replaced in place
+#### Scenario: Version 15 persists occurrence form and project-relative paths
 
-- **WHEN** a version 12 database is created
-- **THEN** `logical_symbols` has `member_kind`, `member_dispatch`, `member_accessor`, `native_kind`, and `qualified_name`
-- **AND** `qualified_name` has an equality index
-- **AND** it has no `member_form` column
-- **AND** `public_bindings`, `symbols.search_text`, and `symbol_fts` keep their previous columns
+- **WHEN** a schema 15 database is created
+- **THEN** `files` and `documents` have `project_relative_path` and no `config_relative_path`
+- **AND** `symbols` has `project_relative_path`
+- **AND** `logical_declarations` has `occurrence_form`
+- **AND** `logical_symbols` has `member_kind`, `member_dispatch`, `member_accessor`, `native_kind`, and indexed `qualified_name`
 
-#### Scenario: Version 12 opens without rebuild
+#### Scenario: Version 15 opens without rebuild
 
-- **GIVEN** `meta.schemaVersion` is already 12
+- **GIVEN** `meta.schemaVersion` is already 15
 - **WHEN** the store opens for a read
 - **THEN** it does not throw `GraphSchemaIncompatibleError`
 - **AND** it does not recreate the database
 
-#### Scenario: Any other version is incompatible
+#### Scenario: Unsupported schema versions are incompatible
 
-- **GIVEN** `meta.schemaVersion` is 9 or 13
+- **GIVEN** `meta.schemaVersion` is older than 14 or newer than 15
 - **WHEN** the store opens
 - **THEN** the error is `GraphSchemaIncompatibleError`
+- **AND** no rows are read beside schema 15 rows
 - **AND** no `ALTER TABLE` is executed
-
-#### Scenario: Rebuild discards old logical ids
-
-- **GIVEN** a version 10 database contains logical ids that embed member form
-- **WHEN** graph index recreates version 12
-- **THEN** those old id strings are absent
-- **AND** new ids round-trip through the versioned encoding
 
 #### Scenario: Qualified spelling is an equality column
 
@@ -627,18 +729,20 @@
 - **AND** `symbols.search_text` is the expanded bare name
 - **AND** `symbol_fts` has no extra column
 
-#### Scenario: Worker row uses the new columns
+#### Scenario: Worker row uses schema 15 declaration columns
 
-- **WHEN** a logical symbol is inserted and selected through the worker
-- **THEN** the row carries `member_kind`, `member_dispatch`, `member_accessor`, `native_kind`, and `qualified_name`
-- **AND** the statement does not reference `member_form`
+- **WHEN** logical symbols and physical declarations are inserted and selected through the worker
+- **THEN** logical rows carry `member_kind`, `member_dispatch`, `member_accessor`, `native_kind`, and `qualified_name`
+- **AND** logical declaration rows round-trip `occurrence_form`
+- **AND** a physical-only declaration persists no occurrence form and remains retrievable by physical symbol ID
+- **AND** statements do not reference the removed `member_form`
 
 #### Scenario: SQLite source search preserves occurrence and range semantics
 
-- **GIVEN** source content, construct ranges, and selection ranges were bulk indexed
+- **GIVEN** source content, occurrence forms, construct ranges, and selection ranges were bulk indexed
 - **WHEN** full, raw, expanded, and short source queries are executed with filters
 - **THEN** SQLite returns bounded substring candidates equivalent to the abstract Store contract
-- **AND** ranges round-trip without converting half-open coordinates
+- **AND** ranges and occurrence forms round-trip without converting half-open coordinates
 
 #### Scenario: SQLite semantic queries use structured indexes
 
@@ -647,8 +751,30 @@
 - **THEN** SQLite resolves them through indexed structured columns without parsing or substring-ranking canonical ids
 - **AND** provider-visible canonical ids remain unchanged
 
-#### Scenario: SQLite batches reverse coverage and rebuilds FTS once
+#### Scenario: SQLite batches reverse coverage and rebuilds search indexes once
 
-- **WHEN** a bulk generation containing coverage and source content commits
+- **WHEN** a bulk schema 15 generation containing coverage and source content commits
 - **THEN** reverse file/symbol coverage is queryable in batches
-- **AND** semantic and source-content FTS structures are rebuilt once after commit
+- **AND** semantic and source-content search indexes are rebuilt once after commit
+
+#### Scenario: Version 15 persists local binding source ranges
+
+- **GIVEN** two lexical bindings with the same name and scope but different source ranges
+- **WHEN** they are written and read back through the store
+- **THEN** both rows exist with their own `start_line`, `start_column`, `end_line`, and `end_column`
+- **AND** their identities differ
+
+#### Scenario: Namespace round-trips through the files table
+
+- **GIVEN** a file upserted with `namespace` `App\Models` and `namespaceSeparator` `\`
+- **WHEN** the file is read back
+- **THEN** both values are returned unchanged
+- **AND** a file upserted without a namespace reads back with neither value
+
+#### Scenario: Version 15 database is rejected after the bump
+
+- **GIVEN** a database persisted with schema version 15
+- **WHEN** the public store is opened for an ordinary read
+- **THEN** it fails with `GraphStorageRecoveryRequiredError` and recovery reason `SCHEMA_INCOMPATIBLE`
+- **AND** any low-level `GraphSchemaIncompatibleError` remains internal cause or diagnostic evidence
+- **AND** `graph index` recreates derived storage as version 16 and rotates `storage.epoch`

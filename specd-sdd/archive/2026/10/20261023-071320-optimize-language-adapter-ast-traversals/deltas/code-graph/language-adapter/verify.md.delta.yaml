@@ -1,0 +1,31 @@
+- op: added
+  description: 'Verify shared bounded-work and semantic-parity guarantees'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Bounded per-file structural analysis
+
+    #### Scenario: Repeated semantic queries reuse structural evidence
+
+    - **GIVEN** a generated file contains many members and many calls that share the same owners and lexical scopes
+    - **AND** an internal deterministic counter records owner scans, scope summarizations, and callable-index builds
+    - **WHEN** a built-in adapter analyzes the file
+    - **THEN** each unchanged owner and lexical scope is structurally summarized once
+    - **AND** callable eligibility and ordering are built once per file and policy rather than once per call
+    - **AND** increasing queries within an already indexed structure does not increase the number of full-structure scans
+
+    #### Scenario: Indexed and baseline semantics are equivalent
+
+    - **GIVEN** representative fixtures contain nested owners, overloads, same-name declarations, same-line constructs, multiline syntax, and unresolved references
+    - **WHEN** optimized analysis is compared with the established normalized facts for those fixtures
+    - **THEN** symbols, ranges, parents, imports, bindings, calls, member semantics, hierarchy evidence, diagnostics, and relations are identical
+    - **AND** unresolved or ambiguous inputs remain unresolved or ambiguous
+
+    #### Scenario: Callable containment preserves exact boundaries
+
+    - **GIVEN** nested callable ranges share lines and contain calls at their start, interior, and half-open end boundaries
+    - **WHEN** indexed callable containment resolves each call position
+    - **THEN** the same innermost eligible callable is selected as by the established latest-start, earliest-end, stable-ID ordering
+    - **AND** a position at the exclusive end of a callable is not attributed to that callable

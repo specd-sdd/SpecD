@@ -13,12 +13,7 @@ import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { evaluateRules } from '../../domain/services/rule-evaluator.js'
 import { evaluateCrossArtifactRule } from '../../domain/services/cross-artifact-rule-evaluator.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
-import { DependsOnOverwriteError } from '../../domain/errors/depends-on-overwrite-error.js'
 import { type ReadyArtifactParticipant } from './_shared/cross-artifact-participant-state.js'
-import {
-  extractMetadataFromSpecArtifacts,
-  type MetadataArtifactInput,
-} from './_shared/extract-metadata-from-spec-artifacts.js'
 import { type ExtractorTransformRegistry } from '../../domain/services/extract-metadata.js'
 import { type SpecWorkspaceRoute } from './_shared/spec-reference-resolver.js'
 import { type Schema } from '../../domain/value-objects/schema.js'
@@ -72,8 +67,6 @@ export class ValidateSpecs {
   private readonly _schemaProvider: SchemaProvider
   private readonly _parsers: ArtifactParserRegistry
   private readonly _hasher: ContentHasher
-  private readonly _extractorTransforms: ExtractorTransformRegistry
-  private readonly _workspaceRoutes: readonly SpecWorkspaceRoute[]
   private readonly _validationResultCaches: ReadonlyMap<string, ValidationResultCache>
   private readonly _getMetadata: GetSpecMetadata
 
@@ -85,8 +78,8 @@ export class ValidateSpecs {
    * @param parsers - Registry of artifact format parsers
    * @param getMetadata - Metadata materialization use case
    * @param hasher - Content hasher for metadata freshness validation
-   * @param extractorTransforms - Shared extractor transform registry
-   * @param workspaceRoutes - Workspace routing metadata for cross-workspace resolution
+   * @param _extractorTransforms - Unused compatibility argument; metadata extraction is delegated
+   * @param _workspaceRoutes - Unused compatibility argument; metadata routing is delegated
    * @param validationResultCaches - Validation result caches keyed by workspace name
    */
   constructor(
@@ -95,8 +88,8 @@ export class ValidateSpecs {
     parsers: ArtifactParserRegistry,
     getMetadata: GetSpecMetadata,
     hasher?: ContentHasher,
-    extractorTransforms: ExtractorTransformRegistry = new Map(),
-    workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
+    _extractorTransforms: ExtractorTransformRegistry = new Map(),
+    _workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
     validationResultCaches: ReadonlyMap<string, ValidationResultCache> = new Map(),
   ) {
     this._specs = specs
@@ -108,9 +101,10 @@ export class ValidateSpecs {
         return content
       },
     }
-    this._extractorTransforms = extractorTransforms
-    this._workspaceRoutes = workspaceRoutes
     this._validationResultCaches = validationResultCaches
+    // Preserve constructor slots while extraction and routing belong to metadata materialization.
+    void _extractorTransforms
+    void _workspaceRoutes
   }
 
   /**
@@ -118,6 +112,9 @@ export class ValidateSpecs {
    *
    * @param input - Validation parameters
    * @returns Aggregated validation result
+   * @throws {InvalidSpecIdError} If a requested spec ID is empty, blank, or malformed
+   * @throws {WorkspaceNotFoundError} If a requested spec ID names an unknown workspace
+   * @throws {SpecNotFoundError} If a requested spec does not exist
    * @throws {SchemaNotFoundError} If the schema reference cannot be resolved
    */
   async execute(input: ValidateSpecsInput): Promise<ValidateSpecsResult> {
@@ -130,15 +127,16 @@ export class ValidateSpecs {
     const entries: SpecValidationEntry[] = []
 
     if (input.specPath !== undefined) {
-      const { workspace, capPath: capabilityPath } = parseSpecId(input.specPath)
-      const specRepo = this._specs.get(workspace)
-      if (specRepo === undefined) {
-        throw new WorkspaceNotFoundError(workspace)
-      }
+      const {
+        workspace,
+        capPath: capabilityPath,
+        specId,
+      } = parseSpecId(input.specPath, { workspaces: this._specs.keys() })
+      const specRepo = this._specs.get(workspace)!
       const specPath = SpecPath.parse(capabilityPath)
       const spec = await specRepo.get(specPath)
       if (spec === null) {
-        throw new SpecNotFoundError(input.specPath)
+        throw new SpecNotFoundError(specId)
       }
       const entry = await this._validateSpecWithCache({
         specRepo,
@@ -305,7 +303,6 @@ export class ValidateSpecs {
         args.capabilityPath,
         args.specArtifactTypes,
         args.crossRules,
-        args.schema,
       )
     }
 
@@ -325,7 +322,6 @@ export class ValidateSpecs {
       args.capabilityPath,
       args.specArtifactTypes,
       args.crossRules,
-      args.schema,
     )
     await cache.upsert({
       entry: this._toCacheEntry(entry),
@@ -375,7 +371,6 @@ export class ValidateSpecs {
    * @param capabilityPath - Capability path within the workspace
    * @param specArtifactTypes - Spec-scoped artifact types from the active schema
    * @param crossRules - Cross-artifact validation rules scoped to spec artifacts
-   * @param schema - Active schema governing extraction and validation behavior
    * @returns Validation entry with failures and warnings
    */
   private async _validateSpec(
@@ -385,7 +380,6 @@ export class ValidateSpecs {
     capabilityPath: string,
     specArtifactTypes: readonly ArtifactType[],
     crossRules: readonly CrossArtifactValidationRule[],
-    schema: Schema,
   ): Promise<SpecValidationEntry> {
     const label = `${workspace}:${capabilityPath}`
     const failures: ValidationFailure[] = []
@@ -471,13 +465,10 @@ export class ValidateSpecs {
       )
     }
 
-    await this._validateMetadataConsistency({
-      specRepo,
-      spec,
+    await this._validateMetadataMaterialization({
       label,
-      schema,
-      specArtifactTypes,
       failures,
+      warnings,
     })
 
     return {
@@ -489,117 +480,32 @@ export class ValidateSpecs {
   }
 
   /**
-   * Validates that persisted semantic state and cached metadata remain aligned.
+   * Accepts usable metadata and propagates materialization failures and warnings.
    *
-   * @param args - Metadata consistency inputs for one spec
-   * @param args.specRepo - Repository that owns the spec
-   * @param args.spec - Spec entity under validation
+   * @param args - Metadata materialization inputs for one spec
    * @param args.label - Fully-qualified spec id used in diagnostics
-   * @param args.schema - Effective schema for extraction checks
-   * @param args.specArtifactTypes - Spec artifact definitions from the schema
    * @param args.failures - Mutable validation failures sink
+   * @param args.warnings - Mutable validation warnings sink
    */
-  private async _validateMetadataConsistency(args: {
-    readonly specRepo: SpecRepository
-    readonly spec: import('../../domain/entities/spec.js').Spec
+  private async _validateMetadataMaterialization(args: {
     readonly label: string
-    readonly schema: Schema
-    readonly specArtifactTypes: readonly ArtifactType[]
     readonly failures: ValidationFailure[]
+    readonly warnings: ValidationWarning[]
   }): Promise<void> {
-    let metadata: Awaited<ReturnType<GetSpecMetadata['execute']>>['metadata']
     try {
-      metadata = (await this._getMetadata.execute({ specId: args.label })).metadata
+      const result = await this._getMetadata.execute({ specId: args.label })
+      for (const warning of result.warnings) {
+        args.warnings.push({
+          artifactId: 'metadata',
+          description: `${warning.kind} for '${warning.specId}': ${warning.error}`,
+        })
+      }
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error)
       args.failures.push({
         artifactId: 'metadata',
         description: `Metadata for '${args.label}' could not be materialized: ${reason}`,
       })
-      // Do not also re-check dependsOn here — the materialization error already
-      // carries the root cause (including extracted-vs-persisted mismatches).
-      return
     }
-
-    const persisted = await args.specRepo.readPersistedState(args.spec)
-    if (persisted === null) {
-      return
-    }
-
-    if (
-      metadata.dependsOn === undefined ||
-      !DependsOnOverwriteError.areSame(metadata.dependsOn, persisted.dependsOn)
-    ) {
-      args.failures.push({
-        artifactId: 'metadata',
-        description: `Metadata for '${args.label}' has dependsOn that does not match persisted dependencies`,
-      })
-    }
-
-    const extractedDependsOn = await this._extractDependsOn(args)
-    if (
-      extractedDependsOn !== undefined &&
-      !DependsOnOverwriteError.areSame(extractedDependsOn, persisted.dependsOn)
-    ) {
-      args.failures.push({
-        artifactId: 'metadata',
-        description: `Extracted dependsOn for '${args.label}' does not match persisted dependencies`,
-      })
-    }
-  }
-
-  /**
-   * Extracts `dependsOn` from spec artifacts when the schema declares it.
-   *
-   * @param args - Metadata consistency inputs for one spec
-   * @param args.specRepo - Repository that owns the spec
-   * @param args.spec - Spec entity under validation
-   * @param args.label - Fully-qualified spec id used in diagnostics
-   * @param args.schema - Effective schema for extraction checks
-   * @param args.specArtifactTypes - Spec artifact definitions from the schema
-   * @returns Extracted dependsOn values, or `undefined` when extraction is not declared
-   */
-  private async _extractDependsOn(args: {
-    readonly specRepo: SpecRepository
-    readonly spec: import('../../domain/entities/spec.js').Spec
-    readonly label: string
-    readonly schema: Schema
-    readonly specArtifactTypes: readonly ArtifactType[]
-  }): Promise<readonly string[] | undefined> {
-    const extraction = args.schema.metadataExtraction()
-    if (extraction?.dependsOn === undefined) {
-      return undefined
-    }
-
-    const artifacts: MetadataArtifactInput[] = []
-    for (const artifactType of args.specArtifactTypes) {
-      const filename = path.basename(artifactType.output)
-      const format = artifactType.format ?? inferFormat(filename) ?? 'plaintext'
-      const parser = this._parsers.get(format)
-      if (parser === undefined) continue
-
-      const artifact = await args.specRepo.artifact(args.spec, filename)
-      if (artifact === null) continue
-
-      artifacts.push({
-        artifactId: artifactType.id,
-        filename,
-        format,
-        content: artifact.content,
-      })
-    }
-
-    const { workspace, capPath } = parseSpecId(args.label)
-    const extracted = await extractMetadataFromSpecArtifacts({
-      effectiveSpecSchema: args.schema,
-      workspace,
-      specPath: SpecPath.parse(capPath),
-      artifacts,
-      parsers: this._parsers,
-      extractorTransforms: this._extractorTransforms,
-      repositories: this._specs,
-      workspaceRoutes: this._workspaceRoutes,
-    })
-    return extracted.metadata.dependsOn
   }
 }

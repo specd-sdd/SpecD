@@ -1,9 +1,11 @@
 import path from 'node:path'
 import { applyPersistedSpecStatePatch } from '../../domain/services/apply-persisted-spec-state-patch.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
+import { isValidWorkspaceName } from '../../domain/services/spec-id-rules.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { ImplementationFileNotFoundError } from '../../domain/errors/implementation-file-not-found-error.js'
 import { ImplementationWorkspaceBoundaryError } from '../../domain/errors/implementation-workspace-boundary-error.js'
+import { InvalidInputError } from '../../domain/errors/invalid-input-error.js'
 import { ReadOnlyWorkspaceError } from '../../domain/errors/read-only-workspace-error.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
@@ -72,6 +74,8 @@ export class UpdatePersistedSpecImplementation {
    *
    * @param input - Update parameters
    * @returns The resulting implementation links and whether state was created
+   * @throws {InvalidInputError} If `action` is neither `'add'` nor `'remove'`
+   * @throws {InvalidSpecIdError} If `specId` is empty, blank, or malformed
    * @throws {WorkspaceNotFoundError} If the workspace does not exist
    * @throws {ReadOnlyWorkspaceError} If the workspace is read-only
    * @throws {SpecNotFoundError} If the spec does not exist
@@ -81,54 +85,66 @@ export class UpdatePersistedSpecImplementation {
   async execute(
     input: UpdatePersistedSpecImplementationInput,
   ): Promise<UpdatePersistedSpecImplementationResult> {
-    const { workspace, capPath } = parseSpecId(input.specId)
-    const repo = this.specRepositories.get(workspace)
-    if (repo === undefined) {
-      throw new WorkspaceNotFoundError(workspace)
+    if (input.action !== 'add' && input.action !== 'remove') {
+      throw new InvalidInputError(
+        `Invalid action "${String(input.action)}": expected "add" or "remove".`,
+      )
     }
+
+    const { workspace, capPath, specId } = parseSpecId(input.specId, {
+      workspaces: this.specRepositories.keys(),
+    })
+    const repo = this.specRepositories.get(workspace)!
     if (repo.ownership() === 'readOnly') {
-      throw new ReadOnlyWorkspaceError(workspace)
+      throw ReadOnlyWorkspaceError.forSpec(specId, workspace)
     }
 
     const spec = await repo.get(SpecPath.parse(capPath))
     if (spec === null) {
-      throw new SpecNotFoundError(input.specId)
+      throw new SpecNotFoundError(specId)
     }
 
-    const canonicalFile = await this._normalizeFile(input.file, workspace)
-    const current = await repo.readPersistedState(spec)
+    const normalizedInput: UpdatePersistedSpecImplementationInput = {
+      ...input,
+      specId,
+    }
 
-    if (input.action === 'add') {
-      const codeRoot = await this._codeRoot(workspace)
-      const relativePath = canonicalFile.includes(':')
-        ? canonicalFile.split(':').slice(1).join(':')
-        : canonicalFile
-      const exists = await this.files.read(path.resolve(codeRoot, relativePath))
+    const codeRoot = await this._codeRoot(workspace)
+    const { canonical: canonicalFile, relative } = this._normalizeFile(
+      input.file,
+      workspace,
+      codeRoot,
+    )
+
+    if (normalizedInput.action === 'add') {
+      const exists = await this.files.read(path.resolve(codeRoot, relative))
       if (exists === null) {
         throw new ImplementationFileNotFoundError(input.file)
       }
     }
 
+    const current = await repo.readPersistedState(spec)
+
     if (current === null) {
-      if (input.action === 'remove') {
-        return { specId: input.specId, implementation: [], created: false }
+      if (normalizedInput.action === 'remove') {
+        return { specId, implementation: [], created: false }
       }
-      return this._createAndMutate(input, spec, repo, canonicalFile)
+      return this._createAndMutate(normalizedInput, spec, repo, canonicalFile)
     }
 
     const implementation = applyPersistedImplementationMutation(current.implementation, {
-      action: input.action,
+      action: normalizedInput.action,
       file: canonicalFile,
-      ...(input.symbols !== undefined ? { symbols: input.symbols } : {}),
+      ...(normalizedInput.symbols !== undefined ? { symbols: normalizedInput.symbols } : {}),
     })
 
     const state = applyPersistedSpecStatePatch(
       { kind: 'existing', state: current },
       { implementation },
-      { specId: input.specId },
+      { specId },
     )
     await repo.writePersistedState(spec, state, { expectedRevision: current.originalHash })
-    return { specId: input.specId, implementation, created: false }
+    return { specId, implementation, created: false }
   }
 
   /**
@@ -147,7 +163,7 @@ export class UpdatePersistedSpecImplementation {
     canonicalFile: string,
   ): Promise<UpdatePersistedSpecImplementationResult> {
     const schemaResult = await this.getActiveSchema.execute()
-    if (schemaResult.raw) throw new Error('schema resolution failed')
+    if (schemaResult.raw) throw new InvalidInputError('schema resolution failed')
     const schemaIdentity = {
       name: schemaResult.schema.name(),
       version: schemaResult.schema.version(),
@@ -194,27 +210,41 @@ export class UpdatePersistedSpecImplementation {
   }
 
   /**
-   * Normalizes an implementation file path to workspace-qualified form.
+   * Normalizes an implementation file path to workspace-qualified form and confines it to the
+   * workspace code root.
+   *
+   * A leading `<workspace>:` qualifier is recognized only when the prefix is a valid workspace
+   * name, so drive-letter paths such as `C:\x` are not treated as qualified.
    *
    * @param file - User-provided file path
    * @param workspace - Target workspace name
-   * @returns Canonical workspace-qualified file path
+   * @param codeRoot - Absolute code root of the workspace
+   * @returns Canonical workspace-qualified path and the forward-slash path relative to `codeRoot`
    * @throws {ImplementationWorkspaceBoundaryError} If the file path crosses workspace boundaries
    */
-  private async _normalizeFile(file: string, workspace: string): Promise<string> {
-    if (file.includes(':')) {
-      const [ws, ...rest] = file.split(':')
-      if (ws !== workspace) {
+  private _normalizeFile(
+    file: string,
+    workspace: string,
+    codeRoot: string,
+  ): { readonly canonical: string; readonly relative: string } {
+    let rawPath = file
+    const colon = file.indexOf(':')
+    if (colon > 0 && isValidWorkspaceName(file.slice(0, colon))) {
+      if (file.slice(0, colon) !== workspace) {
         throw new ImplementationWorkspaceBoundaryError(file, workspace)
       }
-      return `${workspace}:${rest.join(':').replace(/\\/g, '/')}`
+      rawPath = file.slice(colon + 1)
     }
-    const codeRoot = await this._codeRoot(workspace)
-    const absolute = path.resolve(codeRoot, file)
-    if (!absolute.startsWith(path.resolve(codeRoot))) {
+    const relative = path.relative(codeRoot, path.resolve(codeRoot, rawPath))
+    if (
+      relative === '' ||
+      relative === '..' ||
+      relative.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(relative)
+    ) {
       throw new ImplementationWorkspaceBoundaryError(file, workspace)
     }
-    const relative = path.relative(codeRoot, absolute).replace(/\\/g, '/')
-    return `${workspace}:${relative}`
+    const forward = relative.split(path.sep).join('/')
+    return { canonical: `${workspace}:${forward}`, relative: forward }
   }
 }

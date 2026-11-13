@@ -105,6 +105,42 @@ function createLoader(options: FsConfigLoaderOptions): FsConfigLoader {
 // ---------------------------------------------------------------------------
 
 describe('FsConfigLoader', () => {
+  it.each(['a', 'Core', 'nul'])('rejects invalid workspace name %s', async (name) => {
+    const configPath = await writeConfig(`
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+  ${name}:
+    specs:
+      adapter: fs
+      fs:
+        path: ${name}-specs
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`)
+    const loader = createLoader({ configPath })
+    await expect(loader.load()).rejects.toThrow(ConfigValidationError)
+  })
+
   it('rejects a workspace named like a Windows device', async () => {
     const configPath = await writeConfig(`
 schema: "@specd/schema-std"
@@ -138,7 +174,7 @@ storage:
       path: .specd/archive
 `)
     const loader = createLoader({ configPath })
-    await expect(loader.load()).rejects.toThrow(/Windows device name/)
+    await expect(loader.load()).rejects.toThrow(/not a valid workspace name/)
   })
 
   it('rejects workspaces named prn and aux', async () => {
@@ -175,7 +211,7 @@ storage:
       path: .specd/archive
 `)
       const loader = createLoader({ configPath })
-      await expect(loader.load()).rejects.toThrow(/Windows device name/)
+      await expect(loader.load()).rejects.toThrow(/not a valid workspace name/)
     }
   })
 
@@ -194,6 +230,43 @@ workspaces:
       adapter: fs
       fs:
         path: con-foo-specs
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`)
+    const loader = createLoader({ configPath })
+    await expect(loader.load()).resolves.toBeDefined()
+  })
+
+  it('accepts a two-character workspace name', async () => {
+    const configPath = await writeConfig(`
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+  ab:
+    codeRoot: .
+    specs:
+      adapter: fs
+      fs:
+        path: ab-specs
 storage:
   changes:
     adapter: fs
@@ -715,6 +788,41 @@ storage:
 
       const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow()
+    })
+
+    it('rejects Team as a prefix segment', async () => {
+      const configPath = await writeConfig(
+        `
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    prefix: Team
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`.trim(),
+      )
+
+      const loader = createLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow(ConfigValidationError)
     })
 
     it('rejects empty string prefix', async () => {
@@ -1524,6 +1632,29 @@ contextExcludeSpecs:
       expect(config.contextExcludeSpecs).toEqual(['auth/login'])
     })
 
+    it('accepts a leading-digit capability segment in patterns', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+contextIncludeSpecs:
+  - 'auth/2fa'
+`),
+      )
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+      expect(config.contextIncludeSpecs).toEqual(['auth/2fa'])
+    })
+
+    it('rejects a one-letter workspace qualifier in patterns', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+contextIncludeSpecs:
+  - 'a:*'
+`),
+      )
+      const loader = createLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow(ConfigValidationError)
+    })
+
     it('rejects wildcard in middle of path segment', async () => {
       const configPath = await writeConfig(
         minimalYaml(`
@@ -1532,7 +1663,7 @@ contextIncludeSpecs:
 `),
       )
       const loader = createLoader({ configPath })
-      await expect(loader.load()).rejects.toThrow(/disallowed position/)
+      await expect(loader.load()).rejects.toThrow(/'\*' is only allowed/)
     })
 
     it('rejects wildcard not preceded by /', async () => {
@@ -1543,7 +1674,7 @@ contextIncludeSpecs:
 `),
       )
       const loader = createLoader({ configPath })
-      await expect(loader.load()).rejects.toThrow(/disallowed position/)
+      await expect(loader.load()).rejects.toThrow(/'\*' is only allowed/)
     })
 
     it('rejects multiple wildcards', async () => {
@@ -1554,7 +1685,7 @@ contextIncludeSpecs:
 `),
       )
       const loader = createLoader({ configPath })
-      await expect(loader.load()).rejects.toThrow(/disallowed position/)
+      await expect(loader.load()).rejects.toThrow(/'\*' is only allowed/)
     })
 
     it('rejects empty pattern', async () => {
@@ -1565,7 +1696,7 @@ contextIncludeSpecs:
 `),
       )
       const loader = createLoader({ configPath })
-      await expect(loader.load()).rejects.toThrow(/invalid pattern/)
+      await expect(loader.load()).rejects.toThrow(/capability path must not be empty/)
     })
 
     it('validates workspace-level patterns too', async () => {
@@ -1600,7 +1731,7 @@ storage:
 `.trim(),
       )
       const loader = createLoader({ configPath })
-      await expect(loader.load()).rejects.toThrow(/disallowed position/)
+      await expect(loader.load()).rejects.toThrow(/'\*' is only allowed/)
     })
   })
 
@@ -1987,6 +2118,265 @@ storage:
       const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow(/workspaces\.default\.graph/)
     })
+
+    it('parses graph.testPaths and graph.ignorePaths correctly on workspace', async () => {
+      const configPath = await writeConfig(`
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+    graph:
+      testPaths:
+        - "**/*.spec.ts"
+      ignorePaths:
+        - "fixtures/**"
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`)
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+      const defaultWs = config.workspaces.find((w) => w.name === 'default')
+
+      expect(defaultWs?.graph?.testPaths).toEqual(['**/*.spec.ts'])
+      expect(defaultWs?.graph?.ignorePaths).toEqual(['fixtures/**'])
+    })
+
+    it('parses workspace graph.maxFileBytes and graph.largeFilePaths correctly', async () => {
+      const configPath = await writeConfig(`
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+    graph:
+      maxFileBytes: 131072
+      largeFilePaths:
+        - "generated/**"
+        - "!generated/small.ts"
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`)
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+      const defaultWs = config.workspaces.find((w) => w.name === 'default')
+
+      expect(defaultWs?.graph?.maxFileBytes).toBe(131072)
+      expect(defaultWs?.graph?.largeFilePaths).toEqual(['generated/**', '!generated/small.ts'])
+    })
+
+    it('workspace maxFileBytes and largeFilePaths are undefined when omitted', async () => {
+      const configPath = await writeConfig(`
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+    graph:
+      respectGitignore: false
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`)
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+      const defaultWs = config.workspaces.find((w) => w.name === 'default')
+
+      expect(defaultWs?.graph?.maxFileBytes).toBeUndefined()
+      expect(defaultWs?.graph?.largeFilePaths).toBeUndefined()
+    })
+
+    it('accepts workspace graph.maxFileBytes: 0', async () => {
+      const configPath = await writeConfig(`
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+    graph:
+      maxFileBytes: 0
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`)
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+      const defaultWs = config.workspaces.find((w) => w.name === 'default')
+
+      expect(defaultWs?.graph?.maxFileBytes).toBe(0)
+    })
+
+    it('rejects workspace graph.maxFileBytes when negative, fractional, or non-number', async () => {
+      const invalidValues = [-1, 1.5, '256KB']
+      for (const val of invalidValues) {
+        const configPath = await writeConfig(`
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+    graph:
+      maxFileBytes: ${typeof val === 'string' ? `"${val}"` : val}
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`)
+        const loader = createLoader({ configPath })
+        await expect(loader.load()).rejects.toThrow(ConfigValidationError)
+        await expect(createLoader({ configPath }).load()).rejects.toThrow(
+          /workspaces\.default\.graph\.maxFileBytes/,
+        )
+      }
+    }, 15_000)
+
+    it('rejects workspace graph.largeFilePaths when given non-array or non-string array', async () => {
+      const configPath1 = await writeConfig(`
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+    graph:
+      largeFilePaths: "generated/**"
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`)
+      await expect(createLoader({ configPath: configPath1 }).load()).rejects.toThrow(
+        /workspaces\.default\.graph\.largeFilePaths/,
+      )
+
+      const configPath2 = await writeConfig(`
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+    graph:
+      largeFilePaths:
+        - 123
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`)
+      await expect(createLoader({ configPath: configPath2 }).load()).rejects.toThrow(
+        /workspaces\.default\.graph\.largeFilePaths/,
+      )
+    })
   })
 
   describe('Requirement: Project graph config', () => {
@@ -2019,6 +2409,151 @@ graph:
 
       const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow(/graph\.includePaths/)
+    })
+
+    it('reads configured graph.testPaths and graph.ignorePaths into SpecdConfig', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+graph:
+  testPaths:
+    - "**/*.test.*"
+  ignorePaths:
+    - "mock/**"
+`),
+      )
+
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.graph?.testPaths).toEqual(['**/*.test.*'])
+      expect(config.graph?.ignorePaths).toEqual(['mock/**'])
+    })
+
+    it('populates default testPaths and ignorePaths when omitted in graph block', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+graph:
+  includePaths:
+    - docs/**
+`),
+      )
+
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.graph?.testPaths).toEqual([
+        '**/*.spec.*',
+        '**/*.test.*',
+        '**/test/**',
+        '**/tests/**',
+        '**/__tests__/**',
+        '*_test.*',
+      ])
+      expect(config.graph?.ignorePaths).toEqual([])
+    })
+
+    it('populates default testPaths and ignorePaths when graph block is completely omitted', async () => {
+      const configPath = await writeConfig(minimalYaml())
+
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.graph?.testPaths).toEqual([
+        '**/*.spec.*',
+        '**/*.test.*',
+        '**/test/**',
+        '**/tests/**',
+        '**/__tests__/**',
+        '*_test.*',
+      ])
+      expect(config.graph?.ignorePaths).toEqual([])
+    })
+
+    it('parses project graph.maxFileBytes and graph.largeFilePaths correctly', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+graph:
+  maxFileBytes: 524288
+  largeFilePaths:
+    - "vendor/**"
+    - "!vendor/stub.ts"
+`),
+      )
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.graph?.maxFileBytes).toBe(524288)
+      expect(config.graph?.largeFilePaths).toEqual(['vendor/**', '!vendor/stub.ts'])
+    })
+
+    it('project maxFileBytes and largeFilePaths are undefined when omitted', async () => {
+      const configPath = await writeConfig(minimalYaml())
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.graph?.maxFileBytes).toBeUndefined()
+      expect(config.graph?.largeFilePaths).toBeUndefined()
+    })
+
+    it('accepts project graph.maxFileBytes: 0', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+graph:
+  maxFileBytes: 0
+`),
+      )
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.graph?.maxFileBytes).toBe(0)
+    })
+
+    it('rejects project graph.maxFileBytes when negative, fractional, or non-number', async () => {
+      const invalidValues = [-1, 2.5, '1MB']
+      for (const val of invalidValues) {
+        const configPath = await writeConfig(
+          minimalYaml(`
+graph:
+  maxFileBytes: ${typeof val === 'string' ? `"${val}"` : val}
+`),
+        )
+        const loader = createLoader({ configPath })
+        await expect(loader.load()).rejects.toThrow(ConfigValidationError)
+        await expect(createLoader({ configPath }).load()).rejects.toThrow(/graph\.maxFileBytes/)
+      }
+    }, 15_000)
+
+    it('rejects project graph.largeFilePaths when given non-array or non-string array', async () => {
+      const configPath1 = await writeConfig(
+        minimalYaml(`
+graph:
+  largeFilePaths: "vendor/**"
+`),
+      )
+      await expect(createLoader({ configPath: configPath1 }).load()).rejects.toThrow(
+        /graph\.largeFilePaths/,
+      )
+
+      const configPath2 = await writeConfig(
+        minimalYaml(`
+graph:
+  largeFilePaths:
+    - 456
+`),
+      )
+      await expect(createLoader({ configPath: configPath2 }).load()).rejects.toThrow(
+        /graph\.largeFilePaths/,
+      )
+    })
+
+    it('rejects unknown fields inside the project graph block', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+graph:
+  unknownKey: true
+`),
+      )
+      await expect(createLoader({ configPath }).load()).rejects.toThrow(ConfigValidationError)
     })
   })
 
@@ -2090,6 +2625,33 @@ contextIncludeSpecs:
 
       // Arrays are appended: both entries present
       expect(config.contextIncludeSpecs).toEqual(['default:*', 'default:arch/*'])
+    })
+
+    it('cascades graph.maxFileBytes (later scalar wins) and graph.largeFilePaths (arrays append)', async () => {
+      await writeConfig(
+        minimalYaml(`
+graph:
+  maxFileBytes: 100000
+  largeFilePaths:
+    - "base/**"
+`),
+      )
+      await writeConfig(
+        `
+extends: true
+graph:
+  maxFileBytes: 200000
+  largeFilePaths:
+    - "overlay/**"
+`.trim(),
+        'specd.local.yaml',
+      )
+
+      const loader = createLoader({ startDir: tmpDir })
+      const config = await loader.load()
+
+      expect(config.graph?.maxFileBytes).toBe(200000)
+      expect(config.graph?.largeFilePaths).toEqual(['base/**', 'overlay/**'])
     })
 
     it('extends: <path> attaches when base is in the active chain', async () => {

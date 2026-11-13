@@ -1,0 +1,455 @@
+{
+  "name": "global-cross-platform-convention",
+  "createdAt": "2026-11-03T07:07:23.831Z",
+  "updatedAt": "2026-11-03T12:19:19.800Z",
+  "description": "Adds the global spec _global/cross-platform, a Windows/Linux/macOS portability convention for production code covering what to consider and how to handle it: paths, case sensitivity, reserved names, CRLF and encoding, processes and shell, permissions, file locking and environment. Extends _global/testing and _global/continuous-integration so they explicitly state that they verify and enforce that contract.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "default:_global/cross-platform",
+    "default:_global/testing",
+    "default:_global/continuous-integration"
+  ],
+  "specDependsOn": {
+    "default:_global/testing": [
+      "default:_global/architecture",
+      "default:_global/conventions",
+      "default:_global/cross-platform"
+    ],
+    "default:_global/continuous-integration": [
+      "default:_global/testing",
+      "default:_global/cross-platform"
+    ],
+    "default:_global/cross-platform": [""]
+  },
+  "invalidationPolicy": "downstream",
+  "implementationTrackingStartedAt": "2026-11-03T11:00:02.238Z",
+  "trackedImplementationFiles": [
+    {
+      "file": "EXPLORATION_CODE_GRAPH_FLOWS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_GRAPH_CLI_OUTPUT_OPTIMIZATION.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_KERNEL_PLUGINS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "SpecD — Análisis de identidad LogicalSymbol dependencias y casos de uso.md",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/graph-file-doc.js",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/spec-metadata-diff-poc/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/spec-metadata-diff-poc/vcs-spec-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/spec-metadata-diff-poc/working-copy-spec-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/symbol-inspect-poc.mjs",
+      "state": "ignored"
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:a4011e88bb3a67966ff3b5e1a902b725e8a90bccafe95c53e8b8b25deeed1174"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "default:_global/cross-platform",
+          "filename": "specs/default/_global/cross-platform/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:c513aa5eb927c5c40755592b861bb3f33a87d9d0ef01f0d9e4a46357fbf54bed"
+        },
+        {
+          "key": "default:_global/testing",
+          "filename": "deltas/default/_global/testing/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e1e65a9d63ebba3706b72d806c2068df737575060dfcbe25b2b127fceecdf647"
+        },
+        {
+          "key": "default:_global/continuous-integration",
+          "filename": "deltas/default/_global/continuous-integration/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0912f179d52569c1340a64c947ca55957f472830d00935cd340402842899f6ec"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "default:_global/cross-platform",
+          "filename": "specs/default/_global/cross-platform/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:37a11f20056cafba696e772a70a05731875f069f5add2acc5f8cb28c61310552"
+        },
+        {
+          "key": "default:_global/testing",
+          "filename": "deltas/default/_global/testing/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b0baf9b85fbfd81e08f595a294e7e1e8cbe0c56bf302e9f9b02dee00e684a22b"
+        },
+        {
+          "key": "default:_global/continuous-integration",
+          "filename": "deltas/default/_global/continuous-integration/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a9f91e6791b8bc1e52b82a8c09ceb989d6e1b25c23327a00dc18fe8425af04e2"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:c9a0cd00ffdb409ea2823b83d55f2f506c23f7aa781d258b93331f1ac37dc747"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:4437f60db296f42469e72025dd4c9a17d31b9e9b3a811c4e403aeb7980e14224"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-11-03T07:07:23.831Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "default:_global/cross-platform",
+        "default:_global/testing",
+        "default:_global/continuous-integration"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-03T07:07:23.847Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "default:_global/cross-platform"
+        },
+        {
+          "type": "specs",
+          "key": "default:_global/testing"
+        },
+        {
+          "type": "specs",
+          "key": "default:_global/continuous-integration"
+        },
+        {
+          "type": "verify",
+          "key": "default:_global/cross-platform"
+        },
+        {
+          "type": "verify",
+          "key": "default:_global/testing"
+        },
+        {
+          "type": "verify",
+          "key": "default:_global/continuous-integration"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-03T07:20:22.137Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-03T07:21:39.872Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "default:_global/cross-platform",
+            "default:_global/testing",
+            "default:_global/continuous-integration"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "default:_global/cross-platform",
+            "default:_global/testing",
+            "default:_global/continuous-integration"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-03T07:23:53.918Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-03T07:24:25.422Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-03T07:24:25.422Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-03T07:24:31.691Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-03T08:12:32.555Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [default:_global/cross-platform]; verify [default:_global/cross-platform]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["default:_global/cross-platform"]
+        },
+        {
+          "type": "verify",
+          "files": ["default:_global/cross-platform"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-03T08:12:32.555Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-03T08:12:41.935Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-03T11:00:02.238Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-03T11:10:17.823Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-03T11:13:12.509Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-03T11:13:20.000Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-11-03T12:17:19.598Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Adds the global spec _global/cross-platform, a Windows/Linux/macOS portability convention for production code covering what to consider and how to handle it: paths, case sensitivity, reserved names, CRLF and encoding, processes and shell, permissions, file locking and environment. Extends _global/testing and _global/continuous-integration so they explicitly state that they verify and enforce that contract."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-03T12:19:19.799Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-11-03T12:19:19.900Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

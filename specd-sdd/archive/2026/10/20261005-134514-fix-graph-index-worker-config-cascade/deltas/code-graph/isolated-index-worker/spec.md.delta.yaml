@@ -1,0 +1,2 @@
+- op: no-op
+  description: The generic isolated worker already transports and validates opaque JSON-safe task input without interpreting host configuration; this change only alters the CLI-owned descriptor.

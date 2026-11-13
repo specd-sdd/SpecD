@@ -9,7 +9,8 @@
     "cli:host-context",
     "plugin-manager:specd-plugin-type",
     "core:composition",
-    "core:config-writer-port"
+    "core:config-writer-port",
+    "core:spec-id-format"
   ],
   "implementation": [
     {

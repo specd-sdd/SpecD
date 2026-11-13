@@ -1,0 +1,23 @@
+- op: added
+  description: Make explicit that tests verify the production cross-platform contract
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Fixtures are valid on Windows'
+  content: |
+    ### Requirement: Tests verify the cross-platform contract
+
+    The POSIX and Windows rules in this spec apply to test code, and tests MUST also verify the production rules defined by `_global/cross-platform`. Code that handles paths, names reaching disk, line endings, external processes, permissions, or file replacement MUST have tests that exercise the platform-specific branch, using `path.win32` or a stubbed `process.platform` when the host cannot run it natively. Production portability rules MUST NOT be redefined here; this spec keeps only test-specific rules and `_global/cross-platform` remains the single source for production rules.
+
+- op: modified
+  description: Add dependency on the cross-platform convention
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`default:_global/architecture`](../architecture/spec.md) — layer boundaries determine what is unit-testable vs integration-testable
+    - [`default:_global/conventions`](../conventions/spec.md) — ESM-only constraint is the reason Vitest is used over Jest
+    - [`default:_global/cross-platform`](../cross-platform/spec.md) — production portability rules that these tests must verify

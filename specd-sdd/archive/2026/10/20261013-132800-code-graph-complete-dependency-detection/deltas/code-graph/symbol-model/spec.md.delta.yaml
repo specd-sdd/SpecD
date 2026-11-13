@@ -1,0 +1,62 @@
+- op: modified
+  description: 'Add property to SymbolKind enum and define cross-language container vs local state contract'
+  selector:
+    type: section
+    matches: 'Requirement: SymbolKind enum'
+  content: |
+    `SymbolKind` SHALL be a closed string enum with the following 8 members:
+
+    - `function`
+    - `class`
+    - `method`
+    - `variable`
+    - `type`
+    - `interface`
+    - `enum`
+    - `property`
+
+    No other values are permitted. Language adapters MUST map language-specific constructs to one of these kinds or skip the construct entirely.
+
+    The semantic contract for state declarations SHALL be normalized across all supported languages as follows:
+    - State declared at file or module scope SHALL be assigned `SymbolKind.Variable` with `parentId` undefined.
+    - State declared local to a routine (function or method body) SHALL be assigned `SymbolKind.Variable` with `parentId` set to the enclosing routine's symbol ID.
+    - State encapsulated within a type or container construct (class, interface, struct, protocol, or enum) SHALL be assigned `SymbolKind.Property` with `parentId` set to the enclosing container's symbol ID.
+
+- op: modified
+  description: 'Update closed SymbolKind enumeration list and lexical parentId requirements'
+  selector:
+    type: section
+    matches: 'Requirement: Logical symbol and canonical reference model'
+  content: |
+    The graph SHALL distinguish syntax-level declaration occurrences from logical symbols. A logical symbol MAY contain multiple declarations when the source language defines an overload set, declaration merge, augmentation, or equivalent single semantic identity. Competing declarations that do not form one language-defined symbol MUST remain distinct.
+
+    Every logical symbol SHALL expose structured workspace, declaring surface, declaring owner, symbol space, simple name, and member semantics, plus one versioned canonical reference. Structured fields are authoritative and SHALL drive semantic lookup. The canonical reference MUST be delimiter-safe, MUST include the member-semantics axes, and MUST round-trip with escaping. It MUST remain stable across line and column movement. Human text presentations MUST NOT be the primary actionable location, and `.` or `::` MUST NOT be the canonical identity delimiter.
+
+    The canonical reference replaces the previous encoding that embedded a single member form. Readers MUST NOT accept that previous encoding as a current logical id. Derived storage is rebuilt; the model MUST NOT keep both encodings as canonical.
+
+    A logical symbol that has a declaring owner SHALL expose `qualified_name`: the generic dotted path rebuilt from the owner chain and the simple name, such as `GetStatus.execute`. A symbol with no owner MUST NOT expose a qualified name. `qualified_name` is a stored exact-match spelling. It MUST NOT be part of the canonical id, MUST NOT replace the simple name, and MUST NOT be stored as an alias row. `.` is the only stored separator. A `::` query compares as that same spelling. Generic and language-native spellings MAY still be rendered on demand. Full-text search text MUST NOT be the exact-match store for this spelling.
+
+    A logical symbol MUST NOT carry a package name. Workspace on the file id and the adapter's package-to-workspace map are the package identity.
+
+    The existing location-based `SymbolNode.id` and closed `SymbolKind` remain valid. Symbol space and member semantics are additive dimensions and MUST NOT overload `SymbolKind`. `SymbolKind` stays the closed broad enum (`function`, `class`, `method`, `variable`, `type`, `interface`, `enum`, `property`). Namespace or module is an owner-path role and a surface, not a new `SymbolKind`.
+
+    A logical member's `declaringOwner` SHALL be the canonical logical identity of the type, namespace, module, object, receiver type, trait, contract, or other language-defined owner that syntactically declares it. It MUST NOT contain a parser-node identifier, a location-based child or parent ID, or a display-only qualified name. Adapters SHALL create or locate the logical owner before constructing member identities. Only declarations that are top-level in their language surface MAY omit the owner.
+
+    `parentId` on a declaration occurrence SHALL be emitted by the language adapter that analyzed the file, establishing lexical hierarchy (container types owning methods and properties, routines owning local variables and nested functions). The shared model MUST NOT assign it from a hardcoded language list.
+
+    Same-name members under different declaring owners SHALL always have different logical identities. Moving a declaration within the same logical owner without changing its semantic identity MUST NOT change its canonical reference merely because its source line or parser node changes.
+
+- op: modified
+  description: 'Clarify DuplicateSymbolIdError role alongside overload unification'
+  selector:
+    type: section
+    matches: 'Requirement: Error types'
+  content: |
+    `@specd/code-graph` SHALL define its own `SpecdCodeGraphError` base class which MUST extend `SpecdError` from `@specd/core`. All package-specific errors MUST extend `SpecdCodeGraphError`.
+
+    By extending `SpecdError`, all code-graph errors automatically follow the "Specd Error Contract" defined in [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md), including the `specd: true` discriminator and machine-readable `code` requirement.
+
+    - `InvalidSymbolKindError` — when a symbol kind value is not in the `SymbolKind` enum
+    - `InvalidRelationTypeError` — when a relation type value is not in the defined set
+    - `DuplicateSymbolIdError` — defined for unexpected symbol identity collision conditions during model validation
+    - `StoreNotOpenError` — when an operation is attempted on a closed or uninitialized store

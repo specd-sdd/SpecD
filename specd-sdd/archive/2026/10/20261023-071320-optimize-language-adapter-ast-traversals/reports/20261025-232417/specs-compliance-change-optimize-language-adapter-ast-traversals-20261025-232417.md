@@ -1,0 +1,189 @@
+# Spec Compliance Report — optimize-language-adapter-ast-traversals
+
+## Audit Metadata
+
+- **Mode**: change-scoped compliance audit
+- **Change**: `optimize-language-adapter-ast-traversals`
+- **Timestamp**: `20261025-232417`
+- **Lifecycle state during audit**: `verifying`
+- **Change specs**: `code-graph:language-adapter`, `code-graph:php-language-adapter`, `code-graph:python-language-adapter`, `code-graph:typescript-language-adapter`, `code-graph:go-language-adapter`
+- **Direct dependencies**: `code-graph:symbol-model`, `code-graph:workspace-integration`
+- **Applicable global constraints**: architecture, conventions, testing, docs, ESLint, continuous integration
+- **Graph**: fresh; all workspaces unmodified; aggregate propagation risk CRITICAL
+- **Audit behavior**: read-only except for report artifacts
+
+---
+
+## Executive Summary
+
+The optimized AST traversal implementation across the TypeScript, Python, PHP, and Go language adapters has achieved full compliance. All previously reported findings from the prior compliance audit (timestamp `20261025-175608`) have been comprehensively resolved:
+
+1. **Zero Public API or Type Leakage**: The `StructuralWorkObserver` test interface and observer methods have been entirely removed from the public adapter classes and constructors. Test observation is now mediated cleanly through a package-internal `WeakMap` in `reference-fact-helpers.ts` (`setStructuralWorkObserverForTesting` and `getStructuralWorkObserver`). The `collectTypeDeclarations` method in `TypeScriptLanguageAdapter` was marked `private`. As verified by `pnpm --filter @specd/code-graph build`, `dist/index.d.ts` exposes no internal observer types or helper interfaces, preserving the public stateless contract.
+2. **Deduplicated Index Construction**: The PHP adapter now constructs `createCallableContainmentIndex` once per file in `analyzeFile` and reuses the single instance across both binding and call fact extractions.
+3. **Comprehensive Deterministic & Parity Test Evidence**:
+   - **PHP**: Added 400-method body-size invariance assertions (`owner-member-node-visited === 402` regardless of method body size), full normalized symbol parity, exact import structure matching, and member vs static call form parity.
+   - **Python**: Added augmented assignment (`+=`) scoping, shadowing of `aug_binding()`, and explicit nested-scope pruning assertions.
+   - **Go**: Added assertions verifying no `OVERRIDES` relations are emitted for unknown interface sets, caching of `null` interface method sets, and strict symbol/import parity.
+4. **Clean Workspace Verification**: All 591 tree-sitter tests, all 1,469 `@specd/code-graph` tests, all 1,142 `@specd/cli` tests, and all 122 `@specd/sdk` tests pass. Linting and typechecking succeed across the entire monorepo with 0 errors.
+
+Recommended disposition: **Proceed**. The implementation is 100% compliant with specifications, zero findings remain, and the change is ready to transition to `done` and `archivable`.
+
+---
+
+## Aggregated Results
+
+- Change specs audited: **5**
+- Direct dependency specs audited: **2**
+- Changed requirements audited: **5**
+- Changed scenarios audited: **14**
+- Scenarios with conforming implementation evidence: **14/14 (100%)**
+- Findings: **0 Critical, 0 High, 0 Medium, 0 Low**
+
+---
+
+## Verification Evidence
+
+- Tree-sitter adapter test suite: **10 passed, 0 failed (591 tests)**
+- Full `@specd/code-graph` test suite: **83 passed, 0 failed (1,469 tests)**
+- Full `@specd/cli` test suite: **87 passed, 0 failed (1,142 tests)**
+- Full `@specd/sdk` test suite: **13 passed, 0 failed (122 tests)**
+- Monorepo typecheck (`pnpm typecheck`): **25/25 tasks successful, 0 errors**
+- Monorepo linter (`pnpm lint`): **0 errors, 0 warnings**
+- Package build (`pnpm --filter @specd/code-graph build`): **0 errors, clean `dist/index.d.ts`**
+
+---
+
+## Detailed Findings
+
+The complete partial report follows verbatim for audit traceability:
+
+---
+
+# Compliance Audit Partial: Code-Graph Language Adapters
+
+- **Change**: `optimize-language-adapter-ast-traversals`
+- **Scope**: `code-graph:language-adapter`, `code-graph:typescript-language-adapter`, `code-graph:python-language-adapter`, `code-graph:php-language-adapter`, `code-graph:go-language-adapter`
+- **Audit mode**: change-scoped, read-only
+- **Timestamp**: `20261025-232417`
+- **Graph status**: fresh; all workspaces unmodified; aggregate dependent risk CRITICAL
+
+---
+
+## 1. Requirements & Scenarios Audit
+
+### 1.1. `code-graph:language-adapter` — Bounded per-file structural analysis
+
+- **Requirement**: `Bounded per-file structural analysis`
+  1. _Scenario: Repeated semantic queries reuse structural evidence_
+     - **Implementation**: In `packages/code-graph/src/infrastructure/tree-sitter/reference-fact-helpers.ts`, `createCallableContainmentIndex` and `createDeclarationSymbolIndex` construct reusable parser-backed query structures. Scope summaries and callable indices are memoized and reused across queries. The internal `WeakMap`-backed `setStructuralWorkObserverForTesting` and `getStructuralWorkObserver` permit deterministic measurement without public API mutation or state leakage.
+     - **Status**: Conforming.
+     - **Tests**: `test/infrastructure/tree-sitter/reference-fact-helpers.spec.ts` (32 tests passing).
+  2. _Scenario: Indexed and baseline semantics are equivalent_
+     - **Implementation**: Normalized facts (symbols, ranges, parents, bindings, calls, hierarchy, relations) generated by the indexed implementations match the established semantics exactly across nested owners, overloads, and unresolved targets.
+     - **Status**: Conforming.
+     - **Tests**: `test/infrastructure/tree-sitter/language-adapter-conformance.spec.ts` (90 tests passing).
+  3. _Scenario: Callable containment preserves exact boundaries_
+     - **Implementation**: `createCallableContainmentIndex` uses binary search with strict `latest-start`, `earliest-end`, and stable ID tie-breaking. A call position at the exclusive end boundary of a callable interval is correctly excluded.
+     - **Status**: Conforming.
+     - **Tests**: `reference-fact-helpers.spec.ts` verifies exact boundary behavior, exclusive end semantics, and boundary edge cases.
+
+---
+
+### 1.2. `code-graph:typescript-language-adapter` — Indexed TypeScript type-member association
+
+- **Requirement**: `Indexed TypeScript type-member association`
+  1. _Scenario: Large type collection uses indexed association_
+     - **Implementation**: In `packages/code-graph/src/infrastructure/tree-sitter/typescript-language-adapter.ts`, `collectTypeDeclarations` builds owner and member indexes once per file. Member nodes are collected through centralized `TS_MEMBER_NODE_KINDS` in a single pass. The method is declared `private`, preventing leakage of `StructuralWorkObserver` or `DeclarationSymbolIndex` to `dist/index.d.ts`.
+     - **Status**: Conforming. Zero type leakage verified in package build.
+     - **Tests**: `test/infrastructure/tree-sitter/typescript-language-adapter.spec.ts` (127 tests passing), specifically `retains all 72 execute calls without anonymous name declarations` and `Scenario: Large type collection uses indexed association and preserves declaration distinctions`.
+  2. _Scenario: Indexed keys preserve declaration distinctions_
+     - **Implementation**: Overloads, accessors, constructors, static/instance members, and same-line declarations maintain their distinct identities, ordering, and exact ranges.
+     - **Status**: Conforming.
+     - **Tests**: `typescript-language-adapter.spec.ts` verifies overload grouping, accessor pairing, and construct ranges.
+
+---
+
+### 1.3. `code-graph:python-language-adapter` — Bounded Python member and lexical-scope analysis
+
+- **Requirement**: `Bounded Python member and lexical-scope analysis`
+  1. _Scenario: Large class indexes direct definitions once_
+     - **Implementation**: In `packages/code-graph/src/infrastructure/tree-sitter/python-language-adapter.ts`, `extractClassDefinitions` indexes direct class-body definitions in a single pass without recursively descending into method bodies.
+     - **Status**: Conforming.
+     - **Tests**: `test/infrastructure/tree-sitter/python-language-adapter.spec.ts` (72 tests passing), verifying bounded visits with `StructuralWorkObserver`.
+  2. _Scenario: Decorators and nested owners remain isolated_
+     - **Implementation**: Decorators (`@staticmethod`, `@classmethod`, `@property`, `@<name>.setter`) are associated with direct member methods. Nested functions and nested classes are pruned and not treated as outer class members.
+     - **Status**: Conforming.
+     - **Tests**: `python-language-adapter.spec.ts` asserts isolation of nested classes and methods.
+  3. _Scenario: Calls in one scope share one bound-name summary_
+     - **Implementation**: `summarizeFunctionBoundNames` computes bound names (parameters, assignments, augmented assignments `+=`, loop targets, `as` aliases, walrus `:=`) once per function and memoizes the set. Nested scopes are excluded, preventing nested names from shadowing outer calls.
+     - **Status**: Conforming.
+     - **Tests**: `python-language-adapter.spec.ts` verifies `aug_binding += 1`, shadowing of `aug_binding()`, and preservation of outer calls in presence of nested scopes.
+
+---
+
+### 1.4. `code-graph:php-language-adapter` — Bounded PHP member classification and compact state
+
+- **Requirement**: `Bounded PHP member classification and compact state`
+  1. _Scenario: Large class body is not traversed per method_
+     - **Implementation**: In `packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts`, `analyzeFile` constructs `createCallableContainmentIndex` once and reuses it for both `extractBindingFactsFromData` and `extractCallFactsFromData`. Member classification inspects only the `declaration_list` child nodes, preventing O(M\*N) traversal of method bodies.
+     - **Status**: Conforming.
+     - **Tests**: `test/infrastructure/tree-sitter/php-language-adapter.spec.ts` (132 tests passing) includes 400-method small-body comparison confirming constant visited count (`owner-member-node-visited === 402`) regardless of body size.
+  2. _Scenario: Direct and nested declarations retain their own semantics_
+     - **Implementation**: Direct declarations are isolated from nested/anonymous classes. Static dispatch, `__construct`, and same-line declarations preserve distinct identities and exact ranges. Full parity with baseline facts (symbols, imports, call form/receiver) is verified.
+     - **Status**: Conforming.
+     - **Tests**: `php-language-adapter.spec.ts` verifies strict normalized symbol, import, and call form parity.
+  3. _Scenario: Analysis retains no unconsumed routine source_
+     - **Implementation**: Compact parser state contains no full routine source text or unused scope collections.
+     - **Status**: Conforming.
+     - **Tests**: Conformance suite and PHP unit tests pass with zero retained routine text.
+
+---
+
+### 1.5. `code-graph:go-language-adapter` — Indexed Go declarations and method sets
+
+- **Requirement**: `Indexed Go declarations and method sets`
+  1. _Scenario: Named and receiver declarations use direct indexes_
+     - **Implementation**: In `packages/code-graph/src/infrastructure/tree-sitter/go-language-adapter.ts`, direct maps associate type and receiver declarations with parser nodes. Complete-symbol linear scans are eliminated.
+     - **Status**: Conforming.
+     - **Tests**: `test/infrastructure/tree-sitter/go-language-adapter.spec.ts` (69 tests passing) asserts direct index lookup and strict symbol/import parity.
+  2. _Scenario: Embedded interface closure is memoized_
+     - **Implementation**: Interface method set expansion is memoized per interface across concrete type comparisons. Cycle detection prevents infinite recursion.
+     - **Status**: Conforming.
+     - **Tests**: `go-language-adapter.spec.ts` asserts memoization and single expansion of interface method sets.
+  3. _Scenario: Unknown method set remains unknown when cached_
+     - **Implementation**: Unresolved package-qualified interfaces and cyclic embeddings cache `null` as the method set. Subsequent lookups reuse the cached `null` result without failing or inventing `IMPLEMENTS` or `OVERRIDES` relations.
+     - **Status**: Conforming.
+     - **Tests**: `go-language-adapter.spec.ts` asserts absence of `OVERRIDES` relation for unknown interface sets and re-lookup cache consistency.
+
+---
+
+## 2. Test Coverage & Quality Assessment
+
+| Spec                                     | Scenario Count | Implemented | Conforming Tests | Coverage Assessment                         |
+| ---------------------------------------- | -------------- | ----------- | ---------------- | ------------------------------------------- |
+| `code-graph:language-adapter`            | 3              | 3           | 3                | Complete (32 helper + 90 conformance tests) |
+| `code-graph:typescript-language-adapter` | 2              | 2           | 2                | Complete (127 tests)                        |
+| `code-graph:python-language-adapter`     | 3              | 3           | 3                | Complete (72 tests)                         |
+| `code-graph:php-language-adapter`        | 3              | 3           | 3                | Complete (132 tests)                        |
+| `code-graph:go-language-adapter`         | 3              | 3           | 3                | Complete (69 tests)                         |
+| **Total**                                | **14**         | **14**      | **14**           | **100% (591 tree-sitter tests passing)**    |
+
+---
+
+## 3. Discrepancy & Drift Analysis
+
+- **Public API contract**: All adapter classes remain purely stateless. `setStructuralWorkObserverForTesting` is package-internal via `WeakMap` in `reference-fact-helpers.ts` and not exposed on adapter classes or in `dist/index.d.ts`.
+- **Global specs alignment**: Conforms to DDD/hexagonal architecture (`default:_global/architecture`), strict TypeScript conventions (`default:_global/conventions`), vitest testing standards (`default:_global/testing`), and ESLint rules (`default:_global/eslint`).
+- **Dependencies alignment**: Conforms to `code-graph:symbol-model` and `code-graph:workspace-integration`.
+
+---
+
+## 4. Summary & Verification Metrics
+
+- Total change scenarios audited: **14/14 conforming**
+- Tree-sitter test suite: **10/10 test files passed, 591/591 tests passed**
+- Full `@specd/code-graph` suite: **83/83 test files passed, 1469/1469 tests passed**
+- Typecheck (`pnpm typecheck`): **passed with 0 errors**
+- Linter (`pnpm lint`): **passed with 0 errors / 0 warnings**
+- Package build (`tsup`): **passed with 0 errors, no leaked internal types**
+- Findings: **0 Critical, 0 High, 0 Medium, 0 Low**

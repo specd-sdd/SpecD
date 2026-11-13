@@ -70,6 +70,24 @@
 - **WHEN** metadata is regenerated
 - **THEN** the sidecar `dependsOn` value is used as the authoritative fallback
 
+#### Scenario: Empty dependency entry rejected
+
+- **GIVEN** `spec-lock.json` contains `"dependsOn": [""]`
+- **WHEN** the lock is read
+- **THEN** it fails with `InvalidSpecLockError`
+
+#### Scenario: Bare dependency entry rejected
+
+- **GIVEN** `spec-lock.json` contains `"dependsOn": ["auth/login"]`
+- **WHEN** the lock is read
+- **THEN** it fails with `InvalidSpecLockError` naming `dependsOn.0`
+
+#### Scenario: Qualified valid entries accepted
+
+- **GIVEN** `spec-lock.json` contains `"dependsOn": ["core:storage", "default:_global/architecture"]`
+- **WHEN** the lock is read
+- **THEN** both entries are returned unchanged
+
 ### Requirement: Archived implementation links
 
 #### Scenario: File-level link is stored without symbols
@@ -225,3 +243,68 @@
   artifact API
 - **THEN** the repository rejects the request
 - **AND** callers must use persisted-state semantic operations instead
+
+### Requirement: Invalid lock fails with a typed error
+
+#### Scenario: Error names spec, file, and field path
+
+- **GIVEN** the lock of `core:update-spec-deps` has `dependsOn: ['Bad Id']`
+- **WHEN** the lock is read
+- **THEN** the error is `InvalidSpecLockError` with code `INVALID_SPEC_LOCK`
+- **AND** the message names `core:update-spec-deps`, the lock file location, `dependsOn.0`, `Bad Id`, and the violated rule
+- **AND** the message does not tell the user to edit the file by hand and names no repair command
+
+#### Scenario: No raw validation-library error escapes
+
+- **WHEN** any lock fails structural validation
+- **THEN** the thrown error is a `SpecdError` and not a raw `ZodError`
+
+#### Scenario: Reading never rewrites or drops entries
+
+- **GIVEN** a lock with one valid and one invalid `dependsOn` entry
+- **WHEN** the lock is read
+- **THEN** the read fails
+- **AND** the file on disk is unchanged
+
+#### Scenario: Lenient dependsOn read tolerates only invalid dependsOn entries
+
+- **GIVEN** a lock with one valid and one invalid `dependsOn` entry
+- **WHEN** it is read with `lenientDependsOn: true`
+- **THEN** both entries are returned as given and nothing is rewritten
+
+#### Scenario: Lenient read still validates other fields
+
+- **GIVEN** a lock whose `implementation` entry has an empty `file`
+- **WHEN** it is read with `lenientDependsOn: true`
+- **THEN** `InvalidSpecLockError` naming `implementation.0.file` is thrown
+
+#### Scenario: Repository lenient read returns invalid dependsOn as given
+
+- **GIVEN** a spec directory whose `spec-lock.json` has `"dependsOn": ["core:ok", ""]`
+- **WHEN** `readPersistedState(spec, { lenientDependsOn: true })` is called on the filesystem repository
+- **THEN** the snapshot's `dependsOn` is `["core:ok", ""]`
+- **AND** the file on disk is unchanged
+
+#### Scenario: Repository lenient read still rejects other invalid fields
+
+- **GIVEN** a `spec-lock.json` whose `implementation.0.file` is empty
+- **WHEN** `readPersistedState(spec, { lenientDependsOn: true })` is called
+- **THEN** `InvalidSpecLockError` naming `implementation.0.file` is thrown
+
+#### Scenario: writePersistedState repairs a lock with invalid dependsOn
+
+- **GIVEN** a lock whose `dependsOn` holds an invalid entry and an `expectedRevision` equal to its current hash
+- **WHEN** `writePersistedState` is called with a valid state
+- **THEN** the write succeeds (its revision check reads the lock leniently) and the invalid entry is gone
+
+#### Scenario: Strict read of a lock with one valid and one invalid entry changes nothing on disk
+
+- **GIVEN** a lock with `"dependsOn": ["core:ok", "Bad Id"]`
+- **WHEN** `readPersistedState(spec)` is called without the lenient option
+- **THEN** `InvalidSpecLockError` is thrown and the file bytes are unchanged
+
+#### Scenario: Error code and message form
+
+- **WHEN** any strict read of an invalid lock fails
+- **THEN** the error `code` is `INVALID_SPEC_LOCK`
+- **AND** the message contains neither `edit` instructions nor a command name

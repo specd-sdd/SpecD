@@ -1,0 +1,23 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Design skill review scope without review file lists$'
+  content: |
+    Design templates SHALL select work from current blockers/nextAction and affected artifact facts, with notes supplying cause/audit context. Remove review.reason/route/message dependencies and review.required-only routing/stops. Pending/drifted artifact detail remains the review scope; do not rewrite/revalidate downstream blindly. Preserve review-mode selection, optional-artifact choice, per-artifact review, redesign consent, risk/scope confirmations, final review and terminal human approval stops.
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Overlap invalidation vs live archive overlap in templates$'
+  content: |
+    Live OVERLAP_CONFLICT remains an archive check and only offers Core's advertised bypass. Peer invalidation is described by persisted notes, never reconstructed review.reason/overlapDetail. New/design/implement/verify/archive/shared templates SHALL route from blockers and nextAction, respecting preserve/redesign policy and legal alternatives, without review.required-only redirects. Do not teach a live overlap bypass for peer invalidation context.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Repair reason notes and preserved consent
+
+    Update source templates for new/design/implement/verify/archive/compliance plus shared guidance consistently. Preserve actual user decisions enumerated in the proposal: creation confirmation; design review choices; agreed return-to-design; full verify audit repair/proceed selection; archive consent/bypass consent; terminal handoffs and human-only approvals. Full verify SHALL record report path and user-selected repair as reason and a separately requested note only on an authorized successful hop; use combined forward completion policies covering optional phases. Compliance retains its existing selection and attempt ownership, with no invented post-audit transition flow. Template contract tests SHALL reject removed review-field routing and assert decision stops remain.

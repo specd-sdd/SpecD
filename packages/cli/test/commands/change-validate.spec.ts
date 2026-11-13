@@ -62,6 +62,7 @@ describe('change validate', () => {
   it('prints success message when no failures or warnings', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.validate.execute.mockResolvedValue({
+      specId: 'default:auth/login',
       failures: [],
       warnings: [],
       files: [
@@ -90,6 +91,7 @@ describe('change validate', () => {
   it('prints failures and exits 1 when validation fails', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.validate.execute.mockResolvedValue({
+      specId: 'default:auth/login',
       failures: [{ artifactId: 'spec', description: 'missing required section' }],
       warnings: [],
       files: [
@@ -179,6 +181,7 @@ describe('change validate', () => {
       ]),
     )
     kernel.changes.validate.execute.mockResolvedValue({
+      specId: 'default:auth/login',
       failures: [],
       notes: [],
       files: [
@@ -213,6 +216,7 @@ describe('change validate', () => {
     const { kernel, stdout } = setup()
     kernel.specs.getActiveSchema.execute.mockResolvedValue(mockBatchSchema())
     kernel.changes.validate.execute.mockResolvedValue({
+      specId: 'default:auth/login',
       failures: [],
       notes: [],
       files: [
@@ -265,6 +269,7 @@ describe('change validate', () => {
     const { kernel, stdout } = setup()
     kernel.specs.getActiveSchema.execute.mockResolvedValue(mockBatchSchema())
     kernel.changes.validate.execute.mockResolvedValue({
+      specId: 'default:auth/login',
       failures: [],
       notes: [],
       files: [
@@ -315,6 +320,7 @@ describe('change validate', () => {
     const { kernel, stdout } = setup()
     kernel.specs.getActiveSchema.execute.mockResolvedValue(mockBatchSchema())
     kernel.changes.validate.execute.mockResolvedValue({
+      specId: 'default:auth/login',
       failures: [{ artifactId: 'specs', description: 'missing section' }],
       notes: [],
       files: [
@@ -473,7 +479,7 @@ describe('change validate', () => {
     expect(process.exit).toHaveBeenCalledWith(1)
   })
 
-  it('--all validates all specIds in the change', async () => {
+  it('--all delegates to validateBatch and reports success', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
       change: { specIds: ['default:auth/login', 'default:auth/logout'] },
@@ -482,14 +488,37 @@ describe('change validate', () => {
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
     })
-    kernel.specs.getActiveSchema.execute.mockResolvedValue(mockBatchSchema())
-    kernel.changes.validate.execute.mockResolvedValue({ failures: [], warnings: [], files: [] })
+    kernel.changes.validateBatch.execute.mockResolvedValue({
+      passed: true,
+      total: 2,
+      results: [
+        {
+          spec: 'default:auth/login',
+          artifact: 'specs',
+          passed: true,
+          failures: [],
+          warnings: [],
+          files: [],
+        },
+        {
+          spec: 'default:auth/logout',
+          artifact: 'specs',
+          passed: true,
+          failures: [],
+          warnings: [],
+          files: [],
+        },
+      ],
+    })
 
     const program = makeProgram()
     registerChangeValidate(program.command('change'))
     await program.parseAsync(['node', 'specd', 'change', 'validate', 'feat', '--all'])
 
-    expect(kernel.changes.validate.execute).toHaveBeenCalledTimes(2)
+    expect(kernel.changes.validateBatch.execute).toHaveBeenCalledWith({
+      name: 'feat',
+      artifactId: undefined,
+    })
     const out = stdout()
     expect(out).toContain('validated feat/default:auth/login [artifact:specs]: all artifacts pass')
     expect(out).toContain('validated feat/default:auth/logout [artifact:specs]: all artifacts pass')
@@ -506,14 +535,28 @@ describe('change validate', () => {
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
     })
-    kernel.specs.getActiveSchema.execute.mockResolvedValue(mockBatchSchema())
-    kernel.changes.validate.execute
-      .mockResolvedValueOnce({ failures: [], warnings: [], files: [] })
-      .mockResolvedValueOnce({
-        failures: [{ artifactId: 'specs', description: 'missing delta' }],
-        warnings: [],
-        files: [],
-      })
+    kernel.changes.validateBatch.execute.mockResolvedValue({
+      passed: false,
+      total: 2,
+      results: [
+        {
+          spec: 'default:auth/login',
+          artifact: 'specs',
+          passed: true,
+          failures: [],
+          warnings: [],
+          files: [],
+        },
+        {
+          spec: 'default:auth/logout',
+          artifact: 'specs',
+          passed: false,
+          failures: [{ artifactId: 'specs', description: 'missing delta' }],
+          warnings: [],
+          files: [],
+        },
+      ],
+    })
 
     const program = makeProgram()
     registerChangeValidate(program.command('change'))
@@ -528,7 +571,7 @@ describe('change validate', () => {
     expect(process.exitCode).toBe(1)
   })
 
-  it('--all passes --artifact to each spec', async () => {
+  it('--all passes --artifact to validateBatch', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
       change: { specIds: ['default:auth/login', 'default:auth/logout'] },
@@ -550,7 +593,28 @@ describe('change validate', () => {
         }),
       ]),
     )
-    kernel.changes.validate.execute.mockResolvedValue({ failures: [], warnings: [], files: [] })
+    kernel.changes.validateBatch.execute.mockResolvedValue({
+      passed: true,
+      total: 2,
+      results: [
+        {
+          spec: 'default:auth/login',
+          artifact: 'proposal',
+          passed: true,
+          failures: [],
+          warnings: [],
+          files: [],
+        },
+        {
+          spec: 'default:auth/logout',
+          artifact: 'proposal',
+          passed: true,
+          failures: [],
+          warnings: [],
+          files: [],
+        },
+      ],
+    })
 
     const program = makeProgram()
     registerChangeValidate(program.command('change'))
@@ -565,12 +629,10 @@ describe('change validate', () => {
       'proposal',
     ])
 
-    expect(kernel.changes.validate.execute).toHaveBeenCalledWith(
-      expect.objectContaining({ artifactId: 'proposal', specPath: 'default:auth/login' }),
-    )
-    expect(kernel.changes.validate.execute).toHaveBeenCalledWith(
-      expect.objectContaining({ artifactId: 'proposal', specPath: 'default:auth/logout' }),
-    )
+    expect(kernel.changes.validateBatch.execute).toHaveBeenCalledWith({
+      name: 'feat',
+      artifactId: 'proposal',
+    })
     expect(stdout()).toContain(
       'inspect merged spec output with `specd changes spec-preview feat default:auth/login --artifact proposal`',
     )
@@ -579,8 +641,8 @@ describe('change validate', () => {
     )
   })
 
-  it('--all invokes change-scoped steps without specPath', async () => {
-    const { kernel } = setup()
+  it('--all formats change-scoped step results without specPath', async () => {
+    const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
       change: { specIds: ['default:auth/login'] },
       artifactStatuses: [],
@@ -588,43 +650,41 @@ describe('change validate', () => {
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
     })
-    kernel.specs.getActiveSchema.execute.mockResolvedValue(
-      mockBatchSchema([
-        new ArtifactType({
-          id: 'proposal',
-          scope: 'change',
-          output: 'proposal.md',
-          requires: [],
-          validations: [],
-          deltaValidations: [],
-          preHashCleanup: [],
-        }),
-        new ArtifactType({
-          id: 'specs',
-          scope: 'spec',
-          output: 'spec.md',
-          requires: ['proposal'],
-          validations: [],
-          deltaValidations: [],
-          preHashCleanup: [],
-        }),
-      ]),
-    )
-    kernel.changes.validate.execute.mockResolvedValue({ failures: [], warnings: [], files: [] })
+    kernel.changes.validateBatch.execute.mockResolvedValue({
+      passed: true,
+      total: 2,
+      results: [
+        {
+          spec: null,
+          artifact: 'proposal',
+          passed: true,
+          failures: [],
+          warnings: [],
+          files: [],
+        },
+        {
+          spec: 'default:auth/login',
+          artifact: 'specs',
+          passed: true,
+          failures: [],
+          warnings: [],
+          files: [],
+        },
+      ],
+    })
 
     const program = makeProgram()
     registerChangeValidate(program.command('change'))
     await program.parseAsync(['node', 'specd', 'change', 'validate', 'feat', '--all'])
 
-    expect(kernel.changes.validate.execute).toHaveBeenCalledWith({
+    expect(kernel.changes.validateBatch.execute).toHaveBeenCalledWith({
       name: 'feat',
-      artifactId: 'proposal',
+      artifactId: undefined,
     })
-    expect(kernel.changes.validate.execute).toHaveBeenCalledWith({
-      name: 'feat',
-      specPath: 'default:auth/login',
-      artifactId: 'specs',
-    })
+    expect(stdout()).toContain('validated feat [artifact:proposal]: all artifacts pass')
+    expect(stdout()).toContain(
+      'validated feat/default:auth/login [artifact:specs]: all artifacts pass',
+    )
   })
 
   it('--all JSON output has batch structure', async () => {
@@ -636,8 +696,20 @@ describe('change validate', () => {
       specDependsOn: {},
       implementationTracking: { trackedFiles: [], links: [] },
     })
-    kernel.specs.getActiveSchema.execute.mockResolvedValue(mockBatchSchema())
-    kernel.changes.validate.execute.mockResolvedValue({ failures: [], warnings: [], files: [] })
+    kernel.changes.validateBatch.execute.mockResolvedValue({
+      passed: true,
+      total: 1,
+      results: [
+        {
+          spec: 'default:auth/login',
+          artifact: 'specs',
+          passed: true,
+          failures: [],
+          warnings: [],
+          files: [],
+        },
+      ],
+    })
 
     const program = makeProgram()
     registerChangeValidate(program.command('change'))
@@ -728,37 +800,34 @@ describe('change validate', () => {
 })
 
 describe('change validate — change schema resolution', () => {
-  it('resolves the artifact model from the change schema, not the workspace default', async () => {
+  it('resolves the artifact model via validateBatch without consulting workspace default', async () => {
     const { kernel, stdout } = setup()
-    kernel.specs.getActiveSchema.execute.mockRejectedValue(new Error('must not be consulted'))
-    kernel.changes.resolveSchema.execute.mockResolvedValue({
-      schema: mockBatchSchema().schema,
-      warnings: [],
-    })
     kernel.changes.status.execute.mockResolvedValue({
-      change: { name: 'feat', specIds: ['default:auth/login'], state: 'designing' },
-    })
-    kernel.changes.validate.execute.mockResolvedValue({ failures: [], notes: [], files: [] })
+      change: { name: 'feat', specIds: ['default:auth/login'] },
+    } as never)
+    kernel.specs.getActiveSchema.execute.mockRejectedValue(new Error('must not be consulted'))
+    kernel.changes.validateBatch.execute.mockResolvedValue({
+      total: 0,
+      passed: true,
+      results: [],
+      warnings: [],
+    } as never)
 
     const program = makeProgram()
     registerChangeValidate(program.command('change'))
     await program.parseAsync(['node', 'specd', 'change', 'validate', 'feat', '--all'])
 
-    expect(kernel.changes.resolveSchema.execute).toHaveBeenCalledWith({
-      changeName: 'feat',
-      schemaName: '@specd/schema-std',
-      schemaVersion: 1,
-    })
+    expect(kernel.changes.validateBatch.execute).toHaveBeenCalledWith({ name: 'feat' })
     expect(kernel.specs.getActiveSchema.execute).not.toHaveBeenCalled()
     expect(stdout()).toContain('feat')
   })
 
   it('exits 3 with the resolution error when the change schema cannot be resolved', async () => {
     const { kernel, stderr } = setup()
-    kernel.changes.resolveSchema.execute.mockRejectedValue(new Error('schema is broken'))
     kernel.changes.status.execute.mockResolvedValue({
-      change: { name: 'feat', specIds: ['default:auth/login'], state: 'designing' },
-    })
+      change: { name: 'feat', specIds: ['default:auth/login'] },
+    } as never)
+    kernel.changes.validateBatch.execute.mockRejectedValue(new Error('schema is broken'))
 
     const program = makeProgram()
     registerChangeValidate(program.command('change'))
@@ -783,8 +852,10 @@ describe('change validate — resolver diagnostics', () => {
 
   it('exits 3 with a fatal error and the identity code on provider mismatch', async () => {
     const { kernel, stdout, stderr } = setup()
-    kernel.changes.status.execute.mockResolvedValue({ change: { specIds: ['default:auth/login'] } })
-    kernel.changes.resolveSchema.execute.mockRejectedValue(
+    kernel.changes.status.execute.mockResolvedValue({
+      change: { name: 'feat', specIds: ['default:auth/login'] },
+    } as never)
+    kernel.changes.validateBatch.execute.mockRejectedValue(
       new SchemaProviderIdentityMismatchError('feat', 'custom', 'schema-std'),
     )
 

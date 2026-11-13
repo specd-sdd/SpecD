@@ -1,0 +1,8 @@
+releases:
+  core:config: minor
+  code-graph:graph-store: minor
+  code-graph:traversal: minor
+  code-graph:hotspots: minor
+  cli:graph-impact: minor
+  cli:graph-hotspots: minor
+  cli:graph-search: minor

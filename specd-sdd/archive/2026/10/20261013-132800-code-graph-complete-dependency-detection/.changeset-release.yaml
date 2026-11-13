@@ -1,0 +1,11 @@
+releases:
+  code-graph:symbol-model: minor
+  code-graph:language-adapter: minor
+  code-graph:typescript-language-adapter: minor
+  code-graph:go-language-adapter: minor
+  code-graph:python-language-adapter: minor
+  code-graph:php-language-adapter: minor
+  code-graph:resolve-symbol-reference: minor
+  code-graph:indexer: minor
+  code-graph:hotspots: minor
+  code-graph:sqlite-graph-store: minor

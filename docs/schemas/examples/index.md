@@ -1,5 +1,6 @@
 ---
 title: Schema Examples
+description: Reference examples for authoring and evolving schemas.
 sidebar_position: 1
 ---
 

@@ -61,18 +61,43 @@ export interface SpecdWorkspaceGraphConfig {
    */
   readonly respectGitignore?: boolean
   /**
-   * Gitignore-syntax exclusion patterns applied during file discovery.
-   * Supports `!` negation. These patterns are additive on top of the
-   * project-global graph exclusion set.
+   * Gitignore-syntax exclusion patterns applied during file discovery, relative to the
+   * project root (not to `codeRoot`). Supports `!` negation. They form the workspace
+   * layer, evaluated after the project-global exclusion set: a `!` negation only reverses
+   * earlier workspace patterns and can never re-include a path the global set excluded.
    */
   readonly excludePaths?: readonly string[]
   /**
    * Optional graph-visible include surface inside the workspace `codeRoot`.
    *
-   * Paths are gitignore-syntax patterns relative to `codeRoot`. They affect
+   * Paths are glob patterns relative to the project root. They affect
    * graph indexing only and do not change workspace ownership semantics.
    */
   readonly allowedPaths?: readonly string[]
+  /**
+   * Gitignore-syntax test file patterns, relative to the project root.
+   * Additive on top of project-level testPaths.
+   */
+  readonly testPaths?: readonly string[]
+  /**
+   * Gitignore-syntax ignored file patterns, relative to the project root.
+   * Additive on top of project-level ignorePaths.
+   */
+  readonly ignorePaths?: readonly string[]
+  /**
+   * Maximum file size in bytes for source files and documents owned by this workspace.
+   * Files exceeding this limit are skipped during graph indexing with coverage reason 'file-too-large'.
+   *
+   * Setting this to `0` disables the file size limit for this workspace.
+   * When omitted, falls back to project-level `graph.maxFileBytes` (or built-in default applied by the code graph).
+   */
+  readonly maxFileBytes?: number
+  /**
+   * Gitignore-syntax exemption patterns evaluated relative to the project root.
+   * Files matching these patterns are analysed even if their size exceeds `maxFileBytes`.
+   * Added to the project-level `graph.largeFilePaths` list.
+   */
+  readonly largeFilePaths?: readonly string[]
 }
 
 /** Project-level code graph configuration from `specd.yaml`. */
@@ -92,7 +117,45 @@ export interface SpecdGraphConfig {
    * Workspace-local graph excludes are additive on top of this set.
    */
   readonly excludePaths?: readonly string[]
+  /**
+   * Optional project-level test file patterns.
+   * When omitted, built-in defaults are used.
+   */
+  readonly testPaths?: readonly string[]
+  /**
+   * Optional project-level ignored file patterns.
+   * When omitted, defaults to empty list.
+   */
+  readonly ignorePaths?: readonly string[]
+  /**
+   * Maximum file size in bytes for source files and documents across the project.
+   * Files exceeding this limit are skipped during graph indexing with coverage reason 'file-too-large'.
+   *
+   * Setting this to `0` disables the file size limit across the project.
+   * When omitted, the code-graph layer applies its built-in default (262144 bytes / 256 KiB).
+   * Can be overridden per workspace via `workspaces.<name>.graph.maxFileBytes`.
+   */
+  readonly maxFileBytes?: number
+  /**
+   * Gitignore-syntax exemption patterns evaluated relative to the project root.
+   * Files matching these patterns are analysed even if their size exceeds `maxFileBytes`.
+   * Workspace-level `largeFilePaths` patterns are also evaluated relative to the project root and are added to this list.
+   */
+  readonly largeFilePaths?: readonly string[]
 }
+
+/** Built-in default test file patterns for code graph indexing. */
+export const DEFAULT_GRAPH_TEST_PATHS: readonly string[] = [
+  '**/*.spec.*',
+  '**/*.test.*',
+  '**/test/**',
+  '**/tests/**',
+  '**/__tests__/**',
+  '*_test.*',
+]
+
+/** Built-in default ignored file patterns for code graph indexing. */
+export const DEFAULT_GRAPH_IGNORE_PATHS: readonly string[] = []
 
 /**
  * Named adapter binding preserved from `specd.yaml`.
@@ -290,6 +353,8 @@ const specdConfigShape = z.object({
     .object({
       includePaths: z.array(z.string()).optional(),
       excludePaths: z.array(z.string()).optional(),
+      testPaths: z.array(z.string()).optional(),
+      ignorePaths: z.array(z.string()).optional(),
     })
     .optional(),
   logging: z

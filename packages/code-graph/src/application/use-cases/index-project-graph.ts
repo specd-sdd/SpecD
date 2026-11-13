@@ -1,23 +1,28 @@
 import { type CodeGraphHostPort } from '../ports/code-graph-host-port.js'
-import { type GetSpecMetadata } from '@specd/core'
+import { type GetSpecMetadata, type ProjectWorkspace } from '@specd/core'
 import {
   type IndexProgressCallback,
   type ProjectGraphConfig,
   type WorkspaceIndexTarget,
 } from '../../domain/value-objects/index-options.js'
 import { type IndexResult } from '../../domain/value-objects/index-result.js'
+import { type IndexEventReceiver } from '../../domain/value-objects/index-event.js'
 
 /** Input for project graph indexing on an open provider. */
 export interface IndexProjectGraphInput {
   readonly provider: CodeGraphHostPort
   readonly projectRoot: string
   readonly workspaces: readonly WorkspaceIndexTarget[]
+  readonly configuredWorkspaces?: readonly ProjectWorkspace[]
   readonly graphConfig: ProjectGraphConfig
   readonly codeGraphVersion: string
   readonly vcsRoot: string | null
   readonly vcsRef?: string
   readonly force?: boolean
+  /** Repair strategy for an incompatible stored derivation; defaults to in-place rebuild. */
+  readonly derivationMismatch?: 'rebuild' | 'fail'
   readonly onProgress?: IndexProgressCallback
+  readonly onEvent?: IndexEventReceiver
   /** Materialized spec metadata source used for spec-content fingerprinting. */
   readonly getSpecMetadata?: GetSpecMetadata
 }
@@ -36,12 +41,19 @@ export class IndexProjectGraph {
     return input.provider.index({
       projectRoot: input.projectRoot,
       workspaces: [...input.workspaces],
+      ...(input.configuredWorkspaces !== undefined
+        ? { configuredWorkspaces: [...input.configuredWorkspaces] }
+        : {}),
       graphConfig: input.graphConfig,
       codeGraphVersion: input.codeGraphVersion,
       vcsRoot: input.vcsRoot,
       ...(input.force === true ? { force: true } : {}),
+      ...(input.derivationMismatch !== undefined
+        ? { derivationMismatch: input.derivationMismatch }
+        : {}),
       ...(input.vcsRef !== undefined ? { vcsRef: input.vcsRef } : {}),
       ...(input.onProgress !== undefined ? { onProgress: input.onProgress } : {}),
+      ...(input.onEvent !== undefined ? { onEvent: input.onEvent } : {}),
       ...(input.getSpecMetadata !== undefined ? { getSpecMetadata: input.getSpecMetadata } : {}),
     })
   }

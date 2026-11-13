@@ -1,0 +1,1135 @@
+{
+  "name": "code-graph-complete-dependency-detection",
+  "createdAt": "2026-10-13T13:28:00.101Z",
+  "updatedAt": "2026-10-14T08:50:27.690Z",
+  "description": "Complete language adapter symbol extraction across TypeScript, Go, Python, and PHP with first-class Property kind and lexical scope stack management. Resolve overload sets cleanly across files and in selector resolution without false ambiguity, and add kind-tiered search ranking and interface hotspot filtering.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "code-graph:symbol-model",
+    "code-graph:language-adapter",
+    "code-graph:typescript-language-adapter",
+    "code-graph:go-language-adapter",
+    "code-graph:python-language-adapter",
+    "code-graph:php-language-adapter",
+    "code-graph:resolve-symbol-reference",
+    "code-graph:indexer",
+    "code-graph:hotspots",
+    "code-graph:sqlite-graph-store"
+  ],
+  "specDependsOn": {
+    "code-graph:symbol-model": [
+      "default:_global/conventions",
+      "default:_global/error-handling-conventions",
+      "code-graph:document-model"
+    ],
+    "code-graph:language-adapter": ["code-graph:symbol-model"],
+    "code-graph:typescript-language-adapter": [
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:go-language-adapter": [
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:python-language-adapter": [
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:php-language-adapter": [
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:resolve-symbol-reference": [
+      "code-graph:symbol-model",
+      "code-graph:graph-store",
+      "code-graph:language-adapter",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:indexer": [
+      "code-graph:graph-store",
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration",
+      "core:config",
+      "core:spec-repository-port",
+      "core:list-workspaces",
+      "code-graph:document-model",
+      "core:get-spec-metadata",
+      "code-graph:sqlite-graph-store"
+    ],
+    "code-graph:hotspots": [
+      "code-graph:symbol-model",
+      "code-graph:graph-store",
+      "code-graph:traversal"
+    ],
+    "code-graph:sqlite-graph-store": [
+      "code-graph:graph-store",
+      "core:config",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "implementationTrackingStartedAt": "2026-10-13T15:47:52.113Z",
+  "trackedImplementationFiles": [
+    {
+      "file": "dev/scripts/graph-file-doc.js",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/symbol-inspect-poc.mjs",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/symbol-kind.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/reference-fact-helpers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/go-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/value-objects/symbol-kind.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/go-language-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/reference-fact-helpers.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/typescript-language-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/python-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/php-language-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/python-language-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/services/resolve-graph-selector.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/hotspot-result.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-database.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/code-graph.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/services/resolve-graph-selector.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-code-graph.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/compute-hotspots.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-graph-store.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/guide-sdk/guide-sdk.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/generated/guides-sdk.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/generated/guides.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/test/integration/sdk-catalog.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/scoped-binding-environment.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/scoped-binding-environment.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "code-graph:symbol-model",
+      "file": "packages/code-graph/src/domain/value-objects/symbol-kind.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SymbolKind", "isSymbolKind"]
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/reference-fact-helpers.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["withEnclosingTypeParents"]
+    },
+    {
+      "specId": "code-graph:typescript-language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["TypeScriptLanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:go-language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/go-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GoLanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:python-language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/python-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["PythonLanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:php-language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["PhpLanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:resolve-symbol-reference",
+      "file": "packages/code-graph/src/application/services/resolve-graph-selector.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["unifyOverloadSetCandidates", "resolveSymbolSelector"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["IndexCodeGraph"]
+    },
+    {
+      "specId": "code-graph:hotspots",
+      "file": "packages/code-graph/src/domain/value-objects/hotspot-result.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["DEFAULT_HOTSPOT_KINDS"]
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-database.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SQLiteGraphDatabase"]
+    },
+    {
+      "specId": "code-graph:symbol-model",
+      "file": "packages/code-graph/src/domain/services/scoped-binding-environment.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["buildScopedBindingEnvironment"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:eaca591cad5daa7dcda8cde91076cfdf993b3134dbc3d89ea67029c93d798490"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:symbol-model",
+          "filename": "deltas/code-graph/symbol-model/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:02bc965c6e0c87f143f20a303a9fa069a3fbfe188e12e64f9c62d44d22118c8f"
+        },
+        {
+          "key": "code-graph:language-adapter",
+          "filename": "deltas/code-graph/language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:516c3e8f2a530e0900f51516bed99ab1d1051ea99362256101e0eb25f1ddfa0a"
+        },
+        {
+          "key": "code-graph:typescript-language-adapter",
+          "filename": "deltas/code-graph/typescript-language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a370d7507e3859e1c28f1600875c8cdad8d0771a1c2a91a047ed3ca5e16c729b"
+        },
+        {
+          "key": "code-graph:go-language-adapter",
+          "filename": "deltas/code-graph/go-language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:063eb540f52da709c5df79aa45c5c697bb06332868e2203b0ca9d9efc314994a"
+        },
+        {
+          "key": "code-graph:python-language-adapter",
+          "filename": "deltas/code-graph/python-language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f489100850e63566b7ccbbad5dd2d5ca66066ce8a58cb0c6e424d55ec6f7d327"
+        },
+        {
+          "key": "code-graph:php-language-adapter",
+          "filename": "deltas/code-graph/php-language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:73144a5c2f352a19e8d77a7aa0bbfe5053ccd72ac322bab22cdb576f55367c4c"
+        },
+        {
+          "key": "code-graph:resolve-symbol-reference",
+          "filename": "deltas/code-graph/resolve-symbol-reference/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1c351e9dad2b21169d0bba18796d5a5be425f80aa52f3bf42fea13a612fa64e9"
+        },
+        {
+          "key": "code-graph:indexer",
+          "filename": "deltas/code-graph/indexer/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:13143bf97db67c51544da259e0d3c78df52760ebefccc80dda1394937c869bac"
+        },
+        {
+          "key": "code-graph:hotspots",
+          "filename": "deltas/code-graph/hotspots/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3b683c8eff698929498389e3ec3d87604c6467ddecc36950056ce0bfd48ac35a"
+        },
+        {
+          "key": "code-graph:sqlite-graph-store",
+          "filename": "deltas/code-graph/sqlite-graph-store/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6ad95c26a5d8f0a8bd2aab1d398fab21c69f2c740677b75654208a439773f6af"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:symbol-model",
+          "filename": "deltas/code-graph/symbol-model/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4f18a7253bb051234e0d64d8ee38ac10163fa00c1d55fd323a21c7cee70d4ad5"
+        },
+        {
+          "key": "code-graph:language-adapter",
+          "filename": "deltas/code-graph/language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:db13f6305583561f626518a8276ccfad24da5d92eb45663a51843357d6b4c695"
+        },
+        {
+          "key": "code-graph:typescript-language-adapter",
+          "filename": "deltas/code-graph/typescript-language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9dc6034eddf63317f0b0f0ac0e1b432f0acd1c07880db627bc43cb7067862a3d"
+        },
+        {
+          "key": "code-graph:go-language-adapter",
+          "filename": "deltas/code-graph/go-language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:30cb56da69059d2a5e4f08dd2ddb24c925c76f5367c4bd0c3cba1112725b7578"
+        },
+        {
+          "key": "code-graph:python-language-adapter",
+          "filename": "deltas/code-graph/python-language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5b3be232e55ab8be37627de1ba230376f4a76efd0fec7853aa3f8b04b1e4b01e"
+        },
+        {
+          "key": "code-graph:php-language-adapter",
+          "filename": "deltas/code-graph/php-language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b3048fdffecbef07812f161d170047381d04d6a4b56ee91a5c3d1c195c92669d"
+        },
+        {
+          "key": "code-graph:resolve-symbol-reference",
+          "filename": "deltas/code-graph/resolve-symbol-reference/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:629805f1ee789c772b6d7158b898595dbe69092703cfdb6ae74f162279adf986"
+        },
+        {
+          "key": "code-graph:indexer",
+          "filename": "deltas/code-graph/indexer/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a97278cc309fd73c9c434a20c8abc2108e890a72f432b85ea98625e193382d32"
+        },
+        {
+          "key": "code-graph:hotspots",
+          "filename": "deltas/code-graph/hotspots/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:67ff4c7d276c2545a4da83d0b329963c301615b43b66d2aa96a7b673578568ac"
+        },
+        {
+          "key": "code-graph:sqlite-graph-store",
+          "filename": "deltas/code-graph/sqlite-graph-store/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:47d644d2094d5f455471b237ca6dce51eaadc5dd104dcf4dd35f16d0162d21ed"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:97d9bd980f35cb3d40fb0ad0c8ef58f9ec8b0a05d56cb1b424af2b77184190d1"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:79d3b6aed5395d535ab72b3249326c41a228aed01d0f21dd432c5db9fffa4305"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-10-13T13:28:00.101Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "code-graph:symbol-model",
+        "code-graph:language-adapter",
+        "code-graph:typescript-language-adapter",
+        "code-graph:go-language-adapter",
+        "code-graph:python-language-adapter",
+        "code-graph:php-language-adapter",
+        "code-graph:resolve-symbol-reference",
+        "code-graph:indexer",
+        "code-graph:hotspots"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-13T13:28:00.171Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:symbol-model"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:language-adapter"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:typescript-language-adapter"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:go-language-adapter"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:python-language-adapter"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:php-language-adapter"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:resolve-symbol-reference"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:indexer"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:hotspots"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:symbol-model"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:typescript-language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:go-language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:python-language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:php-language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:resolve-symbol-reference"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:indexer"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:hotspots"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-13T13:31:43.908Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-13T13:37:14.607Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:indexer",
+            "code-graph:hotspots"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:indexer",
+            "code-graph:hotspots"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-13T13:52:08.586Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'unify-graph-project-relative-paths' was archived with overlapping specs: code-graph:symbol-model",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:symbol-model"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:symbol-model"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-13T13:54:42.431Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:indexer",
+            "code-graph:hotspots"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:indexer",
+            "code-graph:hotspots"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-13T13:58:05.285Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:indexer",
+            "code-graph:hotspots"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:indexer",
+            "code-graph:hotspots"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-13T14:23:29.866Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:indexer",
+            "code-graph:hotspots"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:indexer",
+            "code-graph:hotspots"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-13T14:33:07.361Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:indexer",
+            "code-graph:hotspots"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:indexer",
+            "code-graph:hotspots"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-13T14:33:07.363Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:sqlite-graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:sqlite-graph-store"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-13T14:43:19.478Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'unify-graph-project-relative-paths' was archived with overlapping specs: code-graph:sqlite-graph-store, code-graph:symbol-model",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:symbol-model", "code-graph:sqlite-graph-store"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:symbol-model", "code-graph:sqlite-graph-store"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-13T14:47:13.696Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'unify-graph-project-relative-paths' was archived with overlapping specs: code-graph:sqlite-graph-store, code-graph:symbol-model",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:symbol-model", "code-graph:sqlite-graph-store"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:symbol-model", "code-graph:sqlite-graph-store"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-13T15:43:13.577Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-13T15:47:52.113Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-13T16:55:06.716Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-13T17:23:46.369Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:indexer",
+            "code-graph:hotspots",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:typescript-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:php-language-adapter",
+            "code-graph:resolve-symbol-reference",
+            "code-graph:indexer",
+            "code-graph:hotspots",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-13T17:23:46.369Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-14T06:22:34.202Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-14T06:29:03.620Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-14T07:44:23.992Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-14T08:23:10.847Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-14T08:23:39.178Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-10-14T08:45:19.273Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Complete language adapter symbol extraction across TypeScript, Go, Python, and PHP with first-class Property kind and lexical scope stack management. Resolve overload sets cleanly across files and in selector resolution without false ambiguity, and add kind-tiered search ranking and interface hotspot filtering."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-14T08:50:27.688Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-10-14T08:50:28.014Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

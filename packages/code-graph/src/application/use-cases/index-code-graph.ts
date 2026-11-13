@@ -1,31 +1,64 @@
 import { readFileSync, statSync, rmSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { GraphDerivationMismatchError } from '../../domain/errors/graph-derivation-mismatch-error.js'
+import { replacesWholeGraph } from '../../domain/services/replaces-whole-graph.js'
 import { join, relative } from 'node:path'
 import { setImmediate } from 'node:timers'
 import { performance } from 'node:perf_hooks'
-import { type Spec, SpecPath, Logger } from '@specd/core'
+import {
+  type Spec,
+  SpecPath,
+  Logger,
+  DEFAULT_GRAPH_TEST_PATHS,
+  DEFAULT_GRAPH_IGNORE_PATHS,
+} from '@specd/core'
 import { type GraphStore, type ReferenceFactsWrite } from '../../domain/ports/graph-store.js'
 import { ResolveSymbolReference } from './resolve-symbol-reference.js'
 import { asGraphStore, SessionReferenceStore } from '../services/session-reference-store.js'
 import { type FileNode, createFileNode } from '../../domain/value-objects/file-node.js'
+import { explainFileCategory } from '../../domain/services/classify-file-category.js'
+import { buildPathSubject } from '../../domain/services/project-path-rules.js'
 import { type DocumentNode, createDocumentNode } from '../../domain/value-objects/document-node.js'
 import { type SymbolNode } from '../../domain/value-objects/symbol-node.js'
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { type SpecNode, createSpecNode } from '../../domain/value-objects/spec-node.js'
 import { type Relation, createRelation } from '../../domain/value-objects/relation.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
-import { type IndexOptions } from '../../domain/value-objects/index-options.js'
 import {
+  type IndexOptions,
+  type ProjectWorkspace,
+} from '../../domain/value-objects/index-options.js'
+import {
+  IMPORT_DIAGNOSTIC_SAMPLE_LIMIT,
+  SIZE_SKIP_LIST_LIMIT,
+  WORKSPACE_OVERLAP_LIST_LIMIT,
+  type WorkspaceOverlap,
+  type ImportDiagnosticSummary,
   type IndexResult,
   type IndexError,
   type IndexRunCoverageSummary,
   type WorkspaceIndexBreakdown,
 } from '../../domain/value-objects/index-result.js'
-import { type AdapterRegistryPort } from '../../domain/ports/adapter-registry-port.js'
 import {
-  emptyResolutionManifestSource,
-  type ResolutionManifestSource,
-} from '../ports/resolution-manifest-source.js'
-import { type ResolvedImports } from '../../domain/value-objects/language-adapter.js'
+  type IndexEvent,
+  type SizeSkippedFile,
+  type SizeExemptFile,
+} from '../../domain/value-objects/index-event.js'
+import { createFileSizeGate } from '../services/file-size-gate.js'
+import { closeParserResourceEpoch } from '../services/close-parser-resource-epoch.js'
+import { type AdapterRegistryPort } from '../../domain/ports/adapter-registry-port.js'
+import { type ResolutionManifestSource } from '../ports/resolution-manifest-source.js'
+import { type RepositoryRootSource } from '../ports/repository-root-source.js'
+import { type WorkspaceAccessibilitySource } from '../ports/workspace-accessibility-source.js'
+import {
+  type LanguageAdapter,
+  type ResolvedImports,
+} from '../../domain/value-objects/language-adapter.js'
+import {
+  type ImportDiagnostic,
+  type ImportUnresolvedReason,
+  type PackageWorkspace,
+} from '../../domain/value-objects/language-adapter-facets.js'
+import { PackageImportResolver } from '../services/package-import-resolver.js'
 import { mapWithConcurrency } from '../../domain/services/map-with-concurrency.js'
 import {
   type IndexCoverage,
@@ -43,6 +76,7 @@ import {
   toPortableGraphPath,
 } from '../../domain/services/split-workspace-identity.js'
 import { computeContentHash } from './compute-content-hash.js'
+import { decodeTextualContent } from '../services/decode-textual-content.js'
 import { InMemoryIndexSession } from './in-memory-index-session.js'
 import {
   projectSpecCoverage,
@@ -249,113 +283,6 @@ function readFilesAndSymbolsStageChunk(
 }
 
 /**
- * Attempts to decode a buffer as supported textual content.
- * @param content - Raw file content.
- * @returns Decoded text when the content should be treated as a document.
- */
-function decodeTextualContent(content: Buffer): string | null {
-  if (content.length === 0) {
-    return ''
-  }
-
-  if (content[0] === 0xef && content[1] === 0xbb && content[2] === 0xbf) {
-    return new TextDecoder('utf-8', { fatal: true }).decode(content)
-  }
-
-  if (content[0] === 0xff && content[1] === 0xfe) {
-    return new TextDecoder('utf-16le', { fatal: true }).decode(content)
-  }
-
-  if (content[0] === 0xfe && content[1] === 0xff) {
-    return decodeUtf16Be(content)
-  }
-
-  try {
-    const decoded = new TextDecoder('utf-8', { fatal: true }).decode(content)
-    if (!(content.includes(0) && decoded.includes('\u0000'))) {
-      return decoded
-    }
-  } catch {
-    // Fall through to the remaining encoding probes.
-  }
-
-  if (looksLikeUtf16Le(content)) {
-    try {
-      return new TextDecoder('utf-16le', { fatal: true }).decode(content)
-    } catch {
-      // Fall through to the remaining checks.
-    }
-  }
-
-  if (looksLikeUtf16Be(content)) {
-    try {
-      return decodeUtf16Be(content)
-    } catch {
-      // Fall through to the remaining checks.
-    }
-  }
-
-  if (!content.includes(0)) {
-    try {
-      return new TextDecoder('windows-1252', { fatal: true }).decode(content)
-    } catch {
-      return null
-    }
-  }
-
-  return null
-}
-
-/**
- * Decodes a UTF-16BE buffer by swapping byte order before decoding.
- * @param content - Raw file content.
- * @returns Decoded text.
- */
-function decodeUtf16Be(content: Buffer): string {
-  const normalized =
-    content.length % 2 === 0 ? Buffer.from(content) : Buffer.concat([content, Buffer.from([0])])
-  normalized.swap16()
-  return new TextDecoder('utf-16le', { fatal: true }).decode(normalized)
-}
-
-/**
- * Returns whether content matches the common UTF-16LE null-byte pattern.
- * @param content - Raw file content.
- * @returns True when odd bytes are predominantly NUL.
- */
-function looksLikeUtf16Le(content: Buffer): boolean {
-  return hasMostlyNullBytesAtParity(content, 1)
-}
-
-/**
- * Returns whether content matches the common UTF-16BE null-byte pattern.
- * @param content - Raw file content.
- * @returns True when even bytes are predominantly NUL.
- */
-function looksLikeUtf16Be(content: Buffer): boolean {
-  return hasMostlyNullBytesAtParity(content, 0)
-}
-
-/**
- * Checks whether one byte parity contains a dominant number of NUL bytes.
- * @param content - Raw file content.
- * @param parity - Byte parity to inspect.
- * @returns True when the sampled parity is mostly NUL.
- */
-function hasMostlyNullBytesAtParity(content: Buffer, parity: 0 | 1): boolean {
-  let samples = 0
-  let nulls = 0
-  for (let index = parity; index < content.length; index += 2) {
-    samples++
-    if (content[index] === 0) {
-      nulls++
-    }
-  }
-
-  return samples > 0 && nulls / samples >= 0.6
-}
-
-/**
  * Reads a staged relations chunk.
  * @param stageDir - Run-local staging directory.
  * @param filename - Chunk filename.
@@ -366,26 +293,40 @@ function readRelationsStageChunk(stageDir: string, filename: string): RelationsS
 }
 
 /**
+ * Compares two strings by UTF-16 code units so that ordering does not depend on the host locale.
+ * @param a - First string.
+ * @param b - Second string.
+ * @returns A negative number, zero, or a positive number.
+ */
+function compareCodeUnits(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0
+}
+
+/**
  * Groups file paths into chunks where each chunk's total source size
  * does not exceed the byte budget.
  * @param files - Array of [workspace-prefixed path, absolute path] tuples.
  * @param budget - Maximum bytes per chunk.
+ * @param sizeLookup - Optional lookup for cached file sizes.
  * @returns An array of tuple arrays (chunks).
  */
 function groupIntoChunks(
   files: Array<[string, string]>,
   budget: number,
+  sizeLookup?: (absPath: string) => number | null | undefined,
 ): Array<Array<[string, string]>> {
   const chunks: Array<Array<[string, string]>> = []
   let current: Array<[string, string]> = []
   let currentBytes = 0
 
   for (const entry of files) {
-    let size = 0
-    try {
-      size = statSync(entry[1]).size
-    } catch {
-      size = 0
+    let size: number | null | undefined = sizeLookup ? sizeLookup(entry[1]) : null
+    if (size === null || size === undefined) {
+      try {
+        size = statSync(entry[1]).size
+      } catch {
+        size = 0
+      }
     }
 
     if (current.length > 0 && currentBytes + size > budget) {
@@ -436,11 +377,15 @@ export class IndexCodeGraph {
    * @param store - The graph store to persist indexed data into.
    * @param registry - The adapter registry for resolving language adapters.
    * @param manifestSource - Port that reads resolution-manifest existence and text.
+   * @param repositoryRoots - Port that resolves repository roots for workspaces.
+   * @param workspaceAccessibility - Port that checks workspace code root accessibility.
    */
   constructor(
     private readonly store: GraphStore,
     private readonly registry: AdapterRegistryPort,
-    private readonly manifestSource: ResolutionManifestSource = emptyResolutionManifestSource,
+    private readonly manifestSource: ResolutionManifestSource,
+    private readonly repositoryRoots: RepositoryRootSource,
+    private readonly workspaceAccessibility: WorkspaceAccessibilitySource,
   ) {}
 
   /**
@@ -449,12 +394,17 @@ export class IndexCodeGraph {
    * This is the primary write path into the code graph. It handles both code files
    * (via language adapters) and textual documents (as generic DocumentNodes).
    *
+   * Discovered files are evaluated against the effective size gate before reading or hashing.
+   * Files exceeding the effective size limit (default 256 KiB) are skipped with coverage reason 'file-too-large'.
+   * Parser resources are tracked in per-file epochs that are closed in finally blocks before event-loop yields.
+   *
    * @param options - Options controlling the indexing run, including rich workspaces.
    * @returns A summary result with counts and any errors encountered.
    */
   async execute(options: IndexOptions): Promise<IndexResult> {
     const start = performance.now()
     const errors: IndexError[] = []
+    const diagnostics: IndexError[] = []
     const phaseMetrics = {
       importResolution: { count: 0, durationMs: 0 },
       dependencyFacts: { count: 0, durationMs: 0 },
@@ -468,9 +418,17 @@ export class IndexCodeGraph {
     const chunkBudget = options.chunkBytes ?? DEFAULT_CHUNK_BYTES
     const runId = `index-stage-${Date.now()}`
     const stageDir = makeStageDir(this.store.storagePath, runId)
+    let activeSession: IndexSession | undefined
     try {
       const progress = (pct: number, phase: string, detail?: string): void => {
         onProgress(Math.min(pct, 100), detail ? `${phase} — ${detail}` : phase)
+      }
+      const emitEvent = (event: IndexEvent): void => {
+        try {
+          options.onEvent?.(event)
+        } catch (error) {
+          Logger.debug(`[IndexCodeGraph] onEvent listener threw: ${String(error)}`)
+        }
       }
 
       // ── Discovery (0-5%) ──
@@ -480,7 +438,7 @@ export class IndexCodeGraph {
       const fileHashes = new Map<string, string>()
       const coverageByFilePath = new Map<string, IndexCoverage>()
       const absolutePaths = new Map<string, string>()
-      const configRelativePaths = new Map<string, string>()
+      const projectRelativePaths = new Map<string, string>()
       const wsBreakdowns = new Map<string, MutableWorkspaceIndexBreakdown>()
       const indexedWorkspaceNames = new Set(options.workspaces.map((ws) => ws.name))
       const effectiveGraphConfig = resolveEffectiveGraphConfig(
@@ -488,6 +446,13 @@ export class IndexCodeGraph {
         options.workspaces,
         options.graphConfig,
       )
+      const sizeGate = createFileSizeGate(effectiveGraphConfig)
+      const fileSizes = new Map<string, number | null>()
+      const sizeSkipped = new Map<string, SizeSkippedFile>()
+      const sizeExempt = new Map<string, SizeExemptFile>()
+
+      // Physical files kept by discovery, keyed by project-relative path (overlap diagnostic)
+      const overlapOwners = new Map<string, string[]>()
 
       // 1. Workspace Discovery
       for (const ws of options.workspaces) {
@@ -495,7 +460,13 @@ export class IndexCodeGraph {
         const discovered = discoverFiles(ws.codeRoot, undefined, {
           respectGitignore: wsGraph?.respectGitignore ?? true,
           vcsRoot: options.vcsRoot,
-          ...(wsGraph?.excludePaths !== undefined ? { excludePaths: wsGraph.excludePaths } : {}),
+          ...(wsGraph !== undefined
+            ? {
+                excludePaths: wsGraph.globalExcludePaths,
+                workspaceExcludePaths: wsGraph.workspaceExcludePaths,
+                pathBase: wsGraph.pathBase,
+              }
+            : {}),
           ...(wsGraph?.allowedPaths ? { allowedPaths: wsGraph.allowedPaths } : {}),
         })
 
@@ -513,14 +484,48 @@ export class IndexCodeGraph {
         for (const relPath of discovered) {
           const prefixed = `${ws.name}:${relPath}`
           const absPath = join(ws.codeRoot, relPath)
-          const configRel = toPortableGraphPath(relative(options.projectRoot, absPath))
+          const rawProjectRel = toPortableGraphPath(relative(options.projectRoot, absPath))
+          const projectRel = rawProjectRel.startsWith('./') ? rawProjectRel.slice(2) : rawProjectRel
+          const owners = overlapOwners.get(projectRel)
+          if (owners === undefined) overlapOwners.set(projectRel, [ws.name])
+          else owners.push(ws.name)
 
-          allDiscoveredPaths.push(prefixed)
-          absolutePaths.set(prefixed, absPath)
-          configRelativePaths.set(
-            prefixed,
-            configRel.startsWith('./') ? configRel.slice(2) : configRel,
-          )
+          const decision = sizeGate.decide({
+            workspaceName: ws.name,
+            relativeToCodeRoot: relPath,
+            projectRelativePath: projectRel,
+            absolutePath: absPath,
+          })
+
+          if (decision.kind === 'skip') {
+            projectRelativePaths.set(prefixed, projectRel)
+            sizeSkipped.set(prefixed, {
+              filePath: prefixed,
+              projectRelativePath: projectRel,
+              sizeBytes: decision.sizeBytes,
+              limitBytes: decision.limitBytes,
+            })
+            emitEvent({
+              kind: 'file-skipped',
+              filePath: prefixed,
+              projectRelativePath: projectRel,
+              sizeBytes: decision.sizeBytes,
+              limitBytes: decision.limitBytes,
+              reason: 'file-too-large',
+            })
+          } else {
+            fileSizes.set(prefixed, decision.sizeBytes)
+            if (decision.kind === 'exempt') {
+              sizeExempt.set(prefixed, {
+                filePath: prefixed,
+                projectRelativePath: projectRel,
+                sizeBytes: decision.sizeBytes,
+              })
+            }
+            allDiscoveredPaths.push(prefixed)
+            absolutePaths.set(prefixed, absPath)
+            projectRelativePaths.set(prefixed, projectRel)
+          }
         }
       }
 
@@ -553,10 +558,56 @@ export class IndexCodeGraph {
         for (const relPath of filteredRootDiscovered) {
           const prefixed = `root:${relPath}`
           const absPath = join(options.projectRoot, relPath)
-          allDiscoveredPaths.push(prefixed)
-          absolutePaths.set(prefixed, absPath)
-          configRelativePaths.set(prefixed, toPortableGraphPath(relPath))
+          const projectRel = toPortableGraphPath(relPath)
+
+          const decision = sizeGate.decide({
+            workspaceName: 'root',
+            relativeToCodeRoot: projectRel,
+            projectRelativePath: projectRel,
+            absolutePath: absPath,
+          })
+
+          if (decision.kind === 'skip') {
+            projectRelativePaths.set(prefixed, projectRel)
+            sizeSkipped.set(prefixed, {
+              filePath: prefixed,
+              projectRelativePath: projectRel,
+              sizeBytes: decision.sizeBytes,
+              limitBytes: decision.limitBytes,
+            })
+            emitEvent({
+              kind: 'file-skipped',
+              filePath: prefixed,
+              projectRelativePath: projectRel,
+              sizeBytes: decision.sizeBytes,
+              limitBytes: decision.limitBytes,
+              reason: 'file-too-large',
+            })
+          } else {
+            fileSizes.set(prefixed, decision.sizeBytes)
+            if (decision.kind === 'exempt') {
+              sizeExempt.set(prefixed, {
+                filePath: prefixed,
+                projectRelativePath: projectRel,
+                sizeBytes: decision.sizeBytes,
+              })
+            }
+            allDiscoveredPaths.push(prefixed)
+            absolutePaths.set(prefixed, absPath)
+            projectRelativePaths.set(prefixed, projectRel)
+          }
         }
+      }
+
+      // Record coverage for size-skipped files on every run
+      for (const [skippedPath] of sizeSkipped) {
+        coverageByFilePath.set(skippedPath, {
+          filePath: skippedPath,
+          contentHash: undefined,
+          status: IndexCoverageStatus.Unsupported,
+          reason: 'file-too-large',
+          capabilities: [],
+        })
       }
 
       const existingFiles = await this.store.getAllFiles()
@@ -571,13 +622,25 @@ export class IndexCodeGraph {
         existingArtifactHashes.set(document.path, document.contentHash)
         indexedResourceKinds.set(document.path, IndexedResourceKind.Document)
       }
-      const existingCoverage = await this.store.findIndexCoverage(allDiscoveredPaths)
+      const existingCoverage = await this.store.findIndexCoverage([
+        ...allDiscoveredPaths,
+        ...sizeSkipped.keys(),
+      ])
       for (const coverage of existingCoverage) {
-        coverageByFilePath.set(coverage.filePath, coverage)
+        if (!coverageByFilePath.has(coverage.filePath)) {
+          coverageByFilePath.set(coverage.filePath, coverage)
+        }
         if (coverage.contentHash !== undefined && !existingArtifactHashes.has(coverage.filePath)) {
           existingArtifactHashes.set(coverage.filePath, coverage.contentHash)
         }
       }
+
+      // A rebuild may replace the whole graph only when this run indexes every workspace the
+      // store holds. A subset run clears and regenerates just its own workspaces.
+      const runReplacesWholeGraph = replacesWholeGraph(
+        [...existingFiles, ...existingDocuments].map((entry) => entry.workspace),
+        indexedWorkspaceNames,
+      )
 
       // ── Fingerprint comparison ──
       const version = options.codeGraphVersion ?? readInstalledCodeGraphVersion()
@@ -621,7 +684,15 @@ export class IndexCodeGraph {
         adapters,
         options.vcsRoot,
         this.manifestSource,
+        runReplacesWholeGraph,
       )
+
+      // A subset run keeps the stored project-global entry: it cannot be recomputed from a
+      // partial workspace list without making the next whole-graph run look mismatched.
+      const storedRootFingerprint = storedFingerprintMap.get('root')
+      if (!runReplacesWholeGraph && storedRootFingerprint !== undefined) {
+        currentFingerprintMap.set('root', storedRootFingerprint)
+      }
 
       // Merge stored fingerprints for workspaces NOT being indexed into the current map
       for (const [wsName, fp] of storedFingerprintMap) {
@@ -639,10 +710,25 @@ export class IndexCodeGraph {
       const skippedFiles: string[] = []
       const fingerprintInvalidatedPaths = new Set<string>()
 
+      if (
+        fingerprintMismatch &&
+        options.force !== true &&
+        options.derivationMismatch === 'fail' &&
+        runReplacesWholeGraph
+      ) {
+        // Nothing has been written yet: the caller can recreate storage and index again.
+        throw new GraphDerivationMismatchError(FULL_REBUILD_FINGERPRINT_REASON)
+      }
+
       if (options.force === true || fingerprintMismatch) {
         fullRebuild = true
         if (options.force === true) {
           progress(5, 'Forced reindex', 'Reconsidering every selected input')
+          if (!runReplacesWholeGraph) {
+            for (const ef of [...existingFiles, ...existingDocuments]) {
+              if (indexedWorkspaceNames.has(ef.workspace)) fingerprintInvalidatedPaths.add(ef.path)
+            }
+          }
         } else {
           fullRebuildReason = FULL_REBUILD_FINGERPRINT_REASON
           progress(5, 'Fingerprint mismatch', 'Forcing re-index of mismatched workspaces')
@@ -707,6 +793,13 @@ export class IndexCodeGraph {
             }
           } catch (err) {
             errors.push({ filePath: prefixedPath, message: String(err) })
+            coverageByFilePath.set(prefixedPath, {
+              filePath: prefixedPath,
+              contentHash: undefined,
+              status: IndexCoverageStatus.ParseFailed,
+              reason: 'hash-failed',
+              capabilities: [],
+            })
           }
           if (i % 200 === 0) {
             progress(
@@ -725,10 +818,21 @@ export class IndexCodeGraph {
           const existingHash = existingArtifactHashes.get(prefixedPath)
           if (existingHash === undefined) {
             newFiles.push(prefixedPath)
-          } else if (hash && existingHash !== hash) {
+          } else if (hash === undefined) {
+            // The content could not be hashed in this run: the target is retried, never skipped.
+            if (coverageByFilePath.get(prefixedPath)?.status === IndexCoverageStatus.ParseFailed) {
+              changedFiles.push(prefixedPath)
+            }
+          } else if (existingHash !== hash) {
             changedFiles.push(prefixedPath)
-          } else if (hash && existingHash === hash) {
-            skippedFiles.push(prefixedPath)
+          } else if (existingHash === hash) {
+            // The persisted hash does not authorize skipping a target whose last outcome was a
+            // failure: a normal incremental run retries it.
+            if (coverageByFilePath.get(prefixedPath)?.status === IndexCoverageStatus.ParseFailed) {
+              changedFiles.push(prefixedPath)
+            } else {
+              skippedFiles.push(prefixedPath)
+            }
           }
         }
 
@@ -738,11 +842,14 @@ export class IndexCodeGraph {
           ...existingDocuments.map((existing) => existing.path),
           ...existingCoverage.map((coverage) => coverage.filePath),
         ])
+        const sizeSkippedPaths = new Set(sizeSkipped.keys())
         for (const existingPath of existingPaths) {
           const workspace = workspaceIdentityName(existingPath)
-          if (!discoveredSet.has(existingPath) && indexedWorkspaceNames.has(workspace)) {
-            deletedFiles.push(existingPath)
-          }
+          if (!indexedWorkspaceNames.has(workspace)) continue
+          if (discoveredSet.has(existingPath)) continue
+          const skippedForSize = sizeSkippedPaths.has(existingPath)
+          if (skippedForSize && !indexedResourceKinds.has(existingPath)) continue
+          deletedFiles.push(existingPath)
         }
       }
 
@@ -755,8 +862,10 @@ export class IndexCodeGraph {
       // Native stores enforce relation endpoint integrity, so an import whose target did not
       // exist at the previous generation cannot be recovered from persisted relations alone.
       // Reconsider every existing code file only when additions may satisfy such imports.
-      const additionCandidates =
-        newFiles.length === 0 ? [] : existingFiles.map((existing) => existing.path)
+      const addsCode = newFiles.some(
+        (p) => this.registry.getAdapterForFile(relativeIdentityPath(p)) !== undefined,
+      )
+      const additionCandidates = addsCode ? existingFiles.map((existing) => existing.path) : []
       const affectedClosure =
         persistedReferenceFacts === undefined
           ? new Set<string>()
@@ -798,17 +907,37 @@ export class IndexCodeGraph {
       )
 
       // ── Pass 1: Extract symbols (7-50%) ──
+      // Files within size limits (or exempt) are grouped into chunks using cached sizes.
+      // For each file, the adapter registers parser resources into the session's scope.
+      // In the per-file finally block, the parser-resource epoch is closed and garbage collection
+      // is requested before any event-loop yield, bounding native memory retention to at most one file.
+      // A target that fails after its analysis (import resolution, relation building) is recorded
+      // as parse-failed so that a normal incremental run retries it even when its hash is unchanged.
+      const markStageFailed = (prefixedPath: string, reason: string): void => {
+        coverageByFilePath.set(prefixedPath, {
+          filePath: prefixedPath,
+          contentHash: fileHashes.get(prefixedPath),
+          status: IndexCoverageStatus.ParseFailed,
+          reason,
+          capabilities: [],
+        })
+      }
       Logger.debug('[IndexCodeGraph] Code Indexing Phase 1 (analyze/register) started')
       const pass1Start = performance.now()
       const fileTuples: Array<[string, string]> = filesToProcess.map((p) => [
         p,
         absolutePaths.get(p)!,
       ])
-      const chunks = groupIntoChunks(fileTuples, chunkBudget)
+      const sizeByAbsolutePath = new Map<string, number | null>()
+      for (const [prefixed, abs] of absolutePaths) {
+        sizeByAbsolutePath.set(abs, fileSizes.get(prefixed) ?? null)
+      }
+      const chunks = groupIntoChunks(fileTuples, chunkBudget, (abs) => sizeByAbsolutePath.get(abs))
       const totalToProcess = filesToProcess.length
       let filesIndexed = 0
       let documentsIndexed = 0
       const session = new InMemoryIndexSession()
+      activeSession = session
       if (persistedReferenceFacts !== undefined) {
         const replacedPaths = new Set([...filesToProcess, ...deletedFiles])
         const retainedFiles = existingFiles.filter((file) => !replacedPaths.has(file.path))
@@ -830,27 +959,163 @@ export class IndexCodeGraph {
       }
 
       // Build package-name → workspace-name map for cross-workspace import resolution.
+      const configured = options.configuredWorkspaces ?? options.workspaces
+      const probeResults = await Promise.all(
+        configured.map(async (ws) => {
+          try {
+            const isAccessible = await this.workspaceAccessibility.isAccessibleDirectory(
+              ws.codeRoot,
+            )
+            return { ws, isAccessible }
+          } catch {
+            return { ws, isAccessible: false }
+          }
+        }),
+      )
+      const accessible: ProjectWorkspace[] = []
+      for (const { ws, isAccessible } of probeResults) {
+        if (isAccessible) {
+          accessible.push(ws)
+        } else {
+          diagnostics.push({
+            filePath: `${ws.name}:<manifest>`,
+            message: `Workspace "${ws.name}" skipped for package resolution: code root "${ws.codeRoot}" is not accessible`,
+          })
+        }
+      }
+
+      const repoRootByCodeRoot = new Map<string, string>()
+      const repoRootPromises = new Map<string, Promise<string | undefined>>()
+      for (const ws of accessible) {
+        if (!repoRootPromises.has(ws.codeRoot)) {
+          repoRootPromises.set(
+            ws.codeRoot,
+            Promise.resolve()
+              .then(() => this.repositoryRoots.resolve(ws.codeRoot))
+              .catch(() => undefined),
+          )
+        }
+      }
+      await Promise.all(
+        [...repoRootPromises.entries()].map(async ([codeRoot, promise]) => {
+          const root = await promise
+          if (root !== undefined) {
+            repoRootByCodeRoot.set(codeRoot, root)
+          }
+        }),
+      )
+
+      const packageWorkspaces: readonly PackageWorkspace[] = accessible.map((ws) => {
+        const root = repoRootByCodeRoot.get(ws.codeRoot)
+        return {
+          name: ws.name,
+          codeRoot: ws.codeRoot,
+          ...(root !== undefined ? { repoRoot: root } : {}),
+        }
+      })
+
       const packageToWorkspace = new Map<string, string>()
-      for (const ws of options.workspaces) {
+      const claims = new Map<string, Set<string>>()
+      const claimsByAdapter = new Map<string, Set<LanguageAdapter>>()
+      const disabledPackageResolution = new Set<LanguageAdapter>()
+      const purgeDisabledAdapterClaims = (failedAdapter: LanguageAdapter): void => {
+        disabledPackageResolution.add(failedAdapter)
+        for (const [id, claimingAdapters] of claimsByAdapter) {
+          const hasActive = [...claimingAdapters].some(
+            (claiming) => !disabledPackageResolution.has(claiming),
+          )
+          if (!hasActive) {
+            packageToWorkspace.delete(id)
+          }
+        }
+      }
+      for (const ws of accessible) {
+        const wsRepoRoot = repoRootByCodeRoot.get(ws.codeRoot)
         for (const adapter of adapters) {
-          if (adapter.getPackageIdentity) {
-            const identity = adapter.getPackageIdentity(ws.codeRoot)
-            if (identity) {
-              const existingWs = packageToWorkspace.get(identity)
-              if (existingWs && existingWs !== ws.name) {
-                errors.push({
-                  filePath: `${ws.name}:<manifest>`,
-                  message: `Package identity collision: "${identity}" already mapped to workspace "${existingWs}"`,
-                })
-              } else {
-                packageToWorkspace.set(identity, ws.name)
-              }
+          if (adapter.packageResolution === undefined) continue
+          if (disabledPackageResolution.has(adapter)) continue
+          let identity: string | undefined
+          try {
+            identity = adapter.packageResolution.identity(ws.codeRoot, wsRepoRoot, (message) => {
+              diagnostics.push({ filePath: `${ws.name}:<manifest>`, message })
+            })
+          } catch (err) {
+            diagnostics.push({
+              filePath: `${ws.name}:<manifest>`,
+              message: `Package identity failed for adapter "${adapter.languages().join(',')}": ${String(err)}`,
+            })
+            purgeDisabledAdapterClaims(adapter)
+            continue
+          }
+          if (identity === undefined) continue
+          const adapterSet = claimsByAdapter.get(identity) ?? new Set<LanguageAdapter>()
+          adapterSet.add(adapter)
+          claimsByAdapter.set(identity, adapterSet)
+
+          const existingClaims = claims.get(identity)
+          if (existingClaims !== undefined) {
+            if (!existingClaims.has(ws.name)) {
+              existingClaims.add(ws.name)
+              packageToWorkspace.delete(identity)
+              const sorted = [...existingClaims].sort().join(', ')
+              diagnostics.push({
+                filePath: `${ws.name}:<manifest>`,
+                message: `Package identity collision: "${identity}" is claimed by workspaces ${sorted}`,
+              })
             }
+          } else {
+            claims.set(identity, new Set([ws.name]))
+            packageToWorkspace.set(identity, ws.name)
           }
         }
       }
 
+      const packageImportResolver = new PackageImportResolver({
+        session,
+        packageToWorkspace,
+        disabledPackageResolution,
+      })
+      const importDiagnosticCounts = new Map<ImportUnresolvedReason, number>()
+      const importDiagnosticSamples: ImportDiagnostic[] = []
+      const sampledPerReason = new Map<ImportUnresolvedReason, number>()
+      let externalPackageImports = 0
+      const recordImportDiagnostic = (diagnostic: ImportDiagnostic): void => {
+        // A package that no workspace declares is an external dependency, not a failure.
+        if (diagnostic.reason === 'package-unknown') {
+          externalPackageImports++
+          return
+        }
+        // A disabled or absent facet is reported through `adaptersWithoutPackageResolution`.
+        if (diagnostic.reason === 'facet-absent') return
+        importDiagnosticCounts.set(
+          diagnostic.reason,
+          (importDiagnosticCounts.get(diagnostic.reason) ?? 0) + 1,
+        )
+        const sampled = sampledPerReason.get(diagnostic.reason) ?? 0
+        if (sampled < IMPORT_DIAGNOSTIC_SAMPLE_LIMIT) {
+          sampledPerReason.set(diagnostic.reason, sampled + 1)
+          importDiagnosticSamples.push(diagnostic)
+        }
+      }
+      // An adapter without the package resolution facet gets no cross-workspace package
+      // resolution; list it once per run. It is not an unresolved import.
+      const listDisabledAdapters = (): readonly string[] => {
+        const disabledInstances = new Set<LanguageAdapter>([
+          ...adapters.filter((adapter) => adapter.packageResolution === undefined),
+          ...disabledPackageResolution,
+        ])
+        const names = new Set<string>()
+        for (const adapter of disabledInstances) {
+          const langs = adapter.languages()
+          if (langs.length > 0 && langs[0] !== undefined) {
+            names.add(langs[0])
+          }
+        }
+        return [...names].sort()
+      }
+
       const fileLanguages = new Map(existingFiles.map((file) => [file.path, file.language]))
+      const fileCategories = new Map(existingFiles.map((file) => [file.path, file.category]))
       const pass1ChunkFiles: string[] = []
       const pass2ChunkFiles: string[] = []
       let stagedFileCount = 0
@@ -868,6 +1133,13 @@ export class IndexCodeGraph {
         const chunkSymbols: SymbolNode[] = []
         for (const [prefixedPath, absPath] of chunk) {
           processed++
+          emitEvent({
+            kind: 'file-activity',
+            filePath: prefixedPath,
+            sizeBytes: fileSizes.get(prefixedPath) ?? null,
+            index: processed,
+            total: totalToProcess,
+          })
           if (processed % 50 === 0 || processed === 1) {
             progress(
               7 + Math.round((processed / Math.max(totalToProcess, 1)) * 43),
@@ -902,9 +1174,10 @@ export class IndexCodeGraph {
               }
               const wsName = workspaceIdentityName(prefixedPath)
               const hash = fileHashes.get(prefixedPath) ?? computeContentHash(decodedContent)
+              fileHashes.set(prefixedPath, hash)
               const document = createDocumentNode({
                 path: prefixedPath,
-                configRelativePath: configRelativePaths.get(prefixedPath) ?? '',
+                projectRelativePath: projectRelativePaths.get(prefixedPath) ?? '',
                 contentHash: hash,
                 content: decodedContent,
                 workspace: wsName,
@@ -939,24 +1212,65 @@ export class IndexCodeGraph {
             const language = this.registry.getLanguageForFile(relPath) ?? 'unknown'
             const content = contentBuffer.toString('utf-8')
             const hash = fileHashes.get(prefixedPath) ?? computeContentHash(content)
+            fileHashes.set(prefixedPath, hash)
             const wsName = workspaceIdentityName(prefixedPath)
             const ws = options.workspaces.find((w) => w.name === wsName)
+            const wsRepoRoot =
+              ws?.codeRoot !== undefined ? repoRootByCodeRoot.get(ws.codeRoot) : undefined
 
             const draft = adapter.analyzeFile(prefixedPath, content, {
               session,
               workspaceName: wsName,
               ...(ws?.codeRoot !== undefined ? { codeRoot: ws.codeRoot } : {}),
-              repoRoot: options.projectRoot,
+              ...(wsRepoRoot !== undefined ? { repoRoot: wsRepoRoot } : {}),
             })
 
             const finalDraft = draft
 
+            const wsEffective = effectiveGraphConfig.workspaces.get(wsName)
+            const pathBase = wsEffective?.pathBase ?? ''
+            const category = explainFileCategory(
+              buildPathSubject(pathBase, relPath),
+              pathBase,
+              [
+                {
+                  level: 'project',
+                  key: 'graph.ignorePaths',
+                  patterns:
+                    wsEffective?.projectIgnorePaths ??
+                    options.graphConfig.ignorePaths ??
+                    DEFAULT_GRAPH_IGNORE_PATHS,
+                },
+                {
+                  level: 'workspace',
+                  key: 'graph.ignorePaths',
+                  patterns: wsEffective?.workspaceIgnorePaths ?? [],
+                },
+              ],
+              [
+                {
+                  level: 'project',
+                  key: 'graph.testPaths',
+                  patterns:
+                    wsEffective?.projectTestPaths ??
+                    options.graphConfig.testPaths ??
+                    DEFAULT_GRAPH_TEST_PATHS,
+                },
+                {
+                  level: 'workspace',
+                  key: 'graph.testPaths',
+                  patterns: wsEffective?.workspaceTestPaths ?? [],
+                },
+              ],
+            ).category
+
             session.registerFile({
               filePath: prefixedPath,
-              configRelativePath: configRelativePaths.get(prefixedPath) ?? '',
+              projectRelativePath: projectRelativePaths.get(prefixedPath) ?? '',
               language,
               contentHash: hash,
               workspace: wsName,
+              category,
             })
 
             session.registerAnalysis({
@@ -986,16 +1300,26 @@ export class IndexCodeGraph {
             chunkFiles.push(
               createFileNode({
                 path: prefixedPath,
-                configRelativePath: configRelativePaths.get(prefixedPath) ?? '',
+                projectRelativePath: projectRelativePaths.get(prefixedPath) ?? '',
                 language,
                 contentHash: hash,
                 workspace: wsName,
+                category,
                 content,
+                namespace: finalDraft.namespace,
+                namespaceSeparator: finalDraft.namespaceSeparator,
               }),
             )
             indexedResourceKinds.set(prefixedPath, IndexedResourceKind.File)
             fileLanguages.set(prefixedPath, language)
-            chunkSymbols.push(...finalDraft.symbols)
+            fileCategories.set(prefixedPath, category)
+            const fileProjRel = projectRelativePaths.get(prefixedPath) ?? ''
+            const symbolsWithProjRel = finalDraft.symbols.map((sym) =>
+              sym.projectRelativePath === fileProjRel
+                ? sym
+                : { ...sym, projectRelativePath: fileProjRel },
+            )
+            chunkSymbols.push(...symbolsWithProjRel)
             if (contentChangedPaths.has(prefixedPath)) {
               filesIndexed++
               const breakdown = wsBreakdowns.get(wsName)
@@ -1017,12 +1341,19 @@ export class IndexCodeGraph {
               reason: 'analysis-failed',
               capabilities: [],
             })
-          }
-
-          if (processed % 50 === 0) {
-            Logger.debug(`[IndexCodeGraph] Yielding event loop at ${processed} files`)
-            await new Promise<void>((resolve) => setImmediate(resolve))
-            Logger.debug(`[IndexCodeGraph] Resuming from event loop yield at ${processed} files`)
+          } finally {
+            closeParserResourceEpoch(session.parserResources, (failure) =>
+              emitEvent({
+                kind: 'resource-disposal-failed',
+                filePath: prefixedPath,
+                message: failure.message,
+              }),
+            )
+            if (processed % 50 === 0) {
+              Logger.debug(`[IndexCodeGraph] Yielding event loop at ${processed} files`)
+              await new Promise<void>((resolve) => setImmediate(resolve))
+              Logger.debug(`[IndexCodeGraph] Resuming from event loop yield at ${processed} files`)
+            }
           }
         }
         const stageFile = `pass1-${String(chunkIndex).padStart(5, '0')}.json`
@@ -1044,10 +1375,13 @@ export class IndexCodeGraph {
         if (existing.length > 0) {
           session.registerFile({
             filePath: prefixedPath,
-            configRelativePath: configRelativePaths.get(prefixedPath) ?? '',
+            projectRelativePath: projectRelativePaths.get(prefixedPath) ?? '',
             language: fileLanguages.get(prefixedPath) ?? 'unknown',
             contentHash: existingArtifactHashes.get(prefixedPath) ?? '',
             workspace: workspaceIdentityName(prefixedPath),
+            ...(fileCategories.get(prefixedPath) !== undefined
+              ? { category: fileCategories.get(prefixedPath)! }
+              : {}),
           })
           session.registerAnalysis({
             filePath: prefixedPath,
@@ -1070,15 +1404,61 @@ export class IndexCodeGraph {
       const pass2Start = performance.now()
       progress(50, 'Resolving imports')
 
+      // Between the passes: prepare package facts for every workspace, then link re-exports,
+      // so that entry surfaces have final public bindings before any import is resolved.
+      const reexportStart = performance.now()
+      let reexportCount = 0
+      for (const adapter of adapters) {
+        if (adapter.packageResolution === undefined) continue
+        if (disabledPackageResolution.has(adapter)) continue
+        try {
+          adapter.packageResolution.prepare({
+            session,
+            workspaces: packageWorkspaces,
+            projectRoot: options.projectRoot,
+          })
+        } catch (err) {
+          diagnostics.push({
+            filePath: `${adapter.languages().join(',')}:<packageResolution>`,
+            message: String(err),
+          })
+          purgeDisabledAdapterClaims(adapter)
+        }
+      }
+      for (const adapter of adapters) {
+        if (adapter.reExportLinking === undefined) continue
+        try {
+          const linked = adapter.reExportLinking.link({
+            session,
+            packageToWorkspace: disabledPackageResolution.has(adapter)
+              ? new Map()
+              : packageToWorkspace,
+          })
+          session.addReferenceFacts(linked)
+          reexportCount += linked.publicBindings.length + linked.steps.length
+        } catch (err) {
+          diagnostics.push({
+            filePath: `${adapter.languages().join(',')}:<reExportLinking>`,
+            message: String(err),
+          })
+          // An adapter that only links re-exports has no package resolution to disable.
+          if (adapter.packageResolution !== undefined) purgeDisabledAdapterClaims(adapter)
+        }
+      }
+      phaseMetrics.reexports.durationMs += performance.now() - reexportStart
+      phaseMetrics.reexports.count = reexportCount
+
       const ownershipIndex = this.buildMethodOwnershipIndex(session)
       const symbolLookup: SymbolLookup = {
         findByName: (name, filePrefix) => session.findSymbolsByName(name, filePrefix),
         findByFile: (filePath) => session.findSymbolsByFile(filePath),
+        findById: (symbolId) => session.findSymbolById(symbolId),
       }
 
       // ── Pass 2: Resolve imports + extract relations (50-80%) ──
       let resolvedImportsProcessed = 0
       let relationsProcessed = 0
+      const importedSymbolByLocalName = new Map<string, string>()
       for (const [chunkIndex, chunk] of chunks.entries()) {
         const chunkRelations: Relation[] = []
         const resolvedImportsMap = new Map<string, ResolvedImports>()
@@ -1101,21 +1481,37 @@ export class IndexCodeGraph {
 
             const wsName = workspaceIdentityName(prefixedPath)
             const ws = options.workspaces.find((w) => w.name === wsName)
+            const wsRepoRoot =
+              ws?.codeRoot !== undefined ? repoRootByCodeRoot.get(ws.codeRoot) : undefined
 
             const analysis = session.getAnalysis(prefixedPath)
             if (!analysis) continue
 
+            const packageHelpers = packageImportResolver.forAdapter(adapter)
             const resolvedImports = adapter.resolveImports(analysis, {
               session,
-              qualifiedNames: session.getQualifiedNames(),
+              qualifiedNames: session.getQualifiedNames({
+                includeTests: fileCategories.get(prefixedPath) === 'test',
+              }),
               packageToWorkspace,
+              workspaces: packageWorkspaces,
+              packageEntryFiles: packageHelpers.packageEntryFiles,
+              resolvePackageExport: packageHelpers.resolvePackageExport,
               ...(ws?.codeRoot !== undefined ? { codeRoot: ws.codeRoot } : {}),
-              repoRoot: options.projectRoot,
+              ...(wsRepoRoot !== undefined ? { repoRoot: wsRepoRoot } : {}),
             })
             resolvedImportsMap.set(prefixedPath, resolvedImports)
+            if (resolvedImports.steps.length > 0) {
+              session.addReferenceFacts({ publicBindings: [], steps: resolvedImports.steps })
+            }
+            for (const diagnostic of resolvedImports.diagnostics) recordImportDiagnostic(diagnostic)
+            for (const [localName, symbolId] of resolvedImports.importMap) {
+              importedSymbolByLocalName.set(`${prefixedPath}\0${localName}`, symbolId)
+            }
             phaseMetrics.importResolution.count += resolvedImports.fileImports.length
           } catch (err) {
             errors.push({ filePath: prefixedPath, message: String(err) })
+            markStageFailed(prefixedPath, 'import-resolution-failed')
           }
         }
         phaseMetrics.importResolution.durationMs += performance.now() - importResolutionStart
@@ -1137,6 +1533,8 @@ export class IndexCodeGraph {
 
             const wsName = workspaceIdentityName(prefixedPath)
             const ws = options.workspaces.find((w) => w.name === wsName)
+            const wsRepoRoot =
+              ws?.codeRoot !== undefined ? repoRootByCodeRoot.get(ws.codeRoot) : undefined
 
             const analysis = session.getAnalysis(prefixedPath)
             if (!analysis) continue
@@ -1162,7 +1560,7 @@ export class IndexCodeGraph {
               session,
               resolvedImports,
               ...(ws?.codeRoot !== undefined ? { codeRoot: ws.codeRoot } : {}),
-              repoRoot: options.projectRoot,
+              ...(wsRepoRoot !== undefined ? { repoRoot: wsRepoRoot } : {}),
             })
             phaseMetrics.adapterRelations.durationMs += performance.now() - adapterRelationsStart
             phaseMetrics.adapterRelations.count += relations.length
@@ -1193,6 +1591,7 @@ export class IndexCodeGraph {
             }
           } catch (err) {
             errors.push({ filePath: prefixedPath, message: String(err) })
+            markStageFailed(prefixedPath, 'relation-build-failed')
           }
         }
 
@@ -1442,7 +1841,10 @@ export class IndexCodeGraph {
             specsIndexed++
             if (wsBreakdown) wsBreakdown.specsIndexed++
           } catch (err) {
-            errors.push({ filePath: repoSpec.name.toString(), message: String(err) })
+            errors.push({
+              filePath: `${ws.name}:${repoSpec.name.toString()}`,
+              message: String(err),
+            })
           }
         }
 
@@ -1487,16 +1889,6 @@ export class IndexCodeGraph {
           logicalIdByDeclarationSymbolId.set(declaration.symbolId, logicalId)
         }
       }
-      const reexportStart = performance.now()
-      let reexportCount = 0
-      for (const adapter of this.registry.getAdapters()) {
-        const linked = adapter.linkReExports?.(session, packageToWorkspace)
-        if (linked === undefined) continue
-        session.addReferenceFacts(linked)
-        reexportCount += linked.publicBindings.length + linked.steps.length
-      }
-      phaseMetrics.reexports.durationMs += performance.now() - reexportStart
-      phaseMetrics.reexports.count = reexportCount
       const coverageResolver = new ResolveSymbolReference(
         asGraphStore(new SessionReferenceStore(session)),
         () => Promise.resolve({ fresh: true, complete: true, reasonCodes: [] }),
@@ -1544,36 +1936,41 @@ export class IndexCodeGraph {
       )
       const serializedFingerprintMap = serializeFingerprintMap(currentFingerprintMap)
       const observations: IndexedInputObservation[] = []
-      if (errors.length === 0) {
-        observations.push(...specObservations)
-        for (const resourceId of allDiscoveredPaths) {
-          const resourceKind = indexedResourceKinds.get(resourceId)
-          const absolutePath = absolutePaths.get(resourceId)
-          const inputLocator = configRelativePaths.get(resourceId)
-          const indexedContentHash =
-            fileHashes.get(resourceId) ?? existingArtifactHashes.get(resourceId)
-          if (
-            resourceKind === undefined ||
-            absolutePath === undefined ||
-            inputLocator === undefined ||
-            indexedContentHash === undefined
-          ) {
-            continue
-          }
-          const stat = statSync(absolutePath)
-          observations.push({
-            workspace: workspaceIdentityName(resourceId),
-            resourceKind,
-            resourceId,
-            inputKind: IndexedInputKind.Filesystem,
-            inputLocator,
-            indexedContentHash,
-            lastObservedMtime: stat.mtimeMs,
-            lastObservedSize: stat.size,
-            generation: serializedFingerprintMap,
-            stale: false,
-          })
+      // Freshness and processing outcome are separate axes: a target that failed in this run has no
+      // observation (it shows as unknown until a later run indexes it), and every other target
+      // records the content that was seen, so a failure never keeps the graph stale.
+      const failedTargets = new Set(errors.map((error) => error.filePath))
+      observations.push(
+        ...specObservations.filter((observation) => !failedTargets.has(observation.resourceId)),
+      )
+      for (const resourceId of allDiscoveredPaths) {
+        const resourceKind = indexedResourceKinds.get(resourceId)
+        const absolutePath = absolutePaths.get(resourceId)
+        const inputLocator = projectRelativePaths.get(resourceId)
+        const indexedContentHash =
+          fileHashes.get(resourceId) ?? existingArtifactHashes.get(resourceId)
+        if (
+          failedTargets.has(resourceId) ||
+          resourceKind === undefined ||
+          absolutePath === undefined ||
+          inputLocator === undefined ||
+          indexedContentHash === undefined
+        ) {
+          continue
         }
+        const stat = statSync(absolutePath)
+        observations.push({
+          workspace: workspaceIdentityName(resourceId),
+          resourceKind,
+          resourceId,
+          inputKind: IndexedInputKind.Filesystem,
+          inputLocator,
+          indexedContentHash,
+          lastObservedMtime: stat.mtimeMs,
+          lastObservedSize: stat.size,
+          generation: serializedFingerprintMap,
+          stale: false,
+        })
       }
       const hierarchyStart = performance.now()
       const crossFileOverrides = this.deriveCrossFileOverrideRelations(
@@ -1593,13 +1990,27 @@ export class IndexCodeGraph {
             ? binding.targetId
             : undefined,
       }))
-      const localBindings = session.getLocalBindings().map((binding) => ({
-        ...binding,
-        targetId:
-          binding.targetId !== undefined && logicalIds.has(binding.targetId)
-            ? binding.targetId
-            : undefined,
-      }))
+      const logicalIdByDeclaration = new Map<string, string>()
+      for (const [logicalId, declarations] of session.getDeclarationsByLogicalId()) {
+        for (const declaration of declarations) {
+          logicalIdByDeclaration.set(declaration.symbolId, logicalId)
+        }
+      }
+      const localBindings = session.getLocalBindings().map((binding) => {
+        // An import local binding takes its target from the import resolved in pass 2.
+        const importedSymbolId = importedSymbolByLocalName.get(
+          `${binding.filePath}\0${binding.localName}`,
+        )
+        const targetId =
+          binding.targetId ??
+          (importedSymbolId === undefined
+            ? undefined
+            : logicalIdByDeclaration.get(importedSymbolId))
+        return {
+          ...binding,
+          targetId: targetId !== undefined && logicalIds.has(targetId) ? targetId : undefined,
+        }
+      })
       const knownReferenceIds = new Set([
         ...logicalIds,
         ...publicBindings.map((binding) => binding.id),
@@ -1616,7 +2027,7 @@ export class IndexCodeGraph {
         steps: session
           .getResolutionSteps()
           .filter((step) => knownReferenceIds.has(step.fromId) && knownReferenceIds.has(step.toId)),
-        coverage: allDiscoveredPaths.map(
+        coverage: [...allDiscoveredPaths, ...sizeSkipped.keys()].map(
           (filePath): IndexCoverage =>
             coverageByFilePath.get(filePath) ?? {
               filePath,
@@ -1646,16 +2057,12 @@ export class IndexCodeGraph {
       }
       const writeSession = this.store.beginBulkIndexSession({
         onProgress: onBulkStep,
-        replaceCodeGraph: fullRebuild,
+        replaceCodeGraph: fullRebuild && runReplacesWholeGraph,
         rebuildSearchIndexes,
         ...(options.vcsRef === undefined ? {} : { vcsRef: options.vcsRef }),
         graphFingerprint: serializedFingerprintMap,
-        ...(errors.length === 0
-          ? {
-              indexedWorkspaces: [...indexedWorkspaceNames],
-              clearGraphStaleLatch: true,
-            }
-          : {}),
+        indexedWorkspaces: [...indexedWorkspaceNames],
+        clearGraphStaleLatch: true,
       })
       try {
         const persistenceStart = performance.now()
@@ -1736,16 +2143,37 @@ export class IndexCodeGraph {
         })
       }
 
-      session.setAdapterState('napi-keepalive', null)
+      const sortedLargestSkipped = [...sizeSkipped.values()]
+        .sort((a, b) => b.sizeBytes - a.sizeBytes || compareCodeUnits(a.filePath, b.filePath))
+        .slice(0, SIZE_SKIP_LIST_LIMIT)
+      const sortedSizeExempt = [...sizeExempt.values()].sort(
+        (a, b) => b.sizeBytes - a.sizeBytes || compareCodeUnits(a.filePath, b.filePath),
+      )
+
+      const overlaps: WorkspaceOverlap[] = []
+      for (const [projectRelativePath, owners] of overlapOwners) {
+        if (owners.length >= 2) overlaps.push({ projectRelativePath, workspaces: owners })
+      }
+      overlaps.sort((a, b) => compareCodeUnits(a.projectRelativePath, b.projectRelativePath))
+
       return {
-        filesDiscovered: allDiscoveredPaths.length,
+        filesDiscovered: allDiscoveredPaths.length + sizeSkipped.size,
         filesIndexed: filesIndexed + documentsIndexed,
         documentsIndexed,
         filesRemoved: filesRemovedCount,
         filesSkipped: skippedFiles.length,
+        filesSkippedForSize: sizeSkipped.size,
+        largestSkippedForSize: sortedLargestSkipped,
+        sizeExemptAnalysed: sortedSizeExempt,
+        workspaceOverlaps: overlaps.slice(0, WORKSPACE_OVERLAP_LIST_LIMIT),
+        workspaceOverlapCount: overlaps.length,
         specsDiscovered: totalSpecsToProcess,
         specsIndexed,
-        errors,
+        errors: errors.filter(
+          (error, index) =>
+            errors.findIndex((other) => other.filePath === error.filePath) === index,
+        ),
+        diagnostics,
         duration: performance.now() - start,
         workspaces,
         vcsRef: options.vcsRef ?? null,
@@ -1755,8 +2183,23 @@ export class IndexCodeGraph {
         phaseMetrics,
         coverage: summarizeCoverage(referenceFacts.coverage),
         coverageDiagnostics: coverageProjection.diagnostics,
+        logicalDiagnostics: session.getLogicalDiagnostics(),
+        importDiagnostics: {
+          total: [...importDiagnosticCounts.values()].reduce((sum, count) => sum + count, 0),
+          byReason: Object.fromEntries(importDiagnosticCounts),
+          samples: importDiagnosticSamples,
+          externalPackageImports,
+          adaptersWithoutPackageResolution: listDisabledAdapters(),
+        } satisfies ImportDiagnosticSummary,
       }
     } finally {
+      if (activeSession !== undefined) {
+        closeParserResourceEpoch(activeSession.parserResources, (failure) =>
+          Logger.debug(
+            `[IndexCodeGraph] parser resource disposal failed while closing the run: ${failure.message}`,
+          ),
+        )
+      }
       rmSync(stageDir, { recursive: true, force: true })
     }
   }
@@ -1875,19 +2318,21 @@ export class IndexCodeGraph {
         const superMethods = ownershipIndex.methodsByOwnerId.get(superTypeId)
         if (superMethods === undefined) continue
         for (const [name, subMethodIds] of subMethods) {
-          const superMethodId = superMethods.get(name)?.[0]
-          if (superMethodId === undefined) continue
-          for (const subId of subMethodIds) {
-            const key = `${subId}:${RelationType.Overrides}:${superMethodId}`
-            if (seenOverrideKeys.has(key)) continue
-            relations.push(
-              createRelation({
-                source: subId,
-                target: superMethodId,
-                type: RelationType.Overrides,
-              }),
-            )
-            seenOverrideKeys.add(key)
+          const superMethodIds = superMethods.get(name)
+          if (superMethodIds === undefined || superMethodIds.length === 0) continue
+          for (const superMethodId of superMethodIds) {
+            for (const subId of subMethodIds) {
+              const key = `${subId}:${RelationType.Overrides}:${superMethodId}`
+              if (seenOverrideKeys.has(key)) continue
+              relations.push(
+                createRelation({
+                  source: subId,
+                  target: superMethodId,
+                  type: RelationType.Overrides,
+                }),
+              )
+              seenOverrideKeys.add(key)
+            }
           }
         }
       }

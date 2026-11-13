@@ -16,11 +16,13 @@ import {
 } from '../../domain/services/change-validity.js'
 import { type NextAction } from './get-status.js'
 import { IncompatibleSchemaError } from '../../domain/errors/incompatible-schema-error.js'
+import { ReadOnlyWorkspaceError } from '../../domain/errors/read-only-workspace-error.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { loadPersistedSpecDependsOn } from './_shared/load-persisted-spec-depends-on.js'
 import { loadPersistedSpecSchema } from './_shared/load-persisted-spec-schema.js'
+import { assertInvalidationPolicyOverride } from './_shared/assert-invalidation-policy.js'
 import { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
 import { type RefreshImplementationTracking } from './refresh-implementation-tracking.js'
 import { type ReconcileChangeValidity } from './reconcile-change-validity.js'
@@ -117,6 +119,12 @@ export class EditChange {
    * @param input - Edit parameters
    * @returns The updated change and whether approvals were invalidated
    * @throws {ChangeNotFoundError} If no change with the given name exists
+   * @throws {InvalidInputError} If `invalidation` contains an invalid artifact or workflow policy
+   * @throws {InvalidSpecIdError} If an added spec ID is empty, blank, or malformed
+   * @throws {WorkspaceNotFoundError} If an added spec ID names an unknown workspace
+   * @throws {ReadOnlyWorkspaceError} If an added spec belongs to a readOnly workspace
+   * @throws {IncompatibleSchemaError} If an added spec uses an incompatible persisted schema
+   * @throws {SpecNotInChangeError} If a spec to remove is not in the change's specIds
    */
   async execute(input: EditChangeInput): Promise<EditChangeResult> {
     const change = await this._changes.get(input.name)
@@ -124,8 +132,14 @@ export class EditChange {
       throw new ChangeNotFoundError(input.name)
     }
 
-    const hasDescriptionChange = input.description !== undefined
-    const resolvedPolicy = resolveInvalidationPolicy(change.invalidationPolicy, input.invalidation)
+    const invalidationOverride = assertInvalidationPolicyOverride(input.invalidation)
+
+    const hasDescriptionChange =
+      input.description !== undefined && input.description !== change.description
+    const resolvedPolicy = resolveInvalidationPolicy(
+      change.invalidationPolicy,
+      invalidationOverride,
+    )
     const policyChanged = !samePolicy(change.invalidationPolicy, resolvedPolicy)
     const hasSpecChanges =
       (input.addSpecIds !== undefined && input.addSpecIds.length > 0) ||
@@ -135,9 +149,42 @@ export class EditChange {
       return editResult(change, false, resolvedPolicy)
     }
 
-    const actor = await this._actor.identity()
     const workspaces = await this._listWorkspaces.execute()
     const workspaceMap = new Map(workspaces.map((ws) => [ws.name, ws]))
+
+    const parsedAdds =
+      input.addSpecIds !== undefined && input.addSpecIds.length > 0
+        ? input.addSpecIds.map((id) => parseSpecId(id, { workspaces }))
+        : undefined
+
+    if (parsedAdds !== undefined) {
+      const readOnlyOffenders = parsedAdds.filter(
+        (parsed) => workspaceMap.get(parsed.workspace)?.ownership === 'readOnly',
+      )
+      if (readOnlyOffenders.length > 0) {
+        const lines = readOnlyOffenders.map(
+          (parsed) =>
+            `Cannot add spec "${parsed.specId}" to change — workspace "${parsed.workspace}" is readOnly.`,
+        )
+        throw new ReadOnlyWorkspaceError(
+          `${lines.join('\n')}\n\nReadOnly workspaces are protected: their specs and code cannot be modified by changes.`,
+        )
+      }
+    }
+
+    const addSpecIds = parsedAdds?.map((parsed) => parsed.specId)
+    const removeNormalized =
+      input.removeSpecIds !== undefined
+        ? input.removeSpecIds.map((id) => {
+            try {
+              return parseSpecId(id, { workspaces }).specId
+            } catch {
+              return id
+            }
+          })
+        : undefined
+    const removeSpecIds =
+      removeNormalized === undefined ? undefined : [...new Set(removeNormalized)]
 
     if (hasSpecChanges) {
       const { schema } = await this._resolveChangeSchema.execute({
@@ -146,8 +193,8 @@ export class EditChange {
         schemaVersion: change.schemaVersion,
       })
 
-      if (input.addSpecIds !== undefined && input.addSpecIds.length > 0) {
-        for (const specId of input.addSpecIds) {
+      if (addSpecIds !== undefined && addSpecIds.length > 0) {
+        for (const specId of addSpecIds) {
           const persisted = await loadPersistedSpecSchema(workspaceMap, specId)
           const specSchemaName = persisted.schema !== null ? persisted.schema.name : schema.name()
           const isCompatible =
@@ -159,21 +206,39 @@ export class EditChange {
         }
       }
 
-      return this._executeScopeEdit(
-        input,
-        actor,
-        workspaceMap,
-        resolvedPolicy,
-        policyChanged,
-        hasDescriptionChange,
-      )
+      const hasEffectiveAdds = (addSpecIds ?? []).some((id) => !change.specIds.includes(id))
+      const hasRemoveInputs = removeSpecIds !== undefined && removeSpecIds.length > 0
+
+      if (hasEffectiveAdds || hasRemoveInputs) {
+        const actor = await this._actor.identity()
+        return this._executeScopeEdit(
+          {
+            ...input,
+            ...(addSpecIds !== undefined ? { addSpecIds } : {}),
+            ...(removeSpecIds !== undefined ? { removeSpecIds } : {}),
+          },
+          actor,
+          workspaceMap,
+          resolvedPolicy,
+          policyChanged,
+          hasDescriptionChange,
+        )
+      }
     }
+
+    if (!hasDescriptionChange && !policyChanged) {
+      return editResult(change, false, resolvedPolicy)
+    }
+
+    let actor: Awaited<ReturnType<ActorResolver['identity']>> | undefined
+    const resolveActor = async (): Promise<Awaited<ReturnType<ActorResolver['identity']>>> =>
+      (actor ??= await this._actor.identity())
 
     const { result: persisted, change: initialChange } = await this._changes.mutate(
       input.name,
-      (freshChange) => {
+      async (freshChange) => {
         if (hasDescriptionChange) {
-          freshChange.updateDescription(input.description ?? '', actor)
+          freshChange.updateDescription(input.description ?? '', await resolveActor())
         }
 
         if (policyChanged) {
@@ -289,6 +354,47 @@ export class EditChange {
   }
 
   /**
+   * Tells whether applying the request to the persisted change would alter nothing.
+   *
+   * A request whose resulting `specIds`, description and invalidation policy equal the persisted
+   * ones persists nothing and resolves no actor. A removal of a spec that is not in the change is
+   * never a no-op: the mutation must run so it fails with `SpecNotInChangeError`.
+   *
+   * @param change - The persisted change snapshot
+   * @param input - The edit request
+   * @param invalidationPolicy - The validated policy from the request, if any
+   * @param addSpecIds - Normalized spec IDs to add
+   * @param removeSpecIds - Normalized, de-duplicated spec IDs to remove
+   * @returns `true` when nothing would change
+   */
+  private _isNoOp(
+    change: Change,
+    input: EditChangeInput,
+    invalidationPolicy: InvalidationPolicy | undefined,
+    addSpecIds: readonly string[] | undefined,
+    removeSpecIds: readonly string[] | undefined,
+  ): boolean {
+    if (input.description !== undefined && input.description !== (change.description ?? '')) {
+      return false
+    }
+    if (invalidationPolicy !== undefined && invalidationPolicy !== change.invalidationPolicy) {
+      return false
+    }
+    const specIds = [...change.specIds]
+    for (const id of removeSpecIds ?? []) {
+      const idx = specIds.indexOf(id)
+      if (idx === -1) return false
+      specIds.splice(idx, 1)
+    }
+    for (const id of addSpecIds ?? []) {
+      if (!specIds.includes(id)) specIds.push(id)
+    }
+    return (
+      specIds.length === change.specIds.length && specIds.every((id, i) => id === change.specIds[i])
+    )
+  }
+
+  /**
    * Checks whether a spec exists in its workspace repository.
    *
    * @param workspaces - Orchestrated workspace map
@@ -299,7 +405,7 @@ export class EditChange {
     workspaces: ReadonlyMap<string, ProjectWorkspace>,
     specId: string,
   ): Promise<boolean> {
-    const { workspace, capPath } = parseSpecId(specId)
+    const { workspace, capPath } = parseSpecId(specId, { workspaces: workspaces.keys() })
     const ws = workspaces.get(workspace)
     if (ws === undefined) return false
     const spec = await ws.specRepo.get(SpecPath.parse(capPath))

@@ -1,6 +1,7 @@
 ---
 title: SDK
-sidebar_position: 3
+description: Single import surface for specd delivery hosts, wiring `@specd/core` and `@specd/code-graph`.
+sidebar_position: 1
 ---
 
 # @specd/sdk
@@ -154,31 +155,250 @@ Both are pure synchronous functions: no I/O, no kernel access, no process side e
 
 ## Orchestration
 
-| Function                     | Purpose                                                      |
-| ---------------------------- | ------------------------------------------------------------ |
-| `buildProjectStatusSnapshot` | `GetProjectSummary` + optional `GetGraphHealth` / hotspots   |
-| `runIndexProjectGraph`       | `listWorkspaces` + VCS ref + `IndexProjectGraph`             |
-| `runIsolatedGraphIndex`      | Code Graph-owned isolated child execution for a trusted task |
-| `buildImplementationReview`  | Core raw tracking + one Code Graph resolution batch          |
+| Function                     | Purpose                                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `buildProjectStatusSnapshot` | `GetProjectSummary` + optional `GetGraphHealth` / hotspots                                             |
+| `runIndexProjectGraph`       | `listWorkspaces` + VCS ref + `IndexProjectGraph`                                                       |
+| `runIsolatedGraphIndex`      | Code Graph-owned isolated child execution for a trusted task                                           |
+| `buildImplementationReview`  | Core raw tracking + one Code Graph resolution batch                                                    |
+| `runGraphSearch`             | Multi-modal graph search with provider lifecycle and `projectRelativePath` projection                  |
+| `runGraphHotspots`           | Architectural hotspot ranking with provider lifecycle and `projectRelativePath` projection             |
+| `runGraphWhy`                | Explains why a path is excluded, classified or indexed (`ExplainGraphPath`) with provider lifecycle    |
+| `runGraphImpact`             | Target/multi-target blast radius impact analysis with `projectRelativePath` projection                 |
+| `toProjectRelativePath`      | Pure projection mapping canonical graph paths (`<workspace>:<relPath>`) to project-root relative paths |
+
+### Resolution-preserving symbol impact
+
+`runGraphImpact` preserves the resolved identity layer. Hosts receive
+`targetKind` and `resolvedTarget` as `logical-target`, `declaration`, or
+`public-binding`; ambiguous and unresolved selectors never start traversal.
+
+```typescript
+import { openSpecdHost, runGraphImpact } from '@specd/sdk'
+
+const host = await openSpecdHost({ startDir: process.cwd() })
+const result = await runGraphImpact(host, {
+  symbol: 'Change.execute',
+  direction: 'dependents',
+})
+
+if (result.kind === 'symbol' && result.status === 'resolved') {
+  console.log(result.targetKind)
+  console.log(result.declarations)
+  console.log(result.semanticCounts)
+  console.log(result.physicalEvidence)
+}
+```
+
+`runGraphImpact` reports every selector outcome with its own status instead of folding
+them into `not_found`:
+
+```typescript
+import { openSpecdHost, runGraphImpact } from '@specd/sdk'
+
+const host = await openSpecdHost({
+  options: { graph: { onWarning: (message) => console.warn(message) } },
+})
+const result = await runGraphImpact(host, { symbol: 'Change.execute' })
+
+if (result.kind === 'symbol') {
+  switch (result.status) {
+    case 'resolved':
+      console.log(result.targetKind, result.semanticCounts)
+      break
+    case 'ambiguous':
+      // One candidate per logical target; no traversal was started.
+      console.log(result.totalCandidates, result.candidates)
+      break
+    case 'unresolved':
+      // Stale or partial graph evidence, for example CONTENT_DIRTY or COVERAGE_PARTIAL.
+      console.log(result.reasonCode)
+      break
+    case 'not_found':
+      console.log('no such symbol')
+      break
+  }
+}
+```
+
+Public export results use the same statuses (`not_found`, `ambiguous` with `candidates`,
+`unresolved`). A resolved export result carries `coveringSpecs` (also on
+`canonicalImpact`), the specs covering the canonical target and its dependents, with
+file evidence projected to `projectRelativePath`; the exact-route `bindingImpact` has none. A `from` value that begins with a Windows drive letter is a file selector;
+only `workspace:path` values are treated as canonical surfaces. The `onWarning` callback
+receives non-fatal events such as recovery of a stale graph index lock.
+
+Selector resolution returns the typed logical target for an overload set, so a name that
+matches several declarations of one logical symbol is analysed once with all of them.
+`impact.target` carries the canonical logical identity for a logical target; the
+deprecated `symbol` summary is derived after traversal and never selects what is
+traversed. Public export results (`resolution`, `binding.projectRelativeSurface`,
+ambiguous `candidates`) and `coveringSpecs[].evidence[].projectRelativePath` are
+projected like every other nested location.
+
+Logical results contain every contributing declaration. `semanticCounts` counts
+unique logical and physical-only targets, while `physicalEvidence` retains concrete
+declaration edges and locations. Exact declaration results use one physical seed.
+Every retained path is projected to `projectRelativePath` without additional graph
+reads. Projection is recursive: it covers top-level declarations,
+`resolvedTarget.declarations[].location`, semantic affected-target declarations, and
+every nested source/target location in physical evidence. Delivery hosts receive those
+paths unchanged and must not reconstruct them from canonical IDs. Deprecated aggregate
+and primary-symbol projections remain for one compatibility release and must not be used
+to drive traversal.
+| `splitWorkspaceIdentity` | Pure helper decomposing canonical identities into workspace name and relative path |
 
 All return structured data — formatting stays in delivery presenters.
+
+### Code Graph Query Orchestration & Path Projections
+
+Delivery hosts (CLI, MCP, IDE plugins) query the Code Graph through SDK orchestration functions that manage provider lifecycle and project internal canonical paths (`<workspace>:<relPath>`) into repository-relative filesystem paths (`projectRelativePath`):
+
+```typescript
+import {
+  openSpecdHost,
+  runGraphSearch,
+  runGraphHotspots,
+  runGraphImpact,
+  toProjectRelativePath,
+  splitWorkspaceIdentity,
+} from '@specd/sdk'
+
+const host = await openSpecdHost({ startDir: process.cwd() })
+
+// 1. Multi-modal search: symbols, files, specs, documents
+const searchResult = await runGraphSearch(host, {
+  query: 'createKernel',
+  categories: ['symbols', 'files'],
+  limit: 10,
+})
+// searchResult.hits[0].projectRelativePath === 'packages/core/src/bootstrap.ts'
+
+// 2. Architectural hotspots: ranked symbols by coupling impact
+const hotspotsResult = await runGraphHotspots(host, {
+  minRisk: 'HIGH',
+  limit: 20,
+})
+// hotspotsResult.hotspots[0].projectRelativePath === 'packages/core/src/domain/entities/change.ts'
+
+// 3. Blast radius impact analysis: single/multi-file, symbol, or spec
+const impactResult = await runGraphImpact(host, {
+  target: {
+    type: 'file',
+    filePaths: ['packages/core/src/domain/entities/change.ts'],
+  },
+  direction: 'dependents',
+  depth: 3,
+})
+// impactResult.projectRelativeTargets === ['packages/core/src/domain/entities/change.ts']
+// impactResult.impactedFiles[0].projectRelativePath === 'packages/cli/src/commands/changes/status.ts'
+```
+
+#### Synchronous Path Projection Utilities
+
+The SDK provides pure projection utilities that map SQLite canonical identifiers to repository-relative filesystem paths:
+
+- `toProjectRelativePath(config, canonicalPath)`: Resolves `<workspace>:<relPath>` against `config.projectRoot` and the workspace's declared `codeRoot`.
+- `splitWorkspaceIdentity(canonicalPath)`: Purely decomposes a canonical identity string into `{ workspace, relPath }`.
+
+#### Process-Isolated Indexing (`runIsolatedGraphIndex`)
 
 `runIsolatedGraphIndex` is the SDK re-export for a host that needs to run a trusted,
 installed graph-index task in a child process. The host supplies a graph storage root,
 an absolute task path or `file:` URL, JSON-serializable input, and optionally receives
-ordered progress values. Code Graph acquires and releases the shared writer lock,
-launches and supervises the child, validates IPC, and forwards `SIGINT`/`SIGTERM` only
-for the active run. Typed worker failures are re-exported alongside the function.
+ordered progress and activity events. Code Graph acquires and releases the shared writer lock,
+launches and supervises the child with piped stdio and `--expose-gc`, validates IPC, and
+forwards `SIGINT`/`SIGTERM` only for the active run.
+
+```typescript
+import { runIsolatedGraphIndex, GraphIndexWorkerEvent, GraphIndexWorkerError } from '@specd/sdk'
+
+const result = await runIsolatedGraphIndex({
+  storageRoot: '.specd/config/graph',
+  taskModulePath: '/path/to/task.mjs',
+  input: { force: false },
+  onProgress: (progress) => console.log('Progress:', progress),
+  onEvent: (event: GraphIndexWorkerEvent) => {
+    switch (event.kind) {
+      case 'activity':
+        // Activity heartbeat from worker (e.g. file item)
+        break
+      case 'worker-silent':
+        // Emitted when worker produces no IPC activity for >= 10s
+        console.warn(`Worker silent for ${event.silentForMs}ms on ${event.item}`)
+        break
+      case 'stale-lock-recovered':
+        // Emitted when a stale writer lock was safely removed
+        console.warn(`Recovered stale lock at ${event.lockPath}`)
+        break
+    }
+  },
+})
+```
+
+##### Worker Failure Classification & Diagnostics
+
+When the child process encounters an unrecoverable failure, `runIsolatedGraphIndex` rejects with a typed `GraphIndexWorkerError` instance carrying `diagnostics: GraphIndexWorkerDiagnostics`:
+
+- **`cause: GraphIndexFailureCause`**: Classified cause of failure:
+  - `'start-failed'`: Child failed to spawn or fork, or its IPC channel could not be established.
+  - `'task-contract'`: Task module missing required export or returned invalid structure.
+  - `'task-error'`: Task threw an unhandled exception during execution.
+  - `'protocol'`: Invalid, late or duplicate IPC message, or a host progress or event callback that threw.
+  - `'cancelled'`: Process was interrupted by a signal that the supervisor forwarded.
+  - `'resource-limit'`: Child terminated after V8 reported memory exhaustion on its standard error.
+  - `'native-crash'`: Process crashed in a native addon / tree-sitter binding (`SIGSEGV`, `SIGBUS`, `SIGILL`, `SIGABRT`, or a Windows access-violation or abort exit code).
+  - `'exited'`: Any other exit without a valid terminal message.
+- **`lastActivity`**: `{ item: string, agoMs: number } | null` identifying the last task item processed before failure.
+- **`stdoutTail`**: Trailing output (up to 16 KiB) captured from child `stdout`.
+- **`stderrTail`**: Trailing output (up to 16 KiB) captured from child `stderr`.
+
+#### Project Graph Indexing (`runIndexProjectGraph`)
 
 The task itself can call `runIndexProjectGraph` after reconstructing the intended SDK
 context. This separates parent-side isolation from child-side project orchestration.
 The SDK intentionally does not expose raw lock acquisition, lock paths or leases,
 handoff tokens, child bootstrap controls, or raw IPC envelopes.
 
-For a transient `runIndexProjectGraph({ force: true })` call, the SDK may repair a
-typed `GraphStorageRecoveryRequiredError` exactly once: it closes the failed transient
-provider, recreates closed derived storage, and retries open. Healthy force runs are
-logical full rebuilds and do not physically recreate storage. Non-forced calls,
+`runIndexProjectGraph` supports fine-grained typed indexing events via `onEvent`:
+
+```typescript
+import { runIndexProjectGraph, IndexEvent } from '@specd/sdk'
+
+const indexResult = await runIndexProjectGraph({
+  host,
+  force: false,
+  onEvent: (event: IndexEvent) => {
+    switch (event.kind) {
+      case 'file-activity':
+        // { kind: 'file-activity', file: { workspace, path, sizeBytes } }
+        break
+      case 'file-skipped':
+        // { kind: 'file-skipped', file: { workspace, path, sizeBytes }, reason: 'file-too-large' }
+        break
+      case 'resource-disposal-failed':
+        // { kind: 'resource-disposal-failed', resourceIndex, message }
+        break
+    }
+  },
+})
+
+// Result includes file size gating fields:
+console.log('Skipped files:', indexResult.filesSkippedForSize)
+console.log('Largest skipped:', indexResult.largestSkippedForSize)
+console.log('Exempt files analysed:', indexResult.sizeExemptAnalysed)
+console.log('Failures:', indexResult.errors) // files or specs that failed
+console.log('Diagnostics:', indexResult.diagnostics) // package-resolution problems, not failures
+```
+
+For a transient `runIndexProjectGraph` call, the SDK may repair a typed
+`GraphStorageRecoveryRequiredError` exactly once: it closes the failed transient
+provider, recreates closed derived storage, and retries open. With `force: true` it
+repairs any typed recoverable open failure; without `force` it repairs only an
+incompatible schema (`SCHEMA_INCOMPATIBLE`), because that store cannot be read at all.
+A derivation mismatch detected before any write is repaired the same way, by recreating
+the closed store once and indexing it empty. Healthy force runs are logical full
+rebuilds and do not physically recreate storage. Other typed failures without `force`,
 explicit providers, recovery failures, second-open failures, and unrelated errors do
 not retry or receive deletion authority.
 
@@ -254,15 +474,19 @@ them in the SDK or CLI.
 
 `@specd/cli` and `@specd/mcp` depend on `@specd/sdk` only — no direct `@specd/core` or `@specd/code-graph` runtime imports in delivery hosts.
 
-| CLI surface                            | SDK entry                                                        |
-| -------------------------------------- | ---------------------------------------------------------------- |
-| `resolveCliContext`                    | `openSpecdHost` + `buildCliKernelOptions`                        |
-| `project status`                       | `buildProjectStatusSnapshot`                                     |
-| `project context-specs`                | `kernel.project.resolveContextSpecs` (core re-export types)      |
-| `graph stats`                          | `withOpenGraphProvider` + `createGetGraphHealth`                 |
-| `graph index`                          | `runIsolatedGraphIndex` → packaged task → `runIndexProjectGraph` |
-| `graph search` / `hotspots` / `impact` | `withOpenGraphProvider` via `withProvider`                       |
-| `changes implementation` / status      | `buildImplementationReview`                                      |
+| CLI surface                       | SDK entry                                                        |
+| --------------------------------- | ---------------------------------------------------------------- |
+| `resolveCliContext`               | `openSpecdHost` + `buildCliKernelOptions`                        |
+| `project status`                  | `buildProjectStatusSnapshot`                                     |
+| `project context-specs`           | `kernel.project.resolveContextSpecs` (core re-export types)      |
+| `graph stats`                     | `withOpenGraphProvider` + `createGetGraphHealth`                 |
+| `graph index`                     | `runIsolatedGraphIndex` → packaged task → `runIndexProjectGraph` |
+| `graph search`                    | `runGraphSearch`                                                 |
+| `graph hotspots`                  | `runGraphHotspots`                                               |
+| `graph why`                       | `runGraphWhy`                                                    |
+| `graph impact`                    | `runGraphImpact`                                                 |
+| `changes implementation` / status | `buildImplementationReview`                                      |
+| `changes deps <name> <specId>`    | `kernel.changes.getSpecDeps` (normalized `default:...` ID)       |
 
 ## Re-exports
 
@@ -270,9 +494,11 @@ The SDK root exports explicit symbols from the curated `@specd/core` and `@specd
 
 - `createDefaultConfigLoader`, `createConfigWriter`, `createKernel`, kernel-equivalent `createX` factories, and repository factories
 - Standalone `createX` factories (e.g. `createGetStatus`, `createResolveSchema`) for hosts that need a single use case without `createKernel`
-- Host orchestration: `openSpecdHost`, `withOpenGraphProvider`, `buildProjectStatusSnapshot`, `runIndexProjectGraph`, `runIsolatedGraphIndex`, `buildImplementationReview`
-- Isolated worker contracts and typed failures: `GraphIndexJsonValue`, `GraphIndexTask`, `RunIsolatedGraphIndexInput`, `GraphIndexWorkerStartError`, `GraphIndexTaskContractError`, `GraphIndexTaskExecutionError`, `GraphIndexWorkerProtocolError`, `GraphIndexWorkerExitError`, `GraphIndexWorkerSignalError`, and `GraphIndexProgressHandlerError`
+- Host orchestration: `openSpecdHost`, `withOpenGraphProvider`, `buildProjectStatusSnapshot`, `runIndexProjectGraph`, `runIsolatedGraphIndex`, `buildImplementationReview`, `runGraphSearch`, `runGraphHotspots`, `runGraphWhy`, `runGraphImpact`, `toProjectRelativePath`, `splitWorkspaceIdentity`
+- Isolated worker contracts, diagnostics, and typed failures: `GraphIndexJsonValue`, `GraphIndexTask`, `RunIsolatedGraphIndexInput`, `GraphIndexWorkerStartError`, `GraphIndexTaskContractError`, `GraphIndexTaskExecutionError`, `GraphIndexWorkerProtocolError`, `GraphIndexWorkerExitError`, `GraphIndexWorkerSignalError`, `GraphIndexProgressHandlerError`, `GraphIndexWorkerError`, `GraphIndexWorkerEvent`, `GraphIndexFailureCause`, `GraphIndexWorkerDiagnostics`
+- Index events and size gating: `IndexEvent`, `FileActivityEvent`, `FileSkippedEvent`, `ResourceDisposalFailedEvent`, `IndexEventReceiver`, `SizeSkippedFile`, `SizeExemptFile`, `DEFAULT_MAX_FILE_BYTES`
 - Graph helpers: `createGetGraphHealth`, `GetGraphHealthResult`, `IndexResult`, `HotspotResult`, `GraphProviderStaleError`, `GraphStorageRecoveryRequiredError`, `GraphStoreRecreateRequiresClosedError`
+- Spec ID helpers: `parseSpecId` (strict; accepts `{ workspaces }` and resolves bare IDs to `default:`), `isFullyQualifiedSpecId`, `isValidWorkspaceName`, and `kernel.changes.getSpecDeps` / `createGetChangeSpecDeps` for reading a change spec's declared dependencies with a normalized ID
 - `SDK_VERSION`, `CORE_VERSION`, `CODE_GRAPH_VERSION`
 
 For package-level semantics (domain model, graph indexing, plugin ports), see the **Core** and **Code graph** package reference sections.

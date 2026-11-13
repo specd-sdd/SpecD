@@ -170,6 +170,20 @@
 - **WHEN** `analyzeImpact(store, target.id, 'upstream')` is called
 - **THEN** overriding methods are included in `affectedSymbols`
 
+#### Scenario: Test callers do not inflate risk level or dependents
+
+- **GIVEN** a production symbol called by 1 production module and 20 test files
+- **WHEN** `analyzeImpact(store, symbol.id, 'upstream')` is called with default categories
+- **THEN** `directDependents` is 1
+- **AND** `riskLevel` is `LOW`
+- **AND** `omittedCounts.tests` is 20
+
+#### Scenario: Anchored test target traverses dependencies
+
+- **GIVEN** a test file target `test/my.spec.ts`
+- **WHEN** `analyzeFileImpact(store, 'test/my.spec.ts', 'downstream')` is called
+- **THEN** downstream dependencies of `test/my.spec.ts` are returned in `affectedFiles`
+
 ### Requirement: Filtered impact results
 
 #### Scenario: Omitted filter preserves legacy impact
@@ -219,6 +233,13 @@
 - **WHEN** filtered impact analysis executes
 - **THEN** the store predicates exclude those candidates before the final limit
 - **AND** admitted candidates fill the deterministic result up to that limit
+
+#### Scenario: Category filter prunes BFS traversal through test files
+
+- **GIVEN** module A called by test file T, and test file T also imports module B
+- **WHEN** `analyzeImpact(store, A.id, 'both')` is called with default categories
+- **THEN** BFS expansion halts at test file T
+- **AND** module B is NOT reached through test file T
 
 ### Requirement: Spec impact
 
@@ -355,6 +376,36 @@
 - **AND** if several case-exact candidates exist, bounded ambiguity is returned with no traversal
 - **AND** prefix and textual discovery matches are ignored
 
+### Requirement: Logical-target impact aggregation
+
+#### Scenario: Every declaration seeds logical impact
+
+- **GIVEN** one logical target has several physical declarations with different dependency routes
+- **WHEN** logical symbol impact is analyzed
+- **THEN** traversal starts from every contributing declaration
+- **AND** all physical routes remain available as evidence
+
+#### Scenario: Logical aggregation preserves physical counts
+
+- **GIVEN** several reached declarations map to the same logical target
+- **WHEN** impact results are aggregated
+- **THEN** the logical target appears once at its shallowest semantic depth
+- **AND** logical-target counts and physical-occurrence counts remain explicitly distinct
+
+#### Scenario: Exact impact is not implicitly widened
+
+- **GIVEN** an exact declaration or public binding route is selected
+- **WHEN** impact is analyzed
+- **THEN** traversal preserves the selected physical or binding semantics
+- **AND** it does not silently widen to every declaration of the logical target
+
+#### Scenario: Public-binding canonical impact aggregates logically
+
+- **GIVEN** a public export route whose canonical target has several declarations reached through distinct physical relations
+- **WHEN** public-binding impact is analysed
+- **THEN** the canonical target appears once in the semantic affected targets with `semanticCounts`
+- **AND** the exact binding route impact remains reported separately
+
 ### Requirement: Owner-qualified impact target
 
 #### Scenario: Qualified member traverses only that member
@@ -423,3 +474,48 @@
 - **THEN** every input file and its symbols contribute depth-0 evidence
 - **AND** reverse coverage is requested in batches over deduplicated file and symbol sets
 - **AND** no store call is issued per affected resource
+
+### Requirement: Logical symbol coverage during impact
+
+#### Scenario: Reached declarations are mapped before coverage lookup
+
+- **GIVEN** reached physical declarations map to repeated logical targets
+- **WHEN** reverse symbol coverage is requested
+- **THEN** logical IDs are deduplicated and queried in one bounded batch
+- **AND** no physical declaration ID is used as a logical coverage target
+
+#### Scenario: Coverage retains contributing declaration evidence
+
+- **GIVEN** a spec covers a logical symbol reached through multiple declarations
+- **WHEN** covering specs are assembled
+- **THEN** the result identifies the logical coverage target
+- **AND** it retains every contributing physical declaration as evidence
+
+#### Scenario: Physical-only declarations are classified explicitly
+
+- **GIVEN** a reached physical declaration has no logical mapping
+- **WHEN** coverage is evaluated
+- **THEN** it is classified as physical-only or coverage-not-applicable
+- **AND** it is not falsely reported as lacking logical coverage
+
+#### Scenario: All-physical-only traversal skips logical coverage storage
+
+- **GIVEN** neither the target's own declarations nor any reached declaration has a logical mapping
+- **WHEN** traversal constructs the coverage frontier
+- **THEN** the logical frontier is empty
+- **AND** the reverse logical-coverage store method is not called
+- **AND** no physical declaration ID is passed as a fallback logical ID
+
+#### Scenario: Logical target with only physical-only dependents still queries its own coverage
+
+- **GIVEN** the target maps to a logical symbol and every reached declaration lacks a logical mapping
+- **WHEN** traversal constructs the coverage frontier
+- **THEN** the logical frontier contains only the target's logical symbol
+- **AND** the reverse logical-coverage store method is called once for that frontier
+
+#### Scenario: Target's own coverage is reported at depth zero
+
+- **GIVEN** a spec covers the logical symbol that is the impact target
+- **WHEN** symbol impact is analysed with no dependents
+- **THEN** that spec appears in `coveringSpecs` at depth 0
+- **AND** its evidence names the target's contributing declarations

@@ -10,6 +10,29 @@
 - **THEN** it accepts no positional arguments
 - **AND** output format defaults to text
 
+#### Scenario: --exclude-path is project-relative and global
+
+- **GIVEN** `graph index --exclude-path 'app/tmp/'` and a workspace `backend` with `codeRoot` `app`
+- **WHEN** the index runs
+- **THEN** `app/tmp/` is excluded for `backend` and in project-global discovery
+- **AND** a workspace `!app/tmp/` does not re-include it
+
+#### Scenario: --exclude-path value with a comma is one pattern
+
+- **WHEN** `specd graph index --exclude-path '{a,b}/**'` is run
+- **THEN** the task input contains the single pattern `{a,b}/**`
+- **AND** it is not split into `{a` and `b}/**`
+
+#### Scenario: Several patterns by repeating the option
+
+- **WHEN** `specd graph index --exclude-path 'app/tmp/' --exclude-path 'dist/'` is run
+- **THEN** the task input contains the two patterns `app/tmp/` and `dist/`
+
+#### Scenario: Several patterns listed after one option
+
+- **WHEN** `specd graph index --exclude-path 'app/tmp/' 'dist/'` is run
+- **THEN** the task input contains the two patterns
+
 ### Requirement: Output format
 
 #### Scenario: Text output shows summary including documents
@@ -35,6 +58,128 @@
 - **GIVEN** indexing completes successfully
 - **WHEN** `specd graph index --format json` is run
 - **THEN** stdout is valid JSON containing `filesDiscovered`, `filesIndexed`, `documentsIndexed`, `filesSkipped`, `filesRemoved`, `specsIndexed`, `errors`, and `duration`
+
+### Requirement: Size-skip summary and hint
+
+#### Scenario: Text output lists the skipped files and the snippet
+
+- **GIVEN** a result with three files skipped for size
+- **WHEN** the command prints in `text` mode
+- **THEN** the output states the count and the applied limit
+- **AND** lists the three files with project-relative paths and human-readable sizes
+- **AND** prints a `graph.largeFilePaths` YAML snippet containing those paths
+- **AND** mentions raising `graph.maxFileBytes` and that `0` disables the limit
+- **AND** states the memory cost of large files
+
+#### Scenario: The list is capped at ten
+
+- **GIVEN** a result with twenty-five files skipped for size
+- **WHEN** the command prints in `text` mode
+- **THEN** the ten largest are listed
+- **AND** a line states that fifteen more were skipped and the total of twenty-five is shown
+
+#### Scenario: Special characters are escaped in the snippet
+
+- **GIVEN** a skipped file whose path contains a character that gitignore syntax treats specially
+- **WHEN** the snippet is printed
+- **THEN** the character is escaped so that the pattern matches only that file
+
+#### Scenario: Exempt files that were analysed are listed separately
+
+- **GIVEN** a result with `sizeExemptAnalysed` entries
+- **WHEN** the command prints in `text` mode
+- **THEN** they appear in a separate list with their sizes
+
+#### Scenario: Output is unchanged when nothing exceeded the limit
+
+- **GIVEN** a result without skipped or exempt oversized files
+- **WHEN** the command prints in `text` mode
+- **THEN** the output equals the output before this requirement
+
+#### Scenario: Structured modes carry data and no hint
+
+- **GIVEN** a result with skipped files
+- **WHEN** the command prints in `json` or `toon` mode
+- **THEN** the new result fields are present and no hint or snippet text is added
+
+#### Scenario: The command never edits the configuration
+
+- **GIVEN** a run that skipped files
+- **WHEN** the command finishes
+- **THEN** `specd.yaml` is unchanged
+
+### Requirement: Workspace overlap warning
+
+#### Scenario: Warning in text mode
+
+- **GIVEN** the result reports overlap diagnostics for 3 files
+- **WHEN** `graph index` renders in text mode
+- **THEN** a warning section states 3 files owned by more than one workspace
+- **AND** lists each path with its workspaces
+- **AND** suggests `excludePaths`/`allowedPaths` and `specd graph why <path>`
+- **AND** the exit status is unchanged
+
+#### Scenario: More than ten overlaps
+
+- **GIVEN** 14 overlap diagnostics
+- **WHEN** text mode renders
+- **THEN** ten are listed followed by a line stating 4 more
+
+#### Scenario: No overlap, no section
+
+- **GIVEN** no overlap diagnostics
+- **WHEN** text mode renders
+- **THEN** no overlap section appears
+
+#### Scenario: Structured modes carry the diagnostics
+
+- **GIVEN** overlap diagnostics
+- **WHEN** `--format json` or `toon` is used
+- **THEN** the diagnostics are part of the `IndexResult` and no hint text is added
+
+### Requirement: Worker diagnostics presentation
+
+#### Scenario: A silent worker produces a warning on standard error
+
+- **GIVEN** a `worker-silent` event naming `src/big.ts` after ten seconds
+- **WHEN** the CLI renders it in `text` mode
+- **THEN** a warning on standard error names the file and the duration
+- **AND** suggests `graph.excludePaths` or a lower `graph.maxFileBytes`
+
+#### Scenario: Structured modes do not print warnings
+
+- **GIVEN** the same event
+- **WHEN** the command runs in `json` or `toon` mode
+- **THEN** the standard output contains only the final result
+
+#### Scenario: A native crash prints its cause and context
+
+- **GIVEN** an isolated run that fails with cause `native-crash`
+- **WHEN** the CLI prints the failure in `text` mode
+- **THEN** the output shows the cause, the last announced file, and the captured standard error tail
+- **AND** the exit code is the one of Requirement: Error cases
+
+#### Scenario: Structured failure output carries the cause as data
+
+- **GIVEN** the same failure in `json` mode
+- **WHEN** the CLI prints it
+- **THEN** the cause and the diagnostics are structured fields and the CLI adds no sentence
+
+#### Scenario: Events cross the worker boundary as JSON values
+
+- **GIVEN** the packaged task module
+- **WHEN** it emits an event
+- **THEN** the value is JSON-serializable and no new message format is introduced
+
+### Requirement: Resolution diagnostics presentation
+
+#### Scenario: Diagnostics are warnings and do not fail the run
+
+- **GIVEN** an index result with two diagnostics and no errors
+- **WHEN** `graph index` prints it in `text` mode
+- **THEN** the output states that the run finished with 2 diagnostics and lists them as warnings
+- **AND** the exit code is 0
+- **AND** in `json` mode `diagnostics` appears next to `errors`
 
 ### Requirement: Forced indexing result completeness
 
@@ -104,6 +249,14 @@
 - **AND** project-global `graph.includePaths`, global `graph.excludePaths`, and workspace `graph.respectGitignore` / `graph.allowedPaths` behavior are explained
 - **AND** the bootstrap-only nature of `--path` and no-config fallback is stated
 
+#### Scenario: Size limit configuration is documented
+
+- **GIVEN** the CLI reference
+- **WHEN** the `graph index` documentation is read
+- **THEN** it documents `graph.maxFileBytes` and `graph.largeFilePaths`, the 256 KiB default, `0` disabling the limit, and the project and workspace scope
+- **AND** it includes an example that indexes a specific large file through `graph.largeFilePaths`
+- **AND** it describes the size-skip summary and the failure causes
+
 ### Requirement: Indexing behaviour
 
 #### Scenario: Command delegates exactly once to the SDK isolated worker
@@ -111,8 +264,8 @@
 - **WHEN** `specd graph index` executes after resolving its command context
 - **THEN** it calls `runIsolatedGraphIndex` imported from `@specd/sdk` exactly once
 - **AND** the call contains the resolved storage root, the packaged graph-index task
-  module URL, a serializable configured-or-bootstrap context descriptor, the index
-  input, and an optional progress callback
+  module URL, a serializable forced, discovered, or bootstrap context descriptor,
+  the index input, and an optional progress callback
 
 #### Scenario: CLI does not own lock or subprocess mechanics
 
@@ -122,13 +275,41 @@
   lock-path, fork, IPC, signal-forwarding, or child-cleanup helpers
 - **AND** the CLI has no direct dependency or import on `@specd/code-graph`
 
+#### Scenario: Explicit config remains forced in the child
+
+- **GIVEN** `specd graph index --config /repo/specd.yaml` is invoked
+- **AND** `/repo/specd.local.yaml` exists but is not in the explicit config's
+  `extends` chain
+- **WHEN** the parent constructs and the child reconstructs the task descriptor
+- **THEN** the descriptor identifies forced mode with `/repo/specd.yaml`
+- **AND** the child calls `openSpecdHost({ configPath: '/repo/specd.yaml' })`
+- **AND** the sibling local file is not attached by discovery
+
+#### Scenario: Automatic discovery replays local cascade in the child
+
+- **GIVEN** the command is invoked without `--config`
+- **AND** discovery from `/repo/packages/app` activates `/repo/specd.yaml` and an
+  extending `/repo/specd.local.yaml` with different graph exclusions
+- **WHEN** the parent constructs and the child reconstructs the task descriptor
+- **THEN** the descriptor identifies discovered mode with the absolute start
+  directory `/repo/packages/app`
+- **AND** the child calls `openSpecdHost({ startDir: '/repo/packages/app' })`
+- **AND** the child observes the same local cascade values as the parent
+
+#### Scenario: Discovery replay does not silently substitute bootstrap
+
+- **GIVEN** automatic discovery succeeds in the parent
+- **AND** the project config is no longer discoverable when the child reconstructs
+  the context
+- **WHEN** the packaged task opens the discovered descriptor
+- **THEN** task execution fails through the worker/system-error path
+- **AND** the child does not create a bootstrap context or select another project
+
 #### Scenario: Packaged task invokes SDK indexing once
 
 - **GIVEN** the isolated child loads the trusted packaged CLI task module
-- **WHEN** the task receives a valid configured-project descriptor
-- **THEN** it reconstructs an equivalent configured SDK context from the explicit
-  configuration location and workspace selection
-- **AND** it calls `runIndexProjectGraph(ctx, input)` exactly once
+- **WHEN** the task reconstructs a valid forced, discovered, or bootstrap context
+- **THEN** it calls `runIndexProjectGraph(ctx, input)` exactly once
 - **AND** it returns the resulting `IndexResult` without CLI presentation fields
 
 #### Scenario: Bootstrap context remains explicit

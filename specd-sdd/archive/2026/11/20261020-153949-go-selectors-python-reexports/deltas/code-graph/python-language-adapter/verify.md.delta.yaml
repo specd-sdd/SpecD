@@ -1,0 +1,211 @@
+- op: removed
+  description: Replaced by the re-export route scenarios below
+  selector:
+    type: section
+    matches: 'Scenario: Re-imported alias is not a public route'
+
+- op: removed
+  description: Replaced by the static __all__ scenarios below
+  selector:
+    type: section
+    matches: 'Scenario: Module visibility is not inferred from naming convention'
+
+- op: added
+  description: Re-export route resolution through imports
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Imports and package resolution'
+  content: |
+    #### Scenario: Re-exported name resolves through the entry file
+
+    - **GIVEN** `acme_auth/__init__.py` contains `from .models import User` and `models.py` declares `User`
+    - **AND** another file contains `from acme_auth import User`
+    - **WHEN** imports are resolved
+    - **THEN** the local binding of `User` targets the declaration in `models.py`
+    - **AND** an `import:package` step is returned
+
+    #### Scenario: Plain import in an entry file is not a route
+
+    - **GIVEN** `__init__.py` contains `import acme_auth.models`
+    - **WHEN** `from acme_auth import models` style names are resolved
+    - **THEN** the import stays unresolved or becomes a submodule dependency, never a re-export binding
+
+- op: added
+  description: Re-export route and static __all__ scenarios
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Public surface and stub behavior'
+  content: |
+    #### Scenario: Relative re-export is a route
+
+    - **GIVEN** `__init__.py` contains `from .models import User` at module level
+    - **WHEN** re-export linking runs after Pass 1
+    - **THEN** a public binding for `User` exists on the `__init__` surface with the logical target of `models.User`
+
+    #### Scenario: Absolute same-package re-export is a route
+
+    - **GIVEN** `__init__.py` contains `from acme_auth.models import User` and that module is an indexed file of the same package
+    - **WHEN** re-export linking runs
+    - **THEN** the route publishes `User`
+
+    #### Scenario: Absolute import leaving the package is not a route
+
+    - **GIVEN** `__init__.py` contains `from other_pkg.models import User` and the module belongs to a different package
+    - **WHEN** re-export linking runs
+    - **THEN** no binding is published for `User`
+
+    #### Scenario: Alias publishes the alias name
+
+    - **GIVEN** `from .models import User as Account`
+    - **WHEN** re-export linking runs
+    - **THEN** `Account` is published and `User` is not
+
+    #### Scenario: Chained re-exports keep the final target
+
+    - **GIVEN** `pkg/__init__.py` re-exports from `pkg/sub/__init__.py`, which re-exports from `pkg/sub/models.py`
+    - **WHEN** re-export linking runs
+    - **THEN** the binding on `pkg` carries the logical target declared in `models.py`
+
+    #### Scenario: Cycles and nested imports publish nothing
+
+    - **GIVEN** two entry files re-export each other, and an import inside `try:` or `if TYPE_CHECKING:` or a function
+    - **WHEN** re-export linking runs
+    - **THEN** no binding is published for the cycle or the nested import
+
+    #### Scenario: Wildcard import is not a route
+
+    - **GIVEN** `from .models import *`
+    - **WHEN** re-export linking runs
+    - **THEN** no names are published
+
+    #### Scenario: Static __all__ filters routes
+
+    - **GIVEN** `__init__.py` re-exports `User` and `Session` and declares `__all__ = ["User"]`
+    - **WHEN** re-export linking runs
+    - **THEN** `User` is published and `Session` is not
+    - **AND** module declarations of the same file are not filtered
+
+    #### Scenario: Literal concatenation and augmented assignment are static
+
+    - **GIVEN** `__all__ = ["User"] + ["Session"]` or `__all__ = ["User"]` followed by `__all__ += ["Session"]`
+    - **WHEN** re-export linking runs
+    - **THEN** both names are treated as listed
+
+    #### Scenario: Non-static __all__ publishes no routes
+
+    - **GIVEN** `__all__ = [name for name in names]` or `__all__.extend(other)`
+    - **WHEN** re-export linking runs
+    - **THEN** no re-export route of that file is published
+
+    #### Scenario: Listed name without a route creates no binding
+
+    - **GIVEN** `__all__ = ["Ghost"]` and nothing binds `Ghost`
+    - **WHEN** re-export linking runs
+    - **THEN** no binding exists for `Ghost`
+
+    #### Scenario: Naming convention does not publish
+
+    - **GIVEN** an import alias with no re-export route
+    - **WHEN** public reference facts are built
+    - **THEN** it stays a local binding
+    - **AND** `.pyi` declarations remain addressable without runtime merging
+
+- op: added
+  description: Sibling routes, excluded forms, and __all__ reads from the compliance audit
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Public surface and stub behavior'
+  content: |
+    #### Scenario: Sub-package entry re-exports a sibling absolute module
+
+    - **GIVEN** `acme_auth/sub/__init__.py` contains `from acme_auth.models import User` and `acme_auth/models.py` declares `User`
+    - **WHEN** re-export linking runs
+    - **THEN** `User` is published on the `acme_auth/sub` surface
+
+    #### Scenario: Bare relative import is not a route
+
+    - **GIVEN** `__init__.py` contains `from . import models`
+    - **WHEN** re-export linking runs
+    - **THEN** no binding is published for `models`
+
+    #### Scenario: Reading __all__ makes it non-static
+
+    - **GIVEN** `__init__.py` re-exports `User` and contains `if "User" in __all__: pass`
+    - **WHEN** re-export linking runs
+    - **THEN** no re-export route of that file is published
+
+    #### Scenario: Stub and src layout routes
+
+    - **GIVEN** a `__init__.pyi` entry with a relative route, and an absolute route under a `src/` layout
+    - **WHEN** re-export linking runs
+    - **THEN** both routes publish their names
+
+    #### Scenario: Declarations keep convention-based publishing
+
+    - **GIVEN** a module-level declaration without a leading underscore and an import alias without a route
+    - **WHEN** public bindings are built
+    - **THEN** the declaration is published and the alias stays local
+- op: added
+  description: Route target, chain, cycle, and __all__ form scenarios from the second compliance audit
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Public surface and stub behavior'
+  content: |
+    #### Scenario: Routes carry the final logical target
+
+    - **GIVEN** a relative route, an absolute route, an alias route, and a two-level chain
+    - **WHEN** re-export linking runs
+    - **THEN** each published binding's target is the declaration in the module that finally declares the name
+    - **AND** an alias route does not also publish the original name
+
+    #### Scenario: Two entry files re-exporting each other publish nothing
+
+    - **GIVEN** two `__init__.py` entries that each contain `from <other> import User` and nothing declares `User`
+    - **WHEN** re-export linking runs
+    - **THEN** neither entry publishes `User`
+
+    #### Scenario: Plain import beside a from-import
+
+    - **GIVEN** `__init__.py` contains `import acme_auth.models` and another file contains `from acme_auth import models`
+    - **WHEN** imports are resolved
+    - **THEN** no re-export binding exists for `models`
+
+    #### Scenario: Unparenthesized tuple and annotated __all__ are static
+
+    - **GIVEN** `__all__ = "User", "Session"` or `__all__: list[str] = ["User"]`
+    - **WHEN** re-export linking runs
+    - **THEN** the listed names filter the routes
+
+    #### Scenario: Bytes literals are not names
+
+    - **GIVEN** `__all__ = [b"User"]`
+    - **WHEN** re-export linking runs
+    - **THEN** `__all__` is non-static and no route is published
+
+    #### Scenario: Other mutations of __all__ are non-static
+
+    - **GIVEN** `__all__.extend(other)`, `__all__.append("X")`, or a list with a non-literal element
+    - **WHEN** re-export linking runs
+    - **THEN** no route of that file is published
+
+    #### Scenario: Stub twin of an entry file is not an entry
+
+    - **GIVEN** both `__init__.py` and `__init__.pyi` are indexed
+    - **WHEN** re-export linking runs
+    - **THEN** only the source file's routes are linked
+
+    #### Scenario: Module and package with the same name stay ambiguous
+
+    - **GIVEN** `pkg/X.py` and `pkg/X/__init__.py` under the same root
+    - **WHEN** `from pkg import X` is resolved and the entry does not publish `X`
+    - **THEN** the import stays unresolved
+
+    #### Scenario: Resolved import without a local binding adds no step
+
+    - **GIVEN** a resolved package import with no retained file-scope local binding
+    - **WHEN** imports are resolved
+    - **THEN** its file dependency exists and no `import:package` step is returned

@@ -1,9 +1,7 @@
 import { type Command } from 'commander'
-import { SpecPath } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
-import { parseSpecId } from '../../helpers/spec-path.js'
 
 /**
  * Registers the `specs outline` command.
@@ -52,8 +50,7 @@ Examples:
         },
       ) => {
         try {
-          const { config, kernel } = await resolveCliContext({ configPath: opts.config })
-          const parsed = parseSpecId(specPath, config)
+          const { kernel } = await resolveCliContext({ configPath: opts.config })
 
           if (opts.artifact !== undefined) {
             const schemaResult = await kernel.specs.getActiveSchema.execute()
@@ -76,8 +73,7 @@ Examples:
           }
 
           const result = await kernel.specs.getOutline.execute({
-            workspace: parsed.workspace,
-            specPath: SpecPath.parse(parsed.capabilityPath),
+            specId: specPath,
             ...(opts.artifact !== undefined ? { artifactId: opts.artifact } : {}),
             ...(opts.file !== undefined ? { filename: opts.file } : {}),
             ...(opts.full === true ? { full: true } : {}),
@@ -86,9 +82,9 @@ Examples:
 
           const fmt = parseFormat(opts.format)
           if (fmt === 'text') {
-            output(JSON.stringify(result, null, 2), 'text')
+            output(JSON.stringify(result.outlines, null, 2), 'text')
           } else {
-            output(result, fmt)
+            output(result.outlines, fmt)
           }
         } catch (err) {
           handleError(err, opts.format)

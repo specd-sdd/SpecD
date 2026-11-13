@@ -1,0 +1,17 @@
+- op: added
+  description: 'Define symbol extraction semantics for object properties inside anonymous array data records'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Declaration extraction and ranges$'
+  content: |
+    ### Requirement: Object properties in array data records
+
+    The adapter SHALL omit a non-callable object property from symbol extraction when the property's enclosing object is anonymous and an array boundary is encountered before a supported named declaration while traversing the property's enclosing expression path. The classification SHALL apply to direct array elements and to objects nested beneath an array element.
+
+    The adapter SHALL preserve scalar properties belonging to named object declarations, including declarations wrapped in supported transparent expressions such as parentheses, type assertions, `as const`, and `satisfies`. It SHALL preserve callable property values and object methods regardless of array ancestry.
+
+    Filtering these property symbols MUST NOT remove or alter the file's indexed source content. Every preserved property symbol SHALL retain its parser-derived construct range and declared-name selection range, and equivalent analysis SHALL remain deterministic.

@@ -1,0 +1,39 @@
+- op: added
+  description: 'Verify discriminated logical-target and exact-declaration resolution.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Logical canonical targets$'
+  content: |
+    ### Requirement: Resolution target kind and declaration evidence
+
+    #### Scenario: Logical selector returns every contributing declaration
+
+    - **GIVEN** several declarations form one canonical overload or merge target
+    - **WHEN** an owner-qualified or canonical selector is resolved
+    - **THEN** the result is discriminated as a logical target
+    - **AND** it contains every contributing declaration in deterministic order
+
+    #### Scenario: Exact location retains physical identity
+
+    - **GIVEN** one declaration occurrence is selected by file and position
+    - **WHEN** the reference is resolved
+    - **THEN** the result is discriminated as an exact declaration
+    - **AND** it also identifies the logical target when one exists
+
+    #### Scenario: Competing logical targets remain ambiguous
+
+    - **GIVEN** multiple declarations belong to one logical target and another competing logical target also matches
+    - **WHEN** ambiguity is evaluated
+    - **THEN** the declarations of the first target count as one semantic candidate
+    - **AND** the competing logical targets produce an ambiguous result without arbitrary selection
+
+    #### Scenario: Overload selector returns one typed logical target
+
+    - **GIVEN** a bare-name selector matching three declarations of one overloaded method
+    - **WHEN** the selector-level resolver runs
+    - **THEN** it returns one logical-target result carrying all three declarations
+    - **AND** it does not return a single arbitrary physical match as the only output

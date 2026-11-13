@@ -1,0 +1,23 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "code-graph:explain-graph-path",
+    "sdk:host-context",
+    "sdk:with-open-graph-provider"
+  ],
+  "implementation": [
+    {
+      "file": "sdk:src/orchestration/run-graph-why.ts",
+      "symbols": ["runGraphWhy", "RunGraphWhyInput", "RunGraphWhyResult"]
+    },
+    {
+      "file": "sdk:src/orchestration/index.ts"
+    },
+    {
+      "file": "sdk:src/index.ts"
+    }
+  ]
+}

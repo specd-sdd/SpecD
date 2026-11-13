@@ -6,6 +6,11 @@ export {
   type IndexCoverageHealthSummary,
 } from './use-cases/get-graph-health.js'
 export {
+  ExplainGraphPath,
+  type ExplainGraphPathInput,
+  type ExplainGraphPathResult,
+} from './use-cases/explain-graph-path.js'
+export {
   AssessIndexedResourceFreshness,
   type AssessIndexedResourceFreshnessInput,
   type IndexedInputFreshnessStore,

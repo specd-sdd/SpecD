@@ -1,3 +1,9 @@
+---
+title: Services
+description: Pure domain service functions exported by `@specd/core`.
+sidebar_position: 5
+---
+
 # Services
 
 `@specd/core` exports a set of domain service functions. All are pure functions with no I/O dependencies — they accept typed values and return new values without side effects.
@@ -141,28 +147,36 @@ import { parseSpecId } from '@specd/core'
 
 function parseSpecId(
   specId: string,
-  defaultWorkspace?: string,
-): { workspace: string; capPath: string }
+  options?: {
+    workspaces?: Iterable<string | { readonly name: string }>
+    defaultWorkspace?: string
+  },
+): { workspace: string; capPath: string; specId: string }
 ```
 
-Splits a spec identifier of the form `workspace:capabilityPath` into its two components. When the identifier contains no colon, `defaultWorkspace` (defaults to `'default'`) is used as the workspace name and the entire string is treated as the capability path.
+Validates and normalizes a spec identifier. Canonical form is `workspace:capabilityPath`. When no colon is present (input-boundary bare ID), `defaultWorkspace` (defaults to `'default'`) is used and the entire string is the capability path. The returned `specId` is always fully qualified.
 
-| Parameter          | Type     | Description                                                        |
-| ------------------ | -------- | ------------------------------------------------------------------ |
-| `specId`           | `string` | A spec identifier, e.g. `"billing:payments/checkout"`.             |
-| `defaultWorkspace` | `string` | Workspace to use when `specId` has no colon. Default: `'default'`. |
+Workspace names must match `^[a-z][a-z0-9-]+$` (at least two characters). Capability segments must match `^[a-z0-9_][a-z0-9_-]*$`. Invalid syntax throws `InvalidSpecIdError` (`INVALID_SPEC_ID`). When `workspaces` is supplied and the resolved workspace is absent, throws `WorkspaceNotFoundError` (`WORKSPACE_NOT_FOUND`).
 
-**Returns:** `{ workspace: string; capPath: string }`
+| Parameter                  | Type                                   | Description                                                            |
+| -------------------------- | -------------------------------------- | ---------------------------------------------------------------------- |
+| `specId`                   | `string`                               | Spec identifier, e.g. `"billing:payments/checkout"` or `"auth/oauth"`. |
+| `options.defaultWorkspace` | `string`                               | Workspace when `specId` has no colon. Default: `'default'`.            |
+| `options.workspaces`       | `Iterable<string \| { name: string }>` | Optional configured workspace set for existence checks.                |
+
+**Returns:** `{ workspace: string; capPath: string; specId: string }`
 
 ```typescript
 import { parseSpecId } from '@specd/core'
 
 parseSpecId('billing:payments/checkout')
-// → { workspace: 'billing', capPath: 'payments/checkout' }
+// → { workspace: 'billing', capPath: 'payments/checkout', specId: 'billing:payments/checkout' }
 
 parseSpecId('auth/oauth')
-// → { workspace: 'default', capPath: 'auth/oauth' }
+// → { workspace: 'default', capPath: 'auth/oauth', specId: 'default:auth/oauth' }
 ```
+
+Related helpers: `isValidWorkspaceName`, `isValidCapabilitySegment`, `isFullyQualifiedSpecId`.
 
 ---
 

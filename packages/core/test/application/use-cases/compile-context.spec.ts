@@ -36,6 +36,7 @@ import { type WorkflowStep } from '../../../src/domain/value-objects/workflow-st
 import { createBuiltinExtractorTransforms } from '../../../src/composition/extractor-transforms/index.js'
 import {
   makeChangeRepository,
+  makeDefaultWorkspaceRepos,
   makeListWorkspaces,
   makeSpecRepository,
   makeArtifactType as makeArtifactTypeBase,
@@ -368,7 +369,7 @@ function makeSut(opts: {
   const changeRepo = makeStubChangeRepo(change)
   const schemaProvider = makeStubSchemaProvider(schema ?? null)
   const listWorkspaces = makeListWorkspaces(
-    (specRepos ?? new Map()) as unknown as Map<string, SpecRepository>,
+    (specRepos ?? makeDefaultWorkspaceRepos()) as unknown as Map<string, SpecRepository>,
   )
   const fileReaderImpl = fileReader ?? makeStubFileReader()
   const previewSpecImpl = previewSpec ?? makeStubPreviewSpec()
@@ -456,7 +457,7 @@ describe('CompileContext', () => {
       expect(() =>
         createCompileContextForTest(
           makeStubChangeRepo(),
-          makeListWorkspaces(new Map()),
+          makeListWorkspaces(makeDefaultWorkspaceRepos()),
           makeStubSchemaProvider(null),
           makeStubFileReader(),
           new Map() as ArtifactParserRegistry,
@@ -474,7 +475,7 @@ describe('CompileContext', () => {
     it('throws ChangeNotFoundError when change is not found', async () => {
       const sut = createCompileContextForTest(
         makeStubChangeRepo(),
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeStubSchemaProvider(makeSchema()),
         makeStubFileReader(),
         new Map() as ArtifactParserRegistry,
@@ -487,7 +488,7 @@ describe('CompileContext', () => {
       patchLegacyConfigExecute(sut, (cfg) =>
         createCompileContextForTest(
           makeStubChangeRepo(),
-          makeListWorkspaces(new Map()),
+          makeListWorkspaces(makeDefaultWorkspaceRepos()),
           makeStubSchemaProvider(makeSchema()),
           makeStubFileReader(),
           new Map() as ArtifactParserRegistry,
@@ -510,7 +511,7 @@ describe('CompileContext', () => {
       const change = makeChange('my-change')
       const sut = createCompileContextForTest(
         makeStubChangeRepo(change),
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeStubSchemaProvider(null),
         makeStubFileReader(),
         new Map() as ArtifactParserRegistry,
@@ -523,7 +524,7 @@ describe('CompileContext', () => {
       patchLegacyConfigExecute(sut, (cfg) =>
         createCompileContextForTest(
           makeStubChangeRepo(change),
-          makeListWorkspaces(new Map()),
+          makeListWorkspaces(makeDefaultWorkspaceRepos()),
           makeStubSchemaProvider(null),
           makeStubFileReader(),
           new Map() as ArtifactParserRegistry,
@@ -1874,7 +1875,7 @@ describe('CompileContext', () => {
       const change = makeChange('my-change')
       const schema = makeSchema()
 
-      const { sut } = makeSut({ change, schema, specRepos: new Map() })
+      const { sut } = makeSut({ change, schema, specRepos: makeDefaultWorkspaceRepos() })
 
       const result = await sut.execute({
         name: 'my-change',

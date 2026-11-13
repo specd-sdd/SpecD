@@ -1,0 +1,81 @@
+- op: modified
+  description: 'Add category flags scenario to Command signature'
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    #### Scenario: Default hotspot filters apply when no explicit overrides are provided
+
+    - **WHEN** `specd graph hotspots` is run with no explicit filter flags
+    - **THEN** the command queries hotspots with default kinds `class,method,function`, importer-only symbols excluded, `minScore > 0`, `minRisk >= MEDIUM`, and `limit = 20`
+
+    #### Scenario: Explicit limit changes only the limit
+
+    - **WHEN** `specd graph hotspots --limit 50` is run
+    - **THEN** the command uses the explicit `limit = 50`
+    - **AND** it preserves the implicit default kind set, importer-only exclusion, and `minRisk >= MEDIUM`
+
+    #### Scenario: Explicit min-risk changes only the risk threshold
+
+    - **WHEN** `specd graph hotspots --min-risk HIGH` is run
+    - **THEN** the command uses the explicit `minRisk = HIGH`
+    - **AND** it preserves the implicit default kind set, importer-only exclusion, and limit `20`
+
+    #### Scenario: Explicit min-score changes only the score threshold
+
+    - **WHEN** `specd graph hotspots --min-score 0` is run
+    - **THEN** the command uses the explicit `minScore = 0`
+    - **AND** it preserves the implicit default kind set and importer-only exclusion
+
+    #### Scenario: Explicit importer-only inclusion widens the query
+
+    - **WHEN** `specd graph hotspots --include-importer-only` is run
+    - **THEN** importer-only symbols may be returned
+    - **AND** the command keeps the default kind set unless `--kind` is also provided
+
+    #### Scenario: Category flags passed to hotspots
+
+    - **WHEN** `specd graph hotspots --include-tests` is run
+    - **THEN** the command includes test files in caller metrics and ranking candidates
+
+    #### Scenario: Category filter accepts comma-separated categories
+
+    - **WHEN** `specd graph hotspots --category source,test` is run
+    - **THEN** the command admits both source and test files in caller metrics and ranking candidates
+    - **AND** ignored files remain excluded
+
+- op: modified
+  description: 'Add omission notices and omittedCounts scenarios to Output format'
+  selector:
+    type: section
+    matches: 'Requirement: Output format'
+  content: |
+    #### Scenario: Text output shows ranked hotspot table
+
+    - **GIVEN** hotspot results exist
+    - **WHEN** `specd graph hotspots` is run in text mode
+    - **THEN** stdout shows the total returned entry count and total symbol count
+    - **AND** each row includes score, risk level, cross-workspace caller count, kind, symbol name, and workspace-qualified file location
+
+    #### Scenario: Empty result set in text mode
+
+    - **GIVEN** no hotspots match the active filters
+    - **WHEN** `specd graph hotspots` is run in text mode
+    - **THEN** stdout shows `No hotspots found.`
+
+    #### Scenario: JSON output includes derived workspace field
+
+    - **WHEN** `specd graph hotspots --format json` is run
+    - **THEN** stdout is a JSON object containing `totalSymbols` and `entries`
+    - **AND** each entry includes `symbol`, `score`, `directCallers`, `crossWorkspaceCallers`, `fileImporters`, `riskLevel`, and `workspace`
+
+    #### Scenario: Text output shows omission notice when items excluded
+
+    - **GIVEN** a hotspot run where 12 test files were excluded
+    - **WHEN** `specd graph hotspots` is run in text mode
+    - **THEN** stdout includes `Excluded from results: 12 test files`
+
+    #### Scenario: JSON output includes omittedCounts
+
+    - **WHEN** `specd graph hotspots --format json` is run
+    - **THEN** stdout JSON contains `omittedCounts` with test and ignored counts

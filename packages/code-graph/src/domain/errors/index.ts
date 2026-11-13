@@ -1,12 +1,17 @@
 export { SpecdCodeGraphError } from './specd-code-graph-error.js'
 export { InvalidSymbolKindError } from './invalid-symbol-kind-error.js'
 export { InvalidRelationTypeError } from './invalid-relation-type-error.js'
+export { InvalidLanguageAdapterError } from './invalid-language-adapter-error.js'
 export { InvalidGraphSelectorError } from './invalid-graph-selector-error.js'
 export { DuplicateSymbolIdError } from './duplicate-symbol-id-error.js'
+export { DuplicateDeclarationMappingError } from './duplicate-declaration-mapping-error.js'
 export { GraphBusyError } from './graph-busy-error.js'
 export { GraphProviderStaleError } from './graph-provider-stale-error.js'
 export { StoreNotOpenError } from './store-not-open-error.js'
 export { SpecNotFoundError } from './spec-not-found-error.js'
+export { UnknownWorkspaceError } from './unknown-workspace-error.js'
+export { InvalidGraphWhyPathError } from './invalid-graph-why-path-error.js'
+export { GraphWhyRequiresConfigError } from './graph-why-requires-config-error.js'
 export { GraphStoreRegistryError } from './graph-store-registry-error.js'
 export { StoreOverloadError } from './store-overload-error.js'
 export { StoreWorkerError } from './store-worker-error.js'
@@ -18,3 +23,14 @@ export {
   type GraphStorageRecoveryReason,
 } from './graph-storage-recovery-required-error.js'
 export { GraphStoreRecreateRequiresClosedError } from './graph-store-recreate-requires-closed-error.js'
+export { GraphDerivationMismatchError } from './graph-derivation-mismatch-error.js'
+export {
+  GraphIndexWorkerError,
+  GraphIndexWorkerStartError,
+  GraphIndexTaskContractError,
+  GraphIndexTaskExecutionError,
+  GraphIndexWorkerProtocolError,
+  GraphIndexWorkerExitError,
+  GraphIndexWorkerSignalError,
+  GraphIndexProgressHandlerError,
+} from './isolated-graph-index-errors.js'

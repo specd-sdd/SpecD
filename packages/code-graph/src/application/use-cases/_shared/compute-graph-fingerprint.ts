@@ -9,6 +9,12 @@ import {
 } from '../../ports/resolution-manifest-source.js'
 import { resolveEffectiveGraphConfig } from './resolve-effective-graph-config.js'
 
+/**
+ * Marker for the reference root of graph path patterns. Bump it whenever the root that
+ * `graph.*` patterns are matched against changes, so older indexes are rebuilt.
+ */
+export const PATH_SEMANTICS_MARKER = 'project-relative-v1'
+
 /** Visible full-rebuild reason when the derivation fingerprint differs. */
 export const FULL_REBUILD_FINGERPRINT_REASON =
   'Graph derivation fingerprint mismatch — code-graph version, workspace configuration, or resolution manifest content changed'
@@ -33,8 +39,22 @@ interface NormalizedWorkspaceFingerprint {
   readonly name: string
   readonly codeRoot: string
   readonly allowedPaths: readonly string[]
-  readonly excludePaths: readonly string[]
+  readonly globalExcludePaths: readonly string[]
+  readonly workspaceExcludePaths: readonly string[]
+  readonly testPaths: {
+    readonly project: readonly string[]
+    readonly workspace: readonly string[]
+  }
+  readonly ignorePaths: {
+    readonly project: readonly string[]
+    readonly workspace: readonly string[]
+  }
   readonly respectGitignore: boolean
+  readonly maxFileBytes: number
+  readonly largeFilePaths: {
+    readonly project: readonly string[]
+    readonly workspace: readonly string[]
+  }
   readonly resolutionInputs: readonly ResolutionInputFingerprint[]
 }
 
@@ -69,8 +89,22 @@ function normalizeWorkspaceFingerprintInput(
       name: ws.name,
       codeRoot: normalizeRelativePath(projectRoot, ws.codeRoot),
       allowedPaths: wsGraph?.allowedPaths ? [...wsGraph.allowedPaths] : [],
-      excludePaths: wsGraph?.excludePaths ? [...wsGraph.excludePaths] : [],
+      globalExcludePaths: wsGraph ? [...wsGraph.globalExcludePaths] : [],
+      workspaceExcludePaths: wsGraph ? [...wsGraph.workspaceExcludePaths] : [],
+      testPaths: {
+        project: wsGraph ? [...wsGraph.projectTestPaths] : [],
+        workspace: wsGraph ? [...wsGraph.workspaceTestPaths] : [],
+      },
+      ignorePaths: {
+        project: wsGraph ? [...wsGraph.projectIgnorePaths] : [],
+        workspace: wsGraph ? [...wsGraph.workspaceIgnorePaths] : [],
+      },
       respectGitignore: wsGraph?.respectGitignore ?? true,
+      maxFileBytes: wsGraph?.maxFileBytes ?? effectiveGraphConfig.rootMaxFileBytes,
+      largeFilePaths: {
+        project: wsGraph?.projectLargeFilePaths ? [...wsGraph.projectLargeFilePaths] : [],
+        workspace: wsGraph?.workspaceLargeFilePaths ? [...wsGraph.workspaceLargeFilePaths] : [],
+      },
       resolutionInputs: discoverResolutionInputs(
         projectRoot,
         ws.codeRoot,
@@ -105,9 +139,12 @@ export function computeGraphFingerprint(input: GraphFingerprintInput): string {
     v: input.codeGraphVersion,
     w: normalized,
     g: {
+      pathSemantics: PATH_SEMANTICS_MARKER,
       includePaths: effectiveGraphConfig.includePaths,
       globalExcludePaths: effectiveGraphConfig.globalExcludePaths,
       syntheticSpecExcludePaths: effectiveGraphConfig.syntheticSpecExcludePaths,
+      rootMaxFileBytes: effectiveGraphConfig.rootMaxFileBytes,
+      rootLargeFilePaths: effectiveGraphConfig.rootLargeFilePaths,
     },
   })
   return createHash('sha256').update(payload).digest('hex')
@@ -141,8 +178,22 @@ export function computeWorkspaceFingerprint(
     name: workspace.name,
     codeRoot: normalizeRelativePath(projectRoot, workspace.codeRoot),
     allowedPaths: wsGraph?.allowedPaths ? [...wsGraph.allowedPaths] : [],
-    excludePaths: wsGraph?.excludePaths ? [...wsGraph.excludePaths] : [],
+    globalExcludePaths: wsGraph ? [...wsGraph.globalExcludePaths] : [],
+    workspaceExcludePaths: wsGraph ? [...wsGraph.workspaceExcludePaths] : [],
+    testPaths: {
+      project: wsGraph ? [...wsGraph.projectTestPaths] : [],
+      workspace: wsGraph ? [...wsGraph.workspaceTestPaths] : [],
+    },
+    ignorePaths: {
+      project: wsGraph ? [...wsGraph.projectIgnorePaths] : [],
+      workspace: wsGraph ? [...wsGraph.workspaceIgnorePaths] : [],
+    },
     respectGitignore: wsGraph?.respectGitignore ?? true,
+    maxFileBytes: wsGraph?.maxFileBytes ?? effectiveGraphConfig.rootMaxFileBytes,
+    largeFilePaths: {
+      project: wsGraph?.projectLargeFilePaths ? [...wsGraph.projectLargeFilePaths] : [],
+      workspace: wsGraph?.workspaceLargeFilePaths ? [...wsGraph.workspaceLargeFilePaths] : [],
+    },
     resolutionInputs: discoverResolutionInputs(
       projectRoot,
       workspace.codeRoot,
@@ -151,7 +202,11 @@ export function computeWorkspaceFingerprint(
       source,
     ),
   }
-  const payload = JSON.stringify({ v: codeGraphVersion, w: [normalized] })
+  const payload = JSON.stringify({
+    v: codeGraphVersion,
+    g: { pathSemantics: PATH_SEMANTICS_MARKER },
+    w: [normalized],
+  })
   return createHash('sha256').update(payload).digest('hex')
 }
 
@@ -178,9 +233,12 @@ export function computeRootFingerprint(
   const effectiveGraphConfig = resolveEffectiveGraphConfig(projectRoot, workspaces, graphConfig)
   const payload = JSON.stringify({
     v: codeGraphVersion,
+    g: { pathSemantics: PATH_SEMANTICS_MARKER },
     root: {
       includePaths: effectiveGraphConfig.includePaths,
       excludePaths: effectiveGraphConfig.rootExcludePaths,
+      maxFileBytes: effectiveGraphConfig.rootMaxFileBytes,
+      largeFilePaths: effectiveGraphConfig.rootLargeFilePaths,
     },
     workspaces: workspaces.map((workspace) => ({
       name: workspace.name,
@@ -359,6 +417,7 @@ export function serializeFingerprintMap(map: Map<string, string>): string {
  * @param adapters - Registered language adapters supply resolution-manifest basenames.
  * @param repoRoot - Repository root that bounds the resolution-manifest walk, or null.
  * @param source - Port that reads manifest existence and text.
+ * @param includeRoot - Whether the project-global `root` entry takes part; false for subset runs.
  * @returns True if any mismatch is detected.
  */
 export function detectFingerprintMismatch(
@@ -370,6 +429,7 @@ export function detectFingerprintMismatch(
   adapters: readonly LanguageAdapter[] = [],
   repoRoot: string | null = null,
   source: ResolutionManifestSource = emptyResolutionManifestSource,
+  includeRoot = true,
 ): boolean {
   if (storedMap.size === 0) {
     return false
@@ -391,6 +451,10 @@ export function detectFingerprintMismatch(
       return true
     }
   }
+
+  // The root entry is derived from the whole workspace list, so only a run that indexes
+  // every workspace can judge it; a subset run must neither compare nor rewrite it.
+  if (!includeRoot) return false
 
   const rootFingerprint = computeRootFingerprint(
     codeGraphVersion,

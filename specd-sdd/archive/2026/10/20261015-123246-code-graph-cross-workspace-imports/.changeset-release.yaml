@@ -1,0 +1,9 @@
+releases:
+  code-graph:language-adapter: minor
+  code-graph:workspace-integration: minor
+  code-graph:typescript-language-adapter: minor
+  code-graph:python-language-adapter: minor
+  code-graph:go-language-adapter: minor
+  code-graph:php-language-adapter: minor
+  code-graph:resolve-symbol-reference: minor
+  code-graph:indexer: minor

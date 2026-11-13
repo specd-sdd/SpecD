@@ -1,3 +1,9 @@
+---
+title: Use Cases
+description: Entry points to `@specd/core` business logic and how to construct them.
+sidebar_position: 6
+---
+
 # Use Cases
 
 > **Audience:** plugin authors and `@specd/core` consumers. Delivery hosts should use [`@specd/sdk`](../sdk/index.md) instead of wiring use cases directly.
@@ -771,6 +777,10 @@ Each spec's artifacts are validated in two passes:
 1. **Local structural validation** — each spec-scoped artifact file is parsed and evaluated against its `validations[]` rules. Artifacts with no local rules are still parsed when they participate in a `crossArtifactValidations` rule. Parsed ASTs are retained after local validation passes.
 2. **Cross-artifact relational validation** — applicable `crossArtifactValidations` rules with `scope: spec` are evaluated over the retained ASTs, reusing the same `evaluateCrossArtifactRule` engine as `ValidateArtifacts`. Failures and deferred warnings are folded into each `SpecValidationEntry`'s existing `failures` and `warnings` arrays.
 
+After these passes, full validation obtains usable metadata through `GetSpecMetadata`. The metadata operation owns extraction, freshness and dependency consistency, including conflicts between schema-extracted dependencies and persisted dependencies. `ValidateSpecs` accepts a successful projection without re-extracting dependencies or comparing them against a second lock observation. A spec without a lock can therefore use dependencies extracted by its schema.
+
+If materialization fails, the spec entry receives a metadata failure carrying the reason. Materialization warnings, including `metadata-cache-write-failed`, become entry warnings without duplicate logging; they do not fail an otherwise valid spec. Successful metadata does not clear artifact failures. A valid validation-result-cache hit reuses the complete outcome, including its warnings, without repeating artifact validation or metadata materialization.
+
 **Constructor:**
 
 ```typescript
@@ -778,8 +788,15 @@ new ValidateSpecs(
   specs: ReadonlyMap<string, SpecRepository>,
   schemaProvider: SchemaProvider,
   parsers: ArtifactParserRegistry,
+  getMetadata: GetSpecMetadata,
+  hasher?: ContentHasher,
+  extractorTransforms?: ExtractorTransformRegistry,
+  workspaceRoutes?: readonly SpecWorkspaceRoute[],
+  validationResultCaches?: ReadonlyMap<string, ValidationResultCache>,
 )
 ```
+
+The optional extractor-transform and workspace-route arguments remain accepted for constructor compatibility; extraction and routing are handled by the metadata operation.
 
 **Input:**
 
@@ -1052,6 +1069,33 @@ interface UpdateSpecDepsResult {
 | Error                 | Condition                             |
 | --------------------- | ------------------------------------- |
 | `ChangeNotFoundError` | No change with the given name exists. |
+
+---
+
+### GetChangeSpecDeps
+
+Reads the declared `dependsOn` dependencies of one spec in a change. The spec ID is validated and normalized in core with strict `parseSpecId` (bare IDs resolve to `default:`), so hosts never parse IDs themselves.
+
+**Input:** `{ name: string, specId: string }` — `specId` is the raw value typed by the user.
+
+**Returns:** `Promise<GetChangeSpecDepsResult>` — `{ name, specId, dependsOn }` where `specId` and every `dependsOn` entry are fully-qualified (e.g. `default:auth/login`).
+
+**Throws:**
+
+| Error                    | Condition                               |
+| ------------------------ | --------------------------------------- |
+| `ChangeNotFoundError`    | No change with the given name exists.   |
+| `InvalidSpecIdError`     | `specId` is empty, blank, or malformed. |
+| `WorkspaceNotFoundError` | `specId` names an unknown workspace.    |
+| `InvalidInputError`      | The spec is not in the change's scope.  |
+
+Exposed as `kernel.changes.getSpecDeps` and `createGetChangeSpecDeps`.
+
+---
+
+### UpdatePersistedSpecDeps
+
+Mutates the persisted `dependsOn` list in a spec's `spec-lock.json`. The result is `{ specId, dependsOn, created, initialized }`: `created` is `true` when the call created the lock, and `initialized` is `false` when no durable state exists and the call was a no-op (for example `remove` on an uninitialized spec). Writing into a `readOnly` workspace fails with `ReadOnlyWorkspaceError.forSpec(specId, workspace)`; concurrent writes fail with `ArtifactConflictError`.
 
 ---
 

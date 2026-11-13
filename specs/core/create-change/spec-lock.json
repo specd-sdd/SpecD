@@ -8,7 +8,9 @@
     "default:_global/architecture",
     "core:get-active-schema",
     "core:spec-overlap",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:spec-id-format",
+    "core:workspace"
   ],
   "implementation": [
     {

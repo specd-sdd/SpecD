@@ -2,7 +2,6 @@ import { type Command } from 'commander'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
-import { parseSpecId } from '../../helpers/spec-path.js'
 
 /**
  * Registers the `spec schema` command group.
@@ -22,14 +21,13 @@ export function registerSpecSchema(parent: Command): void {
     .option('--config <path>', 'path to specd.yaml')
     .action(async (specPath: string, opts: { format: string; config?: string }) => {
       try {
-        const { config, kernel } = await resolveCliContext({ configPath: opts.config })
-        const specId = parseSpecId(specPath, config).specId
-        const result = await kernel.specs.getPersistedSchema.execute({ specId })
+        const { kernel } = await resolveCliContext({ configPath: opts.config })
+        const result = await kernel.specs.getPersistedSchema.execute({ specId: specPath })
         const fmt = parseFormat(opts.format)
         if (fmt === 'text') {
           output(`schema: ${result.schema.name}@${result.schema.version}`, 'text')
         } else {
-          output({ result: 'ok', specId, schema: result.schema }, fmt)
+          output({ result: 'ok', specId: result.specId, schema: result.schema }, fmt)
         }
       } catch (err) {
         handleError(err, opts.format)
@@ -45,10 +43,9 @@ export function registerSpecSchema(parent: Command): void {
     .option('--config <path>', 'path to specd.yaml')
     .action(async (specPath: string, opts: { schema: string; format: string; config?: string }) => {
       try {
-        const { config, kernel } = await resolveCliContext({ configPath: opts.config })
-        const specId = parseSpecId(specPath, config).specId
+        const { kernel } = await resolveCliContext({ configPath: opts.config })
         const result = await kernel.specs.updatePersistedSchema.execute({
-          specId,
+          specId: specPath,
           schemaRef: opts.schema,
         })
         const fmt = parseFormat(opts.format)

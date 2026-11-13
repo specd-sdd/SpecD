@@ -1,0 +1,85 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Note use case entries and identity finalization
+
+    Kernel.changes SHALL expose addNote, removeNote, listNotes and getNote as their concrete use case types, with standard public factories/resolver wiring. Shared repository/actor dependencies SHALL be reused. Actor finalization SHALL supply versioned pre-privacy IDs with or without privacy configured, including SYSTEM_ACTOR; narrowing actor copies MUST preserve IDs.
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`default:_global/architecture`](../../_global/architecture/spec.md)
+    - [`core:composition`](../composition/spec.md)
+    - [`core:create-change`](../create-change/spec.md)
+    - [`core:get-status`](../get-status/spec.md)
+    - [`core:transition-change`](../transition-change/spec.md)
+    - [`core:draft-change`](../draft-change/spec.md)
+    - [`core:restore-change`](../restore-change/spec.md)
+    - [`core:discard-change`](../discard-change/spec.md)
+    - [`core:archive-change`](../archive-change/spec.md)
+    - [`core:validate-artifacts`](../validate-artifacts/spec.md)
+    - [`core:compile-context`](../compile-context/spec.md)
+    - [`core:list-changes`](../list-changes/spec.md)
+    - [`core:list-drafts`](../list-drafts/spec.md)
+    - [`core:list-discarded`](../list-discarded/spec.md)
+    - [`core:edit-change`](../edit-change/spec.md)
+    - [`core:skip-artifact`](../skip-artifact/spec.md)
+    - [`core:update-spec-deps`](../update-spec-deps/spec.md)
+    - [`core:list-archived`](../list-archived/spec.md)
+    - [`core:get-archived-change`](../get-archived-change/spec.md)
+    - [`core:run-step-hooks`](../run-step-hooks/spec.md)
+    - [`core:get-hook-instructions`](../get-hook-instructions/spec.md)
+    - [`core:get-artifact-instruction`](../get-artifact-instruction/spec.md)
+    - [`core:approve-spec`](../approve-spec/spec.md)
+    - [`core:approve-signoff`](../approve-signoff/spec.md)
+    - [`core:list-specs`](../list-specs/spec.md)
+    - [`core:get-spec`](../get-spec/spec.md)
+    - [`core:get-active-schema`](../get-active-schema/spec.md)
+    - [`core:validate-specs`](../validate-specs/spec.md)
+    - [`core:generate-metadata`](../generate-metadata/spec.md)
+    - [`core:materialize-spec-metadata`](../materialize-spec-metadata/spec.md)
+    - [`core:get-spec-metadata`](../get-spec-metadata/spec.md)
+    - [`core:regenerate-spec-metadata`](../regenerate-spec-metadata/spec.md)
+    - [`core:initialize-persisted-spec-state`](../initialize-persisted-spec-state/spec.md)
+    - [`core:get-persisted-spec-schema`](../get-persisted-spec-schema/spec.md)
+    - [`core:update-persisted-spec-schema`](../update-persisted-spec-schema/spec.md)
+    - [`core:get-persisted-spec-deps`](../get-persisted-spec-deps/spec.md)
+    - [`core:update-persisted-spec-deps`](../update-persisted-spec-deps/spec.md)
+    - [`core:get-persisted-spec-implementation`](../get-persisted-spec-implementation/spec.md)
+    - [`core:update-persisted-spec-implementation`](../update-persisted-spec-implementation/spec.md)
+    - [`core:get-persisted-spec-optimizations`](../get-persisted-spec-optimizations/spec.md)
+    - [`core:update-persisted-spec-optimizations`](../update-persisted-spec-optimizations/spec.md)
+    - [`core:get-spec-context`](../get-spec-context/spec.md)
+    - [`core:config-writer-port`](../config-writer-port/spec.md)
+    - [`core:list-workspaces`](../list-workspaces/spec.md)
+    - [`core:get-project-context`](../get-project-context/spec.md)
+    - [`core:get-config`](../get-config/spec.md)
+    - [`core:project-metadata`](../project-metadata/spec.md)
+    - [`core:update-project-metadata`](../update-project-metadata/spec.md)
+    - [`core:resolve-schema`](../resolve-schema/spec.md)
+    - [`core:spec-overlap`](../spec-overlap/spec.md)
+    - [`core:get-specs-health`](../get-specs-health/spec.md)
+    - [`core:count-tasks`](../count-tasks/spec.md) — shared task-completion query exposed by the kernel.
+    - [`core:check-registry`](../check-registry/spec.md) — Dynamic check catalog, namespacing, and governance.
+    - [`core:archive-repository-port`](../archive-repository-port/spec.md) — `changes.archiveRepo`
+    - [`core:get-draft`](../get-draft/spec.md) — `changes.getDraft`
+    - [`core:get-discarded`](../get-discarded/spec.md) — `changes.getDiscarded`
+    - [`core:invalidate-change`](../invalidate-change/spec.md) — `changes.invalidate`
+    - [`core:update-implementation-tracking`](../update-implementation-tracking/spec.md) — `changes.updateImplementationTracking`
+    - [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md) — `changes.refreshImplementationTracking`
+    - [`core:get-implementation-review`](../get-implementation-review/spec.md) — `changes.getImplementationReview`
+    - [`core:preview-spec`](../preview-spec/spec.md) — `changes.preview`
+    - [`core:get-spec-outline`](../get-spec-outline/spec.md) — `specs.getOutline`
+    - [`core:validate-schema`](../validate-schema/spec.md) — `specs.validateSchema`
+    - [`core:resolve-context-specs`](../resolve-context-specs/spec.md) — `project.resolveContextSpecs`
+    - [`core:get-project-summary`](../get-project-summary/spec.md) — `project.getProjectSummary`
+    - [`core:actor-resolver`](../actor-resolver/spec.md) — `createLazyVcsActorResolver` used by `CompositionResolver.getActorResolver`
+    - `core:add-change-note` — note policy or application capability used by this contract.
+    - `core:remove-change-note` — note policy or application capability used by this contract.
+    - `core:list-change-notes` — note policy or application capability used by this contract.
+    - `core:get-change-note` — note policy or application capability used by this contract.

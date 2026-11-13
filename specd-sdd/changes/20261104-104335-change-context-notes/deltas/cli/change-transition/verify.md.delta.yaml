@@ -1,0 +1,14 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Reason sources and optional note policy
+
+    #### Scenario: Bad grammar and unreadable input have zero mutation
+
+    - **GIVEN** reason-input points to an unreadable file or a repeated policy has an invalid token
+    - **WHEN** the transition command runs
+    - **THEN** the command reports the input error without invoking a mutating use case
+    - **AND** valid --reason-input - --note passes typed Core policy and text

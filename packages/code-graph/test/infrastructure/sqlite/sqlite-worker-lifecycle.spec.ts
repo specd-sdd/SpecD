@@ -135,7 +135,7 @@ describe('SQLiteWorkerClient & Store Lifecycle', { timeout: 15_000 }, () => {
 
     const file = createFileNode({
       path: 'core:src/drain.ts',
-      configRelativePath: 'src/drain.ts',
+      projectRelativePath: 'src/drain.ts',
       language: 'typescript',
       contentHash: 'sha256:drain',
       workspace: 'core',
@@ -167,7 +167,7 @@ describe('SQLiteWorkerClient & Store Lifecycle', { timeout: 15_000 }, () => {
 
     const file1 = createFileNode({
       path: 'core:src/1.ts',
-      configRelativePath: 'src/1.ts',
+      projectRelativePath: 'src/1.ts',
       language: 'typescript',
       contentHash: 'sha256:1',
       workspace: 'core',
@@ -362,7 +362,7 @@ parentPort.on('message', (msg) => {
 
     const file = createFileNode({
       path: 'core:src/progress.ts',
-      configRelativePath: 'src/progress.ts',
+      projectRelativePath: 'src/progress.ts',
       language: 'typescript',
       contentHash: 'sha256:progress',
       workspace: 'core',
@@ -408,7 +408,7 @@ parentPort.on('message', (msg) => {
 
     const file = createFileNode({
       path: 'core:src/closed-recreate.ts',
-      configRelativePath: 'src/closed-recreate.ts',
+      projectRelativePath: 'src/closed-recreate.ts',
       language: 'typescript',
       contentHash: 'sha256:cr',
       workspace: 'core',
@@ -442,7 +442,7 @@ parentPort.on('message', (msg) => {
       session1.writeFiles([
         createFileNode({
           path: 'core:src/s1.ts',
-          configRelativePath: 'src/s1.ts',
+          projectRelativePath: 'src/s1.ts',
           language: 'typescript',
           contentHash: 'sha256:s1',
           workspace: 'core',
@@ -462,7 +462,7 @@ parentPort.on('message', (msg) => {
       session2.writeFiles([
         createFileNode({
           path: 'core:src/s2.ts',
-          configRelativePath: 'src/s2.ts',
+          projectRelativePath: 'src/s2.ts',
           language: 'typescript',
           contentHash: 'sha256:s2',
           workspace: 'core',
@@ -480,7 +480,7 @@ parentPort.on('message', (msg) => {
 
     const doc = createDocumentNode({
       path: 'core:docs/auth.md',
-      configRelativePath: 'docs/auth.md',
+      projectRelativePath: 'docs/auth.md',
       contentHash: 'sha256:doc',
       content: 'auth docs',
       workspace: 'core',
@@ -566,7 +566,7 @@ parentPort.on('message', (msg) => {
 
     const file = createFileNode({
       path: 'core:src/state.ts',
-      configRelativePath: 'src/state.ts',
+      projectRelativePath: 'src/state.ts',
       language: 'typescript',
       contentHash: 'sha256:state',
       workspace: 'core',
@@ -591,7 +591,7 @@ parentPort.on('message', (msg) => {
 
     const file = createFileNode({
       path: 'core:src/rollback-state.ts',
-      configRelativePath: 'src/rollback-state.ts',
+      projectRelativePath: 'src/rollback-state.ts',
       language: 'typescript',
       contentHash: 'sha256:rollback',
       workspace: 'core',
@@ -615,7 +615,7 @@ parentPort.on('message', (msg) => {
 
     const file = createFileNode({
       path: 'core:src/already-active.ts',
-      configRelativePath: 'src/already-active.ts',
+      projectRelativePath: 'src/already-active.ts',
       language: 'typescript',
       contentHash: 'sha256:already-active',
       workspace: 'core',
@@ -636,7 +636,7 @@ parentPort.on('message', (msg) => {
 
     const file = createFileNode({
       path: 'core:src/limited.ts',
-      configRelativePath: 'src/limited.ts',
+      projectRelativePath: 'src/limited.ts',
       language: 'typescript',
       contentHash: 'sha256:limited',
       workspace: 'core',
@@ -656,7 +656,7 @@ parentPort.on('message', (msg) => {
 
     const file = createFileNode({
       path: 'core:src/cleared.ts',
-      configRelativePath: 'src/cleared.ts',
+      projectRelativePath: 'src/cleared.ts',
       language: 'typescript',
       contentHash: 'sha256:cleared',
       workspace: 'core',
@@ -684,7 +684,7 @@ parentPort.on('message', (msg) => {
 
     const file = createFileNode({
       path: 'core:src/race.ts',
-      configRelativePath: 'src/race.ts',
+      projectRelativePath: 'src/race.ts',
       language: 'typescript',
       contentHash: 'sha256:race',
       workspace: 'core',

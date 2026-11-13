@@ -1,10 +1,8 @@
 import * as path from 'node:path'
 import { type Command } from 'commander'
-import { SpecPath } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
-import { parseSpecId } from '../../helpers/spec-path.js'
 
 /**
  * Registers the `spec show` subcommand on the given parent command.
@@ -31,12 +29,10 @@ JSON/TOON output schema:
     .action(
       async (specPath: string, opts: { artifact?: string; format: string; config?: string }) => {
         try {
-          const { config, kernel } = await resolveCliContext({ configPath: opts.config })
-          const parsed = parseSpecId(specPath, config)
+          const { kernel } = await resolveCliContext({ configPath: opts.config })
 
           const result = await kernel.specs.get.execute({
-            workspace: parsed.workspace,
-            specPath: SpecPath.parse(parsed.capabilityPath),
+            specId: specPath,
           })
 
           if (result === null) {
@@ -48,12 +44,12 @@ JSON/TOON output schema:
           )
 
           if (opts.artifact !== undefined) {
-            const result = await kernel.specs.getActiveSchema.execute()
-            if (result.raw) {
+            const schemaResult = await kernel.specs.getActiveSchema.execute()
+            if (schemaResult.raw) {
               // This branch is unreachable given we don't pass { raw: true }
               throw new Error('Unexpected raw schema result')
             }
-            const schema = result.schema
+            const schema = schemaResult.schema
             const artifactType = schema.artifact(opts.artifact)
 
             if (artifactType === null) {
@@ -72,7 +68,7 @@ JSON/TOON output schema:
 
             if (artifact === undefined) {
               cliError(
-                `artifact '${opts.artifact}' (${targetFilename}) not found on disk for spec '${specPath}'`,
+                `artifact '${opts.artifact}' (${targetFilename}) not found on disk for spec '${result.specId}'`,
                 opts.format,
               )
             }

@@ -1,0 +1,18 @@
+- op: modified
+  description: >-
+    Require structural list-item validations for WHEN/THEN under each Scenario
+    (GIVEN optional) and clarify that authoring instructions must distinguish
+    #### scenario headings from mandatory GWT list-item bodies.
+  selector:
+    type: section
+    matches: 'Requirement: Verify Artifact Contract, Instructions, and Deltas'
+  content: |
+    The schema definition for `verify` SHALL instruct authoring of acceptance scenarios:
+
+    1. Scenarios MUST be grouped under `### Requirement:` headings matching the spec's requirement names and order.
+    2. Individual scenarios MUST use `#### Scenario:` subheadings whose bodies express WHEN / THEN assertions and optional GIVEN preconditions as Markdown list items (optionally followed by AND/OR list items), matching the format consumed by scenario metadata extraction.
+    3. Authoring instructions MUST state that scenario headings use exactly four hashtags (not three, and not bullet titles), while scenario bodies MUST use list items for GWT clauses — “never bullets” applies only to scenario titles, not to GWT lines.
+    4. Modified verification suites MUST be authored as structured deltas under `deltas/`.
+    5. Structural validations MUST enforce that every requirement contains at least one scenario.
+    6. Structural validations MUST enforce that every scenario contains at least one WHEN list item and at least one THEN list item; GIVEN list items MAY be absent when the precondition is obvious.
+    7. It SHALL enforce a post-authoring rule ensuring requirement-to-scenario coverage parity between `spec.md` and `verify.md`.

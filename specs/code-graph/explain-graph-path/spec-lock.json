@@ -1,0 +1,18 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:config",
+    "code-graph:indexer",
+    "code-graph:workspace-integration",
+    "code-graph:graph-path-identity"
+  ],
+  "implementation": [
+    {
+      "file": "code-graph:src/application/use-cases/explain-graph-path.ts",
+      "symbols": ["ExplainGraphPath"]
+    }
+  ]
+}

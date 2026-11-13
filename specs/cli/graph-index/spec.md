@@ -17,7 +17,7 @@ specd graph index [--force] [--exclude-path <pattern>...] [--config <path> | --p
 - If a typed recoverable storage-open failure occurs, `--force` also authorizes the
   SDK use case to recreate closed storage and retry once; it does not authorize
   deletion for ordinary open failures.
-- `--exclude-path <pattern>` is optional and repeatable.
+- `--exclude-path <pattern>` is optional and repeatable. Each pattern is gitignore-syntax and relative to the project root, like every path in `specd.yaml`; it is added to the global exclusion layer and cannot be negated by workspace `excludePaths`. Each value is one whole pattern and is never split on commas, because a gitignore pattern can contain commas (for example `{a,b}/**`); several patterns are given by repeating the option or listing them after it.
 - `--config <path>` and `--path <path>` remain mutually exclusive.
 - `--format text|json|toon` defaults to text.
 
@@ -26,10 +26,10 @@ specd graph index [--force] [--exclude-path <pattern>...] [--config <path> | --p
 Index execution MUST go through the high-level `runIsolatedGraphIndex` capability
 imported from `@specd/sdk`. The CLI SHALL provide:
 
-- the graph storage root resolved for the command context;
+- the graph storage root resolved from the parent's effective command context;
 - the URL of its trusted, packaged graph-index task module;
-- JSON-serializable task input containing the explicit configured or bootstrap
-  context descriptor plus `force` and additional exclude paths;
+- JSON-serializable task input containing an explicit forced, discovered, or
+  bootstrap context descriptor plus `force` and additional exclude paths;
 - a progress callback that renders text-mode progress while leaving structured
   modes presentation-neutral.
 
@@ -38,12 +38,28 @@ the graph index lock. It MUST NOT spawn or fork a graph-index process itself. Lo
 acquisition, child creation, signal forwarding, IPC validation, termination
 classification, and cleanup belong to the code-graph isolated worker.
 
+The parent SHALL preserve the mode used to resolve the command context:
+
+- an explicit `--config` SHALL produce a forced descriptor containing the selected
+  config path;
+- automatic project discovery SHALL produce a discovered descriptor containing the
+  absolute directory from which the parent started discovery;
+- `--path` or no-config fallback SHALL produce the existing bootstrap descriptor
+  containing the explicit project and VCS roots.
+
 The packaged CLI task SHALL execute inside the isolated child. It SHALL reconstruct
-an SDK host context equivalent to the parent's explicit configured or bootstrap
-descriptor and invoke `runIndexProjectGraph(ctx, input)` exactly once. Because an
-in-memory kernel cannot cross a process boundary, the task MUST NOT claim or attempt
-to reuse the same kernel object identity. It MUST preserve the selected config path
-or bootstrap root and MUST NOT perform implicit project substitution.
+a host context equivalent to the parent's descriptor: forced descriptors SHALL use
+`openSpecdHost({ configPath })`, discovered descriptors SHALL replay normal discovery
+with `openSpecdHost({ startDir })`, and bootstrap descriptors SHALL construct the
+explicit bootstrap config without discovery. A discovered descriptor MUST NOT be
+converted into forced loading of its resolved root config file. After reconstruction,
+the task SHALL invoke `runIndexProjectGraph(ctx, input)` exactly once.
+
+If discovered reconstruction no longer finds a valid project configuration, the task
+MUST fail through the existing worker/system-error path. It MUST NOT fall back to
+bootstrap mode or substitute another project. Because an in-memory kernel cannot
+cross a process boundary, the task MUST NOT claim or attempt to reuse the same kernel
+object identity.
 
 Workspace assembly, VCS resolution, spec metadata materialization, provider
 lifecycle, repair handling, and `IndexProjectGraph` orchestration SHALL remain in
@@ -51,15 +67,14 @@ lifecycle, repair handling, and `IndexProjectGraph` orchestration SHALL remain i
 
 Production execution SHALL always use the process-isolated worker. CLI-specific
 `SPECD_GRAPH_INDEX_WORKER` and `SPECD_GRAPH_INDEX_NO_WORKER` execution branches are
-not part of the target command behaviour. Tests SHALL use explicit worker/task
-seams without changing the production path.
+not part of the target command behaviour. Tests SHALL use explicit worker/task seams
+without changing the production path.
 
 The parent CLI SHALL receive typed progress, result, and failure outcomes from the
-high-level worker. It SHALL render the successful `RunIndexProjectGraphResult`
-using the existing text, JSON, or TOON contract. Per-file indexing errors remain a
+high-level worker. It SHALL render the successful `RunIndexProjectGraphResult` using
+the existing text, JSON, or TOON contract. Per-file indexing errors remain a
 successful result; busy, fork, task, protocol, abnormal-exit, signal, provider, and
-other infrastructure failures SHALL follow the command's existing system-error
-path.
+other infrastructure failures SHALL follow the command's existing system-error path.
 
 ### Requirement: Output format
 
@@ -82,6 +97,38 @@ When the result includes per-workspace breakdowns, text mode also lists each wor
 
 In `json` or `toon` mode, the full `IndexResult` object is output as-is, including `documentsIndexed` and the per-workspace `documentsIndexed` breakdown.
 
+### Requirement: Size-skip summary and hint
+
+When the result reports `filesSkippedForSize` greater than zero, `text` mode SHALL append to the summary block a section that:
+
+1. states the number of files skipped because they exceed `graph.maxFileBytes` and the limit that was applied;
+2. lists the largest skipped files from `largestSkippedForSize`, at most ten, each with its project-relative path and a human-readable size, followed by a line stating how many more were skipped when the total exceeds ten (the total is always shown);
+3. prints a `graph.largeFilePaths` snippet in YAML, ready to paste into `specd.yaml`, containing the listed files with project-root-relative paths, escaping any character that gitignore syntax treats specially, so that the same snippet is valid for every workspace;
+4. mentions that `graph.maxFileBytes` can be raised and that `0` disables the limit;
+5. states that large files cost roughly 3 KB of memory per source byte while they are analysed.
+
+When the result reports `sizeExemptAnalysed` entries, `text` mode SHALL list them separately with their sizes, so that the user can see which exempt files were analysed.
+
+The section MUST NOT appear when no file was skipped for size and no exempt file exceeded the limit, so the output of runs without those conditions is unchanged. In `json` and `toon` mode the data is output as part of the `IndexResult` and no hint text is added. The command MUST NOT modify `specd.yaml`.
+
+### Requirement: Workspace overlap warning
+
+When the result reports workspace overlaps (`workspaceOverlapCount` greater than zero, with the bounded list `workspaceOverlaps`), `text` mode SHALL print a warning section stating how many physical files are owned by more than one workspace, listing at most ten (project-relative path and owning workspaces) followed by a line with the remaining count, and hinting that the `excludePaths` or `allowedPaths` of the workspaces probably do not partition the files and that `specd graph why <path>` explains each case.
+
+The section MUST NOT appear when there are no overlaps, and the exit status is unchanged. In `json` and `toon` mode `workspaceOverlaps` and `workspaceOverlapCount` are output as part of the `IndexResult` with no hint text.
+
+### Requirement: Worker diagnostics presentation
+
+In `text` mode the CLI SHALL render the typed events it receives from the SDK without altering the structured modes. When a `worker-silent` event arrives, the CLI SHALL print a warning to standard error that names the last announced file and the silent duration, and SHALL suggest `graph.excludePaths` (or a lower `graph.maxFileBytes`) for that file. The most recent `file-activity` event MAY be used to enrich the progress detail.
+
+When the isolated run fails, `text` mode SHALL print the failure cause (`start-failed`, `task-contract`, `task-error`, `protocol`, `cancelled`, `native-crash`, `resource-limit`, or `exited`), the last announced file, and the captured standard error tail. The exit code behaviour of Requirement: Error cases is unchanged. In `json` and `toon` mode the cause and diagnostics are output as structured data and no sentences are generated by the CLI.
+
+The CLI task module MUST pass the typed events across the worker boundary as JSON-serializable values and MUST NOT introduce its own message formats.
+
+### Requirement: Resolution diagnostics presentation
+
+In `text` mode the CLI SHALL print the entries of `diagnostics` after the result as warnings (one line per entry, with the path and the message), under a heading that states that the run finished with that number of diagnostics. They MUST NOT be printed as errors and MUST NOT change the exit code. `errors` keeps its presentation and exit-code behaviour. The structured modes expose `diagnostics` unchanged next to `errors`.
+
 ### Requirement: Forced indexing result completeness
 
 A successful `graph index --force` result SHALL identify the run as a forced full logical reindex in text, JSON, and TOON output. Structured output MUST retain the stable full-rebuild flag and reason together with discovered, indexed, unsupported, excluded, skipped, coverage, and error counts.
@@ -100,20 +147,24 @@ Per-file indexing errors (parse failures, unsupported syntax) do not cause a non
 
 ### Requirement: CLI reference documentation
 
-The `specd graph` command group SHALL be fully documented in `docs/cli/cli-reference.md` under a `## graph` section. The reference MUST cover all five subcommands: `index`, `search`, `hotspots`, `stats`, and `impact`.
+The `specd graph` command group SHALL be fully documented in `docs/cli/cli-reference.md` under a `## graph` section. The reference MUST cover all six subcommands: `index`, `search`, `hotspots`, `stats`, `impact`, and `why`.
 
 For `graph index`, the documentation MUST include:
 
 - Full command signature with all flags
-- Description of `--exclude-path` flag: repeatable, gitignore-syntax, merges on top of config's `graph.excludePaths`
+- Description of `--exclude-path` flag: repeatable, gitignore-syntax, project-relative, merges into the global exclusion layer on top of config's `graph.excludePaths`
 - Description of `--config` and `--path` behavior, including that they are mutually exclusive
 - Description of bootstrap mode and no-config fallback as setup/bootstrap mechanisms rather than the normal configured mode
 - Description of `graph.excludePaths` and `graph.respectGitignore` workspace config fields and their effect on indexing
+- Description of the project-relative interpretation of every graph path and pattern at project and workspace level, of the non-overridable global exclusion layer, and a pointer to `graph why` for diagnosing a path
+- Description of `graph.maxFileBytes` and `graph.largeFilePaths` (project and workspace scope, the 256 KiB default, `0` disabling the limit, how workspace values combine with the project ones) and of the size-skip summary and hint
+- Description of the failure causes and diagnostics printed by `graph index`
 - The built-in default exclusion list (applied when `graph.excludePaths` is not configured)
 - Replace semantics: specifying `graph.excludePaths` replaces built-in defaults
-- Example showing how to re-include a subdirectory of an otherwise-excluded dir using negation
+- Example showing how to re-include a subdirectory of an otherwise-excluded dir using negation, with project-relative patterns
+- Example showing how to index a specific large file by listing it in `graph.largeFilePaths`
 
-For each other subcommand (`search`, `hotspots`, `stats`, `impact`), the documentation MUST include: command signature, flag descriptions, at least one usage example, and the graph CLI context model (`--config`, `--path`, bootstrap-only fallback semantics) when the command supports those flags.
+For each other subcommand (`search`, `hotspots`, `stats`, `impact`, `why`), the documentation MUST include: command signature, flag descriptions, at least one usage example, and the graph CLI context model (`--config`, `--path`, bootstrap-only fallback semantics) when the command supports those flags.
 
 ### Requirement: Visible incompatibility repair
 
@@ -184,5 +235,7 @@ $ specd graph index --format json
   execution orchestration performed by the injected CLI task
 - [`sdk:host-context`](../../sdk/host-context/spec.md) — equivalent SDK host context
   reconstruction inside the child
-- `code-graph:isolated-index-worker` — lock-aware process isolation and injected
-  task execution consumed through SDK
+- `code-graph:isolated-index-worker` — lock-aware process isolation and injected task
+  execution consumed through SDK
+- `core:config-loader` — forced and start-directory discovery semantics replayed by
+  the packaged child task

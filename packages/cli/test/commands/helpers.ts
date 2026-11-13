@@ -357,10 +357,12 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): TestKer
         return { schema: active.schema, warnings: [] }
       }),
     },
+    validateBatch: { execute: vi.fn() },
     edit: { execute: vi.fn() },
     skipArtifact: { execute: vi.fn() },
     compile: { execute: vi.fn() },
     updateSpecDeps: { execute: vi.fn() },
+    getSpecDeps: { execute: vi.fn() },
     updateImplementationTracking: { execute: vi.fn() },
     refreshImplementationTracking: {
       execute: vi.fn().mockResolvedValue({

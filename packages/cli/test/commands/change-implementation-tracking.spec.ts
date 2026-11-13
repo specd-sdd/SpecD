@@ -51,6 +51,20 @@ describe('enrichImplementationTracking', () => {
               status: 'resolved',
               reasonCode: null,
               health: { fresh: true, complete: true, reasonCodes: [] },
+              resolvedTarget: {
+                kind: 'logical-target',
+                logicalSymbol: {
+                  id: 'logical-change-transition',
+                  workspace: 'core',
+                  surface: 'core:src/change.ts',
+                  name: 'transition',
+                  space: 'property',
+                  ownerId: 'logical-change',
+                  memberSemantics: { kind: 'method', dispatch: 'instance' },
+                },
+                declarations: [],
+                path: [],
+              },
               target: {
                 id: 'logical-change-transition',
                 workspace: 'core',

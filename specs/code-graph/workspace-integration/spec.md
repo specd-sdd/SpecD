@@ -19,7 +19,7 @@ If a physical file falls under a configured workspace `codeRoot`, the workspace 
 
 `path` remains the canonical graph identity used by `SymbolNode.filePath`, symbol ids, and persisted relations.
 
-Each node MUST also store its `configRelativePath` (relative to the directory containing the active `specd.yaml`) to enable user-facing lookups from project-relative path selectors.
+Each node MUST also store its `projectRelativePath` (relative to the project root containing the active `specd.yaml`) to enable user-facing lookups and direct filesystem navigation.
 
 This ensures that two workspaces with identical relative paths produce distinct `FileNode.path` values while still allowing CLI users to resolve file arguments using repository-style paths relative to the active config. The workspace name is the `SpecdWorkspaceConfig.name` from the specd configuration.
 
@@ -47,20 +47,28 @@ Spec IDs use the format `{workspace}:{specPath}` (e.g. `core:change`, `default:_
 
 For each workspace with a `codeRoot`, the indexer SHALL discover files starting from the workspace's `codeRoot` (an absolute path). The `codeRoot` is provided by `SpecdWorkspaceConfig.codeRoot` from the specd configuration.
 
-Files are discovered per workspace and their paths are prefixed with the workspace name before being stored in the graph. The `discoverFiles` function itself has no workspace knowledge — it accepts a root directory and returns paths relative to that root.
+Files are discovered per workspace and their paths are prefixed with the workspace name before being stored in the graph. The `discoverFiles` function itself has no workspace knowledge — it accepts a root directory, returns paths relative to that root, and receives the project-relative directory of that root (`pathBase`) so that configured patterns, which are project-relative, are matched against `pathBase` joined with the path below the root. The indexer derives `pathBase` as the path from the project root to the workspace `codeRoot`.
 
-### Requirement: Config-relative file lookup
+### Requirement: Project-relative file lookup
 
-The graph SHALL support resolving file selectors by a path relative to the directory containing the active `specd.yaml`.
+The graph SHALL support resolving file selectors by a path relative to the project root containing the active `specd.yaml`.
 
 For a configured project:
 
-1. The indexer computes `configRelativePath` for every indexed file from the active config directory to the file on disk.
+1. The indexer computes `projectRelativePath` for every indexed file and document from the project root to the file on disk, and denormalizes it onto every extracted symbol.
 2. The value is normalized to forward slashes and MUST NOT include a leading `./`.
-3. Files outside the config directory remain representable by a relative path containing `..` segments.
-4. CLI commands that accept file selectors MAY use this field to resolve inputs that do not include a `{workspace}:` prefix.
+3. Files outside the project root remain representable by a relative path containing `..` segments.
+4. CLI commands and tool hosts that accept file selectors MAY use this field to resolve inputs that do not include a `{workspace}:` prefix.
 
 This lookup is in addition to canonical workspace-prefixed graph identity; it does not replace it.
+
+### Requirement: Workspace ownership is decided by discovery rules
+
+Workspace-level `graph` filters (`allowedPaths`, `excludePaths`, `testPaths`, `ignorePaths`, `largeFilePaths`, `maxFileBytes`) apply to the files a workspace owns. They are matched against the file's `projectRelativePath` (see `core:config` Requirement: Project-relative graph path semantics), not against the path below `codeRoot`.
+
+A workspace is a **candidate** for a physical path when its `codeRoot` contains the path. A candidate is an **owner** of the path when the path passes that workspace's discovery (`.gitignore`, global and workspace exclusions, `allowedPaths`). Candidates are not ranked by `codeRoot` depth or by configuration order: workspaces may legitimately share or nest `codeRoot` values when their `excludePaths` and `allowedPaths` partition the files between them.
+
+A physical path with more than one owner is persisted under one identity per owner and is a probable misconfiguration of `specd.yaml`. It SHALL be reported as a workspace-overlap warning by the indexer (Requirement: Workspace overlap diagnostic in `code-graph:indexer`) and SHALL NOT make indexing fail.
 
 ### Requirement: Spec resolution via SpecRepository
 
@@ -89,24 +97,38 @@ prefixes, ownership, and locality as configured in `specd.yaml`.
 During Pass 2 (import resolution), the indexer SHALL resolve imports across workspaces:
 
 - **Relative imports** — resolved within the same workspace (same path prefix)
-- **Package imports** — the `packageName → workspaceName` map (built from `LanguageAdapter.getPackageIdentity`) correlates package names with workspace names, allowing resolution across workspace boundaries. This works for both monorepo and multirepo setups.
-- **PHP qualified names** — resolved globally across all workspaces
+- **Package imports** — the `packageName → workspaceName` map (built from the `packageResolution` facet of each `LanguageAdapter`) correlates package names with workspace names, allowing resolution across workspace boundaries. This works for both monorepo and multirepo setups. A package-specifier import resolves its exported name only through the target package's published entry surface and the public bindings of those entry files. The imported name is never searched among the target workspace's symbols.
+- **Qualified names** — a fully qualified name that a language declares as a symbol identity (for example a PHP class) resolves to that symbol in any workspace through the exact qualified-name map; a qualified name that only maps to a file resolves through the `qualifiedNameResolution` and `packageResolution` facets of the importing language's adapter using prepared metadata
 
-The in-memory `SymbolIndex` holds symbols from ALL workspaces before Pass 2 begins, enabling cross-workspace resolution.
+The in-memory `SymbolIndex` holds symbols from ALL workspaces before Pass 2 begins, enabling cross-workspace resolution. Public bindings of every entry surface, including those reached through barrel chains and other workspaces, are final before the first import is resolved.
+
+A package-specifier import that names a symbol and resolves SHALL produce a cross-workspace binding target, a resolution step, and a file-level `IMPORTS` relation to the entry file that published the name. A package import that names no symbol (for example a Go package import) and resolves SHALL produce the file-level `IMPORTS` relations to the entry files only. Downstream `USES_TYPE`, `CALLS`, and `CONSTRUCTS` relations resolve through that binding exactly as they do for a relative import.
+
+A package-specifier import that does not resolve SHALL produce no relation, binding target, or step. The reason (adapter without the facet, no entry surface, name not exported, or ambiguous) is a non-persisted diagnostic. An import of a package that no workspace declares is an external dependency; it produces no relation and is only counted.
+
+A package-specifier import never resolves through a file classified as a test: test files are never package entries, and an exact qualified-name lookup used by an import MUST NOT resolve to a symbol declared in a test file either.
 
 ### Requirement: WorkspaceIndexTarget
 
-`IndexOptions` SHALL accept the orchestrated project structure and graph-specific configuration:
+`IndexOptions` SHALL accept the orchestrated project structure and graph-specific configuration. Every path and pattern in `ProjectGraphConfig` is relative to the project root:
 
 ```ts
 interface ProjectGraphConfig {
   readonly includePaths?: readonly string[]
   readonly excludePaths?: readonly string[]
+  readonly testPaths?: readonly string[]
+  readonly ignorePaths?: readonly string[]
+  readonly maxFileBytes?: number
+  readonly largeFilePaths?: readonly string[]
   readonly workspaces?: ReadonlyMap<
     string,
     {
       readonly allowedPaths?: readonly string[]
       readonly excludePaths?: readonly string[]
+      readonly testPaths?: readonly string[]
+      readonly ignorePaths?: readonly string[]
+      readonly maxFileBytes?: number
+      readonly largeFilePaths?: readonly string[]
       readonly respectGitignore?: boolean
     }
   >
@@ -155,10 +177,11 @@ When discovering files from a `codeRoot`, `.gitignore` handling is controlled by
 When `respectGitignore` is `true`:
 
 1. Use the provided `vcsRoot` in options, which is resolved upstream from `VcsAdapter.rootDir()`.
-2. When `vcsRoot` is non-null, load `.gitignore` from that VCS root.
+2. When `vcsRoot` is non-null, load `.gitignore` from that VCS root and from every directory between the VCS root and the `codeRoot`, then from the `codeRoot` itself.
 3. Load any `.gitignore` files found in subdirectories during the walk.
-4. Apply rules relative to the directory containing each `.gitignore`.
+4. Apply rules relative to the directory containing each `.gitignore`, including the files above the `codeRoot`, whose rules are matched against the path below their own directory.
 5. `.gitignore` exclusions have absolute priority — `excludePaths` cannot re-include gitignored files.
+6. As in git, a path cannot be re-included by a negation when one of its parent directories is excluded, whichever `.gitignore` excluded it.
 
 When `vcsRoot` is `null`:
 
@@ -172,11 +195,11 @@ When `respectGitignore` is `false`:
 
 ### Requirement: Canonical module and package resolution identity
 
-Cross-workspace resolution SHALL produce structured workspace, module/package, public-surface, and symbol-space identity from configured code roots and language adapter package facts.
+Cross-workspace resolution SHALL produce structured workspace, module/package, public-surface, and symbol-space identity from configured code roots and the package facts that language adapters provide through their `packageResolution` facet.
 
-Resolution SHALL apply language-specific case and visibility rules and supported package/project configuration. It MUST NOT infer cross-workspace targets from a global same-name match.
+Resolution SHALL apply language-specific case and visibility rules and supported package/project configuration. It MUST NOT infer cross-workspace targets from a global same-name match, from a same-name match within the target workspace, or from the uniqueness of a name.
 
-Changes to workspace roots, package identities, project references, autoload mappings, or other deterministic resolution inputs SHALL change the derivation fingerprint and require reindexing.
+Changes to workspace roots, package identities, `exports` or `main` of a package manifest, module paths, project references, autoload mappings, or other deterministic resolution inputs SHALL change the derivation fingerprint and require reindexing. Those inputs are the manifests that adapters declare through `resolutionManifests()`.
 
 Exact graph file selectors SHALL normalize canonical workspace-relative paths, config/project-relative paths, and absolute paths to the same file identity. Wildcard selectors SHALL preserve pattern semantics and MUST NOT be coerced to one file.
 
@@ -184,9 +207,10 @@ Exact graph file selectors SHALL normalize canonical workspace-relative paths, c
 
 - `@specd/code-graph` depends on `@specd/core` as a runtime dependency (types, domain services)
 - Single `.specd/code-graph.lbug` file for the whole project
-- The `discoverFiles` function remains workspace-agnostic — workspace prefixing and config-relative path derivation happen in the indexer
+- The `discoverFiles` function remains workspace-agnostic — workspace prefixing, `pathBase` and project-relative path derivation happen in the indexer
 - Spec resolution uses `SpecRepository` exclusively — no filesystem fallback
-- Existing graph stores are incompatible when file identity metadata changes (for example adding `configRelativePath`) — a full rebuild is required after upgrading
+- Existing graph stores are incompatible when file identity metadata changes (for example replacing `configRelativePath` with `projectRelativePath`) — a full rebuild is required after upgrading
+- Existing graph stores built under `codeRoot`-relative path-pattern semantics are rebuilt when the path-semantics marker of the discovery fingerprint differs
 
 ## Examples
 

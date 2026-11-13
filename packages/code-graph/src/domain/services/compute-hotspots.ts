@@ -1,4 +1,6 @@
 import { type GraphStore } from '../ports/graph-store.js'
+import { type FileCategory } from '../value-objects/file-node.js'
+import { resolveAdmittedCategories } from '../value-objects/impact-result.js'
 import { RelationType } from '../value-objects/relation-type.js'
 import {
   DEFAULT_HOTSPOT_KINDS,
@@ -67,11 +69,17 @@ interface HierarchySignal {
  * one logical batch relation lookup.
  * @param store - The graph store to query.
  * @param symbols - Candidate symbols to score.
+ * @param fileCategories - Map from file path to category.
+ * @param admittedCategories - Set of admitted file categories.
+ * @param allSymbolsById - Map from symbol id to SymbolNode.
  * @returns Per-symbol hierarchy counts.
  */
 async function collectHierarchySignals(
   store: GraphStore,
   symbols: readonly SymbolNode[],
+  fileCategories: Map<string, FileCategory>,
+  admittedCategories: Set<FileCategory>,
+  allSymbolsById: Map<string, SymbolNode>,
 ): Promise<Map<string, HierarchySignal>> {
   const candidateIds = symbols.map((symbol) => symbol.id)
   if (candidateIds.length === 0) return new Map()
@@ -87,6 +95,13 @@ async function collectHierarchySignals(
     { extenders: number; implementors: number; overriders: number }
   >()
   for (const relation of relations) {
+    const sourceSymbol = allSymbolsById.get(relation.source)
+    if (sourceSymbol) {
+      const sourceCategory = fileCategories.get(sourceSymbol.filePath) ?? 'source'
+      if (!admittedCategories.has(sourceCategory)) {
+        continue
+      }
+    }
     let entry = hierarchyByTarget.get(relation.target)
     if (entry === undefined) {
       entry = { extenders: 0, implementors: 0, overriders: 0 }
@@ -125,17 +140,50 @@ export async function computeHotspots(
   store: GraphStore,
   options?: HotspotOptions,
 ): Promise<HotspotResult> {
-  const [callerRows, importerCounts, allSymbols] = await Promise.all([
+  const admittedCategories = new Set(resolveAdmittedCategories(options))
+  const [callerRows, importerCounts, allSymbols, allFiles] = await Promise.all([
     store.getSymbolCallers(),
-    store.getFileImporterCounts(),
+    store.getFileImporterCounts({ categories: [...admittedCategories] }),
     store.findSymbols({}),
+    store.getAllFiles(),
   ])
-  const hierarchySignals = await collectHierarchySignals(store, allSymbols)
 
-  // Group caller rows by symbol id
+  const fileCategories = new Map(allFiles.map((file) => [file.path, file.category]))
+
+  // Calculate omittedCounts across all indexed files
+  let omittedTests = 0
+  let omittedIgnored = 0
+  for (const file of allFiles) {
+    if (file.category === 'test' && !admittedCategories.has('test')) {
+      omittedTests++
+    } else if (file.category === 'ignored' && !admittedCategories.has('ignored')) {
+      omittedIgnored++
+    }
+  }
+
+  const allSymbolsById = new Map(allSymbols.map((symbol) => [symbol.id, symbol]))
+  const hierarchySignals = await collectHierarchySignals(
+    store,
+    allSymbols,
+    fileCategories,
+    admittedCategories,
+    allSymbolsById,
+  )
+
+  // Group caller rows by symbol id, admitting only callers and symbols in admitted categories
   const symbolMap = new Map<string, { symbol: SymbolNode; sameWs: number; crossWs: number }>()
 
   for (const { symbol, callerFilePath } of callerRows) {
+    const callerCategory = fileCategories.get(callerFilePath) ?? 'source'
+    if (!admittedCategories.has(callerCategory)) {
+      continue
+    }
+
+    const symbolCategory = fileCategories.get(symbol.filePath) ?? 'source'
+    if (!admittedCategories.has(symbolCategory)) {
+      continue
+    }
+
     let entry = symbolMap.get(symbol.id)
     if (!entry) {
       entry = { symbol, sameWs: 0, crossWs: 0 }
@@ -165,11 +213,15 @@ export async function computeHotspots(
   } = resolveEffectiveHotspotDefaults(options)
   const minRiskOrder = RISK_ORDER[minRisk]
 
-  // Build entries for all symbols that have callers, hierarchy dependents, or importers.
+  // Build entries for all symbols in admitted categories that have callers, hierarchy dependents, or importers.
   const entries: HotspotEntry[] = []
-  const allSymbolsById = new Map(allSymbols.map((symbol) => [symbol.id, symbol]))
 
   for (const symbol of allSymbolsById.values()) {
+    const symbolCategory = fileCategories.get(symbol.filePath) ?? 'source'
+    if (!admittedCategories.has(symbolCategory)) {
+      continue
+    }
+
     const callerEntry = symbolMap.get(symbol.id)
     const sameWs = callerEntry?.sameWs ?? 0
     const crossWs = callerEntry?.crossWs ?? 0
@@ -247,5 +299,6 @@ export async function computeHotspots(
   return {
     entries: filtered,
     totalSymbols,
+    omittedCounts: { tests: omittedTests, ignored: omittedIgnored },
   }
 }

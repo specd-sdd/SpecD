@@ -1,0 +1,19 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Privacy wrapping$'
+  content: |
+    Privacy wrapping is NOT the responsibility of `createVcsActorResolver`. The factory returns the raw base resolver (VCS-detected or custom). Privacy wrapping is applied at the **kernel composition level**, where `config.privacy` is available.
+
+    The kernel wires the actor resolver as:
+
+    ```typescript
+    const baseActor = await resolveActorResolver(...)
+    i.actor = config.privacy
+      ? new PrivacyActorResolver(baseActor, config.privacy)
+      : baseActor
+    ```
+
+    This approach ensures privacy is applied uniformly to ALL actor sources — VCS-backed (git, hg, svn), custom providers registered via the registry, and the null fallback — without coupling `createVcsActorResolver` to the privacy config shape.
+
+    Kernel composition SHALL finalize actor IDs before optional privacy processing for every successfully resolved actor source, and also when privacy is absent. Use one shared canonical derivation operation consistent with core:actor-resolver-port. SYSTEM_ACTOR SHALL be finalized deterministically too. Preserve finalized IDs through wrappers; do not invoke unavailable identity sources merely to produce the system identity.

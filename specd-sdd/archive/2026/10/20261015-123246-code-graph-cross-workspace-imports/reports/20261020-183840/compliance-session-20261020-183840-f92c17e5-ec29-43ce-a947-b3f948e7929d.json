@@ -1,0 +1,1967 @@
+{
+  "schema": "https://specd.dev/schemas/compliance-session-v1.schema.json",
+  "schemaVersion": "1.4.0",
+  "sessionId": "f92c17e5-ec29-43ce-a947-b3f948e7929d",
+  "sessionTimestamp": "20261020-183840",
+  "sessionFile": "specd-sdd/changes/20261015-123246-code-graph-cross-workspace-imports/reports/20261020-183840/compliance-session-20261020-183840-f92c17e5-ec29-43ce-a947-b3f948e7929d.json",
+  "changeName": "code-graph-cross-workspace-imports",
+  "createdAt": "2026-10-20T16:38:40.884Z",
+  "updatedAt": "2026-10-20T16:45:03.951Z",
+  "createdBy": {
+    "id": "coord",
+    "name": "coordinator"
+  },
+  "finalReport": "specd-sdd/changes/20261015-123246-code-graph-cross-workspace-imports/reports/20261020-183840/specs-compliance-change-lite-code-graph-cross-workspace-imports-20261020-183840-f92c17e5-ec29-43ce-a947-b3f948e7929d.md",
+  "commonContext": {
+    "step": "verifying",
+    "fingerprint": "sha256:1823052f0fd34f922fdec85d2b7238824a2829c721e163a411392c8bf1828789",
+    "capturedAt": "2026-10-20T16:39:08.754Z",
+    "capturedBy": {
+      "id": "coord",
+      "name": "coordinator"
+    },
+    "contentHash": "1823052f0fd34f922fdec85d2b7238824a2829c721e163a411392c8bf1828789",
+    "entries": [
+      {
+        "source": "instruction",
+        "content": "# Project Context (LLM-optimized)\n\n## Directives\n- GRAPH-FIRST: explore code via `specd graph`; grep/glob only non-code or last resort. Stale/missing graph → `specd graph index`.\n- `specs/` = requirements SoT; never edit directly. Workflow: draft → implement → review → approve → merge → archive. No code without spec; read/update existing specs; avoid duplicates.\n- Artifacts, code, comments, docs English. Full spec: `specd specs context <id>`; include globals with `default:*`.\n- TypeScript pnpm ESM monorepo. Hexagonal+DDD: domain no I/O; application ports; infrastructure adapters; rich entities enforce invariants; pure stateless services; manual DI.\n\n## Global Specs — load full via `specd specs context <id>`\n\n### default:_global/architecture\n- Business packages: domain → application → infrastructure; inner layers never import outer. Domain no I/O; application uses ports; infrastructure excludes composition.\n- Entities own invariants/typed transition errors; value objects expose behavior; stateless domain services are exported functions.\n- Ports abstract classes with explicit methods. Constructor DI; no IoC/singletons. Validate external YAML at infrastructure boundary; typed `SpecdError`.\n- Composition alone imports infrastructure. `createKernel`, `createKernelBuilder`, capability factories share resolver; canonical `createX(deps)`. Public barrels exclude concrete adapters.\n- Adapter packages contain no business logic. Dependencies: plugin-* → skills → core; cli/mcp → sdk; sdk → core|code-graph; schema-* standalone; no cycles. Cross core/graph hosts use `@specd/sdk`.\n\n### default:_global/conventions\n- Strict TypeScript; `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, ESM NodeNext. Named exports; kebab-case; explicit public returns; no `any`; expected errors use `SpecdError`; immutable domain.\n\n### default:_global/testing\n- Vitest; test tree mirrors src; `.spec.ts`; Given/When/Then; no snapshots. Domain/application unit tests mock I/O. Integration uses unique `os.tmpdir()` dirs and cleanup. Ensure cross-platform paths, fixtures, line endings.\n\n### default:_global/docs\n- Docs only under `docs/{adr,cli,code-graph,core,guide,mcp,schemas,sdk,skills}`; exceptions: root README, AGENTS, CLAUDE.\n- `docs/guide`: title/description/sidebar_position frontmatter; user usage only; configuration/workflows match core; begin with What is SpecD; cover skills, project update, plugins, graph. Keep SDK/package internals outside guide.\n- ADR: sequential `NNNN-kebab-case`, MADR, Decision Outcome Confirmation + More Information/Spec; link source specs only.\n- Every CLI command needs docs/cli page, index, sidebar; MCP schemas/examples in docs/mcp. Public symbols need full JSDoc.\n- Hosts document/import `@specd/sdk` only. SDK collections under `docs/sdk/{core,code-graph,skills,schemas}` require frontmatter. Update affected docs for public composition, template/config cascades, list-contract changes.\n\n### default:_global/eslint\n- Type-aware TypeScript: forbid any/default exports; require explicit returns, kebab-case, JSDoc, layer boundaries. Lint before commit.\n\n### default:_global/continuous-integration\n- CI on macOS/Ubuntu/Windows for PR+main; pnpm 10.6.5, Node 22, frozen install; build → typecheck → test.\n\n### default:_global/error-handling-conventions\n- Expected user failures: `SpecdError`, `specd=true`, UPPER_SNAKE code, actionable message, JSON/TOON metadata.\n\n### default:_global/logging\n- Console-compatible `log/info/debug/warn/error`; info for normal events; fatal/trace through error/debug prefixes; abstraction over raw console."
+      }
+    ],
+    "warnings": []
+  },
+  "queue": {
+    "sealedAt": "2026-10-20T16:39:18.758Z",
+    "sealedBy": {
+      "id": "coord",
+      "name": "coordinator"
+    },
+    "planDigest": "79bab68df15a67c954aa59f1ec38c25d85f89fe6e5841ca20c1dddaf43315ed8",
+    "specCount": 8,
+    "batchCount": 16,
+    "targetCount": 207
+  },
+  "workers": [
+    {
+      "id": "w1",
+      "name": "auditor-w1",
+      "registeredAt": "2026-10-20T16:39:08.883Z",
+      "registeredBy": {
+        "id": "coord",
+        "name": "coordinator"
+      }
+    },
+    {
+      "id": "w2",
+      "name": "auditor-w2",
+      "registeredAt": "2026-10-20T16:39:09.291Z",
+      "registeredBy": {
+        "id": "coord",
+        "name": "coordinator"
+      }
+    },
+    {
+      "id": "w3",
+      "name": "auditor-w3",
+      "registeredAt": "2026-10-20T16:39:09.670Z",
+      "registeredBy": {
+        "id": "coord",
+        "name": "coordinator"
+      }
+    },
+    {
+      "id": "w4",
+      "name": "auditor-w4",
+      "registeredAt": "2026-10-20T16:39:10.029Z",
+      "registeredBy": {
+        "id": "coord",
+        "name": "coordinator"
+      }
+    },
+    {
+      "id": "w5",
+      "name": "auditor-w5",
+      "registeredAt": "2026-10-20T16:39:10.415Z",
+      "registeredBy": {
+        "id": "coord",
+        "name": "coordinator"
+      }
+    },
+    {
+      "id": "w6",
+      "name": "auditor-w6",
+      "registeredAt": "2026-10-20T16:39:10.959Z",
+      "registeredBy": {
+        "id": "coord",
+        "name": "coordinator"
+      }
+    },
+    {
+      "id": "w7",
+      "name": "auditor-w7",
+      "registeredAt": "2026-10-20T16:39:11.600Z",
+      "registeredBy": {
+        "id": "coord",
+        "name": "coordinator"
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-001",
+      "assignedWorkerId": "w1",
+      "planFingerprint": "4e407f3c47071b75dc74f770d28ca7caee7ac67e0c1bfb37031ea40d3cef8e0c",
+      "auditWeight": 8,
+      "targetIds": [
+        "requirement:added:0001",
+        "requirement:added:0002",
+        "requirement:added:0003",
+        "requirement:added:0004",
+        "requirement:added:0005",
+        "requirement:added:0006",
+        "requirement:added:0007",
+        "requirement:added:0008"
+      ],
+      "expectedTargetCount": 8,
+      "status": "issues",
+      "checkedTargetCount": 8,
+      "registeredAt": "2026-10-20T16:39:09.010Z",
+      "registeredBy": {
+        "id": "coord",
+        "name": "coordinator"
+      },
+      "completedAt": "2026-10-20T16:43:25.784Z",
+      "completedBy": {
+        "id": "w1",
+        "name": "auditor-w1"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-002",
+      "assignedWorkerId": "w1",
+      "planFingerprint": "4e407f3c47071b75dc74f770d28ca7caee7ac67e0c1bfb37031ea40d3cef8e0c",
+      "auditWeight": 8,
+      "targetIds": [
+        "requirement:modified:0001",
+        "requirement:modified:0002",
+        "requirement:modified:0003",
+        "requirement:modified:0004",
+        "requirement:modified:0005",
+        "requirement:modified:0006",
+        "requirement:modified:0007",
+        "constraint:added:0001"
+      ],
+      "expectedTargetCount": 8,
+      "status": "issues",
+      "checkedTargetCount": 8,
+      "registeredAt": "2026-10-20T16:39:09.181Z",
+      "registeredBy": {
+        "id": "coord",
+        "name": "coordinator"
+      },
+      "completedAt": "2026-10-20T16:43:25.892Z",
+      "completedBy": {
+        "id": "w1",
+        "name": "auditor-w1"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-003",
+      "assignedWorkerId": "w2",
+      "planFingerprint": "4e407f3c47071b75dc74f770d28ca7caee7ac67e0c1bfb37031ea40d3cef8e0c",
+      "auditWeight": 8,
+      "targetIds": [
+        "constraint:added:0002",
+        "constraint:added:0003",
+        "constraint:added:0004",
+        "constraint:added:0005",
+        "constraint:added:0006",
+        "constraint:added:0007",
+        "constraint:removed:0001",
+        "constraint:removed:0002"
+      ],
+      "expectedTargetCount": 8,
+      "status": "issues",
+      "checkedTargetCount": 8,
+      "registeredAt": "2026-10-20T16:39:09.422Z",
+      "registeredBy": {
+        "id": "coord",
+        "name": "coordinator"
+      },
+      "completedAt": "2026-10-20T16:43:37.164Z",
+      "completedBy": {
+        "id": "w2",
+        "name": "auditor-w2"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-004",
+      "assignedWorkerId": "w2",
+      "planFingerprint": "4e407f3c47071b75dc74f770d28ca7caee7ac67e0c1bfb37031ea40d3cef8e0c",
+      "auditWeight": 7.75,
+      "targetIds": [
+        "constraint:removed:0003",
+        "constraint:removed:0004",
+        "scenario:added:0001",
+        "scenario:added:0002",
+        "scenario:added:0003",
+        "scenario:added:0004",
+        "scenario:added:0005",
+        "scenario:added:0006",
+        "scenario:added:0007",
+        "scenario:added:0008",
+        "scenario:added:0009",
+        "scenario:added:0010",
+        "scenario:added:0011",
+        "scenario:added:0012",
+        "scenario:added:0013",
+        "scenario:added:0014",
+        "scenario:added:0015",
+        "scenario:added:0016",
+        "scenario:added:0017",
+        "scenario:added:0018",
+        "scenario:added:0019",
+        "scenario:added:0020",
+        "scenario:added:0021",
+        "scenario:added:0022",
+        "scenario:added:0023"
+      ],
+      "expectedTargetCount": 25,
+      "status": "issues",
+      "checkedTargetCount": 25,
+      "registeredAt": "2026-10-20T16:39:09.540Z",
+      "registeredBy": {
+        "id": "coord",
+        "name": "coordinator"
+      },
+      "completedAt": "2026-10-20T16:43:37.273Z",
+      "completedBy": {
+        "id": "w2",
+        "name": "auditor-w2"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-005",
+      "assignedWorkerId": "w3",
+      "planFingerprint": "4e407f3c47071b75dc74f770d28ca7caee7ac67e0c1bfb37031ea40d3cef8e0c",
+      "auditWeight": 6.25,
+      "targetIds": [
+        "scenario:added:0024",
+        "scenario:added:0025",
+        "scenario:added:0026",
+        "scenario:added:0027",
+        "scenario:added:0028",
+        "scenario:added:0029",
+        "scenario:added:0030",
+        "scenario:added:0031",
+        "scenario:added:0032",
+        "scenario:added:0033",
+        "scenario:added:0034",
+        "scenario:added:0035",
+        "scenario:added:0036",
+        "scenario:added:0037",
+        "scenario:added:0038",
+        "scenario:added:0039",
+        "scenario:added:0040",
+        "scenario:added:0041",
+        "scenario:added:0042",
+        "scenario:added:0043",
+        "scenario:added:0044",
+        "scenario:added:0045",
+        "scenario:added:0046",
+        "scenario:modified:0001",
+        "scenario:modified:0002"
+      ],
+      "expectedTargetCount": 25,
+      "status": "issues",
+      "checkedTargetCount": 25,
+      "registeredAt": "2026-10-20T16:39:09.791Z",
+      "registeredBy": {
+        "id": "coord",
+        "name": "coordinator"
+      },
+      "completedAt": "2026-10-20T16:42:32.341Z",
+      "completedBy": {
+        "id": "w3",
+        "name": "auditor-w3"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:resolve-symbol-reference",
+      "batchId": "batch-001",
+      "assignedWorkerId": "w3",
+      "planFingerprint": "45d432a7a901748b93a459834247ccf3e37a03dcfcab958af1bbd0fa056ac4f1",
+      "auditWeight": 1.75,
+      "targetIds": [
+        "requirement:added:0001",
+        "scenario:added:0001",
+        "scenario:added:0002",
+        "scenario:added:0003"
+      ],
+      "expectedTargetCount": 4,
+      "status": "issues",
+      "checkedTargetCount": 4,
+      "registeredAt": "2026-10-20T16:39:09.896Z",
+      "registeredBy": {
+        "id": "coord",
+        "name": "coordinator"
+      },
+      "completedAt": "2026-10-20T16:42:32.653Z",
+      "completedBy": {
+        "id": "w3",
+        "name": "auditor-w3"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:indexer",
+      "batchId": "batch-001",
+      "assignedWorkerId": "w4",
+      "planFingerprint": "ad7103de631746f51ef649ccd1ac6c2b4e47e80d7bf670db257598e105823b1f",
+      "auditWeight": 8,
+      "targetIds": [
+        "requirement:added:0001",
+        "requirement:added:0002",
+        "requirement:modified:0001",
+        "requirement:modified:0002",
+        "requirement:modified:0003",
+        "constraint:added:0001",
+        "constraint:added:0002",
+        "constraint:added:0003"
+      ],
+      "expectedTargetCount": 8,
+      "status": "issues",
+      "checkedTargetCount": 8,
+      "registeredAt": "2026-10-20T16:39:10.146Z",
+      "registeredBy": {
+        "id": "coord",
+        "name": "coordinator"
+      },
+      "completedAt": "2026-10-20T16:42:05.909Z",
+      "completedBy": {
+        "id": "w4",
+        "name": "auditor-w4"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:indexer",
+      "batchId": "batch-002",
+      "assignedWorkerId": "w4",
+      "planFingerprint": "ad7103de631746f51ef649ccd1ac6c2b4e47e80d7bf670db257598e105823b1f",
+      "auditWeight": 8,
+      "targetIds": [
+        "constraint:added:0004",
+        "constraint:removed:0001",
+        "constraint:removed:0002",
+        "constraint:removed:0003",
+        "constraint:removed:0004",
+        "constraint:removed:0005",
+        "constraint:removed:0006",
+        "constraint:removed:0007"
+      ],
+      "expectedTargetCount": 8,
+      "status": "clean",
+      "checkedTargetCount": 8,
+      "registeredAt": "2026-10-20T16:39:10.274Z",
+      "registeredBy": {
+        "id": "coord",
+        "name": "coordinator"
+      },
+      "completedAt": "2026-10-20T16:42:06.009Z",
+      "completedBy": {
+        "id": "w4",
+        "name": "auditor-w4"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:indexer",
+      "batchId": "batch-003",
+      "assignedWorkerId": "w5",
+      "planFingerprint": "ad7103de631746f51ef649ccd1ac6c2b4e47e80d7bf670db257598e105823b1f",
+      "auditWeight": 8,
+      "targetIds": [
+        "constraint:removed:0008",
+        "constraint:removed:0009",
+        "constraint:removed:0010",
+        "constraint:removed:0011",
+        "constraint:removed:0012",
+        "constraint:removed:0013",
+        "scenario:added:0001",
+        "scenario:added:0002",
+        "scenario:added:0003",
+        "scenario:added:0004",
+        "scenario:added:0005",
+        "scenario:added:0006",
+        "scenario:added:0007",
+        "scenario:added:0008"
+      ],
+      "expectedTargetCount": 14,
+      "status": "issues",
+      "checkedTargetCount": 14,
+      "registeredAt": "2026-10-20T16:39:10.553Z",
+      "registeredBy": {
+        "id": "coord",
+        "name": "coordinator"
+      },
+      "completedAt": "2026-10-20T16:44:50.803Z",
+      "completedBy": {
+        "id": "w5",
+        "name": "auditor-w5"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:indexer",
+      "batchId": "batch-004",
+      "assignedWorkerId": "w5",
+      "planFingerprint": "ad7103de631746f51ef649ccd1ac6c2b4e47e80d7bf670db257598e105823b1f",
+      "auditWeight": 4.5,
+      "targetIds": [
+        "scenario:added:0009",
+        "scenario:added:0010",
+        "scenario:added:0011",
+        "scenario:added:0012",
+        "scenario:added:0013",
+        "scenario:added:0014",
+        "scenario:added:0015",
+        "scenario:added:0016",
+        "scenario:added:0017",
+        "scenario:added:0018",
+        "scenario:added:0019",
+        "scenario:added:0020",
+        "scenario:added:0021",
+        "scenario:added:0022",
+        "scenario:added:0023",
+        "scenario:added:0024",
+        "scenario:added:0025",
+        "scenario:added:0026"
+      ],
+      "expectedTargetCount": 18,
+      "status": "issues",
+      "checkedTargetCount": 18,
+      "registeredAt": "2026-10-20T16:39:10.692Z",
+      "registeredBy": {
+        "id": "coord",
+        "name": "coordinator"
+      },
+      "completedAt": "2026-10-20T16:44:50.917Z",
+      "completedBy": {
+        "id": "w5",
+        "name": "auditor-w5"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:php-language-adapter",
+      "batchId": "batch-001",
+      "assignedWorkerId": "w5",
+      "planFingerprint": "f50dd28e6459dbaa970f93e7a784dd029445de9c3513fb9d5a79e3e99467916c",
+      "auditWeight": 3.5,
+      "targetIds": [
+        "requirement:modified:0001",
+        "requirement:modified:0002",
+        "scenario:added:0001",
+        "scenario:added:0002",
+        "scenario:added:0003",
+        "scenario:added:0004",
+        "scenario:added:0005",
+        "scenario:added:0006"
+      ],
+      "expectedTargetCount": 8,
+      "status": "issues",
+      "checkedTargetCount": 8,
+      "registeredAt": "2026-10-20T16:39:10.829Z",
+      "registeredBy": {
+        "id": "coord",
+        "name": "coordinator"
+      },
+      "completedAt": "2026-10-20T16:44:51.024Z",
+      "completedBy": {
+        "id": "w5",
+        "name": "auditor-w5"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:typescript-language-adapter",
+      "batchId": "batch-001",
+      "assignedWorkerId": "w6",
+      "planFingerprint": "e23bf2a2f14404f5ed13088fa550c61b01a9290daa9d81a3989ace5827ebeb22",
+      "auditWeight": 7.25,
+      "targetIds": [
+        "requirement:modified:0001",
+        "requirement:modified:0002",
+        "scenario:added:0001",
+        "scenario:added:0002",
+        "scenario:added:0003",
+        "scenario:added:0004",
+        "scenario:added:0005",
+        "scenario:added:0006",
+        "scenario:added:0007",
+        "scenario:added:0008",
+        "scenario:added:0009",
+        "scenario:added:0010",
+        "scenario:added:0011",
+        "scenario:added:0012",
+        "scenario:added:0013",
+        "scenario:added:0014",
+        "scenario:added:0015",
+        "scenario:added:0016",
+        "scenario:added:0017",
+        "scenario:added:0018",
+        "scenario:added:0019",
+        "scenario:added:0020",
+        "scenario:modified:0001"
+      ],
+      "expectedTargetCount": 23,
+      "status": "issues",
+      "checkedTargetCount": 23,
+      "registeredAt": "2026-10-20T16:39:11.076Z",
+      "registeredBy": {
+        "id": "coord",
+        "name": "coordinator"
+      },
+      "completedAt": "2026-10-20T16:43:59.570Z",
+      "completedBy": {
+        "id": "w6",
+        "name": "auditor-w6"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:python-language-adapter",
+      "batchId": "batch-001",
+      "assignedWorkerId": "w6",
+      "planFingerprint": "b08f92b62184589ed5340a4ee390745f09af0f155f7885b30274776e566883dc",
+      "auditWeight": 4,
+      "targetIds": [
+        "requirement:modified:0001",
+        "requirement:modified:0002",
+        "scenario:added:0001",
+        "scenario:added:0002",
+        "scenario:added:0003",
+        "scenario:added:0004",
+        "scenario:added:0005",
+        "scenario:added:0006",
+        "scenario:added:0007",
+        "scenario:added:0008"
+      ],
+      "expectedTargetCount": 10,
+      "status": "issues",
+      "checkedTargetCount": 10,
+      "registeredAt": "2026-10-20T16:39:11.331Z",
+      "registeredBy": {
+        "id": "coord",
+        "name": "coordinator"
+      },
+      "completedAt": "2026-10-20T16:43:59.361Z",
+      "completedBy": {
+        "id": "w6",
+        "name": "auditor-w6"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:go-language-adapter",
+      "batchId": "batch-001",
+      "assignedWorkerId": "w6",
+      "planFingerprint": "30aa59d834605323e5f3cf54d17345e07935d27a5324812ea36ce3bd3481fce1",
+      "auditWeight": 3.5,
+      "targetIds": [
+        "requirement:modified:0001",
+        "requirement:modified:0002",
+        "scenario:added:0001",
+        "scenario:added:0002",
+        "scenario:added:0003",
+        "scenario:added:0004",
+        "scenario:added:0005",
+        "scenario:added:0006"
+      ],
+      "expectedTargetCount": 8,
+      "status": "issues",
+      "checkedTargetCount": 8,
+      "registeredAt": "2026-10-20T16:39:11.475Z",
+      "registeredBy": {
+        "id": "coord",
+        "name": "coordinator"
+      },
+      "completedAt": "2026-10-20T16:43:59.228Z",
+      "completedBy": {
+        "id": "w6",
+        "name": "auditor-w6"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-006",
+      "assignedWorkerId": "w7",
+      "planFingerprint": "4e407f3c47071b75dc74f770d28ca7caee7ac67e0c1bfb37031ea40d3cef8e0c",
+      "auditWeight": 4.5,
+      "targetIds": [
+        "scenario:modified:0003",
+        "scenario:modified:0004",
+        "scenario:modified:0005",
+        "scenario:modified:0006",
+        "scenario:modified:0007",
+        "scenario:modified:0008",
+        "scenario:modified:0009",
+        "scenario:modified:0010",
+        "scenario:modified:0011",
+        "scenario:modified:0012",
+        "scenario:modified:0013",
+        "scenario:modified:0014",
+        "scenario:modified:0015",
+        "scenario:modified:0016",
+        "scenario:modified:0017",
+        "scenario:modified:0018",
+        "scenario:modified:0019",
+        "scenario:removed:0001"
+      ],
+      "expectedTargetCount": 18,
+      "status": "clean",
+      "checkedTargetCount": 18,
+      "registeredAt": "2026-10-20T16:39:11.732Z",
+      "registeredBy": {
+        "id": "coord",
+        "name": "coordinator"
+      },
+      "completedAt": "2026-10-20T16:42:24.880Z",
+      "completedBy": {
+        "id": "w7",
+        "name": "auditor-w7"
+      },
+      "completionReason": null
+    },
+    {
+      "specId": "code-graph:workspace-integration",
+      "batchId": "batch-001",
+      "assignedWorkerId": "w7",
+      "planFingerprint": "c21e72f84d566583516c9260750049ffc510ca22c5e919f6e14f09e476b3a2ee",
+      "auditWeight": 5,
+      "targetIds": [
+        "requirement:modified:0001",
+        "requirement:modified:0002",
+        "scenario:added:0001",
+        "scenario:added:0002",
+        "scenario:added:0003",
+        "scenario:added:0004",
+        "scenario:added:0005",
+        "scenario:added:0006",
+        "scenario:added:0007",
+        "scenario:added:0008",
+        "scenario:added:0009",
+        "scenario:added:0010",
+        "scenario:added:0011",
+        "scenario:added:0012"
+      ],
+      "expectedTargetCount": 14,
+      "status": "clean",
+      "checkedTargetCount": 14,
+      "registeredAt": "2026-10-20T16:39:11.846Z",
+      "registeredBy": {
+        "id": "coord",
+        "name": "coordinator"
+      },
+      "completedAt": "2026-10-20T16:42:25.070Z",
+      "completedBy": {
+        "id": "w7",
+        "name": "auditor-w7"
+      },
+      "completionReason": null
+    }
+  ],
+  "findings": [
+    {
+      "id": "24cee351095e4e0494e2ef65",
+      "issueKey": "packages/code-graph/src/application/use-cases/index-code-graph.ts#IndexCodeGraph:adaptersWithoutPackageResolution-missing",
+      "specId": "code-graph:indexer",
+      "batchId": "batch-001",
+      "targetId": "requirement:added:0001",
+      "type": "change-violation",
+      "severity": "medium",
+      "title": "adaptersWithoutPackageResolution not reported; facet-absent counted as failure",
+      "reason": "Spec requires importDiagnostics.adaptersWithoutPackageResolution listing adapters lacking the facet, never counted in total/byReason/samples. ImportDiagnosticSummary has no such field and the indexer records one facet-absent diagnostic per adapter through recordImportDiagnostic, inflating total, byReason and samples.",
+      "evidence": [
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+          "detail": "lines 934-942 facet-absent recorded as diagnostic; 1931-1936 summary lacks field"
+        },
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/domain/value-objects/index-result.ts",
+          "detail": "ImportDiagnosticSummary has no adaptersWithoutPackageResolution"
+        },
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/application/use-cases/index-code-graph.package-imports.spec.ts",
+          "detail": "test at line 396 asserts a diagnostic names the missing facet"
+        },
+        {
+          "kind": "spec",
+          "location": "code-graph:indexer",
+          "detail": "Facet-driven language independence"
+        }
+      ],
+      "agent": {
+        "id": "w4",
+        "name": "auditor-w4"
+      },
+      "createdAt": "2026-10-20T16:42:05.283Z"
+    },
+    {
+      "id": "00c08685d1031f79404a6e5a",
+      "issueKey": "packages/code-graph/src/application/use-cases/index-code-graph.ts#IndexCodeGraph:adaptersWithoutPackageResolution-missing",
+      "specId": "code-graph:indexer",
+      "batchId": "batch-001",
+      "targetId": "requirement:modified:0003",
+      "type": "change-violation",
+      "severity": "medium",
+      "title": "adaptersWithoutPackageResolution not reported; facet-absent counted as failure",
+      "reason": "importDiagnostics summary omits adaptersWithoutPackageResolution and facet-absent entries are counted in total/byReason/samples, contrary to the modified requirement.",
+      "evidence": [
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+          "detail": "lines 934-942, 1931-1936"
+        },
+        {
+          "kind": "spec",
+          "location": "code-graph:indexer",
+          "detail": "Cross-workspace package resolution"
+        }
+      ],
+      "agent": {
+        "id": "w4",
+        "name": "auditor-w4"
+      },
+      "createdAt": "2026-10-20T16:42:05.410Z"
+    },
+    {
+      "id": "1cefac69081d061f92281ca8",
+      "issueKey": "packages/code-graph/src/application/use-cases/index-code-graph.ts#IndexCodeGraph:package-identity-failure-and-first-wins",
+      "specId": "code-graph:indexer",
+      "batchId": "batch-001",
+      "targetId": "requirement:modified:0003",
+      "type": "change-violation",
+      "severity": "medium",
+      "title": "Package identity step lacks failure isolation and first-adapter-wins",
+      "reason": "Spec: identity failure is recorded as an indexing error, adapter treated as not providing facet for that workspace, run continues; first adapter returning identity wins and later adapters are not asked. Code calls packageResolution.identity for every adapter and workspace without try/catch, and does not stop after the first adapter that returned an identity (a second adapter could register another package name for the same workspace).",
+      "evidence": [
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+          "detail": "lines 883-904"
+        },
+        {
+          "kind": "spec",
+          "location": "code-graph:indexer",
+          "detail": "Cross-workspace package resolution"
+        }
+      ],
+      "agent": {
+        "id": "w4",
+        "name": "auditor-w4"
+      },
+      "createdAt": "2026-10-20T16:42:05.526Z"
+    },
+    {
+      "id": "e939d3db387c4d33710cd712",
+      "issueKey": "coverage:code-graph:indexer:package-identity-failure-collision-first-wins",
+      "specId": "code-graph:indexer",
+      "batchId": "batch-001",
+      "targetId": "requirement:modified:0003",
+      "type": "coverage-gap",
+      "severity": "low",
+      "title": "No tests for identity failure, collision error, first-adapter-wins, adaptersWithoutPackageResolution",
+      "reason": "No test asserts identity throw isolation, the two-workspace collision error, first-adapter-wins, or the adaptersWithoutPackageResolution list; only prepare-throw is tested.",
+      "evidence": [
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/application/use-cases/index-code-graph.package-imports.spec.ts",
+          "detail": "prepare-throw covered at line 425 only"
+        }
+      ],
+      "agent": {
+        "id": "w4",
+        "name": "auditor-w4"
+      },
+      "createdAt": "2026-10-20T16:42:05.690Z"
+    },
+    {
+      "id": "b3f1c359947a3a7e26d5f995",
+      "issueKey": "coverage:code-graph:indexer:incremental-new-workspace-manifest-closure",
+      "specId": "code-graph:indexer",
+      "batchId": "batch-001",
+      "targetId": "requirement:added:0002",
+      "type": "coverage-gap",
+      "severity": "low",
+      "title": "Incremental closure for newly added workspace or manifest change not asserted end to end",
+      "reason": "Incremental tests cover entry, barrel and importer changes; none asserts a previously unresolved import resolving when its target workspace is newly added, or an identity-altering manifest edit re-resolving importers (manifest change tested only at fingerprint/full-rebuild level).",
+      "evidence": [
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/application/use-cases/index-code-graph.package-imports.spec.ts",
+          "detail": "lines 304-346"
+        },
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/application/use-cases/workspace-indexing.spec.ts",
+          "detail": "manifest change asserts full rebuild only"
+        }
+      ],
+      "agent": {
+        "id": "w4",
+        "name": "auditor-w4"
+      },
+      "createdAt": "2026-10-20T16:42:05.811Z"
+    },
+    {
+      "id": "018ffe3b35958c10b5efcd00",
+      "issueKey": "coverage:code-graph:language-adapter:facet-vs-capability-flag",
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-005",
+      "targetId": "scenario:added:0040",
+      "type": "coverage-gap",
+      "severity": "low",
+      "title": "No test for facet/capability separation",
+      "reason": "No test asserts capability flags and facets are independent declarations (hierarchy true without packageResolution, or reExportLinking not implying hierarchy).",
+      "evidence": [
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/infrastructure/tree-sitter/adapter-registry.spec.ts",
+          "detail": "no-capability-vs-facet-assertion"
+        },
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/infrastructure/tree-sitter/adapter-registry.ts"
+        }
+      ],
+      "agent": {
+        "id": "w3",
+        "name": "auditor-w3"
+      },
+      "createdAt": "2026-10-20T16:42:31.993Z"
+    },
+    {
+      "id": "f60c89b56922381fab325682",
+      "issueKey": "coverage:code-graph:resolve-symbol-reference:package-import-path-and-no-guess",
+      "specId": "code-graph:resolve-symbol-reference",
+      "batchId": "batch-001",
+      "targetId": "scenario:added:0001",
+      "type": "coverage-gap",
+      "severity": "low",
+      "title": "Provenance path and same-name no-guess only partly asserted",
+      "reason": "Language-independence test asserts resolved target and a non-existent name stays unresolved, but not the ordered path (local binding, import:package, public binding, target) nor the case where a unique same-name symbol exists in the package workspace.",
+      "evidence": [
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/application/use-cases/index-code-graph.language-independence.spec.ts",
+          "detail": "99-125"
+        },
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/application/services/package-import-resolver.ts"
+        }
+      ],
+      "agent": {
+        "id": "w3",
+        "name": "auditor-w3"
+      },
+      "createdAt": "2026-10-20T16:42:32.463Z"
+    },
+    {
+      "id": "115736c8919dfe8ba69ec42e",
+      "issueKey": "coverage:code-graph:language-adapter:qualified-name-prepared-metadata",
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-004",
+      "targetId": "scenario:added:0019",
+      "type": "coverage-gap",
+      "severity": "low",
+      "title": "No test deletes composer.json before resolveToPath",
+      "reason": "Existing PHP tests write composer.json and read it back; none asserts no filesystem access after preparation.",
+      "evidence": [
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/infrastructure/tree-sitter/php-language-adapter.spec.ts",
+          "detail": "lines 692-735"
+        }
+      ],
+      "agent": {
+        "id": "w2",
+        "name": "auditor-w2"
+      },
+      "createdAt": "2026-10-20T16:43:16.956Z"
+    },
+    {
+      "id": "39fc5d729cd8556fb434fe2b",
+      "issueKey": "packages/code-graph/src/application/use-cases/index-code-graph.ts#importDiagnostics:adapters-without-package-resolution-missing",
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-004",
+      "targetId": "scenario:added:0004",
+      "type": "change-violation",
+      "severity": "medium",
+      "title": "adaptersWithoutPackageResolution not provided; facet-absent counted in total",
+      "reason": "Run result has no importDiagnostics.adaptersWithoutPackageResolution; absent-facet adapters are recorded as a facet-absent diagnostic that is counted in total/byReason/samples, contradicting the scenario and design.md line 105.",
+      "evidence": [
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+          "detail": "lines 936-942 and 1931-1936"
+        },
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/domain/value-objects/index-result.ts",
+          "detail": "ImportDiagnosticSummary lines 72-84 lacks the field"
+        },
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/application/use-cases/index-code-graph.package-imports.spec.ts",
+          "detail": "line 454 asserts byReason facet-absent >= 1 (opposite)"
+        },
+        {
+          "kind": "design",
+          "location": "specd-sdd/changes/20261015-123246-code-graph-cross-workspace-imports/design.md",
+          "detail": "line 105 says facet-absent never counted in total"
+        }
+      ],
+      "recommendation": "Add adaptersWithoutPackageResolution to summary, exclude facet-absent adapter notices from total/byReason, update test and docs",
+      "agent": {
+        "id": "w2",
+        "name": "auditor-w2"
+      },
+      "createdAt": "2026-10-20T16:43:17.068Z"
+    },
+    {
+      "id": "70a8b18f0e88f9164587c7a1",
+      "issueKey": "packages/code-graph/src/application/use-cases/index-code-graph.ts#packageResolution.identity:uncaught-aborts-run",
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-004",
+      "targetId": "scenario:added:0007",
+      "type": "change-violation",
+      "severity": "high",
+      "title": "identity() throw aborts the whole indexing run",
+      "reason": "The packageToWorkspace loop calls facet.identity with no try/catch (outer try has only finally), so a throwing identity rejects the run instead of recording an error, disabling the facet and indexing other adapters/workspaces.",
+      "evidence": [
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+          "detail": "lines 884-901 (contrast prepare/link guarded at 1197-1224)"
+        }
+      ],
+      "recommendation": "Wrap identity in try/catch, push error and add adapter to disabledPackageResolution",
+      "agent": {
+        "id": "w2",
+        "name": "auditor-w2"
+      },
+      "createdAt": "2026-10-20T16:43:17.170Z"
+    },
+    {
+      "id": "11d07b064fc7a184d9c8834e",
+      "issueKey": "coverage:code-graph:language-adapter:facet-throw-identity-link",
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-004",
+      "targetId": "scenario:added:0007",
+      "type": "coverage-gap",
+      "severity": "medium",
+      "title": "No tests for identity or link throwing",
+      "reason": "Only a prepare-throws test exists; identity and link failure isolation are unasserted (identity actually fails).",
+      "evidence": [
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/application/use-cases/index-code-graph.package-imports.spec.ts",
+          "detail": "line 425 is the only facet-throw test"
+        }
+      ],
+      "agent": {
+        "id": "w2",
+        "name": "auditor-w2"
+      },
+      "createdAt": "2026-10-20T16:43:17.267Z"
+    },
+    {
+      "id": "c30c2010079af845605e24ec",
+      "issueKey": "coverage:code-graph:language-adapter:facet-throw-per-file",
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-004",
+      "targetId": "scenario:added:0006",
+      "type": "coverage-gap",
+      "severity": "low",
+      "title": "No test for per-file facet throw isolation",
+      "reason": "No test makes matchSpecifier/entrySurface/resolve throw for one file and checks other files still index.",
+      "evidence": [
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/application/use-cases/index-code-graph.package-imports.spec.ts",
+          "detail": "no per-file throw case"
+        }
+      ],
+      "agent": {
+        "id": "w2",
+        "name": "auditor-w2"
+      },
+      "createdAt": "2026-10-20T16:43:17.364Z"
+    },
+    {
+      "id": "f1cea0a04aa3b41c529eb926",
+      "issueKey": "coverage:code-graph:language-adapter:loose-methods-removed",
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-004",
+      "targetId": "scenario:added:0001",
+      "type": "coverage-gap",
+      "severity": "low",
+      "title": "No type-level test that loose adapter methods are gone",
+      "reason": "No expectTypeOf/ts-expect-error assertion that LanguageAdapter lacks getPackageIdentity, resolvePackageFromSpecifier, etc., nor a TS facet-shape assertion.",
+      "evidence": [
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test",
+          "detail": "no matching assertion found by search"
+        }
+      ],
+      "agent": {
+        "id": "w2",
+        "name": "auditor-w2"
+      },
+      "createdAt": "2026-10-20T16:43:17.459Z"
+    },
+    {
+      "id": "3c82d2fd6687053eed06a5ff",
+      "issueKey": "coverage:code-graph:language-adapter:go-omits-facets",
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-004",
+      "targetId": "scenario:added:0017",
+      "type": "coverage-gap",
+      "severity": "low",
+      "title": "No test that Go omits relative and qualified-name facets",
+      "reason": "No assertion that GoLanguageAdapter.relativeImportResolution and qualifiedNameResolution are undefined.",
+      "evidence": [
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/infrastructure/tree-sitter/go-language-adapter.spec.ts",
+          "detail": "no such assertion"
+        }
+      ],
+      "agent": {
+        "id": "w2",
+        "name": "auditor-w2"
+      },
+      "createdAt": "2026-10-20T16:43:17.579Z"
+    },
+    {
+      "id": "82e61945e13a473d347570f2",
+      "issueKey": "coverage:code-graph:language-adapter:go-omits-facets",
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-004",
+      "targetId": "scenario:added:0020",
+      "type": "coverage-gap",
+      "severity": "low",
+      "title": "No test that Go omits qualified-name facet",
+      "reason": "Same gap as relative facet omission.",
+      "evidence": [
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/infrastructure/tree-sitter/go-language-adapter.spec.ts",
+          "detail": "no such assertion"
+        }
+      ],
+      "agent": {
+        "id": "w2",
+        "name": "auditor-w2"
+      },
+      "createdAt": "2026-10-20T16:43:17.699Z"
+    },
+    {
+      "id": "7c80ecd1f56e35ee3a38aca8",
+      "issueKey": "coverage:code-graph:language-adapter:capabilities-vs-facets",
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-004",
+      "targetId": "scenario:added:0002",
+      "type": "coverage-gap",
+      "severity": "low",
+      "title": "No test separating hierarchy capability from absent packageResolution",
+      "reason": "No test combines capabilities().hierarchy true with no packageResolution and checks both outcomes.",
+      "evidence": [
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test",
+          "detail": "no matching case found"
+        }
+      ],
+      "agent": {
+        "id": "w2",
+        "name": "auditor-w2"
+      },
+      "createdAt": "2026-10-20T16:43:17.834Z"
+    },
+    {
+      "id": "6d6a44848264b0e519e929e3",
+      "issueKey": "coverage:code-graph:language-adapter:entry-surface-match-purity",
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-004",
+      "targetId": "scenario:added:0010",
+      "type": "coverage-gap",
+      "severity": "low",
+      "title": "No I/O-free assertion for entrySurface and matchSpecifier",
+      "reason": "No-fs assertions cover resolveImports/buildRelations only; entrySurface and matchSpecifier repeat-call purity is not asserted.",
+      "evidence": [
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/infrastructure/tree-sitter/language-adapter-conformance.spec.ts",
+          "detail": "lines 1037-1075 cover pass-2 relations only"
+        }
+      ],
+      "agent": {
+        "id": "w2",
+        "name": "auditor-w2"
+      },
+      "createdAt": "2026-10-20T16:43:17.944Z"
+    },
+    {
+      "id": "0501b5dbe0f6585470e891a1",
+      "issueKey": "coverage:code-graph:language-adapter:entry-surface-match-purity",
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-004",
+      "targetId": "scenario:added:0014",
+      "type": "coverage-gap",
+      "severity": "low",
+      "title": "matchSpecifier purity unasserted",
+      "reason": "Same gap.",
+      "evidence": [
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/infrastructure/tree-sitter/language-adapter-conformance.spec.ts",
+          "detail": "lines 1037-1075"
+        }
+      ],
+      "agent": {
+        "id": "w2",
+        "name": "auditor-w2"
+      },
+      "createdAt": "2026-10-20T16:43:18.058Z"
+    },
+    {
+      "id": "89a4ccdc230d262b08cd285a",
+      "issueKey": "packages/code-graph/src/application/use-cases/index-code-graph.ts#importDiagnostics:adaptersWithoutPackageResolution-missing",
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-001",
+      "targetId": "requirement:added:0001",
+      "type": "change-violation",
+      "severity": "medium",
+      "title": "Missing facet counted as import failure; adaptersWithoutPackageResolution absent",
+      "reason": "Spec requires listing adapters lacking packageResolution in importDiagnostics.adaptersWithoutPackageResolution and never counting them in total. Indexer records facet-absent via recordImportDiagnostic, which increments total/byReason and samples; ImportDiagnosticSummary has no adaptersWithoutPackageResolution field.",
+      "evidence": [
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+          "detail": "lines 934-942 record facet-absent via recordImportDiagnostic; total sums counts at ~1931"
+        },
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/domain/value-objects/index-result.ts",
+          "detail": "ImportDiagnosticSummary lacks the field"
+        },
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/application/use-cases/index-code-graph.package-imports.spec.ts",
+          "detail": "line 425 test asserts byReason facet-absent >= 1, contradicting the spec"
+        }
+      ],
+      "recommendation": "Add the field and exclude facet-absent from total/byReason, or amend the spec if counting is intended",
+      "agent": {
+        "id": "w1",
+        "name": "auditor-w1"
+      },
+      "createdAt": "2026-10-20T16:43:21.352Z"
+    },
+    {
+      "id": "115113d6e3d008a290b776ea",
+      "issueKey": "packages/code-graph/src/application/use-cases/index-code-graph.ts#packageResolution.identity:unisolated-throw",
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-001",
+      "targetId": "requirement:added:0001",
+      "type": "change-violation",
+      "severity": "medium",
+      "title": "Throwing identity() aborts the run instead of disabling the facet",
+      "reason": "Spec: a throw inside identity is recorded as an indexing error and the adapter is treated as lacking the facet for the rest of the run. The identity loop calls adapter.packageResolution.identity without try/catch and never adds the adapter to disabledPackageResolution, so the exception propagates out of execute. Only prepare and link are guarded.",
+      "evidence": [
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+          "detail": "lines 884-901 unguarded identity call"
+        },
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+          "detail": "lines 1196-1211 prepare is guarded, for contrast"
+        }
+      ],
+      "recommendation": "Wrap identity in try/catch, push an error, add adapter to disabledPackageResolution",
+      "agent": {
+        "id": "w1",
+        "name": "auditor-w1"
+      },
+      "createdAt": "2026-10-20T16:43:21.469Z"
+    },
+    {
+      "id": "09ad64ce6e3d48fe5711bf49",
+      "issueKey": "coverage:code-graph:language-adapter:facet-throw-identity-link",
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-001",
+      "targetId": "requirement:added:0001",
+      "type": "coverage-gap",
+      "severity": "low",
+      "title": "No test for throwing identity() or reExportLinking.link()",
+      "reason": "Only a throwing packageResolution.prepare is tested for facet error isolation; identity and link failures are untested.",
+      "evidence": [
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/application/use-cases/index-code-graph.package-imports.spec.ts",
+          "detail": "line 425 only prepare throws"
+        }
+      ],
+      "agent": {
+        "id": "w1",
+        "name": "auditor-w1"
+      },
+      "createdAt": "2026-10-20T16:43:21.580Z"
+    },
+    {
+      "id": "f4d9ac4a5f0a0db2d29356df",
+      "issueKey": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts#resolveToPath:fs-read-no-session",
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-001",
+      "targetId": "requirement:added:0004",
+      "type": "change-violation",
+      "severity": "medium",
+      "title": "resolveToPath keeps legacy repoRoot signature and reads the filesystem",
+      "reason": "Spec: resolveToPath(qualifiedName, codeRoot, session) uses only session-prepared metadata and MUST NOT read the filesystem. Facet interface and PHP facet take (qualifiedName, codeRoot, repoRoot?), and buildPsr4Map re-reads composer.json on every call. resolveQualifiedNameFromSession exists but is not exposed through the facet. tasks.md 23.8 is unchecked.",
+      "evidence": [
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/domain/value-objects/language-adapter-facets.ts",
+          "detail": "QualifiedNameResolutionFacet.resolveToPath signature"
+        },
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts",
+          "detail": "lines 493 and 2322-2331 resolveQualifiedNameToPath uses buildPsr4Map (file I/O)"
+        },
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/infrastructure/tree-sitter/php-language-adapter.spec.ts",
+          "detail": "lines 684-730 exercise the filesystem-based signature"
+        },
+        {
+          "kind": "task",
+          "location": "specd-sdd/changes/20261015-123246-code-graph-cross-workspace-imports/tasks.md",
+          "detail": "item 23.8 unchecked"
+        },
+        {
+          "kind": "design",
+          "location": "specd-sdd/changes/20261015-123246-code-graph-cross-workspace-imports/design.md",
+          "detail": "line 267 specifies the session parameter"
+        }
+      ],
+      "recommendation": "Complete task 23.8: take session, delegate to resolveQualifiedNameFromSession, update tests and docs",
+      "agent": {
+        "id": "w1",
+        "name": "auditor-w1"
+      },
+      "createdAt": "2026-10-20T16:43:21.694Z"
+    },
+    {
+      "id": "cae11d01b446e5764c060359",
+      "issueKey": "docs/code-graph/language-adapters.md#guide-restates-different-rules",
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-001",
+      "targetId": "requirement:added:0008",
+      "type": "change-violation",
+      "severity": "low",
+      "title": "Adapter guide diverges from spec rules",
+      "reason": "Spec requires the page to state the same rules. Page documents resolveToPath(..., repoRoot?) rather than session; says entrySurface may return test files when explicitly addressed (spec: MUST NOT); checklist steps 6 and 7 differ (spec: pass cross-language conformance suite and facet scenarios; add to built-in adapter specs list).",
+      "evidence": [
+        {
+          "kind": "documentation",
+          "location": "docs/code-graph/language-adapters.md",
+          "detail": "resolveToPath row, entrySurface rules, checklist steps 6-7"
+        },
+        {
+          "kind": "spec",
+          "location": "code-graph:language-adapter",
+          "detail": "Adding a language adapter steps 6-7; Package resolution facet"
+        }
+      ],
+      "recommendation": "Align page and spec after deciding which is authoritative",
+      "agent": {
+        "id": "w1",
+        "name": "auditor-w1"
+      },
+      "createdAt": "2026-10-20T16:43:21.799Z"
+    },
+    {
+      "id": "8f808c148e469c7585cc7f9a",
+      "issueKey": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts#resolveToPath:fs-read-no-session",
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-002",
+      "targetId": "requirement:modified:0003",
+      "type": "change-violation",
+      "severity": "medium",
+      "title": "resolveToPath keeps legacy repoRoot signature and reads the filesystem",
+      "reason": "Import specifier resolution requires Pass 2 qualified-name metadata to come from prepared session state; facet resolveToPath still rebuilds PSR-4 map from composer.json per call.",
+      "evidence": [
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts",
+          "detail": "lines 493 and 2322-2331 resolveQualifiedNameToPath uses buildPsr4Map (file I/O)"
+        }
+      ],
+      "recommendation": "Complete task 23.8",
+      "agent": {
+        "id": "w1",
+        "name": "auditor-w1"
+      },
+      "createdAt": "2026-10-20T16:43:21.904Z"
+    },
+    {
+      "id": "866fa19f6362d20639147bc1",
+      "issueKey": "packages/code-graph/src/application/use-cases/index-code-graph.ts#packageResolution.identity:unisolated-throw",
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-002",
+      "targetId": "requirement:modified:0002",
+      "type": "change-violation",
+      "severity": "medium",
+      "title": "Throwing identity() aborts the run instead of disabling the facet",
+      "reason": "Package identity is obtained through packageResolution.identity in an unguarded loop; a throwing adapter aborts indexing rather than being treated as lacking the facet.",
+      "evidence": [
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+          "detail": "lines 884-901 unguarded identity call"
+        }
+      ],
+      "agent": {
+        "id": "w1",
+        "name": "auditor-w1"
+      },
+      "createdAt": "2026-10-20T16:43:22.018Z"
+    },
+    {
+      "id": "6bbb7309f4f291859f066198",
+      "issueKey": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts#qualifiedNameResolution.resolveToPath:reads-composer-json-per-call",
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-003",
+      "targetId": "constraint:added:0003",
+      "type": "change-violation",
+      "severity": "medium",
+      "title": "PHP resolveToPath reads composer.json on every call",
+      "reason": "resolveToPath rebuilds the PSR-4 map from disk per call and takes no session, so it cannot use prepared metadata; deleting composer.json after prepare breaks it, contradicting the facet I/O constraint and the scenario.",
+      "evidence": [
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts",
+          "detail": "resolveQualifiedNameToPath (~2322) calls buildPsr4Map -> findManifestField (readFileSync) each call"
+        },
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/domain/value-objects/language-adapter-facets.ts",
+          "detail": "QualifiedNameResolutionFacet.resolveToPath(qualifiedName, codeRoot, repoRoot) has no session parameter"
+        }
+      ],
+      "recommendation": "Read prepared psr4ByCodeRoot from the session (add session arg or per-codeRoot cache populated in prepare) or decide the delta wording",
+      "agent": {
+        "id": "w2",
+        "name": "auditor-w2"
+      },
+      "createdAt": "2026-10-20T16:43:29.263Z"
+    },
+    {
+      "id": "8a71e1e95f7b7997d7ac9d43",
+      "issueKey": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts#qualifiedNameResolution.resolveToPath:reads-composer-json-per-call",
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-003",
+      "targetId": "constraint:added:0005",
+      "type": "change-violation",
+      "severity": "medium",
+      "title": "PHP resolveToPath reads composer.json on every call",
+      "reason": "resolveToPath rebuilds the PSR-4 map from disk per call and takes no session, so it cannot use prepared metadata; deleting composer.json after prepare breaks it, contradicting the facet I/O constraint and the scenario.",
+      "evidence": [
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts",
+          "detail": "resolveQualifiedNameToPath (~2322) calls buildPsr4Map -> findManifestField (readFileSync) each call"
+        },
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/domain/value-objects/language-adapter-facets.ts",
+          "detail": "QualifiedNameResolutionFacet.resolveToPath(qualifiedName, codeRoot, repoRoot) has no session parameter"
+        }
+      ],
+      "recommendation": "Read prepared psr4ByCodeRoot from the session (add session arg or per-codeRoot cache populated in prepare) or decide the delta wording",
+      "agent": {
+        "id": "w2",
+        "name": "auditor-w2"
+      },
+      "createdAt": "2026-10-20T16:43:29.374Z"
+    },
+    {
+      "id": "421c338356cca8737ba47640",
+      "issueKey": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts#qualifiedNameResolution.resolveToPath:reads-composer-json-per-call",
+      "specId": "code-graph:language-adapter",
+      "batchId": "batch-004",
+      "targetId": "scenario:added:0019",
+      "type": "change-violation",
+      "severity": "medium",
+      "title": "PHP resolveToPath reads composer.json on every call",
+      "reason": "resolveToPath rebuilds the PSR-4 map from disk per call and takes no session, so it cannot use prepared metadata; deleting composer.json after prepare breaks it, contradicting the facet I/O constraint and the scenario.",
+      "evidence": [
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts",
+          "detail": "resolveQualifiedNameToPath (~2322) calls buildPsr4Map -> findManifestField (readFileSync) each call"
+        },
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/domain/value-objects/language-adapter-facets.ts",
+          "detail": "QualifiedNameResolutionFacet.resolveToPath(qualifiedName, codeRoot, repoRoot) has no session parameter"
+        }
+      ],
+      "recommendation": "Read prepared psr4ByCodeRoot from the session (add session arg or per-codeRoot cache populated in prepare) or decide the delta wording",
+      "agent": {
+        "id": "w2",
+        "name": "auditor-w2"
+      },
+      "createdAt": "2026-10-20T16:43:29.485Z"
+    },
+    {
+      "id": "ad93a66e36a898d9b941f469",
+      "issueKey": "packages/code-graph/src/infrastructure/tree-sitter/typescript-language-adapter.ts#publishedTargets:main-fallback-with-exports",
+      "specId": "code-graph:typescript-language-adapter",
+      "batchId": "batch-001",
+      "targetId": "scenario:added:0011",
+      "type": "change-violation",
+      "severity": "medium",
+      "title": "main used although exports is defined",
+      "reason": "Spec says main is used only when exports is absent and a defined exports without '.' yields no candidates. publishedTargets falls back to manifest.main for subpath '.' whenever exports yields no runtime/types target, so exports without '.' (or with only unsupported conditions) still resolves via main.",
+      "evidence": [
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+          "detail": "publishedTargets pushes manifest.main when exports gave no target"
+        },
+        {
+          "kind": "spec",
+          "location": "specs/code-graph/typescript-language-adapter/spec.md",
+          "detail": "scenario main is ignored when exports is defined"
+        },
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/infrastructure/tree-sitter/package-resolution.spec.ts",
+          "detail": "no test for exports without '.' plus main"
+        }
+      ],
+      "recommendation": "Fall back to main only when manifest.exports is undefined; add scenario test",
+      "agent": {
+        "id": "w6",
+        "name": "auditor-w6"
+      },
+      "createdAt": "2026-10-20T16:43:47.756Z"
+    },
+    {
+      "id": "dc9693c559f4b68916720f51",
+      "issueKey": "coverage:code-graph:typescript-language-adapter:default-namespace-package-import",
+      "specId": "code-graph:typescript-language-adapter",
+      "batchId": "batch-001",
+      "targetId": "scenario:added:0012",
+      "type": "coverage-gap",
+      "severity": "low",
+      "title": "Default/namespace package import not asserted",
+      "reason": "No test asserts that a default package import binds the single default declaration, or that a namespace package import depends on entry files and creates a namespace binding.",
+      "evidence": [
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+          "detail": "resolvePackageImport"
+        },
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/application/use-cases/index-code-graph.package-imports.spec.ts",
+          "detail": "no default/namespace package import case"
+        }
+      ],
+      "agent": {
+        "id": "w6",
+        "name": "auditor-w6"
+      },
+      "createdAt": "2026-10-20T16:43:47.891Z"
+    },
+    {
+      "id": "49291b59ab4e8c102cf53799",
+      "issueKey": "coverage:code-graph:python-language-adapter:submodule-import",
+      "specId": "code-graph:python-language-adapter",
+      "batchId": "batch-001",
+      "targetId": "scenario:added:0004",
+      "type": "coverage-gap",
+      "severity": "medium",
+      "title": "Submodule import dependency untested",
+      "reason": "No test asserts that 'from pkg import models' (not published by __init__) adds a file dependency on models.py with no binding.",
+      "evidence": [
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/infrastructure/tree-sitter/python-language-adapter.ts",
+          "detail": "resolveImports submodule fallback"
+        },
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/application/use-cases/index-code-graph.package-imports.languages.spec.ts",
+          "detail": "only re-imported alias case covered"
+        }
+      ],
+      "agent": {
+        "id": "w6",
+        "name": "auditor-w6"
+      },
+      "createdAt": "2026-10-20T16:43:48.031Z"
+    },
+    {
+      "id": "63ca463d1bee0fa0f190d7ab",
+      "issueKey": "coverage:code-graph:python-language-adapter:init-import-and-unknown-project",
+      "specId": "code-graph:python-language-adapter",
+      "batchId": "batch-001",
+      "targetId": "scenario:added:0003",
+      "type": "coverage-gap",
+      "severity": "low",
+      "title": "Python init-resolve and unknown-project scenarios untested",
+      "reason": "No Python test asserts a name published by __init__.py resolves, nor that an unknown absolute import yields package-unknown with nothing persisted, nor the name-found-elsewhere case.",
+      "evidence": [
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/application/use-cases/index-code-graph.package-imports.languages.spec.ts",
+          "detail": "Python case covers only models import and re-imported alias"
+        }
+      ],
+      "agent": {
+        "id": "w6",
+        "name": "auditor-w6"
+      },
+      "createdAt": "2026-10-20T16:43:48.205Z"
+    },
+    {
+      "id": "fa9fc3081f6ec15d051b9ada",
+      "issueKey": "coverage:code-graph:python-language-adapter:entry-surface-no-fs-read",
+      "specId": "code-graph:python-language-adapter",
+      "batchId": "batch-001",
+      "targetId": "scenario:added:0008",
+      "type": "coverage-gap",
+      "severity": "low",
+      "title": "Python entrySurface no-filesystem-read untested",
+      "reason": "No test deletes pyproject.toml after identity and asserts entrySurface still resolves, unlike the TypeScript equivalent.",
+      "evidence": [
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/infrastructure/tree-sitter/package-resolution.spec.ts",
+          "detail": "Python entry surface block"
+        }
+      ],
+      "agent": {
+        "id": "w6",
+        "name": "auditor-w6"
+      },
+      "createdAt": "2026-10-20T16:43:48.333Z"
+    },
+    {
+      "id": "08b323f75a5af4376de7c499",
+      "issueKey": "coverage:code-graph:go-language-adapter:unknown-module-reason",
+      "specId": "code-graph:go-language-adapter",
+      "batchId": "batch-001",
+      "targetId": "scenario:added:0006",
+      "type": "coverage-gap",
+      "severity": "low",
+      "title": "Go package-unknown reason not asserted at adapter level",
+      "reason": "The unknown-module test asserts only empty fileImports, not the package-unknown diagnostic reason.",
+      "evidence": [
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/infrastructure/tree-sitter/go-language-adapter.spec.ts",
+          "detail": "import resolution block"
+        }
+      ],
+      "agent": {
+        "id": "w6",
+        "name": "auditor-w6"
+      },
+      "createdAt": "2026-10-20T16:43:48.474Z"
+    },
+    {
+      "id": "92ceb7598649ca09f0f65d57",
+      "issueKey": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts#resolveImports:unindexed-psr4-fallback",
+      "specId": "code-graph:php-language-adapter",
+      "batchId": "batch-001",
+      "targetId": "scenario:added:0006",
+      "type": "change-violation",
+      "severity": "high",
+      "title": "Fallback targets unindexed PSR-4 file",
+      "reason": "When the shared helper is unresolved, resolveImports falls back to resolveQualifiedNameFromSession, which returns the single PSR-4 candidate without checking it is indexed and pushes that absolute path into fileImports, after a diagnostic was already emitted.",
+      "evidence": [
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts:978-990"
+        },
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts:2268-2279"
+        }
+      ],
+      "agent": {
+        "id": "w5",
+        "name": "auditor-w5"
+      },
+      "createdAt": "2026-10-20T16:44:26.114Z"
+    },
+    {
+      "id": "9e690582c5242d24ad54587e",
+      "issueKey": "coverage:code-graph:php-language-adapter:longest-prefix-cross-workspace",
+      "specId": "code-graph:php-language-adapter",
+      "batchId": "batch-001",
+      "targetId": "scenario:added:0002",
+      "type": "coverage-gap",
+      "severity": "low",
+      "title": "Cross-workspace longest-prefix untested",
+      "reason": "Longest prefix is tested only within one workspace map (resolveQualifiedNameToPath), not across workspaces via matchSpecifier.",
+      "evidence": [
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/infrastructure/tree-sitter/php-language-adapter.spec.ts:696"
+        }
+      ],
+      "agent": {
+        "id": "w5",
+        "name": "auditor-w5"
+      },
+      "createdAt": "2026-10-20T16:44:26.344Z"
+    },
+    {
+      "id": "e0d037dc28a995a0b6313f91",
+      "issueKey": "coverage:code-graph:indexer:prepare-receives-hydrated-workspaces",
+      "specId": "code-graph:indexer",
+      "batchId": "batch-003",
+      "targetId": "scenario:added:0002",
+      "type": "coverage-gap",
+      "severity": "low",
+      "title": "No test that prepare receives unchanged workspaces",
+      "reason": "No test asserts that packageResolution.prepare receives every workspace in an incremental run where only one workspace changed.",
+      "evidence": [
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/application/use-cases/index-code-graph.ts:1199"
+        },
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/application/use-cases/index-code-graph.package-imports.spec.ts:348",
+          "detail": "only asserts call order and one prepare call"
+        }
+      ],
+      "agent": {
+        "id": "w5",
+        "name": "auditor-w5"
+      },
+      "createdAt": "2026-10-20T16:44:44.659Z"
+    },
+    {
+      "id": "48f1bef930aade5514657534",
+      "issueKey": "coverage:code-graph:indexer:identity-collision-error",
+      "specId": "code-graph:indexer",
+      "batchId": "batch-003",
+      "targetId": "scenario:added:0006",
+      "type": "coverage-gap",
+      "severity": "medium",
+      "title": "Package identity collision error untested",
+      "reason": "No test builds two workspaces with the same package identity and asserts an error naming both workspaces.",
+      "evidence": [
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/application/use-cases/index-code-graph.ts:889",
+          "detail": "collision branch"
+        },
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/application/use-cases",
+          "detail": "no collision test found"
+        }
+      ],
+      "agent": {
+        "id": "w5",
+        "name": "auditor-w5"
+      },
+      "createdAt": "2026-10-20T16:44:44.773Z"
+    },
+    {
+      "id": "d53511937aaf8a2d1d441cec",
+      "issueKey": "spec:code-graph:indexer:constraints-section-replaced",
+      "specId": "code-graph:indexer",
+      "batchId": "batch-003",
+      "targetId": "constraint:removed:0008",
+      "type": "spec-ambiguity",
+      "severity": "low",
+      "title": "Constraints replacement drops two constraints silently",
+      "reason": "The delta replaces the whole Constraints section. Six constraints are removed; four are restated in requirement text, but the specs() callback exclusive/no filesystem fallback and the Pass 2 depends on Pass 1 for ALL workspaces constraints have no replacement as constraints. Confirm the removal is intended or restore them.",
+      "evidence": [
+        {
+          "kind": "spec",
+          "location": "specd-sdd/changes/20261015-123246-code-graph-cross-workspace-imports/deltas/code-graph/indexer/spec.md.delta.yaml:103",
+          "detail": "Constraints op replaces the section"
+        }
+      ],
+      "recommendation": "Restore the two dropped constraints or document the removal",
+      "agent": {
+        "id": "w5",
+        "name": "auditor-w5"
+      },
+      "createdAt": "2026-10-20T16:44:44.890Z"
+    },
+    {
+      "id": "13679bdaca492c41946897c3",
+      "issueKey": "packages/code-graph/src/application/use-cases/index-code-graph.ts#identity:uncaught-throw",
+      "specId": "code-graph:indexer",
+      "batchId": "batch-004",
+      "targetId": "scenario:added:0019",
+      "type": "change-violation",
+      "severity": "high",
+      "title": "Throwing identity aborts the run",
+      "reason": "packageResolution.identity is called without try/catch in the package-map loop, so a throwing identity propagates and stops the run instead of being recorded as an indexing error.",
+      "evidence": [
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/application/use-cases/index-code-graph.ts:884-901"
+        },
+        {
+          "kind": "task",
+          "location": "specd-sdd/changes/20261015-123246-code-graph-cross-workspace-imports/tasks.md:423",
+          "detail": "task 23.1 still open"
+        }
+      ],
+      "agent": {
+        "id": "w5",
+        "name": "auditor-w5"
+      },
+      "createdAt": "2026-10-20T16:44:44.997Z"
+    },
+    {
+      "id": "c361b152c52446ef20616cec",
+      "issueKey": "packages/code-graph/src/application/use-cases/index-code-graph.ts#identity:first-adapter-wins",
+      "specId": "code-graph:indexer",
+      "batchId": "batch-004",
+      "targetId": "scenario:added:0020",
+      "type": "change-violation",
+      "severity": "medium",
+      "title": "Identity not first-adapter-wins",
+      "reason": "The package-map loop asks every adapter with the facet for every workspace and never stops after the first non-undefined identity, so a second adapter is still asked and may add another mapping.",
+      "evidence": [
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/application/use-cases/index-code-graph.ts:884-901"
+        },
+        {
+          "kind": "task",
+          "location": "specd-sdd/changes/20261015-123246-code-graph-cross-workspace-imports/tasks.md:423",
+          "detail": "task 23.1 still open"
+        }
+      ],
+      "agent": {
+        "id": "w5",
+        "name": "auditor-w5"
+      },
+      "createdAt": "2026-10-20T16:44:45.129Z"
+    },
+    {
+      "id": "0be94c46cecc81b0e088f881",
+      "issueKey": "packages/code-graph/src/domain/value-objects/index-result.ts#importDiagnostics:adaptersWithoutPackageResolution",
+      "specId": "code-graph:indexer",
+      "batchId": "batch-004",
+      "targetId": "scenario:added:0018",
+      "type": "change-violation",
+      "severity": "medium",
+      "title": "Absent facet counted as failure; no adaptersWithoutPackageResolution",
+      "reason": "IndexResult.importDiagnostics has no adaptersWithoutPackageResolution, and the run records facet-absent through recordImportDiagnostic so it is counted in total, byReason and samples. The spec forbids counting it.",
+      "evidence": [
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/application/use-cases/index-code-graph.ts:935-943"
+        },
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/application/use-cases/index-code-graph.ts:1931-1936"
+        },
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/domain/value-objects/index-result.ts:72-84"
+        },
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/application/use-cases/index-code-graph.package-imports.spec.ts:396",
+          "detail": "asserts facet-absent appears in samples"
+        },
+        {
+          "kind": "task",
+          "location": "specd-sdd/changes/20261015-123246-code-graph-cross-workspace-imports/tasks.md:427",
+          "detail": "task 23.2 still open"
+        }
+      ],
+      "agent": {
+        "id": "w5",
+        "name": "auditor-w5"
+      },
+      "createdAt": "2026-10-20T16:44:45.251Z"
+    },
+    {
+      "id": "3f91a9393eca8f43d7e7a612",
+      "issueKey": "coverage:code-graph:indexer:throwing-identity",
+      "specId": "code-graph:indexer",
+      "batchId": "batch-004",
+      "targetId": "scenario:added:0019",
+      "type": "coverage-gap",
+      "severity": "medium",
+      "title": "Throwing identity untested",
+      "reason": "No test covers an adapter whose identity throws.",
+      "evidence": [
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/application/use-cases",
+          "detail": "no such test"
+        }
+      ],
+      "agent": {
+        "id": "w5",
+        "name": "auditor-w5"
+      },
+      "createdAt": "2026-10-20T16:44:45.365Z"
+    },
+    {
+      "id": "fc53f7cf2c94f5cb12f43206",
+      "issueKey": "coverage:code-graph:indexer:identity-first-wins",
+      "specId": "code-graph:indexer",
+      "batchId": "batch-004",
+      "targetId": "scenario:added:0020",
+      "type": "coverage-gap",
+      "severity": "medium",
+      "title": "Identity first-wins untested",
+      "reason": "No test registers two adapters answering for one workspace.",
+      "evidence": [
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/application/use-cases",
+          "detail": "no such test"
+        }
+      ],
+      "agent": {
+        "id": "w5",
+        "name": "auditor-w5"
+      },
+      "createdAt": "2026-10-20T16:44:45.481Z"
+    },
+    {
+      "id": "d53c5af15f9a186786c2f53b",
+      "issueKey": "coverage:code-graph:indexer:newly-added-workspace-resolves-package-import",
+      "specId": "code-graph:indexer",
+      "batchId": "batch-004",
+      "targetId": "scenario:added:0024",
+      "type": "coverage-gap",
+      "severity": "low",
+      "title": "Newly added workspace incremental package import untested",
+      "reason": "Incremental tests cover relative-import additions and entry/barrel/importer changes, not a package import that becomes resolvable when its target workspace is added.",
+      "evidence": [
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/application/use-cases/workspace-indexing.spec.ts:254",
+          "detail": "relative import only"
+        },
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/application/use-cases/index-code-graph.ts:808-812"
+        }
+      ],
+      "agent": {
+        "id": "w5",
+        "name": "auditor-w5"
+      },
+      "createdAt": "2026-10-20T16:44:45.597Z"
+    },
+    {
+      "id": "98f02a07743b45a4f6ae8ce5",
+      "issueKey": "coverage:code-graph:indexer:closure-no-scan",
+      "specId": "code-graph:indexer",
+      "batchId": "batch-004",
+      "targetId": "scenario:added:0025",
+      "type": "coverage-gap",
+      "severity": "low",
+      "title": "Closure not-scanning-every-file untested",
+      "reason": "No test asserts importers of a changed entry are found from persisted steps without re-reading unrelated files.",
+      "evidence": [
+        {
+          "kind": "test",
+          "location": "packages/code-graph/test/application/use-cases/index-code-graph.package-imports.spec.ts:304",
+          "detail": "asserts graph equality only"
+        }
+      ],
+      "agent": {
+        "id": "w5",
+        "name": "auditor-w5"
+      },
+      "createdAt": "2026-10-20T16:44:45.709Z"
+    },
+    {
+      "id": "b3d7f1baaa9303514c4f032a",
+      "issueKey": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts#resolveToPath:reads-filesystem",
+      "specId": "code-graph:php-language-adapter",
+      "batchId": "batch-001",
+      "targetId": "requirement:modified:0001",
+      "type": "change-violation",
+      "severity": "medium",
+      "title": "resolveToPath reads composer.json from disk",
+      "reason": "qualifiedNameResolution.resolveToPath takes (qualifiedName, codeRoot, repoRoot) and rebuilds the PSR-4 map from the filesystem; spec requires reading the session-prepared map with no filesystem fallback.",
+      "evidence": [
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts:493"
+        },
+        {
+          "kind": "implementation",
+          "location": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts:2322-2329"
+        },
+        {
+          "kind": "design",
+          "location": "specd-sdd/changes/20261015-123246-code-graph-cross-workspace-imports/design.md:267"
+        },
+        {
+          "kind": "task",
+          "location": "specd-sdd/changes/20261015-123246-code-graph-cross-workspace-imports/tasks.md:451",
+          "detail": "task 23.8 still open"
+        }
+      ],
+      "agent": {
+        "id": "w5",
+        "name": "auditor-w5"
+      },
+      "createdAt": "2026-10-20T16:44:45.822Z"
+    }
+  ],
+  "report": {
+    "generatedAt": "2026-10-20T16:45:03.951Z",
+    "generatedBy": {
+      "id": "coord",
+      "name": "coordinator"
+    }
+  }
+}

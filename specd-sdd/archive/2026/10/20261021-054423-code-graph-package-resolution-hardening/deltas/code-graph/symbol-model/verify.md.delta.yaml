@@ -1,0 +1,13 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: File node'
+  content: |
+    #### Scenario: File namespace is optional and paired
+
+    - **GIVEN** a PHP file that declares `namespace App\Models;` and a Go file that declares no namespace
+    - **WHEN** their file nodes are built
+    - **THEN** the PHP node has `namespace` `App\Models` and `namespaceSeparator` `\`
+    - **AND** the Go node has neither field
+    - **AND** namespace data does not change `FileNode` equality

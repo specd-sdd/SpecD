@@ -1,4 +1,5 @@
 import { InvalidSpecPathError } from '../errors/invalid-spec-path-error.js'
+import { isValidCapabilitySegment } from '../services/spec-id-rules.js'
 import { isWindowsDeviceName } from '../services/windows-device-name.js'
 import { DomainPath } from './domain-path.js'
 
@@ -70,7 +71,8 @@ export class SpecPath extends DomainPath {
    * Validates each segment in the array, throwing if any is invalid.
    *
    * @param segments - The segments to validate
-   * @throws {InvalidSpecPathError} If any segment is `.`, `..`, or contains reserved characters
+   * @throws {InvalidSpecPathError} If any segment is `.`, `..`, a Windows device name,
+   *   or fails the shared capability-segment rule
    */
   private static _validateSegments(segments: readonly string[]): void {
     for (const segment of segments) {
@@ -80,7 +82,7 @@ export class SpecPath extends DomainPath {
       if (isWindowsDeviceName(segment)) {
         throw new InvalidSpecPathError(`segment '${segment}' is a Windows device name`)
       }
-      if (/[\\:*?"<>|]/.test(segment)) {
+      if (!isValidCapabilitySegment(segment)) {
         throw new InvalidSpecPathError(`segment '${segment}' contains invalid characters`)
       }
     }

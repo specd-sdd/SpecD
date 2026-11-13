@@ -20,7 +20,7 @@ export interface UpdateImplementationTrackingDeps {
   /** Absolute project root path. */
   readonly projectRoot: string
   /** Spec repositories keyed by workspace name. */
-  readonly specRepositories?: ReadonlyMap<
+  readonly specRepositories: ReadonlyMap<
     string,
     import('../../application/ports/spec-repository.js').SpecRepository
   >

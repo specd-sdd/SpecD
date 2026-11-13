@@ -82,7 +82,7 @@ describe('spec optimizations', () => {
     await program.parseAsync(makeCliArgs('get', 'auth/login', '--field', 'optimizedContext'))
 
     expect(kernel.specs.getPersistedOptimizations.execute).toHaveBeenCalledWith({
-      specId: 'default:auth/login',
+      specId: 'auth/login',
       field: 'optimizedContext',
     })
     expect(stdout()).toContain('optimizedContext: missing')
@@ -161,7 +161,7 @@ describe('spec optimizations', () => {
     expect(resolveCliContext).toHaveBeenCalledTimes(1)
     expect(kernel.specs.updatePersistedOptimizations.execute).toHaveBeenCalledTimes(1)
     expect(kernel.specs.updatePersistedOptimizations.execute).toHaveBeenCalledWith({
-      specId: 'default:auth/login',
+      specId: 'auth/login',
       set: { optimizedDescription: 'Short summary' },
     })
   })
@@ -192,7 +192,7 @@ describe('spec optimizations', () => {
 
     expect(kernel.specs.updatePersistedOptimizations.execute).toHaveBeenCalledTimes(1)
     expect(kernel.specs.updatePersistedOptimizations.execute).toHaveBeenCalledWith({
-      specId: 'default:auth/login',
+      specId: 'auth/login',
       set: {
         optimizedDescription: 'summary',
         optimizedContext: '# Title\n## Rules',
@@ -214,7 +214,7 @@ describe('spec optimizations', () => {
       await program.parseAsync(makeCliArgs('set', 'auth/login', '--input', input.path))
 
       expect(kernel.specs.updatePersistedOptimizations.execute).toHaveBeenCalledWith({
-        specId: 'default:auth/login',
+        specId: 'auth/login',
         set: { optimizedDescription: 'Short summary' },
       })
     } finally {
@@ -236,7 +236,7 @@ describe('spec optimizations', () => {
 
     expect(readStdin).toHaveBeenCalledTimes(1)
     expect(kernel.specs.updatePersistedOptimizations.execute).toHaveBeenCalledWith({
-      specId: 'default:auth/login',
+      specId: 'auth/login',
       set: { optimizedContext: 'context' },
     })
   })
@@ -407,7 +407,7 @@ describe('spec optimizations', () => {
 
     expect(kernel.specs.updatePersistedOptimizations.execute).toHaveBeenCalledTimes(1)
     expect(kernel.specs.updatePersistedOptimizations.execute).toHaveBeenCalledWith({
-      specId: 'default:auth/login',
+      specId: 'auth/login',
       clear: ['optimizedDescription', 'optimizedContext'],
     })
     expect(stdout()).toContain('cleared optimizations for default:auth/login')
@@ -430,7 +430,7 @@ describe('spec optimizations', () => {
 
     expect(kernel.specs.updatePersistedOptimizations.execute).toHaveBeenCalledTimes(1)
     expect(kernel.specs.updatePersistedOptimizations.execute).toHaveBeenCalledWith({
-      specId: 'default:auth/login',
+      specId: 'auth/login',
       clear: ['optimizedContext'],
     })
     expect(stdout()).toContain('optimizedDescription: summary')
@@ -487,7 +487,7 @@ describe('spec optimizations', () => {
     )
 
     expect(kernel.specs.updatePersistedOptimizations.execute).toHaveBeenCalledWith({
-      specId: 'default:auth/login',
+      specId: 'auth/login',
       clear: ['optimizedDescription', 'optimizedContext'],
     })
   })

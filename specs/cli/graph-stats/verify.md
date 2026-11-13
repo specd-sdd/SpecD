@@ -149,3 +149,25 @@
 - **WHEN** stats is rendered in text, JSON, and TOON
 - **THEN** text explains each reason and structured output preserves all fields
 - **AND** the graph is not labelled simply fresh
+
+### Requirement: Coverage completeness presentation
+
+#### Scenario: Text output labels a graph with size skips
+
+- **GIVEN** a graph health result with `coverageCompleteness` `complete-with-warnings` and a `file-too-large` warning of 3
+- **WHEN** `graph stats` prints in text mode
+- **THEN** the output contains `coverage: complete with warnings (3 file(s) skipped: file-too-large)`
+- **AND** it mentions `graph.maxFileBytes` and `graph.largeFilePaths`
+- **AND** it does not describe the coverage as plainly complete
+
+#### Scenario: A complete graph shows no warning
+
+- **GIVEN** a graph health result with `coverageCompleteness` `complete`
+- **WHEN** `graph stats` prints in text mode
+- **THEN** no coverage warning line is printed
+
+#### Scenario: Structured modes carry the fields without hints
+
+- **GIVEN** a graph health result with warnings
+- **WHEN** `graph stats` prints in `json` or `toon` mode
+- **THEN** `coverageCompleteness` and `coverageWarnings` are present unchanged and no hint text is added

@@ -18,12 +18,16 @@ An explicit `input.provider` MUST already be open. The SDK MUST NOT close,
 recreate, or retry that caller-owned provider; force still reaches
 `IndexProjectGraph` as a logical full-reindex intent.
 
-For a transient provider, the SDK SHALL use `withOpenGraphProvider`. If, and only
-if, `input.force` is true and initial `open()` rejects with the typed recoverable
-storage-open error, the use case SHALL request exactly one recovery through the
-helper: after that provider is closed, call `provider.recreate()`, then retry
-`open()` and the index operation once. It MUST preserve caller hooks and run cleanup
-exactly once per provider lifetime.
+For a transient provider, the SDK SHALL use `withOpenGraphProvider`. When initial
+`open()` rejects with the typed recoverable storage-open error, the SDK SHALL
+request exactly one recovery through the helper if `input.force` is true or if the
+error reason is `SCHEMA_INCOMPATIBLE` (an incompatible store cannot be read, so a
+non-forced run rebuilds it): after that provider is closed, call `provider.recreate()`,
+then retry `open()` and the index operation once. Any other typed recoverable
+failure on a non-forced run MUST propagate unchanged. When the index operation
+reports a derivation mismatch before writing, the SDK SHALL recreate the closed
+store once and index it empty. Each path MUST preserve caller hooks, run cleanup
+exactly once per provider lifetime, and report `fullRebuild` with the reason.
 
 The SDK MUST rethrow non-recoverable errors, an untyped error, a recovery failure,
 or a second open failure without deletion or further retry.
@@ -34,18 +38,27 @@ Subprocess lock for concurrent index exclusion (`acquireGraphIndexLock`) MUST NO
 
 ### Requirement: Progress callback passthrough
 
-When `input.onProgress` is provided, the orchestration MUST forward progress events from `IndexProjectGraph` without transformation.
+When `input.onProgress` is provided, the orchestration MUST forward progress events from `IndexProjectGraph` without transformation. The `(percent, phase)` signature of the callback MUST NOT change.
+
+### Requirement: Typed event passthrough
+
+`RunIndexProjectGraphInput` SHALL accept an optional `onEvent` receiver. When provided, the orchestration MUST forward to it, in arrival order and without transformation, the presentation-neutral typed events produced by the indexing run (`file-activity`, `file-skipped`, `resource-disposal-failed`). Each event carries a stable `kind` identifier and structured fields. The receiver does not carry the typed events of the isolated worker (`activity`, `worker-silent`, `stale-lock-recovered`): `runIndexProjectGraph` executes inside the worker child, and those events are delivered to hosts by `runIsolatedGraphIndex` through its own `onEvent` receiver. The receiver is additive: omitting it MUST NOT change the run, and `onProgress` keeps working unchanged.
+
+The public types of both families of events (the indexer events and the isolated-worker events and failure diagnostics) SHALL be exported from the curated SDK surface with complete documentation, including every member, so that a host (the CLI, or a future HTTP host) can render them without depending on internal modules.
 
 ### Requirement: Result passthrough
 
-`RunIndexProjectGraphResult` MUST match `IndexProjectGraph` result fields (indexed file/symbol counts, per-workspace breakdown, errors) without lossy mapping.
+`RunIndexProjectGraphResult` MUST match `IndexProjectGraph` result fields (indexed file/symbol counts, per-workspace breakdown, errors, diagnostics, and the size-skip summary: `filesSkippedForSize`, `largestSkippedForSize`, `sizeExemptAnalysed`) without lossy mapping.
 
 ### Requirement: Repair lifecycle passthrough
 
 The SDK SHALL report the final full-rebuild result without lossy mapping. It owns
-the force-only decision to recover a typed failed open, while Code Graph owns the
-`recreate()` primitive and its closed-provider precondition. Normal reads and
-non-forced indexing surface the original typed open failure unchanged.
+the decision to recover a typed failed open: with `force` it recovers any typed
+recoverable open failure, and without `force` it recovers only an incompatible
+schema (`SCHEMA_INCOMPATIBLE`), because that store cannot be read at all. Code
+Graph owns the `recreate()` primitive and its closed-provider precondition. Normal
+reads, and non-forced indexing of any other typed recoverable failure, surface the
+original typed open failure unchanged.
 
 ## Spec Dependencies
 

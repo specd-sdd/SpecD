@@ -1,0 +1,22 @@
+- op: added
+  description: Make explicit that the OS matrix enforces the cross-platform contract
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Three operating systems'
+  content: |
+    ### Requirement: The matrix enforces the cross-platform contract
+
+    The three-operating-system job is the gate that enforces `_global/cross-platform`. A pull request MUST NOT merge while any runner fails, and a failure that only reproduces on one operating system MUST be fixed in the code under the rules of `_global/cross-platform`, not by excluding that runner, skipping the affected tests, or adding platform-specific workflow steps that mask it.
+
+- op: modified
+  description: Add dependency on the cross-platform convention
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`default:_global/testing`](../testing/spec.md) — CI runs the Vitest suite those conventions describe
+    - [`default:_global/cross-platform`](../cross-platform/spec.md) — the contract the three-operating-system job enforces

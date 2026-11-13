@@ -9,7 +9,8 @@
     "core:validate-artifacts",
     "core:spec-id-format",
     "core:preview-spec",
-    "core:resolve-change-schema"
+    "core:resolve-change-schema",
+    "core:validate-change-batch"
   ],
   "implementation": [
     {

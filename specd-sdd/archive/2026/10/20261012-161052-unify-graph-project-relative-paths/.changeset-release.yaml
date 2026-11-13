@@ -1,0 +1,11 @@
+releases:
+  code-graph:symbol-model: minor
+  code-graph:document-model: minor
+  code-graph:workspace-integration: minor
+  code-graph:sqlite-graph-store: minor
+  sdk:run-graph-search: minor
+  sdk:run-graph-hotspots: minor
+  sdk:run-graph-impact: minor
+  cli:graph-search: minor
+  cli:graph-hotspots: minor
+  cli:graph-impact: minor

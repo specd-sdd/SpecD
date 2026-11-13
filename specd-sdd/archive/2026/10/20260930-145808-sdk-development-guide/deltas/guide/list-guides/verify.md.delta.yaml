@@ -1,0 +1,130 @@
+- op: modified
+  description: 'Verify the complete catalog port contract, including collection descriptors and complete topics.'
+  selector:
+    type: section
+    matches: 'Requirement: GuideCatalogPort Contract'
+  content: |
+    #### Scenario: Mock catalog port returns summaries
+
+    - **GIVEN** an in-memory test implementation of `GuideCatalogPort` containing 3 guide summaries
+    - **WHEN** `listGuides()` is called on the port
+    - **THEN** it resolves to an array of 3 `GuideSummary` objects
+    - **AND** does not throw
+
+    #### Scenario: Port exposes getAllGuides
+
+    - **GIVEN** an implementation of `GuideCatalogPort`
+    - **WHEN** it is checked for the `getAllGuides` member
+    - **THEN** the member MUST be present and callable
+    - **AND** it MUST return the catalog's summaries without filtering
+
+    #### Scenario: Port exposes collections and full topics
+
+    - **GIVEN** an implementation of `GuideCatalogPort`
+    - **WHEN** `getCollections()` is called
+    - **THEN** it MUST return the collection descriptors the catalog contains
+    - **AND** every returned descriptor's collection identifier MUST appear as the `collection` of at least one summary returned by `getAllGuides()`
+
+    - **WHEN** `getAllTopics()` is called
+    - **THEN** it MUST return the complete topics from that same catalog
+
+    #### Scenario: Port handles empty catalog gracefully
+
+    - **GIVEN** a catalog port initialized with 0 guides
+    - **WHEN** `listGuides()` is called
+    - **THEN** it returns an empty array `[]` without error
+
+    #### Scenario: A port serves exactly one catalog
+
+    - **GIVEN** two catalogs, each exposing a topic named `index`
+    - **WHEN** each catalog's port resolves `index`
+    - **THEN** each MUST resolve its own catalog's document
+    - **AND** neither MUST return the other catalog's document
+
+    #### Scenario: Topic identifiers are resolved as collection-qualified keys
+
+    - **GIVEN** a catalog containing a collection `core` with topic `ports`, and a collection `sdk` with a different `ports` document
+    - **WHEN** `getGuide('core:ports')` is called
+    - **THEN** it MUST resolve the `core` collection's document
+    - **AND** an unqualified `ports` key MUST NOT be accepted as an alternative resolution
+
+- op: modified
+  description: 'Verify the structured page envelope, union scopes, and collection-aware ordering.'
+  selector:
+    type: section
+    matches: 'Requirement: ListGuidesQuery Implementation'
+  content: |
+    #### Scenario: Guides are ordered by collection and sidebar position
+
+    - **GIVEN** guides with orders `[10, 1, 5, 2]`
+    - **WHEN** `ListGuidesQuery.execute()` is invoked
+    - **THEN** `result.topics` are ordered by collection and then strictly with orders `[1, 2, 5, 10]` inside each collection
+
+    #### Scenario: Guides with identical order are sorted alphabetically by topic
+
+    - **GIVEN** two guides both having `order: 5`, with topics `"workflow"` and `"deltas"`
+    - **WHEN** `ListGuidesQuery.execute()` is invoked
+    - **THEN** `"deltas"` appears before `"workflow"` in `result.topics`
+
+    #### Scenario: Tie-breaking uses locale-sensitive comparison
+
+    - **GIVEN** two guides sharing an `order`, with topics that sort differently under locale-sensitive collation than under byte ordering
+    - **WHEN** `ListGuidesQuery.execute()` is invoked
+    - **THEN** the tie-break MUST use locale-sensitive comparison
+    - **AND** it MUST NOT use raw byte or codepoint ordering
+
+    #### Scenario: Guides with sparse or non-consecutive order values
+
+    - **GIVEN** guides with order values `[100, 1, 50]`
+    - **WHEN** `ListGuidesQuery.execute()` runs
+    - **THEN** the sort correctly places order `1` first, `50` second, and `100` third
+
+    #### Scenario: Listing reports a structured, readonly page
+
+    - **GIVEN** the result returned by `ListGuidesQuery.execute()`
+    - **WHEN** an external caller inspects its fields
+    - **THEN** it contains readonly `topics`, `pagination`, and `collections`
+    - **AND** each listed topic reports its 1-indexed `page` and `'docs'` or `'api'` scope
+    - **AND** internal catalog storage remains unaffected by external operations
+
+    #### Scenario: Scope filters before ordering
+
+    - **GIVEN** a catalog with interleaved collections and `order` values
+    - **WHEN** the query is executed with a scope naming a single collection
+    - **THEN** filtering MUST be applied before ordering
+    - **AND** every returned entry MUST belong to the named collection
+
+    #### Scenario: Pagination bounds the result without disturbing order
+
+    - **GIVEN** a catalog with more entries than the requested page size
+    - **WHEN** the query is executed with `{ pagination: { page: 2, pageSize: 2 } }`
+    - **THEN** `result.topics` contains the second ordered page without changed relative order
+    - **AND** `result.pagination` reports the requested page, page size, returned count, total, and total pages
+    - **AND** `result.collections` reports the selected collections' total and first/last page extents
+
+    #### Scenario: Multi-value scopes use union semantics
+
+    - **GIVEN** a catalog containing collections `core`, `sdk`, and `skills`
+    - **WHEN** the query is executed with `{ scope: { collections: ['core', 'sdk'] } }`
+    - **THEN** every matching `core` or `sdk` topic MUST be returned
+    - **AND** no `skills` topic MUST be returned
+
+    #### Scenario: A large generated collection supports a bounded default listing
+
+    - **GIVEN** a catalog containing a large volume of generated entries plus a smaller set of hand-written entries
+    - **WHEN** the query is executed with a scope selecting the hand-written entries
+    - **THEN** only those entries MUST be returned
+    - **AND** the query MUST NOT require an unbounded call to obtain a usable listing
+
+    #### Scenario: Generated entries are reachable through an explicit scope
+
+    - **GIVEN** the same catalog
+    - **WHEN** the query is executed with a scope selecting the generated entries
+    - **THEN** the generated entries MUST be returned
+    - **AND** pagination MUST apply to that scope
+
+    #### Scenario: Withheld generated count is explicit
+
+    - **GIVEN** a scope excluding generated topics from a catalog that contains them
+    - **WHEN** the query completes
+    - **THEN** `result.withheld.generatedTopics` MUST equal the excluded generated topic count

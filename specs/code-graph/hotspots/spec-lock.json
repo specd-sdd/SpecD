@@ -4,5 +4,10 @@
     "version": 1
   },
   "dependsOn": ["code-graph:symbol-model", "code-graph:graph-store", "code-graph:traversal"],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "code-graph:src/domain/value-objects/hotspot-result.ts",
+      "symbols": ["DEFAULT_HOTSPOT_KINDS"]
+    }
+  ]
 }

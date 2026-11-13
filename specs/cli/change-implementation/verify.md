@@ -7,7 +7,7 @@
 #### Scenario: Subcommands are reachable
 
 - **WHEN** `specd changes implementation --help` is run
-- **THEN** it lists `list`, `add`, `resolve`, `ignore`, `remove`, and `review` as subcommands
+- **THEN** it lists `list`, `add`, `resolve`, `unresolve`, `ignore`, `remove`, `review`, and `start` as subcommands
 
 ### Requirement: Add subcommand
 
@@ -34,12 +34,13 @@
 
 ### Requirement: Resolve subcommand
 
-#### Scenario: Resolve closes tracked-file review for multiple files via comma-separated list
+#### Scenario: Resolve closes tracked-file review for multiple files
 
 - **GIVEN** tracked implementation files `f1.ts` and `f2.ts` are in `open` state
 - **AND** both files exist on disk
-- **WHEN** `specd changes implementation resolve <name> --file f1.ts,f2.ts` is run
+- **WHEN** `specd changes implementation resolve <name> --file f1.ts --file f2.ts` is run
 - **THEN** both tracked files move to `resolved`
+- **AND** `--file f1.ts f2.ts` has the same effect
 
 #### Scenario: Resolving a missing file fails
 
@@ -62,6 +63,19 @@
 - **WHEN** `specd changes implementation resolve <name> --file packages/core/src/missing.ts` is run
 - **THEN** the command fails with `ImplementationFileNotFoundError`
 - **AND** the state remains `removed`
+
+#### Scenario: Resolve a file whose name contains a comma
+
+- **GIVEN** the tracked file `a, b.md` is `open` and exists on disk
+- **WHEN** `specd changes implementation resolve <name> --file "a, b.md"` is run
+- **THEN** the tracked file moves to `resolved`
+
+#### Scenario: One missing file aborts the whole resolve
+
+- **GIVEN** `f1.ts` is tracked and exists, `missing.ts` does not exist
+- **WHEN** `specd changes implementation resolve <name> --file f1.ts --file missing.ts` is run
+- **THEN** the command fails with `ImplementationFileNotFoundError` quoting `missing.ts`
+- **AND** `f1.ts` remains `open`
 
 ### Requirement: Unresolve subcommand
 
@@ -88,13 +102,19 @@
 - **THEN** the command fails with `ImplementationFileNotFoundError`
 - **AND** the state remains `removed`
 
+#### Scenario: Unresolve accepts repeated names and names with commas
+
+- **GIVEN** tracked files `a.ts` and `b, c.ts` are `resolved` and exist
+- **WHEN** `specd changes implementation unresolve <name> --file a.ts --file "b, c.ts"` is run
+- **THEN** both files move to `open`
+
 ### Requirement: Ignore subcommand
 
-#### Scenario: Ignore marks multiple files as ignored via comma-separated list
+#### Scenario: Ignore marks multiple files as ignored
 
 - **GIVEN** tracked implementation files `f3.ts` and `f4.ts` are in `open` state
 - **AND** both files exist on disk
-- **WHEN** `specd changes implementation ignore <name> --file f3.ts,f4.ts` is run
+- **WHEN** `specd changes implementation ignore <name> --file f3.ts --file f4.ts` is run
 - **THEN** both tracked files move to `ignored`
 
 #### Scenario: Ignoring a new missing file fails
@@ -120,6 +140,19 @@
 - **THEN** the file state moves to `ignored`
 - **AND** the confirmed implementation link remains present
 
+#### Scenario: Ignore a file whose name contains a comma
+
+- **GIVEN** the tracked file `Análisis, dependencias y casos de uso.md` is in `open` state
+- **WHEN** `specd changes implementation ignore <name> --file "Análisis, dependencias y casos de uso.md"` is run
+- **THEN** the tracked file moves to `ignored`
+- **AND** the command does not fail with `Implementation file "dependencias y casos de uso.md" does not exist`
+
+#### Scenario: A comma-joined value is one name
+
+- **WHEN** `specd changes implementation ignore <name> --file f3.ts,f4.ts` is run
+- **THEN** the value is treated as one file named `f3.ts,f4.ts`
+- **AND** the command fails with `ImplementationFileNotFoundError` quoting `f3.ts,f4.ts`
+
 ### Requirement: Remove subcommand
 
 #### Scenario: Removing one symbol preserves the remaining refinements
@@ -134,6 +167,11 @@
 - **AND** it currently has one remaining symbol refinement
 - **WHEN** that last symbol is removed
 - **THEN** the explicit file-level link remains
+
+#### Scenario: Remove forwards spec and symbol raw, including a comma in a symbol
+
+- **WHEN** `specd changes implementation remove <name> --spec auth/login --file x.ts --symbol "A.b, c"` is run
+- **THEN** the command forwards `auth/login` and the single symbol `A.b, c` unchanged to the use case
 
 ### Requirement: Shared path semantics
 
@@ -170,3 +208,25 @@
 - **THEN** it executes `UpdateImplementationTracking` with action `'start'`
 - **AND** tracking becomes active
 - **AND** re-running `start` succeeds idempotently
+
+### Requirement: Raw values and unambiguous listings
+
+#### Scenario: Spec ID is passed raw
+
+- **WHEN** `specd changes implementation add <name> --spec auth/login --file x.ts` is run
+- **THEN** the command forwards `auth/login` unchanged and the use case normalizes it
+
+#### Scenario: Values are never trimmed
+
+- **WHEN** `--file " spaced.md "` is passed
+- **THEN** the command forwards `spaced.md` with its spaces
+
+#### Scenario: Text listing prints one name per line
+
+- **WHEN** `specd changes implementation list <name>` prints tracked files in text format
+- **THEN** each file name appears on its own line, never joined with commas
+
+#### Scenario: Structured output keeps arrays
+
+- **WHEN** the list is printed with `--format json`
+- **THEN** file names are JSON array entries

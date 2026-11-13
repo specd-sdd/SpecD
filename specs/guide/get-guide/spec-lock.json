@@ -7,11 +7,46 @@
   "implementation": [
     {
       "file": "guide:src/application/queries/get-guide-query.ts",
-      "symbols": ["GetGuideQuery", "GetGuideInput"]
+      "symbols": ["GetGuideQuery"]
     },
     {
-      "file": "guide:src/infrastructure/adapters/prebundled-guide-catalog-adapter.ts",
-      "symbols": ["PrebundledGuideCatalogAdapter"]
+      "file": "guide:test/unit/application/queries.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "GetGuideQuery resolves one guide topic by ID (trim/lowercase/.md-strip) or throws GuideTopicNotFoundError with availableTopics.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:07bf54890303a6111021c32a78d0194f981487de4886bc493918c9ccd8c80b6f",
+          "lastModified": "2026-09-24T13:35:20.744Z"
+        },
+        "verify.md": {
+          "hash": "sha256:50e257a4745ab2c551100059b809c0d0b414d23ff4cc3185ee0988eb9f40e5c1",
+          "lastModified": "2026-09-24T13:35:20.745Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# GetGuideQuery — guide topic lookup\n\n## Rules\n\n### GetGuideQuery\n- App layer MUST implement `GetGuideQuery`; ctor receives `GuideCatalogPort` instance.\n- Input: `{ topic: string }`.\n- Hit -> return full `GuideTopic` entity: title, description, content, section outline.\n- Lookup case-insensitive.\n\n### Normalization today (verbatim order)\n- Query (`get-guide-query.ts`): `raw = input.topic ?? ''` -> `trim()` -> if `endsWith('.md')` `slice(0,-3)` -> `toLowerCase()`; passes `normalized` to `catalogPort.getGuide`.\n- Adapter (`prebundled-guide-catalog-adapter.ts`): `topic.trim().toLowerCase().replace(/\\.md$/,'')` -> O(1) `this.index[normalized]`; miss => `null`.\n- `.md` strip is case-SENSITIVE in query (checked pre-lowercase), case-INSENSITIVE in adapter (stripped post-lowercase). `.MD` resolves only via adapter re-normalization — accidental, unspecified.\n- `:` is NOT special: `collection:topic` (`core:ports`, `sdk:index`) passes through both layers verbatim into flat index lookup.\n\n### Topic Not Found\n- Guard: `normalized.length === 0` -> skip lookup, throw immediately.\n- Miss -> `catalogPort.listGuides()` -> `all.map(g => g.topic)`.\n- Throw `GuideTopicNotFoundError(topic, availableTopics)`.\n- `error.code === 'UNKNOWN_GUIDE_TOPIC'`; `error.topic` = RAW untrimmed input; `error.availableTopics` = full ID array.\n- Message: empty-after-trim -> `Guide topic cannot be empty.`; else `Guide topic '<topic>' not found.`; suffix ` Available topics: <joined>`.\n\n## Constraints\n- Pure app query; deps only `GuideCatalogPort` + domain models/errors. No infra imports.\n- Normalization duplicated in query AND adapter; must remain idempotent under composition.\n- Generator derives topic as `path.basename(filePath,'.md').toLowerCase()` over a FLAT dir (`readdirSync` + `isFile()`, no recursion) -> basename-only keys, no collection scoping.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:07bf54890303a6111021c32a78d0194f981487de4886bc493918c9ccd8c80b6f",
+          "lastModified": "2026-09-24T13:35:20.744Z"
+        },
+        "verify.md": {
+          "hash": "sha256:50e257a4745ab2c551100059b809c0d0b414d23ff4cc3185ee0988eb9f40e5c1",
+          "lastModified": "2026-09-24T13:35:20.745Z"
+        }
+      }
+    }
+  }
 }

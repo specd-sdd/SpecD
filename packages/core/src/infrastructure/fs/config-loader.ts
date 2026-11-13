@@ -14,6 +14,8 @@ import {
   type SpecdWorkspaceConfig,
   type SpecdStorageConfig,
   type SpecdContextEntry,
+  DEFAULT_GRAPH_TEST_PATHS,
+  DEFAULT_GRAPH_IGNORE_PATHS,
 } from '../../application/specd-config.js'
 import { type SchemaOperations } from '../../domain/services/merge-schema-layers.js'
 import { ConfigValidationError } from '../../domain/errors/config-validation-error.js'
@@ -23,7 +25,7 @@ import {
   UnsupportedConfigVersionError,
 } from '../../domain/errors/unsupported-config-version-error.js'
 import { isPathInside } from './path-platform.js'
-import { isWindowsDeviceName } from '../../domain/services/windows-device-name.js'
+import { isValidWorkspaceName } from '../../domain/services/spec-id-rules.js'
 import { StorageDirectoryNotFoundError } from '../../domain/errors/index.js'
 import {
   isRecord,
@@ -399,10 +401,10 @@ export class FsConfigLoader extends ConfigLoader {
     const warnings: string[] = []
 
     const workspaces: SpecdWorkspaceConfig[] = Object.entries(data.workspaces).map(([name, ws]) => {
-      if (isWindowsDeviceName(name)) {
+      if (!isValidWorkspaceName(name)) {
         throw new ConfigValidationError(
           rootConfigPath,
-          `'workspaces.${name}' is invalid because '${name}' is a Windows device name`,
+          `'workspaces.${name}' is invalid because '${name}' is not a valid workspace name`,
         )
       }
       const specsBinding = resolveAdapterBinding(
@@ -476,6 +478,16 @@ export class FsConfigLoader extends ConfigLoader {
                   : {}),
                 ...(ws.graph.allowedPaths !== undefined
                   ? { allowedPaths: ws.graph.allowedPaths }
+                  : {}),
+                ...(ws.graph.testPaths !== undefined ? { testPaths: ws.graph.testPaths } : {}),
+                ...(ws.graph.ignorePaths !== undefined
+                  ? { ignorePaths: ws.graph.ignorePaths }
+                  : {}),
+                ...(ws.graph.maxFileBytes !== undefined
+                  ? { maxFileBytes: ws.graph.maxFileBytes }
+                  : {}),
+                ...(ws.graph.largeFilePaths !== undefined
+                  ? { largeFilePaths: ws.graph.largeFilePaths }
                   : {}),
               },
             }
@@ -631,18 +643,22 @@ export class FsConfigLoader extends ConfigLoader {
       workspaces,
       storage,
       approvals: { spec: data.approvals?.spec ?? false, signoff: data.approvals?.signoff ?? false },
-      ...(data.graph !== undefined
-        ? {
-            graph: {
-              ...(data.graph.includePaths !== undefined
-                ? { includePaths: data.graph.includePaths }
-                : {}),
-              ...(data.graph.excludePaths !== undefined
-                ? { excludePaths: data.graph.excludePaths }
-                : {}),
-            },
-          }
-        : {}),
+      graph: {
+        ...(data.graph?.includePaths !== undefined
+          ? { includePaths: data.graph.includePaths }
+          : {}),
+        ...(data.graph?.excludePaths !== undefined
+          ? { excludePaths: data.graph.excludePaths }
+          : {}),
+        testPaths: data.graph?.testPaths ?? DEFAULT_GRAPH_TEST_PATHS,
+        ignorePaths: data.graph?.ignorePaths ?? DEFAULT_GRAPH_IGNORE_PATHS,
+        ...(data.graph?.maxFileBytes !== undefined
+          ? { maxFileBytes: data.graph.maxFileBytes }
+          : {}),
+        ...(data.graph?.largeFilePaths !== undefined
+          ? { largeFilePaths: data.graph.largeFilePaths }
+          : {}),
+      },
       logging: { level: data.logging?.level ?? 'info' },
       ...(data.actorProvider !== undefined ? { actorProvider: data.actorProvider } : {}),
       ...(data.privacy !== undefined ? { privacy: data.privacy } : {}),

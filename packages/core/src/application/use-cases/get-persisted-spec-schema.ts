@@ -3,7 +3,6 @@ import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { SpecNotInitializedError } from '../../domain/errors/spec-not-initialized-error.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { SpecNotFoundError } from '../errors/spec-not-found-error.js'
-import { WorkspaceNotFoundError } from '../errors/workspace-not-found-error.js'
 
 /** Input for {@link GetPersistedSpecSchema}. */
 export interface GetPersistedSpecSchemaInput {
@@ -30,24 +29,27 @@ export class GetPersistedSpecSchema {
    *
    * @param input - Target spec identifier
    * @returns Persisted schema identity
+   * @throws {InvalidSpecIdError} If `specId` is empty, blank, or malformed
+   * @throws {WorkspaceNotFoundError} If the workspace is not configured
+   * @throws {SpecNotFoundError} If the spec does not exist
+   * @throws {SpecNotInitializedError} If the spec has no persisted state
    */
   async execute(input: GetPersistedSpecSchemaInput): Promise<GetPersistedSpecSchemaResult> {
-    const { workspace, capPath } = parseSpecId(input.specId)
-    const repo = this.specRepositories.get(workspace)
-    if (repo === undefined) {
-      throw new WorkspaceNotFoundError(workspace)
-    }
+    const { workspace, capPath, specId } = parseSpecId(input.specId, {
+      workspaces: this.specRepositories.keys(),
+    })
+    const repo = this.specRepositories.get(workspace)!
 
     const spec = await repo.get(SpecPath.parse(capPath))
     if (spec === null) {
-      throw new SpecNotFoundError(input.specId)
+      throw new SpecNotFoundError(specId)
     }
 
     const persisted = await repo.readPersistedState(spec)
     if (persisted === null) {
-      throw new SpecNotInitializedError(input.specId)
+      throw new SpecNotInitializedError(specId)
     }
 
-    return { specId: input.specId, schema: persisted.schema }
+    return { specId, schema: persisted.schema }
   }
 }

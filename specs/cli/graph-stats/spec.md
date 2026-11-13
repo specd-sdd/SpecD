@@ -54,6 +54,12 @@ Graph stats SHALL render VCS, working-tree/content, derivation, backend schema/g
 
 Text output SHALL explain why the graph cannot prove symbol absence. JSON and TOON SHALL emit the complete structured health and coverage fields unchanged. Dirty or partial state MUST NOT be labelled simply as a fresh graph.
 
+### Requirement: Coverage completeness presentation
+
+In text mode, `graph stats` SHALL render the `coverageCompleteness` returned by graph health with its warnings. For `complete-with-warnings` it SHALL print a line of the form `coverage: complete with warnings (N file(s) skipped: file-too-large)`, followed by a hint that files above `graph.maxFileBytes` are not indexed and can be exempted with `graph.largeFilePaths`. For `complete` it SHALL print no warning, and for `incomplete` and `unknown` it SHALL keep the existing diagnostics. A graph with warnings MUST NOT be labelled as plainly complete.
+
+JSON and TOON SHALL expose `coverageCompleteness` and `coverageWarnings` exactly as returned by graph health, without presenter-side recomputation, and without hint text.
+
 ## Constraints
 
 - Health orchestration runs inside the shared `withProvider` lifecycle, which delegates open and close to `withOpenGraphProvider` from `@specd/sdk`

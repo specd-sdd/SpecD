@@ -54,6 +54,8 @@ export {
   type SpecdStorageConfig,
   type SpecdContextEntry,
   isSpecdConfig,
+  DEFAULT_GRAPH_TEST_PATHS,
+  DEFAULT_GRAPH_IGNORE_PATHS,
 } from './application/specd-config.js'
 export { Logger } from './application/logger.js'
 export { TemplateExpander } from './application/template-expander.js'
@@ -88,6 +90,9 @@ export {
   type EditChangeResult,
   type SkipArtifact,
   type SkipArtifactInput,
+  type GetChangeSpecDeps,
+  type GetChangeSpecDepsInput,
+  type GetChangeSpecDepsResult,
   type UpdateSpecDepsInput,
   type UpdateSpecDepsResult,
   type ListSpecs,
@@ -191,6 +196,10 @@ export {
   type ValidationFileResult,
   type ValidationFileStatus,
   type ValidationWarning,
+  ValidateChangeBatch,
+  type ValidateChangeBatchInput,
+  type ValidateChangeBatchStepResult,
+  type ValidateChangeBatchResult,
   type CompileContext,
   type CompileContextInput,
   type CompileContextResult,
@@ -288,6 +297,7 @@ export {
   type InvalidateChangeResult,
   type GetSpecOutline,
   type GetSpecOutlineInput,
+  type GetSpecOutlineResult,
   type SpecOutlineResult,
   type GetProjectMetadata,
   type GetProjectMetadataResult,
@@ -366,6 +376,9 @@ export {
   type ArchiveChangeDeps,
   createValidateArtifacts,
   type ValidateArtifactsDeps,
+  createValidateChangeBatch,
+  type ValidateChangeBatchDeps,
+  resolveValidateChangeBatchDeps,
   createCompileContext,
   type CompileContextDeps,
   createValidateSpecs,
@@ -380,6 +393,8 @@ export {
   type PreviewSpecDeps,
   createResolveSchema,
   type ResolveSchemaDeps,
+  createGetChangeSpecDeps,
+  type GetChangeSpecDepsDeps,
   createUpdateSpecDeps,
   type UpdateSpecDepsDeps,
   createInvalidateChange,
@@ -559,6 +574,10 @@ export {
   HappyPathNextUnavailableError,
   ApprovalRequiredError,
   InvalidSpecPathError,
+  InvalidSpecIdError,
+  InvalidSpecLockError,
+  InvalidSpecPatternError,
+  type WorkspaceNotFoundContext,
   ArtifactConflictError,
   ArtifactNotOptionalError,
   HookFailedError,
@@ -654,7 +673,21 @@ export {
   type SpecLockData,
   type SpecLockImplementationEntry,
 } from './domain/services/parse-spec-lock.js'
-export { parseSpecId } from './domain/services/parse-spec-id.js'
+export {
+  parseSpecId,
+  isFullyQualifiedSpecId,
+  type ParseSpecIdOptions,
+  type ParsedSpecId,
+} from './domain/services/parse-spec-id.js'
+export {
+  parseSpecPattern,
+  type ParseSpecPatternOptions,
+  type ParsedSpecPattern,
+  type SpecPatternKind,
+} from './domain/services/parse-spec-pattern.js'
+export { isValidWorkspaceName, isValidCapabilitySegment } from './domain/services/spec-id-rules.js'
+export { toLogicalFilePath } from './domain/services/to-logical-file-path.js'
+export { sameTrackedFile } from './domain/services/same-tracked-file.js'
 export { extractSpecSummary } from './domain/services/spec-summary.js'
 export { inferFormat } from './domain/services/format-inference.js'
 export { safeRegex } from './domain/services/safe-regex.js'

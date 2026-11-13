@@ -13,23 +13,31 @@ the outcomes consumers may rely on.
 
 `ResolveSymbolReference` SHALL accept a workspace, requested symbol text, and optional file, public surface, symbol-space, broad kind, member-semantics, owner, and build-context constraints. Structured identity fields SHALL be authoritative. Rendered canonical references MUST round-trip with escaping and MUST NOT be interpreted by ad hoc delimiter splitting.
 
-A request whose text is `Tipo.miembro` or `Tipo::miembro` SHALL resolve by equality on stored `qualified_name`. It MUST NOT require a file, public surface, or language, and the resolver MUST NOT run every adapter or pick a default language for that lookup. `::` MUST compare as the stored dotted spelling. One match resolves that member. Every match MUST be returned. A supplied file or public surface SHALL filter those matches to symbols visible there. No remaining match is unresolved.
+A request whose text is `Tipo.miembro` or `Tipo::miembro` SHALL resolve by equality on stored `qualified_name`. It MUST NOT require a file, public surface, or language, and the resolver MUST NOT run every adapter or pick a default language for that lookup. `::` MUST compare as the stored dotted spelling. One match resolves that member. Every match MUST be returned. A supplied file or public surface SHALL filter those matches to symbols visible there. No remaining match is unresolved. The comparison uses only the `qualified_name` value stored in the graph: neither the resolver nor any persisted or session-backed store implementation answering the qualified-name query may derive a qualified name from an owner, a member, or other symbol fields to extend that equality. A logical symbol without stored `qualified_name` MUST NOT match an owner-qualified text query. Session-backed and persisted stores MUST therefore return the same candidates for equivalent facts.
 
-Other human owner-qualified text SHALL be parsed by the language adapter selected from proven context, in this order: an explicit language, the language of an anchored indexed file, or indexed public-surface metadata. When none of those identifies an adapter, that other text MUST resolve as unresolved.
+Other human owner-qualified text SHALL be parsed by the language adapter selected from proven context, in this order: an explicit language, the language inferred from the file extension of an anchored file path, or the language inferred from the file extension of an anchored public-surface path. When none of those identifies an adapter, the selected adapter does not provide the `symbolReferenceSyntax` facet, or the facet returns no candidates for non-simple text, that other text MUST resolve as unresolved (`REFERENCE_UNPROVEN`). The resolver MUST NOT fall back to a generic dotted or delimiter parser, to another language's adapter, or to a default language for that text; an anchor without an adapter providing `symbolReferenceSyntax` (for example a Go package surface or a `.go` file) leaves such text unresolved.
 
 Identifier case and normalization SHALL follow the source language. Path and workspace normalization SHALL remain separate from symbol normalization. `MemberForm` MUST NOT remain an input field.
 
 ### Requirement: Logical canonical targets
 
-The resolver SHALL return a logical symbol as the canonical target and SHALL retain
-every declaration occurrence contributing to it. Language-defined overload sets,
-declaration merging, and equivalent constructs SHALL resolve as one logical target
-rather than false ambiguity. Genuinely competing declarations SHALL remain separate
-candidates.
+The resolver SHALL return a logical symbol as the canonical target and SHALL retain every declaration occurrence contributing to it. Language-defined overload sets, declaration merging, and equivalent constructs SHALL resolve as one logical target rather than false ambiguity.
 
-The target SHALL expose workspace, module or package, declaring owner, symbol space,
-simple name, member form, contributing declaration locations, and a stable canonical
-reference independent of line or column movement.
+When graph selector resolution produces multiple candidate declarations that all belong to the same logical symbol or overload set, the selector resolution SHALL return `status: 'resolved'`. Only declarations belonging to genuinely competing, distinct logical symbols SHALL be treated as ambiguous candidates.
+
+The target SHALL expose workspace, module or package, declaring owner, symbol space, simple name, member form, contributing declaration locations, and a stable canonical reference independent of line or column movement.
+
+### Requirement: Resolution target kind and declaration evidence
+
+A resolved result SHALL discriminate between a canonical logical target and an exact physical declaration occurrence. A logical-target result MUST include the canonical `LogicalSymbol`, the complete deterministic set of contributing declaration occurrences, and the ordered evidence that selected or unified them. An exact-declaration result MUST identify the selected `SymbolNode` and its logical target when one exists.
+
+Canonical IDs, owner-qualified names, and public semantic selectors SHALL resolve at the logical layer. File, line, column, or exact occurrence identifiers MAY select one physical declaration. A consumer MUST NOT infer target kind from a legacy `symbolId` field or reduce a logical result to an arbitrary first declaration.
+
+Ambiguity SHALL be evaluated at the target layer selected by the request. Multiple declarations of one logical overload or merge target are one semantic candidate, while multiple competing logical targets are ambiguous. An exact physical request MAY remain declaration-ambiguous even when the involved declarations share a logical target.
+
+Every selector-level resolution entry point (bare name, file-qualified name, location-backed symbol ID, canonical logical ID, owner-qualified member, and public export) SHALL return the discriminated typed target described above. A selector that matches several declarations of one logical overload or merge target MUST return one logical-target result carrying every contributing declaration, not one arbitrary physical match. A legacy physical `match` field MAY accompany the typed target only as a derived compatibility projection and MUST NOT be the only resolution output.
+
+Public compatibility changes to resolver result types MUST use an explicit discriminant and migration path. Existing fields MUST NOT silently change from physical to logical identity or vice versa.
 
 ### Requirement: Public and local binding identity
 
@@ -58,6 +66,14 @@ Resolution SHALL apply this precedence:
 An owner-qualified reference SHALL resolve the owner path first and the member second. The resolver MUST NOT search the graph for only the terminal member name and infer its owner from text rank. A unique same-name symbol without a proven path SHALL NOT resolve the request. Conditional or platform alternatives SHALL remain separate unless the supplied build context deterministically selects one. Cyclic binding or hierarchy paths MUST terminate without duplicate candidates.
 
 A public binding matches on public surface, exported name, and symbol space. File path alone MUST NOT select it. The binding's logical target MAY live in another workspace.
+
+### Requirement: Package import bindings
+
+A local binding created by a package-specifier import SHALL resolve as a statically proven scoped import (precedence rule 5) when its target is persisted. The target MAY live in another workspace. The resolver SHALL report the ordered provenance path from the local binding through the `import:package` step to the public binding and the logical target.
+
+A package import that is not persisted as resolved SHALL leave its local binding without a target, and the resolver SHALL report the reference as unresolved. It MUST NOT search the graph for a same-name symbol in the package's workspace, and a unique same-name symbol SHALL NOT resolve the request.
+
+The resolver MUST NOT depend on a language to follow an `import:package` step; the step is part of the shared provenance vocabulary.
 
 ### Requirement: Resolution outcomes
 

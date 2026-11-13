@@ -243,7 +243,7 @@ After finishing each task, before marking its checkbox done:
 **Review and resolve:** use `shared.md` — "Implementation tracking" for `list` /
 `review` / `resolve` / `ignore` command syntax. After each task (and again before
 recommending verify): `list`, then **resolve** in-scope files and **ignore**
-incidental ones. Files with confirmed links cannot be ignored.
+incidental ones. Ignoring a file preserves any confirmed links on it.
 
 **Security & Integrity Guard:** `add`, `resolve`, and `ignore` validate that the
 target files exist on disk before updating the manifest.

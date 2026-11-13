@@ -521,10 +521,15 @@ export class FsSpecRepository extends SpecRepository {
    * Reads the exact persisted semantic state, or `null` when no lock exists.
    *
    * @param spec - The spec whose lock file to read
+   * @param options - Optional read flags
+   * @param options.lenientDependsOn - When `true`, tolerate invalid `dependsOn` entries
    * @returns Parsed persisted state snapshot, or `null` when absent
    */
-  override async readPersistedState(spec: Spec): Promise<PersistedSpecStateSnapshot | null> {
-    const data = await this._readSpecLock(spec)
+  override async readPersistedState(
+    spec: Spec,
+    options?: { readonly lenientDependsOn?: boolean },
+  ): Promise<PersistedSpecStateSnapshot | null> {
+    const data = await this._readSpecLock(spec, options)
     if (data === null) return null
     return toPersistedStateSnapshot(data)
   }
@@ -550,7 +555,8 @@ export class FsSpecRepository extends SpecRepository {
     }
 
     const filePath = this._specLockFilePath(spec.name)
-    const current = await this._readSpecLock(spec)
+    // Revision check only needs the hash — tolerate invalid dependsOn so repair writes can proceed.
+    const current = await this._readSpecLock(spec, { lenientDependsOn: true })
     const content = serializeSpecLock(state)
 
     if (options.expectedRevision === null) {
@@ -780,9 +786,14 @@ export class FsSpecRepository extends SpecRepository {
    * when no sidecar exists.
    *
    * @param spec - The spec whose sidecar to load
+   * @param options - Optional parse flags forwarded to {@link parseSpecLock}
+   * @param options.lenientDependsOn - When `true`, tolerate invalid `dependsOn` entries
    * @returns Parsed sidecar with `originalHash`, or `null` if absent
    */
-  private async _readSpecLock(spec: Spec): Promise<SpecLockData | null> {
+  private async _readSpecLock(
+    spec: Spec,
+    options?: { readonly lenientDependsOn?: boolean },
+  ): Promise<SpecLockData | null> {
     const filePath = this._specLockFilePath(spec.name)
 
     let content: string
@@ -793,7 +804,11 @@ export class FsSpecRepository extends SpecRepository {
       throw err
     }
 
-    return { ...parseSpecLock(content), originalHash: sha256(content) }
+    const specId = `${this.workspace()}:${spec.name.toString()}`
+    return {
+      ...parseSpecLock(content, { specId, location: filePath }, options),
+      originalHash: sha256(content),
+    }
   }
 
   /**

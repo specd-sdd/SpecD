@@ -3,6 +3,7 @@ import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
+import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { type ContextWarning } from './_shared/context-warning.js'
 import { WorkspaceNotFoundError } from '../errors/workspace-not-found-error.js'
 import { SpecNotFoundError } from '../errors/spec-not-found-error.js'
@@ -20,10 +21,8 @@ export type SpecContextSectionFlag = 'rules' | 'constraints' | 'scenarios'
 
 /** Input for the {@link GetSpecContext} use case. */
 export interface GetSpecContextInput {
-  /** The workspace name (e.g. `'default'`, `'billing'`). */
-  readonly workspace: string
-  /** The spec path within the workspace. */
-  readonly specPath: SpecPath
+  /** Raw or fully-qualified spec identifier (validated and normalized). */
+  readonly specId: string
   /** When `true`, follows `dependsOn` links transitively. */
   readonly followDeps?: boolean
   /** Limits dependency traversal depth. Only meaningful when `followDeps` is `true`. */
@@ -68,6 +67,8 @@ export interface SpecContextEntry {
 
 /** Result returned by the {@link GetSpecContext} use case. */
 export interface GetSpecContextResult {
+  /** Fully-qualified normalized spec ID for the root query. */
+  readonly specId: string
   /** Resolved context entries for the spec and its dependencies. */
   readonly entries: readonly SpecContextEntry[]
   /** Advisory warnings encountered during resolution. */
@@ -140,18 +141,19 @@ export class GetSpecContext {
     const workspaces = await this._listWorkspaces.execute()
     const workspaceMap = new Map(workspaces.map((ws) => [ws.name, ws]))
 
-    const ws = workspaceMap.get(input.workspace)
+    const { workspace, capPath, specId: rootLabel } = parseSpecId(input.specId, { workspaces })
+
+    const ws = workspaceMap.get(workspace)
     if (ws === undefined) {
-      throw new WorkspaceNotFoundError(input.workspace)
+      throw new WorkspaceNotFoundError(workspace)
     }
 
     const repo = ws.specRepo
-    const spec = await repo.get(input.specPath)
+    const specPath = SpecPath.parse(capPath)
+    const spec = await repo.get(specPath)
     if (spec === null) {
-      throw new SpecNotFoundError(`${input.workspace}:${input.specPath.toString()}`)
+      throw new SpecNotFoundError(rootLabel)
     }
-
-    const rootLabel = `${input.workspace}:${input.specPath.toString()}`
     let metadata: SpecMetadata | null = null
     try {
       metadata = await materializeContextSpecMetadata(this._getMetadata, rootLabel, warnings)
@@ -173,13 +175,11 @@ export class GetSpecContext {
     )
 
     if (input.followDeps) {
-      const includedSpecs = new Map<string, ResolvedSpec>([
-        [rootLabel, { workspace: input.workspace, capPath: input.specPath.toString() }],
-      ])
+      const includedSpecs = new Map<string, ResolvedSpec>([[rootLabel, { workspace, capPath }]])
       const dependsOnAdded = new Map<string, ResolvedSpec>()
       await traverseDependsOn(
-        input.workspace,
-        input.specPath.toString(),
+        workspace,
+        capPath,
         includedSpecs,
         dependsOnAdded,
         new Set<string>(),
@@ -208,7 +208,7 @@ export class GetSpecContext {
       }
     }
 
-    return { entries, warnings }
+    return { specId: rootLabel, entries, warnings }
   }
 
   /**

@@ -7,6 +7,57 @@
   "implementation": [
     {
       "file": "schema-std:schema.yaml"
+    },
+    {
+      "file": "schema-std:package.json"
+    },
+    {
+      "file": "schema-std:test/standard-schema.spec.ts"
+    },
+    {
+      "file": "schema-std:test/verify-gwt-validation.spec.ts"
+    },
+    {
+      "file": "schema-std:tsconfig.json"
+    },
+    {
+      "file": "schema-std:vitest.config.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "@specd/schema-std schema.yaml: artifact DAG, lifecycle workflow, validations, metadata extractors, ESM export.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:428a583aa403f3d52fd9cd36ae938c853c75faf696c069cb203610ed38a0cba1",
+          "lastModified": "2026-08-28T12:50:21.446Z"
+        },
+        "verify.md": {
+          "hash": "sha256:92272519043ea4c809c1c58b4309789de7b1a77e8b4e4510d4101bedea5d59e4",
+          "lastModified": "2026-08-28T12:48:42.144Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Standard Schema (@specd/schema-std)\n\n## Rules\n\n### Canonical Schema Definition\n- `@specd/schema-std` SHALL provide root `schema.yaml` declaring:\n  1. `name`: schema id (`schema-std`)\n  2. `version`: monotonically increasing integer\n  3. `artifacts[]`: IDs, scope (`change`|`spec`), optionality, output patterns, `requires`, `hasTasks`, rules, validations, metadata extractions, templates\n  4. `workflow[]`: step names, transitions, pre/post hooks\n\n### Artifact DAG Invariants\n- Artifacts SHALL form acyclic DAG:\n  1. `proposal` — change scope, no prereqs\n  2. `specs` — requires `proposal`, spec scope\n  3. `verify` — requires `specs`, spec scope\n  4. `design` — requires `proposal`+`specs`+`verify`, change scope\n  5. `tasks` — requires `specs`+`verify`+`design`, change scope, `hasTasks: true`\n\n### Proposal Artifact\n- Instruct problem/scope authoring; require sections: `Motivation`, `Current behaviour`, `Proposed solution`, `Specs affected` (new vs modified), `Impact`, `Technical context`, `Open questions`\n- Post-authoring: resolve open questions; register spec IDs + deps in change\n\n### Specs Artifact + Deltas\n- New: full files under `specs/` — `Purpose`, `Requirements` (`### Requirement:` + SHALL/MUST), `Constraints`, mandatory `Spec Dependencies`\n- Modified: structured deltas under `deltas/` — AST ops `added`|`modified`|`removed`|`renamed`|`no-op`\n- Validation: single `Requirements` section w/ ≥1 unique `### Requirement:` block\n- Post-authoring: complete coverage for all proposal-declared specs\n\n### Verify Artifact + Deltas\n- Scenarios under `### Requirement:` matching spec requirement names/order\n- `#### Scenario:` + WHEN/THEN; optional GIVEN\n- Modified suites: deltas under `deltas/`\n- Validation: every requirement ≥1 scenario\n- Post-authoring: requirement↔scenario parity `spec.md`↔`verify.md`\n\n### Design Artifact\n- Exhaustive self-contained impl contract; no indirect refs\n- Required: `Affected areas`, `New constructs` (compilable type sigs), `Data models & Contracts`, `Approach & Execution flow`, `Error handling & Edge cases`, `Key decisions`, `Trade-offs`, `Spec impact`, `Dependency map`, `Migration / Rollback`, `Testing` (unit/integration/manual), `Open questions`\n- Post-authoring: full coverage of requirements+scenarios; resolve open questions\n\n### Tasks Artifact\n- Minimal single-responsibility units under `## <n>. <Group name>`\n- Checkbox `- [ ] <n>.<m> <description>` + indented file/symbol, approach from `design.md`, requirement ID\n- Configure `taskCompletionCheck` + `preHashCleanup` for `- [ ]` tracking\n- Post-authoring: every design component/change/test covered by ≥1 task\n\n### Cross-Artifact Validations\n- `specs-verify-requirement-parity`: exact equality of requirement labels (`specs`) vs requirement group labels (`verify`) per spec\n\n### Metadata Extraction\n- From `specs`: `title`, `description`, `dependsOn`, `rules` (`spec-requirements`), `constraints`, `context`\n- From `verify`: structured `scenarios` (name, requirement, given, when, then)\n\n### Lifecycle Steps + Transitions\n- Steps: `drafting`, `designing`, `ready`, `implementing`, `verifying`, `done`, `pending-signoff`, `signed-off`, `archiving`\n- Transitions: permitted forward routes + mandatory gates; declarative pre/post hooks\n\n### Package Distribution\n- ESM package exporting `schema.yaml` + templates; no TypeScript compile step required\n\n## Constraints\n- `schema.yaml` MUST NOT contain circular artifact prerequisite chains\n- Schema MUST stay backwards-compatible within same major version",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:428a583aa403f3d52fd9cd36ae938c853c75faf696c069cb203610ed38a0cba1",
+          "lastModified": "2026-08-28T12:50:21.446Z"
+        },
+        "verify.md": {
+          "hash": "sha256:92272519043ea4c809c1c58b4309789de7b1a77e8b4e4510d4101bedea5d59e4",
+          "lastModified": "2026-08-28T12:48:42.144Z"
+        }
+      }
+    }
+  }
 }

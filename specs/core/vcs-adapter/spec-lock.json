@@ -51,36 +51,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Auto-detects external, git, hg, or svn backends and returns a complete `VcsAdapter`, safely falling back to `NullVcsAdapter`.",
+      "value": "VCS factory selects external or git/hg/svn adapter, otherwise NullVcsAdapter, while normalizing cross-platform roots and paths.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:85bd5fdc6d5402a4296594807c61d837205934834f04dfccf6b6494c34d26f76",
-          "lastModified": "2026-07-20T16:47:44.598Z"
+          "hash": "sha256:68d8d05c2b9101c3b778d84e48f962fbf5547d58d499fcbbf2e5d4d2c03d7433",
+          "lastModified": "2026-09-25T16:14:41.377Z"
         },
         "verify.md": {
-          "hash": "sha256:270725eb5017c53692c4fa15174f95b37750fbe90e4d972c72efddcbb46f22f5",
-          "lastModified": "2026-07-20T16:47:44.598Z"
+          "hash": "sha256:6f452ceb99c0cc284661e7f627e69b9e61a91a40e17223de2fbda762792f400d",
+          "lastModified": "2026-09-25T16:14:41.378Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# VCS Adapter Factory\n\n## Rules\n\n- `createVcsAdapter(cwd?)` asynchronously returns `Promise<VcsAdapter>`; omitted or `undefined` `cwd` defaults to `process.cwd()`.\n- Probe additive external providers in registration order, then built-ins git, hg, svn. First success selects adapter; never execute subsequent probes. Non-zero VCS CLI exit means absent.\n- No provider match => `NullVcsAdapter`; detection miss never throws.\n- Returned implementation satisfies full `core:vcs-adapter-port`, including identity resolution and modified-file enumeration used by implementation detection. Concrete type remains hidden.\n- Factory only composes and selects backend; never performs implementation detection. Callers never construct concrete adapters.\n\n## Constraints\n\n- Detection spawns external processes.\n- `GitVcsAdapter`, `HgVcsAdapter`, `SvnVcsAdapter`, `NullVcsAdapter` never appear in public exports; composition-layer internals.",
+      "value": "# VCS Adapter Factory\n\n## Rules\n- `createVcsAdapter(cwd?)` async, defaults `process.cwd()`, returns `Promise<VcsAdapter>` including identity resolution and modified-file enumeration.\n- Probe registered external providers in registration order, then built-ins: git, hg, svn. Stop after first match; no match → `NullVcsAdapter`, never throw.\n- Built-in git/Mercurial/Subversion roots: absolute; uppercase Windows drive; no `realpath`; valid subsequent VCS CWD. `NullVcsAdapter.rootDir()` throws.\n- Built-in modified paths use `/`; preserve `.`/`..`. Windows git/hg/svn spawns hide console.\n\n## Constraints\n- Detection uses VCS CLI process probes; non-zero means absent.\n- `GitVcsAdapter`, `HgVcsAdapter`, `SvnVcsAdapter`, `NullVcsAdapter` internal; public boundary `VcsAdapter` only.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:85bd5fdc6d5402a4296594807c61d837205934834f04dfccf6b6494c34d26f76",
-          "lastModified": "2026-07-20T16:47:44.598Z"
+          "hash": "sha256:68d8d05c2b9101c3b778d84e48f962fbf5547d58d499fcbbf2e5d4d2c03d7433",
+          "lastModified": "2026-09-25T16:14:41.377Z"
         },
         "verify.md": {
-          "hash": "sha256:270725eb5017c53692c4fa15174f95b37750fbe90e4d972c72efddcbb46f22f5",
-          "lastModified": "2026-07-20T16:47:44.598Z"
+          "hash": "sha256:6f452ceb99c0cc284661e7f627e69b9e61a91a40e17223de2fbda762792f400d",
+          "lastModified": "2026-09-25T16:14:41.378Z"
         }
       }
     }

@@ -9,7 +9,7 @@ Before modifying code, developers and agents need to understand the blast radius
 ### Requirement: Command signature
 
 ```text
-specd graph impact [--file <paths...> | --symbol <reference> | --spec <id> | --export <public-name> --from <file-or-surface>] [--direction dependents|dependencies|upstream|downstream|both] [--depth <n>] [--config <path> | --path <path>] [--format text|json|toon]
+specd graph impact [--file <paths...> | --symbol <reference> | --spec <id> | --export <public-name> --from <file-or-surface>] [--direction dependents|dependencies|upstream|downstream|both] [--depth <n>] [--include-tests] [--include-ignored] [--all] [--category <categories>] [--config <path> | --path <path>] [--format text|json|toon]
 ```
 
 Exactly one target family SHALL be supplied. `--export` and `--from` MUST appear together and are mutually exclusive with file, symbol, and spec targets. A missing half of the export selector is a usage error before provider open.
@@ -20,13 +20,22 @@ The CLI SHALL normalize direction aliases before delegation and MUST NOT impleme
 
 For an unqualified `--symbol`, Code Graph SHALL select a unique case-exact name match when one exists. If several case-exact candidates exist it SHALL return a bounded deterministic ambiguity result and perform no traversal. Only when no case-exact candidate exists SHALL it consider case-insensitive exact-name candidates. Prefix, component, and textual matches MUST NOT be accepted as impact targets. Qualified and full occurrence selectors retain their existing exact semantics.
 
+The command SHALL support category inclusion and restriction options:
+
+- `--include-tests`: admit `test` category files and symbols alongside `source`
+- `--include-ignored`: admit `ignored` category files and symbols
+- `--all`: admit all categories (`source`, `test`, `ignored`)
+- `--category <categories>`: restrict admitted categories strictly to the specified category or comma-separated list of categories (e.g. `source,test`, `test`, `ignored`)
+
 ### Requirement: Provider-owned impact result filters
 
-`specd graph impact` SHALL accept `--type <types>`, `--kind <kinds>`, repeatable `--workspace <workspace>`, and repeatable `--exclude-workspace <workspace>` options for every impact target family.
+`specd graph impact` SHALL accept `--type <types>`, `--kind <kinds>`, repeatable `--workspace <workspace>`, repeatable `--exclude-workspace <workspace>`, `--include-tests`, `--include-ignored`, `--all`, and `--category <categories>` options for every impact target family.
 
 `--type` and `--kind` SHALL accept comma-separated values. The supported result types SHALL be `files`, `symbols`, and `specs`; documents are not an impact-result category. `--kind` SHALL accept the shared Code Graph symbol-kind vocabulary and SHALL be a usage error when `--type` is present without `symbols`.
 
 Repeated `--workspace` values SHALL form an inclusion set and repeated `--exclude-workspace` values SHALL form an exclusion set with the same normalization and matching semantics as `graph search`. Exclusions SHALL take precedence when a workspace occurs in both sets.
+
+`--category` SHALL validate that each comma-separated value is one of `source`, `test`, or `ignored`. `--all` admits all categories. `--include-tests` and `--include-ignored` add the respective category to the default `source` category.
 
 The CLI SHALL validate and normalize the options into one typed impact-filter request and pass that request through the existing provider operation for the selected target. The CLI MUST NOT remove files, symbols, specs, or symbol kinds from a returned impact result. Text, JSON, and TOON rendering SHALL consume the provider-filtered result while retaining pure display-path projection.
 
@@ -46,11 +55,22 @@ When `--symbol` is provided:
 2. Opens the provider through `withProvider`.
 3. Resolves the selector through the provider's shared symbol resolver, which still accepts bare names, file-qualified selectors, location-backed graph symbol ids, canonical logical ids, and owner-qualified member references.
 4. If no symbol matches, outputs `No symbol found matching "<selector>".` and exits with code 0.
-5. If one symbol matches, calls `analyzeImpact(symbolId, direction)` and outputs the result.
-6. If a bare or file-qualified selector matches multiple symbols, analyzes each one and outputs all results.
-7. If an owner-qualified selector matches stored `qualified_name`, one match analyzes that member. Several matches report every candidate and MUST NOT analyze a guessed member. Zero matches output `No symbol found matching "<selector>".` A file in the selector only filters those matches.
+5. If an owner-qualified selector matches stored `qualified_name`, one match analyzes that member. Several matches report every candidate and MUST NOT analyze a guessed member. Zero matches output `No symbol found matching "<selector>".` A file in the selector only filters those matches.
 
 The CLI MUST NOT split owner and member syntax and MUST NOT query storage. Platform symbols MUST come from `@specd/sdk`. The CLI MUST NOT open or close the provider outside `withProvider`.
+
+5. If the selector resolves to one typed target (logical target, exact declaration, or public binding), delegates to `sdk:run-graph-impact` and outputs the result as specified by "Logical and declaration symbol-impact presentation".
+6. If a bare or file-qualified selector matches several distinct semantic targets, reports every candidate as ambiguous and MUST NOT traverse any of them. Several declarations that belong to one logical target are one target, not several matches.
+
+### Requirement: Logical and declaration symbol-impact presentation
+
+The CLI SHALL delegate symbol selector resolution and impact orchestration to `sdk:run-graph-impact` and SHALL preserve its resolved target kind. For a logical selector, the command MUST request one canonical logical-target analysis covering every contributing declaration; it MUST NOT call impact separately for one arbitrary declaration or for each overload occurrence.
+
+For an exact physical selector, the command SHALL identify the result as declaration impact. For an ambiguous selector, it SHALL display deterministic semantic candidates and MUST NOT traverse any candidate. This requirement supersedes legacy behaviour that inferred the operation solely from one `symbolId`.
+
+Text output for logical impact SHALL identify the canonical logical target and summarize its declaration locations. It SHALL distinguish unique affected logical targets from declaration-only evidence and SHALL show covering specs derived from logical coverage. JSON and TOON SHALL expose the SDK result without removing its target discriminant, declarations, physical evidence, semantic affected targets, coverage evidence, explicitly named count units, or `projectRelativePath` on every nested location supplied by the SDK. The CLI MUST NOT reconstruct or omit nested path projections under `resolvedTarget` or its declaration and evidence collections.
+
+The CLI MUST NOT compute declaration grouping, logical deduplication, coverage projection, or risk. It MAY format those provider-owned results for human output while projecting paths through the SDK contract.
 
 ### Requirement: Spec impact analysis
 
@@ -79,6 +99,8 @@ Before impact analysis reads from the graph, the command MUST rely on provider-o
 If the provider reports that the graph is busy or stale after opening, the command SHALL surface that provider error through the normal CLI infrastructure-error path.
 
 ### Requirement: Output format
+
+The command SHALL delegate impact analysis and path projection to `sdk:run-graph-impact`.
 
 All file paths rendered in the impact analysis output (both text and JSON) SHALL be formatted relative to the project root for consistency across multi-workspace projects.
 
@@ -141,9 +163,14 @@ Impact analysis for spec core:change (depth=3)
 
 Spec impact output MUST surface files reached through `COVERS_FILE` and symbols reached through `COVERS_SYMBOL` in the same result structure used by other impact targets.
 
-When multiple symbols match, each analysis is listed sequentially.
+When several logical targets exactly match the requested symbol, the command lists each candidate with its project-relative declaration locations and performs no impact traversal. Overloads of one logical symbol are one target and are analyzed.
 
-In `json` or `toon` mode, the full result object is object as-is. The `AffectedSymbol` entries in JSON include the `depth` field.
+**Omission notices:**
+When `omittedCounts` indicates that results were filtered out (`tests > 0` or `ignored > 0`), text mode output SHALL display an omission notice:
+`ℹ Excluded from results: <count> test files, <count> ignored files. Use --include-tests, --include-ignored, or --all to view them.`
+When only one category has omissions, the notice MAY mention only that category (e.g. `ℹ Excluded from results: 14 test files. Use --include-tests or --all to view them.`).
+
+In `json` or `toon` mode, the full result object is output as-is, including `omittedCounts: { tests: number, ignored: number }`. The `AffectedSymbol` entries in JSON include the `depth` field. Target file and symbol entries SHALL expose `canonicalPath` and `projectRelativePath`. Multi-file impact results SHALL expose `targets` (canonical) and `projectRelativeTargets`. The JSON/TOON output SHALL NOT expose `displayPath` or `displayTargets`. All affected file and symbol paths SHALL be formatted relative to the project root (`projectRelativePath`).
 
 The JSON output MUST include aggregate impact fields to support automated risk assessment:
 
@@ -152,17 +179,18 @@ The JSON output MUST include aggregate impact fields to support automated risk a
 - `indirectDepsCount`
 - `transitiveDepsCount`
 - `affectedFilesCount`
+- `omittedCounts`
 
 ### Requirement: Pure display-path projection
 
 The CLI SHALL render file paths in impact output by projecting canonical graph
-paths to project-relative display paths using project and workspace
+paths to project-relative paths using project and workspace
 configuration alone. Path projection SHALL NOT perform graph reads, SHALL NOT
 resolve files or documents through the provider, and SHALL NOT require
 availability validation.
 
-For single-file impact, all affected-file display paths SHALL derive from the
-resolved project configuration. For multi-file impact, the display path for each
+For single-file impact, all affected-file project-relative paths SHALL derive from the
+resolved project configuration. For multi-file impact, the project-relative path for each
 input file SHALL derive from that file's own resolved workspace configuration,
 and every affected file SHALL be rendered exactly once per input file that
 contributed it.
@@ -259,6 +287,7 @@ $ specd graph impact --file /repo/packages/core/src/auth.ts --format json
 - `code-graph:traversal` — canonical and public-binding impact
 - `code-graph:workspace-integration` — selector identity
 - `code-graph:resolve-symbol-reference` — target resolution and ambiguity
+- `sdk:run-graph-impact` — SDK impact analysis orchestration and path projection
 
 ## ADRs
 

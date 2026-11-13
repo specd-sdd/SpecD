@@ -19,14 +19,7 @@
   "implementation": [
     {
       "file": "core:src/application/ports/spec-repository.ts",
-      "symbols": [
-        "ArtifactMeta",
-        "PersistedStateMeta",
-        "GeneratedMetadataMeta",
-        "SpecListArtifactMeta",
-        "SpecMetaOptions",
-        "SpecRepository"
-      ]
+      "symbols": ["SpecRepository"]
     }
   ],
   "optimizations": {

@@ -9,7 +9,12 @@ import { tmpdir } from 'node:os'
 import { SpecRepository, Spec, SpecPath } from '@specd/core'
 import { IndexCodeGraph } from '../../../src/application/use-cases/index-code-graph.js'
 import { FULL_REBUILD_FINGERPRINT_REASON } from '../../../src/application/use-cases/_shared/compute-graph-fingerprint.js'
-import { type ResolutionManifestSource } from '../../../src/application/ports/resolution-manifest-source.js'
+import {
+  type ResolutionManifestSource,
+  emptyResolutionManifestSource,
+} from '../../../src/application/ports/resolution-manifest-source.js'
+import { emptyRepositoryRootSource } from '../../../src/application/ports/repository-root-source.js'
+import { NodeWorkspaceAccessibilitySource } from '../../../src/infrastructure/fs/node-workspace-accessibility-source.js'
 import { InMemoryGraphStore } from '../../helpers/in-memory-graph-store.js'
 import { type GraphStore } from '../../../src/domain/ports/graph-store.js'
 import { type IndexOptions } from '../../../src/domain/value-objects/index-options.js'
@@ -66,6 +71,20 @@ function manifestSource(files: Map<string, string>): ResolutionManifestSource {
   }
 }
 
+function createIndexer(
+  store: GraphStore,
+  registry: AdapterRegistry,
+  source: ResolutionManifestSource = emptyResolutionManifestSource,
+): IndexCodeGraph {
+  return new IndexCodeGraph(
+    store,
+    registry,
+    source,
+    emptyRepositoryRootSource,
+    new NodeWorkspaceAccessibilitySource(),
+  )
+}
+
 describe('Workspace indexing', () => {
   let tempDir: string
   let store: GraphStore
@@ -88,7 +107,7 @@ describe('Workspace indexing', () => {
     const manifest = resolve(join(wsDir, 'package.json'))
     const files = new Map<string, string>([[manifest, '{\n  "name": "demo"\n}\n']])
     const source = manifestSource(files)
-    const indexer = new IndexCodeGraph(store, registry, source)
+    const indexer = createIndexer(store, registry, source)
     const options: IndexOptions = {
       projectRoot: tempDir,
       vcsRoot: tempDir,
@@ -118,7 +137,7 @@ describe('Workspace indexing', () => {
     const manifest = resolve(join(wsDir, 'package.json'))
     const files = new Map<string, string>([[manifest, '{"name":"before"}']])
     const source = manifestSource(files)
-    const indexer = new IndexCodeGraph(store, registry, source)
+    const indexer = createIndexer(store, registry, source)
     const options: IndexOptions = {
       projectRoot: tempDir,
       vcsRoot: tempDir,
@@ -143,6 +162,40 @@ describe('Workspace indexing', () => {
     expect(second.filesIndexed).toBeGreaterThan(0)
   })
 
+  it('given a changed workspace testPaths, when indexing again, then the run is a full rebuild with the fingerprint reason', async () => {
+    const wsDir = createWorkspaceDir(tempDir, 'ws', {
+      'src/code.ts': 'export const value = 1',
+    })
+    const indexer = createIndexer(store, registry, emptyResolutionManifestSource)
+    const base: Omit<IndexOptions, 'graphConfig'> = {
+      projectRoot: tempDir,
+      vcsRoot: tempDir,
+      workspaces: [
+        {
+          name: 'ws',
+          prefix: null,
+          codeRoot: wsDir,
+          specRepo: makeMockRepo(),
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+    }
+    const withTests = (testPaths: string[]): IndexOptions => ({
+      ...base,
+      graphConfig: { includePaths: [], workspaces: new Map([['ws', { testPaths }]]) },
+    })
+
+    await indexer.execute(withTests(['ws/a/**']))
+    const unchanged = await indexer.execute(withTests(['ws/a/**']))
+    expect(unchanged.fullRebuild).toBe(false)
+
+    const changed = await indexer.execute(withTests(['ws/b/**']))
+    expect(changed.fullRebuild).toBe(true)
+    expect(changed.fullRebuildReason).toBe(FULL_REBUILD_FINGERPRINT_REASON)
+    expect(changed.filesSkipped).toBe(0)
+  })
+
   it('persists one durable coverage outcome for every considered source target', async () => {
     const wsDir = createWorkspaceDir(tempDir, 'ws', {
       'src/code.ts': 'export const value = 1',
@@ -150,7 +203,7 @@ describe('Workspace indexing', () => {
       'asset.bin': new Uint8Array([0, 1, 2, 3]),
     })
 
-    const indexer = new IndexCodeGraph(store, registry)
+    const indexer = createIndexer(store, registry)
     const options: IndexOptions = {
       projectRoot: tempDir,
       vcsRoot: tempDir,
@@ -222,7 +275,7 @@ describe('Workspace indexing', () => {
     const localRegistry = new AdapterRegistry()
     localRegistry.register(adapter)
     const analyzeFile = vi.spyOn(adapter, 'analyzeFile')
-    const indexer = new IndexCodeGraph(store, localRegistry)
+    const indexer = createIndexer(store, localRegistry)
     const options: IndexOptions = {
       projectRoot: tempDir,
       vcsRoot: null,
@@ -261,7 +314,7 @@ describe('Workspace indexing', () => {
     const localRegistry = new AdapterRegistry()
     localRegistry.register(adapter)
     const analyzeFile = vi.spyOn(adapter, 'analyzeFile')
-    const indexer = new IndexCodeGraph(store, localRegistry)
+    const indexer = createIndexer(store, localRegistry)
     const options: IndexOptions = {
       projectRoot: tempDir,
       vcsRoot: null,
@@ -278,9 +331,7 @@ describe('Workspace indexing', () => {
       graphConfig: { includePaths: [], workspaces: new Map() },
     }
     await indexer.execute(options)
-    await expect(store.getImporters('ws:src/target.ts')).resolves.toEqual([
-      expect.objectContaining({ source: 'ws:src/importer.ts', target: 'ws:src/target.ts' }),
-    ])
+    await expect(store.getImporters('ws:src/target.ts')).resolves.toEqual([])
     analyzeFile.mockClear()
 
     writeFileSync(join(wsDir, 'src/target.ts'), 'export function target(): number { return 1 }')
@@ -309,7 +360,7 @@ describe('Workspace indexing', () => {
     const spec1 = makeSpec({ workspace: 'ws1', name: 'spec1', filenames: [] })
     const spec2 = makeSpec({ workspace: 'ws2', name: 'spec2', filenames: [] })
 
-    const uc = new IndexCodeGraph(store, registry)
+    const uc = createIndexer(store, registry)
     const result = await uc.execute({
       projectRoot: tempDir,
       vcsRoot: tempDir,
@@ -349,6 +400,150 @@ describe('Workspace indexing', () => {
     expect(result.errors).toEqual([])
   })
 
+  it('given a store indexed for two workspaces, when a forced run targets only one, then the other workspace keeps its data and only the target is regenerated', async () => {
+    const ws1Dir = createWorkspaceDir(tempDir, 'ws1', {
+      'package.json': JSON.stringify({ name: 'ws1' }),
+      'src/a.ts': 'export const alpha = 1;',
+    })
+    const ws2Dir = createWorkspaceDir(tempDir, 'ws2', {
+      'package.json': JSON.stringify({ name: 'ws2' }),
+      'src/b.ts': 'export const beta = 2;',
+    })
+    const target = (name: string, codeRoot: string) => ({
+      name,
+      prefix: null,
+      codeRoot,
+      specRepo: makeMockRepo([]),
+      ownership: 'owned' as const,
+      isExternal: false,
+    })
+    const base = {
+      projectRoot: tempDir,
+      vcsRoot: tempDir,
+      graphConfig: { includePaths: [], workspaces: new Map() },
+    }
+    const uc = createIndexer(store, registry)
+    await uc.execute({ ...base, workspaces: [target('ws1', ws1Dir), target('ws2', ws2Dir)] })
+    expect(await store.getFile('ws2:src/b.ts')).toBeDefined()
+
+    writeFileSync(join(ws1Dir, 'src/a.ts'), 'export const alpha = 1; export const gamma = 3;')
+    const result = await uc.execute({
+      ...base,
+      workspaces: [target('ws1', ws1Dir)],
+      force: true,
+    })
+
+    expect(result.errors).toEqual([])
+    expect(await store.getFile('ws2:src/b.ts')).toBeDefined()
+    expect(
+      (await store.findSymbols({ name: 'beta' })).some((s) => s.filePath === 'ws2:src/b.ts'),
+    ).toBe(true)
+    expect(
+      (await store.findSymbols({ name: 'gamma' })).some((s) => s.filePath === 'ws1:src/a.ts'),
+    ).toBe(true)
+  })
+
+  it('given a derivation mismatch on a whole-graph run, when derivationMismatch is fail, then it throws before any write and the default rebuilds in place', async () => {
+    const wsDir = createWorkspaceDir(tempDir, 'ws1', { 'src/a.ts': 'export const alpha = 1;' })
+    const options = (
+      codeGraphVersion: string,
+      extra: Partial<IndexOptions> = {},
+    ): IndexOptions => ({
+      projectRoot: tempDir,
+      vcsRoot: tempDir,
+      workspaces: [
+        {
+          name: 'ws1',
+          prefix: null,
+          codeRoot: wsDir,
+          specRepo: makeMockRepo([]),
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+      graphConfig: { includePaths: [], workspaces: new Map() },
+      codeGraphVersion,
+      ...extra,
+    })
+    const uc = createIndexer(store, registry)
+    await uc.execute(options('1.0.0'))
+    const filesBefore = (await store.getAllFiles()).map((file) => file.path)
+
+    await expect(
+      uc.execute(options('2.0.0', { derivationMismatch: 'fail' })),
+    ).rejects.toMatchObject({
+      code: 'GRAPH_DERIVATION_MISMATCH',
+      reason: FULL_REBUILD_FINGERPRINT_REASON,
+    })
+    expect((await store.getAllFiles()).map((file) => file.path)).toEqual(filesBefore)
+
+    const rebuilt = await uc.execute(options('2.0.0'))
+    expect(rebuilt.fullRebuildReason).toBe(FULL_REBUILD_FINGERPRINT_REASON)
+  })
+
+  it('given a full index followed by a subset run, when a full run follows without force, then no derivation mismatch is raised', async () => {
+    const ws1Dir = createWorkspaceDir(tempDir, 'ws1', { 'src/a.ts': 'export const alpha = 1;' })
+    const ws2Dir = createWorkspaceDir(tempDir, 'ws2', { 'src/b.ts': 'export const beta = 2;' })
+    const target = (name: string, codeRoot: string) => ({
+      name,
+      prefix: null,
+      codeRoot,
+      specRepo: makeMockRepo([]),
+      ownership: 'owned' as const,
+      isExternal: false,
+    })
+    const base = {
+      projectRoot: tempDir,
+      vcsRoot: tempDir,
+      graphConfig: { includePaths: [], workspaces: new Map() },
+      derivationMismatch: 'fail' as const,
+    }
+    const uc = createIndexer(store, registry)
+    const all = [target('ws1', ws1Dir), target('ws2', ws2Dir)]
+    await uc.execute({ ...base, workspaces: all })
+    const storedAfterFull = (await store.getStatistics()).graphFingerprint
+
+    await uc.execute({ ...base, workspaces: [target('ws1', ws1Dir)] })
+    const storedAfterSubset = (await store.getStatistics()).graphFingerprint
+    expect(JSON.parse(storedAfterSubset!)).toEqual(JSON.parse(storedAfterFull!))
+
+    const full = await uc.execute({ ...base, workspaces: all })
+
+    expect(full.fullRebuild).toBe(false)
+    expect(full.errors).toEqual([])
+  })
+
+  it('stores the project-relative path of indexed files, including code roots outside the project', async () => {
+    const projectRoot = join(tempDir, 'project')
+    mkdirSync(projectRoot, { recursive: true })
+    const insideDir = createWorkspaceDir(projectRoot, 'inside', {
+      'src/a.ts': 'export const a = 1;',
+    })
+    const outsideDir = createWorkspaceDir(join(tempDir, 'vendor'), 'outside', {
+      'src/b.ts': 'export const b = 2;',
+    })
+    const target = (name: string, codeRoot: string) => ({
+      name,
+      prefix: null,
+      codeRoot,
+      specRepo: makeMockRepo([]),
+      ownership: 'owned' as const,
+      isExternal: false,
+    })
+
+    await createIndexer(store, registry).execute({
+      projectRoot,
+      vcsRoot: tempDir,
+      workspaces: [target('inside', insideDir), target('outside', outsideDir)],
+      graphConfig: { includePaths: [], workspaces: new Map() },
+    })
+
+    expect((await store.getFile('inside:src/a.ts'))?.projectRelativePath).toBe('inside/src/a.ts')
+    expect((await store.getFile('outside:src/b.ts'))?.projectRelativePath).toBe(
+      '../vendor/outside/src/b.ts',
+    )
+  })
+
   it('assigns specs to the correct workspace and specId', async () => {
     const ws1Dir = createWorkspaceDir(tempDir, 'ws1', {
       'src/a.ts': 'export const a = 1;',
@@ -356,7 +551,7 @@ describe('Workspace indexing', () => {
 
     const spec1 = makeSpec({ workspace: 'ws1', name: 'auth/login', filenames: [] })
 
-    const uc = new IndexCodeGraph(store, registry)
+    const uc = createIndexer(store, registry)
     await uc.execute({
       projectRoot: tempDir,
       vcsRoot: tempDir,
@@ -386,7 +581,7 @@ describe('Workspace indexing', () => {
       'docs/guide.md': '# Change Guide\n\nThis document explains the change flow.',
     })
 
-    const uc = new IndexCodeGraph(store, registry)
+    const uc = createIndexer(store, registry)
     const result = await uc.execute({
       projectRoot: tempDir,
       vcsRoot: tempDir,
@@ -408,7 +603,7 @@ describe('Workspace indexing', () => {
 
     const document = await store.getDocument('ws1:docs/guide.md')
     expect(document).toBeDefined()
-    expect(document?.configRelativePath).toBe('ws1/docs/guide.md')
+    expect(document?.projectRelativePath).toBe('ws1/docs/guide.md')
     expect(result.documentsIndexed).toBe(1)
   })
 
@@ -419,7 +614,7 @@ describe('Workspace indexing', () => {
       ]),
     })
 
-    const uc = new IndexCodeGraph(store, registry)
+    const uc = createIndexer(store, registry)
     await uc.execute({
       projectRoot: tempDir,
       vcsRoot: tempDir,
@@ -449,7 +644,7 @@ describe('Workspace indexing', () => {
       'docs/unicode.txt': Buffer.from('Change flow', 'utf16le'),
     })
 
-    const uc = new IndexCodeGraph(store, registry)
+    const uc = createIndexer(store, registry)
     await uc.execute({
       projectRoot: tempDir,
       vcsRoot: tempDir,
@@ -481,7 +676,7 @@ describe('Workspace indexing', () => {
     const spec1 = makeSpec({ workspace: 'ws1', name: 'common', filenames: [] })
     const spec2 = makeSpec({ workspace: 'ws2', name: 'common', filenames: [] })
 
-    const uc = new IndexCodeGraph(store, registry)
+    const uc = createIndexer(store, registry)
     await uc.execute({
       projectRoot: tempDir,
       vcsRoot: tempDir,
@@ -518,7 +713,7 @@ describe('Workspace indexing', () => {
       'docs/guide.md': '# Guide',
     })
 
-    const uc = new IndexCodeGraph(store, registry)
+    const uc = createIndexer(store, registry)
     await uc.execute({
       projectRoot: tempDir,
       vcsRoot: tempDir,
@@ -571,7 +766,7 @@ describe('Workspace indexing', () => {
       artifact: async () => null,
     } as unknown as SpecRepository
 
-    const uc = new IndexCodeGraph(store, registry)
+    const uc = createIndexer(store, registry)
     const result = await uc.execute({
       projectRoot: tempDir,
       vcsRoot: tempDir,
@@ -605,7 +800,7 @@ describe('Workspace indexing', () => {
       ['test', { title: 'Test', description: 'Original', optimizedDescription: 'AI summary' }],
     ])
 
-    const uc = new IndexCodeGraph(store, registry)
+    const uc = createIndexer(store, registry)
     await uc.execute({
       projectRoot: tempDir,
       vcsRoot: tempDir,
@@ -672,7 +867,7 @@ describe('Workspace indexing', () => {
       }),
     } as unknown as SpecRepository
 
-    const uc = new IndexCodeGraph(store, registry)
+    const uc = createIndexer(store, registry)
     await uc.execute({
       projectRoot: tempDir,
       vcsRoot: tempDir,
@@ -720,7 +915,7 @@ describe('Workspace indexing', () => {
       isExternal: false,
     }
 
-    const uc = new IndexCodeGraph(store, registry)
+    const uc = createIndexer(store, registry)
     await uc.execute({
       projectRoot: tempDir,
       vcsRoot: tempDir,
@@ -752,7 +947,7 @@ describe('Workspace indexing', () => {
       isExternal: false,
     }
 
-    const uc = new IndexCodeGraph(store, registry)
+    const uc = createIndexer(store, registry)
 
     await uc.execute({
       projectRoot: tempDir,
@@ -801,7 +996,7 @@ describe('Workspace indexing', () => {
       })),
     }
 
-    const uc = new IndexCodeGraph(store, registry)
+    const uc = createIndexer(store, registry)
     await uc.execute({
       projectRoot: tempDir,
       vcsRoot: tempDir,
@@ -868,7 +1063,7 @@ describe('Workspace indexing', () => {
       })),
     }
 
-    const uc = new IndexCodeGraph(store, registry)
+    const uc = createIndexer(store, registry)
     await uc.execute({
       projectRoot: tempDir,
       vcsRoot: tempDir,

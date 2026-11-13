@@ -4,5 +4,45 @@
     "version": 1
   },
   "dependsOn": ["schema-std:standard-schema"],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "schema-std:test/templates.spec.ts"
+    }
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "@specd/schema-std markdown templates: section scaffolds, placeholders, guidance comments for all change/spec artifacts.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:2dbbc3c0f05e650d5f6fdbb2b15c9a8d1c65e5f6dcb29bc80aa3477f32b0c5aa",
+          "lastModified": "2026-08-28T12:50:21.465Z"
+        },
+        "verify.md": {
+          "hash": "sha256:5174cb8a758319604b026622359d63c9e939dce34f060232efa2c27f910f8b09",
+          "lastModified": "2026-08-28T12:48:42.163Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Templates (@specd/schema-std)\n\n## Rules\n\n### Proposal Template (`templates/proposal.md`)\n- Required H2: `Motivation`, `Current behaviour`, `Proposed solution`, `Specs affected` (`New specs`/`Modified specs`), `Impact`, `Technical context`, `Open questions`\n- Embed `<!-- ... -->` authoring guidance per section\n\n### Specs Template (`templates/spec.md`)\n- Title `# {{spec.name}}`; H2: `Purpose`, `Requirements` (`### Requirement: {{first requirement}}`), `Constraints`, `Spec Dependencies`\n- Normative SHALL/MUST only; omit WHEN/THEN scenarios\n\n### Verify Template (`templates/verify.md`)\n- Title `# Verification: {{spec.name}}`; H2 `Requirements`\n- Scenarios under `### Requirement: {{first requirement}}` + `#### Scenario: {{scenario name}}`\n- Gherkin placeholders: `GIVEN`, `WHEN`, `THEN`, `AND/OR`\n\n### Design Template (`templates/design.md`)\n- Title `# Design: {{change.name}}`\n- Sections: `Non-goals` (optional), `Affected areas`, `New constructs`, `Data models & Contracts`, `Approach & Execution flow`, `Error handling & Edge cases`, `Key decisions`, `Trade-offs`, `Spec impact`, `Dependency map` (Mermaid+ASCII), `Migration / Rollback`, `Testing`, `Open questions`\n- Guidance: self-contained materialized contracts; no indirect refs\n\n### Tasks Template (`templates/tasks.md`)\n- Title `# Tasks: {{change.name}}`; groups `## 1. {{Phase or component name}}`\n- Checklist `- [ ] <n>.<m> <description>` + indented file/symbol, `Approach:`, `(Req: ...)`\n\n### Placeholders + Guidance Invariants\n- Consistent vars `{{change.name}}`, `{{spec.name}}` + `<!-- ... -->` guidance\n- MUST NOT hardcode project-specific logic\n\n## Constraints\n- All templates MUST be valid Markdown parseable by AST tools\n- Templates MUST NOT duplicate sections or violate heading hierarchies",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:2dbbc3c0f05e650d5f6fdbb2b15c9a8d1c65e5f6dcb29bc80aa3477f32b0c5aa",
+          "lastModified": "2026-08-28T12:50:21.465Z"
+        },
+        "verify.md": {
+          "hash": "sha256:5174cb8a758319604b026622359d63c9e939dce34f060232efa2c27f910f8b09",
+          "lastModified": "2026-08-28T12:48:42.163Z"
+        }
+      }
+    }
+  }
 }

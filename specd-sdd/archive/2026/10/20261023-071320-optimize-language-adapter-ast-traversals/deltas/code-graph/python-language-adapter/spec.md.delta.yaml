@@ -1,0 +1,18 @@
+- op: added
+  description: 'Index direct Python members and lexical bindings once per owner or scope'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Bounded Python member and lexical-scope analysis
+
+    The adapter SHALL inspect each class body's direct definitions once and SHALL reuse their parser-backed declaration and decorator evidence when classifying extracted members. Resolving one member MUST NOT recursively recollect every function below the class.
+
+    Direct-member indexing SHALL recognize decorated definitions while excluding nested functions and members of nested classes from the outer owner's member set. Association SHALL use owner containment, declared name, kind, and source position rather than name-only matching.
+
+    `__init__` and `__new__` SHALL remain constructors. `staticmethod` and `classmethod` decorator evidence SHALL retain static dispatch in the shared model. `property` and `.setter` decorator evidence SHALL retain getter and setter member semantics. Multiline decorators and comments between decorators and definitions SHALL remain parser-authoritative.
+
+    For bare-call shadowing, the adapter SHALL derive the bound-name summary of an enclosing function scope at most once and reuse it for references in that scope. The summary SHALL include parameters, assignment and augmented-assignment targets, loop targets, `as` aliases, and named-expression targets, and MUST exclude bindings introduced only inside nested function or class scopes.
+
+    Nested-owner exclusion and lexical lookup MUST use reusable owner or scope indexes rather than scanning all class symbols or the complete scope body once per member or reference.

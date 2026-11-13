@@ -1,0 +1,13 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Note use case entries and identity finalization
+
+    #### Scenario: No-privacy composition still gives stable IDs
+
+    - **GIVEN** a custom provider returns raw actor fields and privacy is disabled
+    - **WHEN** all four note use cases run via Kernel/public factories
+    - **THEN** actor finalization precedes writes, SYSTEM_ACTOR has its ID, and no duplicate repository is constructed

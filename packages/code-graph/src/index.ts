@@ -36,15 +36,66 @@ export { TypeScriptLanguageAdapter } from './infrastructure/tree-sitter/typescri
 export { PythonLanguageAdapter } from './infrastructure/tree-sitter/python-language-adapter.js'
 export { PhpLanguageAdapter } from './infrastructure/tree-sitter/php-language-adapter.js'
 export { GoLanguageAdapter } from './infrastructure/tree-sitter/go-language-adapter.js'
+export {
+  findPackageManifest,
+  findManifestField,
+  type ManifestInspection,
+  type PackageManifestMatch,
+  type PackageManifestSearchResult,
+} from './infrastructure/tree-sitter/find-manifest-field.js'
+export {
+  buildLogicalDeclarationFacts,
+  buildHierarchyReferenceFacts,
+  containsSymbolRange,
+  createAdapterDeclarationDescriptor,
+  createPhysicalOnlyDeclarationDescriptor,
+  createLexicalBindingDeclarationDescriptor,
+  findContainingCallableSymbol,
+  withEnclosingTypeParents,
+  withOwnerParents,
+  type AdapterDeclarationDecision,
+  type GraphDeclarationDecision,
+  type AdapterDeclarationDescriptor,
+  type AdapterSyntaxCandidate,
+  type CallableContainmentPolicy,
+  type LogicalDeclarationDiagnostic,
+  type LogicalDeclarationFacts,
+  type HierarchyReferenceFacts,
+} from './infrastructure/tree-sitter/reference-fact-helpers.js'
 
 // Host use cases
 export {
   GetGraphHealth,
   type GetGraphHealthInput,
   type GetGraphHealthResult,
+  type CoverageCompleteness,
+  type CoverageWarning,
   type IndexCoverageHealthSummary,
 } from './application/use-cases/get-graph-health.js'
 export { createGetGraphHealth } from './composition/use-cases/get-graph-health.js'
+export {
+  ExplainGraphPath,
+  type ExplainGraphPathInput,
+  type ExplainGraphPathResult,
+  type ExplainStage,
+  type ExplainOutcome,
+  type ExplainRuleLayer,
+  type ExplainRuleOrigin,
+  type ExplainRule,
+  type ExplainStep,
+  type CandidateVerdict,
+  type ExplainVerdict,
+  type ExplainDiagnosticCode,
+  type ExplainCandidate,
+  type ExplainDiagnostic,
+} from './application/use-cases/explain-graph-path.js'
+export { createExplainGraphPath } from './composition/use-cases/explain-graph-path.js'
+export { PATH_SEMANTICS_MARKER } from './application/use-cases/_shared/compute-graph-fingerprint.js'
+export {
+  UnknownWorkspaceError,
+  InvalidGraphWhyPathError,
+  GraphWhyRequiresConfigError,
+} from './domain/errors/index.js'
 export {
   IndexProjectGraph,
   type IndexProjectGraphInput,
@@ -85,7 +136,10 @@ export { SymbolKind } from './domain/value-objects/symbol-kind.js'
 export { RelationType } from './domain/value-objects/relation-type.js'
 export { type SymbolQuery } from './domain/value-objects/symbol-query.js'
 export { type GraphStatistics } from './domain/value-objects/graph-statistics.js'
-export { type LanguageAdapter } from './domain/value-objects/language-adapter.js'
+export {
+  type LanguageAdapter,
+  type AdapterDeclarationPolicy,
+} from './domain/value-objects/language-adapter.js'
 export { type ImportDeclaration } from './domain/value-objects/import-declaration.js'
 export { ImportDeclarationKind } from './domain/value-objects/import-declaration-kind.js'
 export { type SourceLocation } from './domain/value-objects/source-location.js'
@@ -94,10 +148,12 @@ export {
   MemberKind,
   MemberDispatch,
   MemberAccessor,
+  DeclarationOccurrenceForm,
   createLogicalSymbol,
   parseLogicalSymbol,
   createPublicBinding,
   createLocalBinding,
+  type SourcePosition,
   type DeclarationOccurrence,
   type MemberSemantics,
   type SymbolPathSegment,
@@ -114,6 +170,10 @@ export {
   type ResolutionStatus,
   type ResolutionHealth,
   type ResolutionCandidate,
+  type LogicalResolutionTarget,
+  type DeclarationResolutionTarget,
+  type PublicBindingResolutionTarget,
+  type ResolvedSymbolTarget,
   type SymbolResolutionResult,
 } from './domain/value-objects/symbol-reference.js'
 export { IndexCoverageStatus, type IndexCoverage } from './domain/value-objects/index-session.js'
@@ -128,6 +188,11 @@ export {
   type CallFact,
   type ResolvedDependency,
 } from './domain/value-objects/call-fact.js'
+export {
+  QualifiedReferenceKind,
+  type QualifiedReferenceFact,
+  qualifiedReferenceKey,
+} from './domain/value-objects/qualified-reference-fact.js'
 
 // Indexer types
 export {
@@ -146,12 +211,19 @@ export {
   type IndexCoverageDiagnosticReason,
   type IndexCoverageDiagnostic,
   type IndexRunCoverageSummary,
+  type WorkspaceOverlap,
 } from './domain/value-objects/index-result.js'
 export {
   type IndexSession,
   type RegisterFileInput,
   type RegisterAnalysisInput,
 } from './domain/value-objects/index-session.js'
+export {
+  type ParserResourceScope,
+  type ParserResourceDisposer,
+  type ParserResourceCloseResult,
+  type ParserResourceDisposalFailure,
+} from './domain/value-objects/parser-resource-scope.js'
 export { InMemoryIndexSession } from './application/use-cases/in-memory-index-session.js'
 
 // Traversal types
@@ -165,6 +237,12 @@ export {
   type CoveringSpecImpact,
   type ImpactResult,
   type FileImpactResult,
+  type PhysicalDependencyEvidence,
+  type LogicalAffectedTarget,
+  type PhysicalOnlyAffectedTarget,
+  type SemanticAffectedTarget,
+  type SemanticImpactCounts,
+  type ResolvedSymbolImpactResult,
 } from './domain/value-objects/impact-result.js'
 export { type ChangeDetectionResult } from './domain/value-objects/change-detection-result.js'
 export { type RiskLevel } from './domain/value-objects/risk-level.js'
@@ -201,7 +279,10 @@ export type {
 // Discovery
 export {
   DEFAULT_EXCLUDE_PATHS,
+  createDiscoveryEvaluator,
   type DiscoverFilesOptions,
+  type DiscoveryDecision,
+  type DiscoveryEvaluator,
 } from './application/use-cases/discover-files.js'
 
 // Domain services
@@ -209,6 +290,15 @@ export { expandSymbolName } from './domain/services/expand-symbol-name.js'
 export { expandSearchQuery, expandSearchToken } from './domain/services/expand-search-query.js'
 export { isGraphStale } from './domain/services/is-graph-stale.js'
 export { analyzeFilesImpact } from './domain/services/analyze-files-impact.js'
+export {
+  analyzeImpact,
+  analyzeResolvedSymbolImpact,
+  analyzePublicBindingImpact,
+} from './domain/services/analyze-impact.js'
+export {
+  collectImpactSpecIds,
+  collectLogicalCoveringSpecs,
+} from './domain/services/collect-impact-specs.js'
 export { normalizeFileSelectorPath } from './application/services/resolve-graph-selector.js'
 export type {
   ResolvedFileSelector,
@@ -249,12 +339,14 @@ export { StoreWorkerError } from './domain/errors/store-worker-error.js'
 export { BulkSessionStateError } from './domain/errors/bulk-session-state-error.js'
 export { InvalidGraphStoreConfigurationError } from './domain/errors/invalid-graph-store-configuration-error.js'
 export { GraphSchemaIncompatibleError } from './domain/errors/graph-schema-incompatible-error.js'
+export { GraphDerivationMismatchError } from './domain/errors/graph-derivation-mismatch-error.js'
 export {
   GraphStorageRecoveryRequiredError,
   type GraphStorageRecoveryReason,
 } from './domain/errors/graph-storage-recovery-required-error.js'
 export { GraphStoreRecreateRequiresClosedError } from './domain/errors/graph-store-recreate-requires-closed-error.js'
 export {
+  GraphIndexWorkerError,
   GraphIndexWorkerStartError,
   GraphIndexTaskContractError,
   GraphIndexTaskExecutionError,
@@ -263,6 +355,22 @@ export {
   GraphIndexWorkerSignalError,
   GraphIndexProgressHandlerError,
 } from './domain/errors/isolated-graph-index-errors.js'
+export {
+  type IndexEvent,
+  type FileActivityEvent,
+  type FileSkippedEvent,
+  type ResourceDisposalFailedEvent,
+  type IndexEventReceiver,
+  type SizeSkippedFile,
+  type SizeExemptFile,
+} from './domain/value-objects/index-event.js'
+export {
+  type GraphIndexTaskAnnouncer,
+  type GraphIndexWorkerEvent,
+  type GraphIndexFailureCause,
+  type GraphIndexWorkerDiagnostics,
+} from './domain/value-objects/graph-index-worker-types.js'
+export { DEFAULT_MAX_FILE_BYTES } from './application/use-cases/_shared/resolve-effective-graph-config.js'
 export { acquireGraphIndexLock, getGraphIndexLockPath } from './infrastructure/index-lock.js'
 
 /** Installed version of `@specd/code-graph`. */

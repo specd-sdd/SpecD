@@ -10,7 +10,8 @@
     "core:file-reader-port",
     "core:composition-resolver",
     "core:diff-generator",
-    "core:resolve-change-schema"
+    "core:resolve-change-schema",
+    "core:spec-id-format"
   ],
   "implementation": [
     {

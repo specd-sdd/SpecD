@@ -4,6 +4,7 @@ import { type SymbolNode } from './symbol-node.js'
 import { type ImportDeclaration } from './import-declaration.js'
 import { type BindingFact } from './binding-fact.js'
 import { type CallFact } from './call-fact.js'
+import { type QualifiedReferenceFact } from './qualified-reference-fact.js'
 import { type ReferenceFacts } from './symbol-reference.js'
 
 /**
@@ -30,6 +31,8 @@ export interface AdapterSessionState {
 export interface FileAnalysisDraft {
   readonly language: string
   readonly namespace?: string
+  /** Separator joining `namespace` and a symbol name in qualified names; defaults to `.`. */
+  readonly namespaceSeparator?: string
   readonly fileNode?: FileNode
   readonly documentNode?: DocumentNode
   readonly symbols: readonly SymbolNode[]
@@ -38,6 +41,8 @@ export interface FileAnalysisDraft {
   readonly callFacts: readonly CallFact[]
   /** Optional language-semantic reference facts, additive to legacy nodes and relations. */
   readonly referenceFacts?: ReferenceFacts
+  /** Optional syntactic evidence of `qualifier.name` references (see QualifiedReferenceFact). */
+  readonly qualifiedReferenceFacts?: readonly QualifiedReferenceFact[]
   readonly parserState?: ParserState
 }
 
@@ -49,5 +54,5 @@ export interface FileAnalysis extends FileAnalysisDraft {
   readonly filePath: string
   readonly contentHash: string
   readonly workspace: string
-  readonly configRelativePath: string
+  readonly projectRelativePath: string
 }

@@ -69,7 +69,7 @@ describe('spec generate-metadata', () => {
     await program.parseAsync(['node', 'specd', 'spec', 'generate-metadata', 'auth/login'])
 
     expect(kernel.specs.regenerateMetadata.execute).toHaveBeenCalledWith({
-      target: { kind: 'spec', specId: 'default:auth/login' },
+      target: { kind: 'spec', specId: 'auth/login' },
       force: false,
     })
     expect(stdout()).toContain('regenerated metadata for default:auth/login')
@@ -122,7 +122,7 @@ describe('spec generate-metadata', () => {
     ])
 
     expect(kernel.specs.regenerateMetadata.execute).toHaveBeenCalledWith({
-      target: { kind: 'spec', specId: 'default:auth/login' },
+      target: { kind: 'spec', specId: 'auth/login' },
       force: true,
     })
     expect(stdout()).toContain('regenerated metadata for default:auth/login')

@@ -7,8 +7,8 @@ import {
 } from '../../domain/services/spec-optimization-freshness.js'
 import { type PersistedOptimizationFieldName } from './update-persisted-spec-optimizations.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
+import { InvalidInputError } from '../../domain/errors/invalid-input-error.js'
 import { SpecNotFoundError } from '../errors/spec-not-found-error.js'
-import { WorkspaceNotFoundError } from '../errors/workspace-not-found-error.js'
 import { type GetActiveSchema } from './get-active-schema.js'
 
 /** Input for {@link GetPersistedSpecOptimizations}. */
@@ -19,8 +19,11 @@ export interface GetPersistedSpecOptimizationsInput {
 
 /** Freshness result for a single persisted optimization field. */
 export interface PersistedOptimizationFieldResult {
+  /** Persisted field text; absent when `freshness` is `'missing'`. */
   readonly value?: string
+  /** Freshness classification of the field relative to the current spec and schema. */
   readonly freshness: 'fresh' | 'stale' | 'missing'
+  /** Why the field is stale or missing; `['missing']` when `freshness` is `'missing'`. */
   readonly reasons: readonly PersistedOptimizationStaleReason[]
 }
 
@@ -55,24 +58,23 @@ export class GetPersistedSpecOptimizations {
   async execute(
     input: GetPersistedSpecOptimizationsInput,
   ): Promise<GetPersistedSpecOptimizationsResult> {
-    const { workspace, capPath } = parseSpecId(input.specId)
-    const repo = this.specRepositories.get(workspace)
-    if (repo === undefined) {
-      throw new WorkspaceNotFoundError(workspace)
-    }
+    const { workspace, capPath, specId } = parseSpecId(input.specId, {
+      workspaces: this.specRepositories.keys(),
+    })
+    const repo = this.specRepositories.get(workspace)!
 
     const spec = await repo.get(SpecPath.parse(capPath))
     if (spec === null) {
-      throw new SpecNotFoundError(input.specId)
+      throw new SpecNotFoundError(specId)
     }
 
     const persisted = await repo.readPersistedState(spec)
     if (persisted === null) {
-      return { specId: input.specId, initialized: false, fresh: false }
+      return { specId, initialized: false, fresh: false }
     }
 
     const schemaResult = await this.getActiveSchema.execute()
-    if (schemaResult.raw) throw new Error('schema resolution failed')
+    if (schemaResult.raw) throw new InvalidInputError('schema resolution failed')
     const schema = schemaResult.schema
     const currentArtifactState = await this._currentArtifactState(repo, spec, schema)
     const schemaIdentity = persisted.schema
@@ -99,7 +101,7 @@ export class GetPersistedSpecOptimizations {
       includedFields.length > 0 && includedFields.every((field) => field.freshness === 'fresh')
 
     return {
-      specId: input.specId,
+      specId,
       initialized: true,
       ...(optimizedDescription !== undefined ? { optimizedDescription } : {}),
       ...(optimizedContext !== undefined ? { optimizedContext } : {}),

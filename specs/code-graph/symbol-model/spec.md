@@ -11,13 +11,15 @@ A code graph needs a unified, language-agnostic representation of source code st
 A `FileNode` SHALL represent a single source file in the workspace. It contains:
 
 - **`path`** (`string`) — globally unique path in format `{workspaceName}:{relativeToCodeRoot}` (e.g. `core:src/index.ts`). Forward-slash-normalized. This is the node's canonical identity.
-- **`configRelativePath`** (`string`) — forward-slash-normalized path from the directory containing the `specd.yaml` used for indexing to the file on disk (e.g. `packages/core/src/index.ts`). This path is not the node identity and MAY include `..` segments when the file lives outside the config directory.
+- **`projectRelativePath`** (`string`) — forward-slash-normalized path from the project root containing the active `specd.yaml` to the file on disk (e.g. `packages/core/src/index.ts`). This path is not the node identity and MAY include `..` segments when the file lives outside the project root.
 - **`language`** (`string`) — language identifier (e.g. `typescript`, `python`). Determined by the language adapter at index time.
 - **`contentHash`** (`string`) — hash of the file's content at last index. Used for incremental diffing.
 - **`workspace`** (`string`) — the workspace name this file belongs to (e.g. `core`, `cli`, `default`).
 - **`embedding`** (`Float32Array | undefined`) — optional vector embedding for semantic search. Deferred to v2+.
 
-Two `FileNode` values are equal if and only if their `path` fields match (since `path` includes the workspace name prefix and remains the canonical graph identity). `configRelativePath` exists for user-facing lookup and diagnostics; it MUST NOT replace the canonical workspace-prefixed path in persisted relations or symbol identifiers.
+Two `FileNode` values are equal if and only if their `path` fields match (since `path` includes the workspace name prefix and remains the canonical graph identity). `projectRelativePath` exists for user-facing lookup and diagnostics; it MUST NOT replace the canonical workspace-prefixed path in persisted relations or symbol identifiers.
+
+A `FileNode` additionally carries two optional fields reported by the language adapter in the file analysis. **`namespace`** (`string | undefined`) is the namespace the file declares (for example a PHP namespace); it is stored so that a file hydrated from the store without re-analysis still contributes its qualified names. **`namespaceSeparator`** (`string | undefined`) is the separator that joins `namespace` and a symbol name into a qualified name (for example `\` for PHP, `.` for Python). Both are absent when the file declares no namespace, and `namespaceSeparator` is present if and only if `namespace` is present. They do not take part in `FileNode` equality.
 
 ### Requirement: Spec node
 
@@ -42,6 +44,7 @@ A `SymbolNode` SHALL represent a named code construct extracted from a file. It 
 - **`name`** (`string`) — the symbol's declared name.
 - **`kind`** (`SymbolKind`) — the category of this symbol.
 - **`filePath`** (`string`) — workspace-prefixed path of the file containing this symbol.
+- **`projectRelativePath`** (`string`) — forward-slash-normalized path from the project root to the file containing this symbol (e.g. `packages/core/src/index.ts`), denormalized from the owning file node at index time.
 - **`line`** (`number`) — 1-based start line of the complete syntactic construct.
 - **`column`** (`number`) — 0-based start column of the complete syntactic construct.
 - **`endLine`** (`number`) — 1-based end line of the complete syntactic construct.
@@ -105,7 +108,7 @@ The graph SHALL support a `document` category for textual non-code nodes.
 
 ### Requirement: SymbolKind enum
 
-`SymbolKind` SHALL be a closed string enum with the following members:
+`SymbolKind` SHALL be a closed string enum with the following 8 members:
 
 - `function`
 - `class`
@@ -114,8 +117,15 @@ The graph SHALL support a `document` category for textual non-code nodes.
 - `type`
 - `interface`
 - `enum`
+- `property`
 
 No other values are permitted. Language adapters MUST map language-specific constructs to one of these kinds or skip the construct entirely.
+
+The semantic contract for state declarations SHALL be normalized across all supported languages as follows:
+
+- State declared at file or module scope SHALL be assigned `SymbolKind.Variable` with `parentId` undefined.
+- State declared local to a routine (function or method body) SHALL be assigned `SymbolKind.Variable` with `parentId` set to the enclosing routine's symbol ID.
+- State encapsulated within a type or container construct (class, interface, struct, protocol, or enum) SHALL be assigned `SymbolKind.Property` with `parentId` set to the enclosing container's symbol ID.
 
 ### Requirement: Relation types
 
@@ -135,12 +145,6 @@ Relations between nodes SHALL be represented as typed edges. Each relation has a
 | `EXTENDS`       | Symbol | Symbol | Source type extends or inherits from target type                      | v2    |
 | `IMPLEMENTS`    | Symbol | Symbol | Source type fulfills or implements target contract/type               | v2    |
 | `OVERRIDES`     | Symbol | Symbol | Source method overrides or concretely fulfills target one             | v2    |
-
-### Requirement: Relation staleness
-
-Relations MAY include a `stale` boolean flag in their `metadata`.
-
-For implementation traceability, `stale` applies specifically to `COVERS_SYMBOL` relations whose target symbol is no longer detectable in the current graph index. It is not the generic marker for workspace-boundary or archive-materialization failures.
 
 ### Requirement: Relation value object
 
@@ -215,6 +219,22 @@ Scoped binding and call resolution SHALL NOT persist symbol-to-symbol dependency
 
 Unresolved binding facts and call facts SHALL NOT create speculative graph edges. They MAY be preserved as non-persisted diagnostics or debug metadata for tests and troubleshooting.
 
+### Requirement: Qualified reference facts
+
+`FileAnalysisDraft` and `FileAnalysis` SHALL accept an optional `qualifiedReferenceFacts` collection. An absent collection is equivalent to an empty one, and an adapter that does not emit qualified references remains valid and MUST NOT be required to change.
+
+A qualified reference fact records a name written as `qualifier.name` in source, where the qualifier is a single identifier. It MUST carry:
+
+- **`qualifier`** — the identifier before the dot, exactly as written
+- **`name`** — the identifier after the dot, exactly as written
+- **`kind`** — one of `call`, `construct`, or `type`, naming the position where the reference occurs
+- **`sourceSymbolId`** — the innermost declaration whose complete parser-derived range contains the reference, when one exists
+- **`location`** — the parser-derived source location of the reference
+
+A qualified reference fact is evidence of syntax only. It MUST NOT by itself imply a relation or a target; whether `qualifier` names an imported namespace, and what `name` resolves to, is decided by the resolution defined in `code-graph:language-adapter`.
+
+Qualified reference facts SHALL be plain immutable data, MUST NOT retain AST nodes or parser objects, and MUST NOT require changes to persisted symbol IDs, relation IDs, or graph-store schemas.
+
 ### Requirement: Immutability
 
 All model types — `FileNode`, `SymbolNode`, `Relation`, and any aggregate containing them — SHALL be immutable value objects. Properties MUST be `readonly`. Mutations to the graph happen exclusively through the `GraphStore` port's atomic upsert operations, which replace entire file-scoped slices. There is no in-place mutation API.
@@ -227,7 +247,7 @@ By extending `SpecdError`, all code-graph errors automatically follow the "Specd
 
 - `InvalidSymbolKindError` — when a symbol kind value is not in the `SymbolKind` enum
 - `InvalidRelationTypeError` — when a relation type value is not in the defined set
-- `DuplicateSymbolIdError` — when two symbols in the same file produce the same deterministic id
+- `DuplicateSymbolIdError` — defined for unexpected symbol identity collision conditions during model validation
 - `StoreNotOpenError` — when an operation is attempted on a closed or uninitialized store
 
 ### Requirement: Logical symbol and canonical reference model
@@ -242,13 +262,27 @@ A logical symbol that has a declaring owner SHALL expose `qualified_name`: the g
 
 A logical symbol MUST NOT carry a package name. Workspace on the file id and the adapter's package-to-workspace map are the package identity.
 
-The existing location-based `SymbolNode.id` and closed `SymbolKind` remain valid. Symbol space and member semantics are additive dimensions and MUST NOT overload `SymbolKind`. `SymbolKind` stays the closed broad enum (`function`, `class`, `method`, `variable`, `type`, `interface`, `enum`). Namespace or module is an owner-path role and a surface, not a new `SymbolKind`.
+The existing location-based `SymbolNode.id` and closed `SymbolKind` remain valid. Symbol space and member semantics are additive dimensions and MUST NOT overload `SymbolKind`. `SymbolKind` stays the closed broad enum (`function`, `class`, `method`, `variable`, `type`, `interface`, `enum`, `property`). Namespace or module is an owner-path role and a surface, not a new `SymbolKind`.
 
 A logical member's `declaringOwner` SHALL be the canonical logical identity of the type, namespace, module, object, receiver type, trait, contract, or other language-defined owner that syntactically declares it. It MUST NOT contain a parser-node identifier, a location-based child or parent ID, or a display-only qualified name. Adapters SHALL create or locate the logical owner before constructing member identities. Only declarations that are top-level in their language surface MAY omit the owner.
 
-`parentId` on a declaration occurrence SHALL be emitted by the language adapter that analyzed the file. The shared model MUST NOT assign it from a hardcoded language list.
+`parentId` on a declaration occurrence SHALL be emitted by the language adapter that analyzed the file, establishing lexical hierarchy (container types owning methods and properties, routines owning local variables and nested functions). The shared model MUST NOT assign it from a hardcoded language list.
 
 Same-name members under different declaring owners SHALL always have different logical identities. Moving a declaration within the same logical owner without changing its semantic identity MUST NOT change its canonical reference merely because its source line or parser node changes.
+
+### Requirement: Declaration, binding, and logical identity layers
+
+The graph SHALL distinguish three identity layers:
+
+- a declaration occurrence represented by a location-backed `SymbolNode`, which is physical source evidence and MAY exist without a logical target;
+- a `LocalBinding`, which identifies a visible name inside a lexical scope and MUST preserve its scope and source range; and
+- a `LogicalSymbol`, which identifies one language-defined semantic target and MAY own one or more declaration occurrences.
+
+These layers MUST NOT be treated as bijective. Parameters, receivers, aliases, ordinary local variables, and other scope-bound names SHALL remain local bindings unless the language adapter proves that the declaration is an addressable semantic target. A physical declaration that has no logical target MUST remain available for navigation and dependency evidence rather than being dropped.
+
+Logical identity MUST be independent of ordinary line and column movement. It SHALL include the canonical logical owner whenever the language defines an owner, and declarations in competing lexical scopes MUST NOT collapse merely because their simple name, broad `SymbolKind`, file, or surface matches.
+
+Multiple declarations SHALL share one logical identity only when the language adapter supplies positive, language-defined grouping evidence, such as a proven overload set or declaration merge. An absent, empty, or unknown grouping key is evidence of no group and MUST NOT cause equal-name declarations to merge. The logical target SHALL retain the complete deterministic declaration set. Declaration-level form, including signature versus implementation, MUST NOT change the logical member identity of a proven group.
 
 ### Requirement: Member semantics and symbol spaces
 
@@ -267,6 +301,14 @@ A public export slot SHALL be looked up by public surface, exported name, and sy
 A public binding's `surface` is the file that exports the name. Its `targetId` is the logical symbol that name publishes. That logical symbol MAY be declared in another workspace. The binding MUST NOT be created by choosing the first same-named symbol in the target workspace.
 
 A local binding SHALL preserve lexical scope and source range. Distinct aliases, shadowed bindings, multiple public routes between identical relation endpoints, and competing targets exposed through the same public slot MUST NOT collapse because ordinary `Relation` equality ignores metadata. Generic and native spellings MUST NOT be stored as alias rows.
+
+### Requirement: Evidence-preserving semantic projection
+
+Physical `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations SHALL remain the authoritative dependency evidence. A semantic projection MAY aggregate or deduplicate results by logical identity, but it MUST retain every physical declaration, relation, and source location that justifies the projected result.
+
+Physical declarations without a logical mapping SHALL remain representable in semantic query results as declaration-only evidence. Counts and risk summaries MUST identify whether their unit is physical occurrences, unique logical targets, or both; one field MUST NOT silently mix those units.
+
+`COVERS_SYMBOL` SHALL target a `LogicalSymbol.id`. Physical declaration traversal MUST be projected to its logical identity before reverse symbol-coverage lookup, and returned coverage evidence SHALL retain contributing declaration locations when available.
 
 ### Requirement: Index coverage facts
 
@@ -343,3 +385,4 @@ const specRelation: Relation = {
 ## ADRs
 
 - [ADR-0024: Logical symbol resolution](../../../docs/adr/0024-logical-symbol-resolution.md)
+- [ADR-0028: Denormalized Project-Relative Paths in Code Graph SQLite Store](../../../docs/adr/0028-denormalized-project-relative-paths-in-code-graph-sqlite-store.md)

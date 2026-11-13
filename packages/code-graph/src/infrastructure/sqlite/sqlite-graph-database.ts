@@ -13,7 +13,13 @@ import { expandSymbolName } from '../../domain/services/expand-symbol-name.js'
 import { matchesExclude } from '../../domain/services/matches-exclude.js'
 import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
 import { createDocumentNode, type DocumentNode } from '../../domain/value-objects/document-node.js'
-import { createFileNode, type FileNode } from '../../domain/value-objects/file-node.js'
+import {
+  createFileNode,
+  FILE_CATEGORIES,
+  type FileNode,
+  type FileCategory,
+} from '../../domain/value-objects/file-node.js'
+import { resolveAdmittedCategories } from '../../domain/value-objects/impact-result.js'
 import { type GraphStatistics } from '../../domain/value-objects/graph-statistics.js'
 import { createRelation, type Relation } from '../../domain/value-objects/relation.js'
 import {
@@ -33,6 +39,7 @@ import {
   type MemberSemantics,
   type PublicBinding,
   type ResolutionStep,
+  DeclarationOccurrenceForm,
 } from '../../domain/value-objects/symbol-reference.js'
 import { type IndexCoverage } from '../../domain/value-objects/index-session.js'
 import {
@@ -56,7 +63,7 @@ import {
   type ReferenceFactsWrite,
   type StorageGenerationSnapshot,
 } from '../../domain/ports/graph-store.js'
-import { SQLITE_SCHEMA_DDL, SQLITE_SCHEMA_VERSION } from './schema.js'
+import { REQUIRED_COLUMNS, SQLITE_SCHEMA_DDL, SQLITE_SCHEMA_VERSION } from './schema.js'
 import {
   ensureStorageGeneration,
   readStorageGeneration,
@@ -106,8 +113,32 @@ const SYMBOL_DEPENDENCY_RELATION_TYPES = [
 ] as const
 
 const SQLITE_BATCH_PARAMETER_LIMIT = 900
+
+/**
+ * Computes the number of primary values that fit inside one SQLite statement.
+ *
+ * @param fixedParameterCount - Bind positions not supplied by the primary values.
+ * @param inputMultiplicity - Bind positions used by each primary value.
+ * @returns A positive chunk size.
+ * @throws {RangeError} When parameter accounting is invalid or exhausts the budget.
+ */
+function getSqliteInputChunkSize(fixedParameterCount: number, inputMultiplicity = 1): number {
+  if (
+    !Number.isInteger(fixedParameterCount) ||
+    fixedParameterCount < 0 ||
+    !Number.isInteger(inputMultiplicity) ||
+    inputMultiplicity < 1
+  ) {
+    throw new RangeError('Invalid SQLite batch parameter accounting')
+  }
+  const chunkSize = Math.floor(
+    (SQLITE_BATCH_PARAMETER_LIMIT - fixedParameterCount) / inputMultiplicity,
+  )
+  if (chunkSize < 1) throw new RangeError('SQLite batch parameter budget exhausted')
+  return chunkSize
+}
 const SYMBOL_ROW_COLUMNS =
-  'id, name, kind, file_path, parent_id, line, column_number, end_line, end_column, selection_start_line, selection_start_column, selection_end_line, selection_end_column, comment'
+  'id, name, kind, file_path, project_relative_path, parent_id, line, column_number, end_line, end_column, selection_start_line, selection_start_column, selection_end_line, selection_end_column, comment'
 
 /**
  * Converts a SqliteRuntimeDescriptor modulePath into a dynamic-import target.
@@ -133,6 +164,7 @@ interface SymbolRow {
   readonly name: string
   readonly kind: string
   readonly file_path: string
+  readonly project_relative_path: string
   readonly parent_id: string | null
   readonly line: number
   readonly column_number: number
@@ -184,6 +216,7 @@ interface LogicalDeclarationRow {
   readonly end_line: number | null
   readonly end_column: number | null
   readonly kind: LogicalDeclaration['declaration']['kind']
+  readonly occurrence_form: string
 }
 
 /**
@@ -207,6 +240,10 @@ interface LocalBindingRow {
   readonly local_name: string
   readonly space: LocalBinding['space']
   readonly target_id: string | null
+  readonly start_line: number
+  readonly start_column: number
+  readonly end_line: number
+  readonly end_column: number
 }
 
 /**
@@ -329,6 +366,7 @@ export class SQLiteGraphDatabase {
       db = new DatabaseModule(this.dbPath) as SqliteDatabase
       this.assertExistingSchemaCompatible(db)
       this.configureDatabase(db)
+      this.assertSchemaShape(db)
       this.db = db
       this.ensureSchemaVersion()
     } catch (error: unknown) {
@@ -419,16 +457,19 @@ export class SQLiteGraphDatabase {
    */
   getFile(path: string): FileNode | undefined {
     const row = this.statement(
-      'SELECT path, config_relative_path, language, content_hash, workspace, embedding, content FROM files WHERE path = ?',
+      'SELECT path, project_relative_path, language, content_hash, workspace, category, embedding, content, namespace, namespace_separator FROM files WHERE path = ?',
     ).get(path) as
       | {
           path: string
-          config_relative_path: string
+          project_relative_path: string
           language: string
           content_hash: string
           workspace: string
+          category?: string | null
           embedding: Buffer | null
           content: string | null
+          namespace?: string | null
+          namespace_separator?: string | null
         }
       | undefined
     return row === undefined ? undefined : this.mapFileRow(row)
@@ -442,11 +483,11 @@ export class SQLiteGraphDatabase {
    */
   getDocument(path: string): DocumentNode | undefined {
     const row = this.statement(
-      'SELECT path, config_relative_path, content_hash, content, workspace FROM documents WHERE path = ?',
+      'SELECT path, project_relative_path, content_hash, content, workspace FROM documents WHERE path = ?',
     ).get(path) as
       | {
           path: string
-          config_relative_path: string
+          project_relative_path: string
           content_hash: string
           content: string
           workspace: string
@@ -456,38 +497,41 @@ export class SQLiteGraphDatabase {
   }
 
   /**
-   * Finds files by config relative path.
+   * Finds files by project relative path.
    *
-   * @param configRelativePath - Config relative path parameter.
-   * @returns The result of find files by config relative path.
+   * @param projectRelativePath - Project relative path parameter.
+   * @returns The result of find files by project relative path.
    */
-  findFilesByConfigRelativePath(configRelativePath: string): FileNode[] {
+  findFilesByProjectRelativePath(projectRelativePath: string): FileNode[] {
     const rows = this.statement(
-      'SELECT path, config_relative_path, language, content_hash, workspace, embedding, content FROM files WHERE config_relative_path = ?',
-    ).all(configRelativePath) as Array<{
+      'SELECT path, project_relative_path, language, content_hash, workspace, category, embedding, content, namespace, namespace_separator FROM files WHERE project_relative_path = ?',
+    ).all(projectRelativePath) as Array<{
       path: string
-      config_relative_path: string
+      project_relative_path: string
       language: string
       content_hash: string
       workspace: string
+      category?: string | null
       embedding: Buffer | null
       content: string | null
+      namespace?: string | null
+      namespace_separator?: string | null
     }>
     return rows.map((row) => this.mapFileRow(row))
   }
 
   /**
-   * Finds documents by config relative path.
+   * Finds documents by project relative path.
    *
-   * @param configRelativePath - Config relative path parameter.
-   * @returns The result of find documents by config relative path.
+   * @param projectRelativePath - Project relative path parameter.
+   * @returns The result of find documents by project relative path.
    */
-  findDocumentsByConfigRelativePath(configRelativePath: string): DocumentNode[] {
+  findDocumentsByProjectRelativePath(projectRelativePath: string): DocumentNode[] {
     const rows = this.statement(
-      'SELECT path, config_relative_path, content_hash, content, workspace FROM documents WHERE config_relative_path = ?',
-    ).all(configRelativePath) as Array<{
+      'SELECT path, project_relative_path, content_hash, content, workspace FROM documents WHERE project_relative_path = ?',
+    ).all(projectRelativePath) as Array<{
       path: string
-      config_relative_path: string
+      project_relative_path: string
       content_hash: string
       content: string
       workspace: string
@@ -503,13 +547,14 @@ export class SQLiteGraphDatabase {
    */
   getSymbol(id: string): SymbolNode | undefined {
     const row = this.statement(
-      'SELECT id, name, kind, file_path, parent_id, line, column_number, end_line, end_column, selection_start_line, selection_start_column, selection_end_line, selection_end_column, comment FROM symbols WHERE id = ?',
+      'SELECT id, name, kind, file_path, project_relative_path, parent_id, line, column_number, end_line, end_column, selection_start_line, selection_start_column, selection_end_line, selection_end_column, comment FROM symbols WHERE id = ?',
     ).get(id) as
       | {
           id: string
           name: string
           kind: string
           file_path: string
+          project_relative_path: string
           parent_id: string | null
           line: number
           column_number: number
@@ -596,19 +641,30 @@ export class SQLiteGraphDatabase {
 
     const relationRows = new Map<string, RelationRow>()
     const neighborIds = new Set<string>()
+    const omittedTestFiles = new Set<string>()
+    const omittedIgnoredFiles = new Set<string>()
+
     const directions =
       input.direction === 'both'
         ? (['upstream', 'downstream'] as const)
         : ([input.direction] as const)
     for (const direction of directions) {
-      for (const row of this.queryImpactFrontierDirection(
+      const { rows, omittedFiles } = this.queryImpactFrontierDirection(
         input,
         direction,
         frontier,
         relationTypes,
-      )) {
+      )
+      for (const row of rows) {
         relationRows.set(`${row.source}\u0000${row.type}\u0000${row.target}`, row)
         neighborIds.add(direction === 'upstream' ? row.source : row.target)
+      }
+      for (const omitted of omittedFiles) {
+        if (omitted.category === 'test') {
+          omittedTestFiles.add(omitted.path)
+        } else if (omitted.category === 'ignored') {
+          omittedIgnoredFiles.add(omitted.path)
+        }
       }
     }
 
@@ -618,13 +674,29 @@ export class SQLiteGraphDatabase {
     const materializes = (type: 'files' | 'symbols' | 'specs'): boolean =>
       types === undefined || types.length === 0 || types.includes(type)
 
-    return {
+    const result: ImpactFrontierResult = {
       relations,
       symbols:
         input.resource === 'symbol' && materializes('symbols') ? this.getSymbolsByIds(ids) : [],
       files: input.resource === 'file' && materializes('files') ? this.getFilesByPaths(ids) : [],
       specs: input.resource === 'spec' && materializes('specs') ? this.getSpecsByIds(ids) : [],
     }
+
+    if (omittedTestFiles.size > 0 || omittedIgnoredFiles.size > 0) {
+      return {
+        ...result,
+        omittedCounts: {
+          tests: omittedTestFiles.size,
+          ignored: omittedIgnoredFiles.size,
+        },
+        omittedFiles: {
+          tests: [...omittedTestFiles].sort(),
+          ignored: [...omittedIgnoredFiles].sort(),
+        },
+      }
+    }
+
+    return result
   }
 
   /**
@@ -640,15 +712,18 @@ export class SQLiteGraphDatabase {
     for (const chunk of chunksOf(uniquePaths, SQLITE_BATCH_PARAMETER_LIMIT)) {
       const placeholders = chunk.map(() => '?').join(', ')
       const rows = this.statement(
-        `SELECT path, config_relative_path, language, content_hash, workspace, embedding, content FROM files WHERE path IN (${placeholders})`,
+        `SELECT path, project_relative_path, language, content_hash, workspace, category, embedding, content, namespace, namespace_separator FROM files WHERE path IN (${placeholders})`,
       ).all(...chunk) as Array<{
         path: string
-        config_relative_path: string
+        project_relative_path: string
         language: string
         content_hash: string
         workspace: string
+        category?: string | null
         embedding: Buffer | null
         content: string | null
+        namespace?: string | null
+        namespace_separator?: string | null
       }>
       for (const row of rows) filesByPath.set(row.path, this.mapFileRow(row))
     }
@@ -672,10 +747,10 @@ export class SQLiteGraphDatabase {
     for (const chunk of chunksOf(uniquePaths, SQLITE_BATCH_PARAMETER_LIMIT)) {
       const placeholders = chunk.map(() => '?').join(', ')
       const rows = this.statement(
-        `SELECT path, config_relative_path, content_hash, content, workspace FROM documents WHERE path IN (${placeholders})`,
+        `SELECT path, project_relative_path, content_hash, content, workspace FROM documents WHERE path IN (${placeholders})`,
       ).all(...chunk) as Array<{
         path: string
-        config_relative_path: string
+        project_relative_path: string
         content_hash: string
         content: string
         workspace: string
@@ -809,21 +884,36 @@ export class SQLiteGraphDatabase {
   /**
    * Retrieves covering specs for symbol.
    *
-   * @param symbolId - Symbol id parameter.
+   * @param logicalSymbolId - Canonical logical symbol identifier.
    * @returns The result of get covering specs for symbol.
    */
-  getCoveringSpecsForSymbol(symbolId: string): Relation[] {
-    return this.getRelationsByTarget(RelationType.CoversSymbol, symbolId)
+  getCoveringSpecsForSymbol(logicalSymbolId: string): Relation[] {
+    return this.readRelations(
+      this.statement(
+        'SELECT r.source, r.target, r.type, r.metadata_json FROM relations r JOIN logical_symbols ls ON r.target = ls.id WHERE r.type = ? AND r.target = ?',
+      ).all(RelationType.CoversSymbol, logicalSymbolId) as RelationRow[],
+    )
   }
 
   /**
    * Retrieves covering specs for symbols.
    *
-   * @param symbolIds - Symbol ids parameter.
+   * @param logicalSymbolIds - Logical symbol ids parameter.
    * @returns The result of get covering specs for symbols.
    */
-  getCoveringSpecsForSymbols(symbolIds: readonly string[]): Relation[] {
-    return this.getRelationsByTargets(RelationType.CoversSymbol, symbolIds)
+  getCoveringSpecsForSymbols(logicalSymbolIds: readonly string[]): Relation[] {
+    const uniqueTargets = [...new Set(logicalSymbolIds)].sort()
+    if (uniqueTargets.length === 0) return []
+    const rowsByKey = new Map<string, RelationRow>()
+    for (const chunk of chunksOf(uniqueTargets, getSqliteInputChunkSize(1))) {
+      const placeholders = chunk.map(() => '?').join(', ')
+      const rows = this.statement(
+        `SELECT r.source, r.target, r.type, r.metadata_json FROM relations r JOIN logical_symbols ls ON r.target = ls.id WHERE r.type = ? AND r.target IN (${placeholders}) ORDER BY r.source, r.type, r.target`,
+      ).all(RelationType.CoversSymbol, ...chunk) as RelationRow[]
+      for (const row of rows)
+        rowsByKey.set(`${row.source}\u0000${row.type}\u0000${row.target}`, row)
+    }
+    return this.readRelations([...rowsByKey.values()]).sort(compareRelations)
   }
 
   /**
@@ -873,9 +963,8 @@ export class SQLiteGraphDatabase {
    * @returns The result of find directly affected files.
    */
   findDirectlyAffectedFiles(filePaths: readonly string[]): string[] {
-    const paths = [...new Set(filePaths)]
+    const paths = [...new Set(filePaths)].sort()
     if (paths.length === 0) return []
-    const placeholders = paths.map(() => '?').join(', ')
     const dependencyTypes = [
       ...SYMBOL_DEPENDENCY_RELATION_TYPES,
       RelationType.Extends,
@@ -883,8 +972,12 @@ export class SQLiteGraphDatabase {
       RelationType.Overrides,
     ]
     const typePlaceholders = dependencyTypes.map(() => '?').join(', ')
-    const rows = this.statement(
-      `SELECT DISTINCT affected_path FROM (
+    const affectedPaths = new Set<string>()
+    const chunkSize = getSqliteInputChunkSize(1 + dependencyTypes.length, 2)
+    for (const chunk of chunksOf(paths, chunkSize)) {
+      const placeholders = chunk.map(() => '?').join(', ')
+      const rows = this.statement(
+        `SELECT DISTINCT affected_path FROM (
          SELECT r.source AS affected_path
          FROM relations r
          WHERE r.type = ? AND r.target IN (${placeholders})
@@ -896,10 +989,12 @@ export class SQLiteGraphDatabase {
          WHERE target_symbol.file_path IN (${placeholders})
            AND r.type IN (${typePlaceholders})
        ) ORDER BY affected_path`,
-    ).all(RelationType.Imports, ...paths, ...paths, ...dependencyTypes) as Array<{
-      affected_path: string
-    }>
-    return rows.map((row) => row.affected_path)
+      ).all(RelationType.Imports, ...chunk, ...chunk, ...dependencyTypes) as Array<{
+        affected_path: string
+      }>
+      for (const row of rows) affectedPaths.add(row.affected_path)
+    }
+    return [...affectedPaths].sort((left, right) => left.localeCompare(right))
   }
 
   /**
@@ -976,6 +1071,7 @@ export class SQLiteGraphDatabase {
           s.name,
           s.kind,
           s.file_path,
+          s.project_relative_path,
           s.parent_id,
           s.line,
           s.column_number,
@@ -991,22 +1087,7 @@ export class SQLiteGraphDatabase {
           ON r.target = s.id
         WHERE r.type = ? AND r.source = ?
       `,
-    ).all(RelationType.Exports, filePath) as Array<{
-      id: string
-      name: string
-      kind: string
-      file_path: string
-      parent_id: string | null
-      line: number
-      column_number: number
-      end_line: number
-      end_column: number
-      selection_start_line: number
-      selection_start_column: number
-      selection_end_line: number
-      selection_end_column: number
-      comment: string | null
-    }>
+    ).all(RelationType.Exports, filePath) as SymbolRow[]
     return rows.map((row) => this.mapSymbolRow(row))
   }
 
@@ -1024,6 +1105,7 @@ export class SQLiteGraphDatabase {
             target.name,
             target.kind,
             target.file_path,
+            target.project_relative_path,
             target.parent_id,
             target.line,
             target.column_number,
@@ -1041,23 +1123,7 @@ export class SQLiteGraphDatabase {
           WHERE r.type IN (?, ?, ?)
         `,
       )
-      .all(...SYMBOL_DEPENDENCY_RELATION_TYPES) as Array<{
-      id: string
-      name: string
-      kind: string
-      file_path: string
-      parent_id: string | null
-      line: number
-      column_number: number
-      end_line: number
-      end_column: number
-      selection_start_line: number
-      selection_start_column: number
-      selection_end_line: number
-      selection_end_column: number
-      comment: string | null
-      caller_file_path: string
-    }>
+      .all(...SYMBOL_DEPENDENCY_RELATION_TYPES) as Array<SymbolRow & { caller_file_path: string }>
 
     return rows.map((row) => ({
       symbol: this.mapSymbolRow(row),
@@ -1068,9 +1134,29 @@ export class SQLiteGraphDatabase {
   /**
    * Retrieves file importer counts.
    *
+   * @param options - Optional filtering options.
+   * @param options.categories - Optional file categories to restrict importers to.
    * @returns The result of get file importer counts.
    */
-  getFileImporterCounts(): Map<string, number> {
+  getFileImporterCounts(options?: { categories?: readonly FileCategory[] }): Map<string, number> {
+    const admitted =
+      options?.categories && options.categories.length > 0 ? options.categories : undefined
+    if (admitted) {
+      const placeholders = admitted.map(() => '?').join(', ')
+      const rows = this.ensureOpen()
+        .prepare(
+          `
+            SELECT r.target, COUNT(DISTINCT r.source) AS importer_count
+            FROM relations r
+            JOIN files f ON f.path = r.source
+            WHERE r.type = ? AND f.category IN (${placeholders})
+            GROUP BY r.target
+          `,
+        )
+        .all(RelationType.Imports, ...admitted) as Array<{ target: string; importer_count: number }>
+      return new Map(rows.map((row) => [row.target, row.importer_count]))
+    }
+
     const rows = this.ensureOpen()
       .prepare(
         `
@@ -1093,16 +1179,19 @@ export class SQLiteGraphDatabase {
   getAllFiles(): FileNode[] {
     const rows = this.ensureOpen()
       .prepare(
-        'SELECT path, config_relative_path, language, content_hash, workspace, embedding, content FROM files',
+        'SELECT path, project_relative_path, language, content_hash, workspace, category, embedding, content, namespace, namespace_separator FROM files',
       )
       .all() as Array<{
       path: string
-      config_relative_path: string
+      project_relative_path: string
       language: string
       content_hash: string
       workspace: string
+      category?: string | null
       embedding: Buffer | null
       content: string | null
+      namespace?: string | null
+      namespace_separator?: string | null
     }>
     return rows.map((row) => this.mapFileRow(row))
   }
@@ -1114,10 +1203,12 @@ export class SQLiteGraphDatabase {
    */
   getAllDocuments(): DocumentNode[] {
     const rows = this.ensureOpen()
-      .prepare('SELECT path, config_relative_path, content_hash, content, workspace FROM documents')
+      .prepare(
+        'SELECT path, project_relative_path, content_hash, content, workspace FROM documents',
+      )
       .all() as Array<{
       path: string
-      config_relative_path: string
+      project_relative_path: string
       content_hash: string
       content: string
       workspace: string
@@ -1163,7 +1254,7 @@ export class SQLiteGraphDatabase {
       .sort(compareLogicalSymbols)
     const declarations = (
       this.statement(
-        'SELECT logical_symbol_id, symbol_id, file_path, line, column_number, end_line, end_column, kind FROM logical_declarations',
+        'SELECT logical_symbol_id, symbol_id, file_path, line, column_number, end_line, end_column, kind, occurrence_form FROM logical_declarations',
       ).all() as LogicalDeclarationRow[]
     )
       .map((row) => this.mapLogicalDeclarationRow(row))
@@ -1177,7 +1268,7 @@ export class SQLiteGraphDatabase {
       .sort(comparePublicBindings)
     const localBindings = (
       this.statement(
-        'SELECT id, file_path, scope_id, local_name, space, target_id FROM local_bindings',
+        'SELECT id, file_path, scope_id, local_name, space, target_id, start_line, start_column, end_line, end_column FROM local_bindings',
       ).all() as LocalBindingRow[]
     )
       .map((row) => this.mapLocalBindingRow(row))
@@ -1207,11 +1298,17 @@ export class SQLiteGraphDatabase {
    */
   findLogicalSymbolsByIds(ids: readonly string[]): LogicalSymbol[] {
     if (ids.length === 0) return []
-    const placeholders = ids.map(() => '?').join(', ')
-    const rows = this.statement(
-      `SELECT id, workspace, surface, name, space, owner_id, member_kind, member_dispatch, member_accessor, native_kind, qualified_name FROM logical_symbols WHERE id IN (${placeholders}) ORDER BY workspace, surface, name, space, owner_id, member_kind, member_dispatch, member_accessor, native_kind, id`,
-    ).all(...ids) as LogicalSymbolRow[]
-    return rows.map((row) => this.mapLogicalSymbolRow(row))
+    const rowsById = new Map<string, LogicalSymbolRow>()
+    for (const chunk of chunksOf([...new Set(ids)].sort(), getSqliteInputChunkSize(0))) {
+      const placeholders = chunk.map(() => '?').join(', ')
+      const rows = this.statement(
+        `SELECT id, workspace, surface, name, space, owner_id, member_kind, member_dispatch, member_accessor, native_kind, qualified_name FROM logical_symbols WHERE id IN (${placeholders})`,
+      ).all(...chunk) as LogicalSymbolRow[]
+      for (const row of rows) rowsById.set(row.id, row)
+    }
+    return [...rowsById.values()]
+      .map((row) => this.mapLogicalSymbolRow(row))
+      .sort(compareLogicalSymbols)
   }
 
   /**
@@ -1222,12 +1319,65 @@ export class SQLiteGraphDatabase {
    */
   findDeclarations(logicalSymbolIds: readonly string[]): LogicalDeclaration[] {
     if (logicalSymbolIds.length === 0) return []
-    const placeholders = [...new Set(logicalSymbolIds)].map(() => '?').join(', ')
-    const rows = this.statement(
-      `SELECT logical_symbol_id, symbol_id, file_path, line, column_number, end_line, end_column, kind
-       FROM logical_declarations WHERE logical_symbol_id IN (${placeholders})`,
-    ).all(...new Set(logicalSymbolIds)) as LogicalDeclarationRow[]
-    return rows.map((row) => this.mapLogicalDeclarationRow(row)).sort(compareLogicalDeclarations)
+    const orderedIds = [...new Set(logicalSymbolIds)]
+    const rowsByLogicalId = new Map<string, LogicalDeclarationRow[]>()
+    for (const chunk of chunksOf(orderedIds, getSqliteInputChunkSize(0))) {
+      const placeholders = chunk.map(() => '?').join(', ')
+      const rows = this.statement(
+        `SELECT logical_symbol_id, symbol_id, file_path, line, column_number, end_line, end_column, kind, occurrence_form FROM logical_declarations WHERE logical_symbol_id IN (${placeholders})`,
+      ).all(...chunk) as LogicalDeclarationRow[]
+      for (const row of rows) {
+        let list = rowsByLogicalId.get(row.logical_symbol_id)
+        if (!list) {
+          list = []
+          rowsByLogicalId.set(row.logical_symbol_id, list)
+        }
+        list.push(row)
+      }
+    }
+    const result: LogicalDeclaration[] = []
+    for (const id of orderedIds) {
+      const rows = rowsByLogicalId.get(id)
+      if (!rows) continue
+      const mapped = rows
+        .map((row) => this.mapLogicalDeclarationRow(row))
+        .sort(compareDeclarationsWithinTarget)
+      result.push(...mapped)
+    }
+    return result
+  }
+
+  /**
+   * Finds logical declarations by physical declaration symbol IDs.
+   *
+   * @param declarationSymbolIds - Physical declaration symbol identifiers to map.
+   * @returns Logical declarations following requested order with unknowns omitted.
+   */
+  findLogicalDeclarationsByDeclarationIds(
+    declarationSymbolIds: readonly string[],
+  ): LogicalDeclaration[] {
+    if (declarationSymbolIds.length === 0) return []
+    const orderedIds = [...new Set(declarationSymbolIds)]
+    const rowsBySymbolId = new Map<string, LogicalDeclarationRow>()
+    for (const chunk of chunksOf(orderedIds, getSqliteInputChunkSize(0))) {
+      const placeholders = chunk.map(() => '?').join(', ')
+      const rows = this.statement(
+        `SELECT logical_symbol_id, symbol_id, file_path, line, column_number, end_line, end_column, kind, occurrence_form FROM logical_declarations WHERE symbol_id IN (${placeholders})`,
+      ).all(...chunk) as LogicalDeclarationRow[]
+      for (const row of rows) {
+        if (!rowsBySymbolId.has(row.symbol_id)) {
+          rowsBySymbolId.set(row.symbol_id, row)
+        }
+      }
+    }
+    const result: LogicalDeclaration[] = []
+    for (const id of orderedIds) {
+      const row = rowsBySymbolId.get(id)
+      if (row) {
+        result.push(this.mapLogicalDeclarationRow(row))
+      }
+    }
+    return result
   }
 
   /**
@@ -1237,14 +1387,19 @@ export class SQLiteGraphDatabase {
    * @returns The result of find public bindings by exported names.
    */
   findPublicBindingsByExportedNames(exportedNames: readonly string[]): PublicBinding[] {
-    const names = [...new Set(exportedNames)]
+    const names = [...new Set(exportedNames)].sort()
     if (names.length === 0) return []
-    const placeholders = names.map(() => '?').join(', ')
-    const rows = this.statement(
-      `SELECT id, surface, exported_name, space, target_id FROM public_bindings
-       WHERE exported_name IN (${placeholders})`,
-    ).all(...names) as PublicBindingRow[]
-    return rows.map((row) => this.mapPublicBindingRow(row)).sort(comparePublicBindings)
+    const rowsById = new Map<string, PublicBindingRow>()
+    for (const chunk of chunksOf(names, getSqliteInputChunkSize(0))) {
+      const placeholders = chunk.map(() => '?').join(', ')
+      const rows = this.statement(
+        `SELECT id, surface, exported_name, space, target_id FROM public_bindings WHERE exported_name IN (${placeholders})`,
+      ).all(...chunk) as PublicBindingRow[]
+      for (const row of rows) rowsById.set(row.id, row)
+    }
+    return [...rowsById.values()]
+      .map((row) => this.mapPublicBindingRow(row))
+      .sort(comparePublicBindings)
   }
 
   /**
@@ -1270,10 +1425,7 @@ export class SQLiteGraphDatabase {
       params.push(query.filePath)
     }
 
-    if (query.filePaths !== undefined && query.filePaths.length > 0) {
-      conditions.push(`file_path IN (${query.filePaths.map(() => '?').join(', ')})`)
-      params.push(...query.filePaths)
-    }
+    const filePaths = query.filePaths === undefined ? [] : [...new Set(query.filePaths)].sort()
 
     if (query.parentSymbolId !== undefined) {
       conditions.push('parent_id = ?')
@@ -1300,25 +1452,27 @@ export class SQLiteGraphDatabase {
       }
     }
 
-    const where = conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : ''
-    const rows = this.statement(
-      `SELECT id, name, kind, file_path, parent_id, line, column_number, end_line, end_column, selection_start_line, selection_start_column, selection_end_line, selection_end_column, comment FROM symbols${where}`,
-    ).all(...params) as Array<{
-      id: string
-      name: string
-      kind: string
-      file_path: string
-      parent_id: string | null
-      line: number
-      column_number: number
-      end_line: number
-      end_column: number
-      selection_start_line: number
-      selection_start_column: number
-      selection_end_line: number
-      selection_end_column: number
-      comment: string | null
-    }>
+    if (query.categories !== undefined && query.categories.length > 0) {
+      const placeholders = query.categories.map(() => '?').join(', ')
+      conditions.push(`file_path IN (SELECT path FROM files WHERE category IN (${placeholders}))`)
+      params.push(...query.categories)
+    }
+
+    const readRows = (extraCondition?: string, extraParams: readonly string[] = []) => {
+      const whereConditions =
+        extraCondition === undefined ? conditions : [...conditions, extraCondition]
+      const where = whereConditions.length > 0 ? ` WHERE ${whereConditions.join(' AND ')}` : ''
+      return this.statement(`SELECT ${SYMBOL_ROW_COLUMNS} FROM symbols${where}`).all(
+        ...params,
+        ...extraParams,
+      ) as SymbolRow[]
+    }
+    const rows =
+      filePaths.length === 0
+        ? readRows()
+        : chunksOf(filePaths, getSqliteInputChunkSize(params.length)).flatMap((chunk) =>
+            readRows(`file_path IN (${chunk.map(() => '?').join(', ')})`, chunk),
+          )
 
     let results = rows.map((row) => this.mapSymbolRow(row))
     const ci = !caseSensitive
@@ -1342,7 +1496,7 @@ export class SQLiteGraphDatabase {
       }
     }
 
-    return results
+    return results.sort(compareSymbolNodes)
   }
 
   /**
@@ -1449,6 +1603,7 @@ export class SQLiteGraphDatabase {
             s.name,
             s.kind,
             s.file_path,
+            s.project_relative_path,
             s.parent_id,
             s.line,
             s.column_number,
@@ -1465,7 +1620,10 @@ export class SQLiteGraphDatabase {
           FROM candidates c
           INNER JOIN symbols s ON s.id = c.id
           LEFT JOIN files f ON s.file_path = f.path
-          ORDER BY identity_tier DESC, identity_token_hits DESC, identity_match_strength DESC, text_score DESC
+          ORDER BY identity_tier DESC, identity_token_hits DESC, identity_match_strength DESC, text_score DESC,
+            CASE s.kind WHEN 'class' THEN 4 WHEN 'interface' THEN 4 WHEN 'function' THEN 3 WHEN 'method' THEN 3 WHEN 'type' THEN 2 WHEN 'enum' THEN 2 ELSE 1 END DESC,
+            s.name ASC,
+            s.line ASC
         `,
       )
       .all(query.ftsQuery, ...identityCandidates.params, ...ranking.params) as Array<{
@@ -1473,6 +1631,7 @@ export class SQLiteGraphDatabase {
       name: string
       kind: string
       file_path: string
+      project_relative_path: string
       parent_id: string | null
       line: number
       column_number: number
@@ -1691,8 +1850,8 @@ export class SQLiteGraphDatabase {
     const ranking = buildIdentityRankingSql({
       canonicalExpr: 'lower(d.path)',
       canonicalComponentsExpr: buildIdentityComponentsExpr('lower(d.path)'),
-      alternateExpr: 'lower(d.config_relative_path)',
-      alternateComponentsExpr: buildIdentityComponentsExpr('lower(d.config_relative_path)'),
+      alternateExpr: 'lower(d.project_relative_path)',
+      alternateComponentsExpr: buildIdentityComponentsExpr('lower(d.project_relative_path)'),
       normalizedQuery: query.normalizedQuery,
       rawTokens: query.rawTokens,
       expandedTokens: query.expandedTokens,
@@ -1700,8 +1859,8 @@ export class SQLiteGraphDatabase {
     const identityCandidates = buildIdentityCandidatePredicateSql({
       canonicalExpr: 'lower(d.path)',
       canonicalComponentsExpr: buildIdentityComponentsExpr('lower(d.path)'),
-      alternateExpr: 'lower(d.config_relative_path)',
-      alternateComponentsExpr: buildIdentityComponentsExpr('lower(d.config_relative_path)'),
+      alternateExpr: 'lower(d.project_relative_path)',
+      alternateComponentsExpr: buildIdentityComponentsExpr('lower(d.project_relative_path)'),
       expandedTokens: query.expandedTokens,
     })
     const rows = this.ensureOpen()
@@ -1732,7 +1891,7 @@ export class SQLiteGraphDatabase {
           )
           SELECT
             d.path,
-            d.config_relative_path,
+            d.project_relative_path,
             d.content_hash,
             d.content,
             d.workspace,
@@ -1746,7 +1905,7 @@ export class SQLiteGraphDatabase {
       )
       .all(query.ftsQuery, ...identityCandidates.params, ...ranking.params) as Array<{
       path: string
-      config_relative_path: string
+      project_relative_path: string
       content_hash: string
       content: string
       workspace: string
@@ -1824,12 +1983,15 @@ export class SQLiteGraphDatabase {
               `
                 SELECT
                   f.path,
-                  f.config_relative_path,
+                  f.project_relative_path,
                   f.language,
                   f.content_hash,
                   f.workspace,
+                  f.category,
                   f.embedding,
                   f.content,
+                  f.namespace,
+                  f.namespace_separator,
                   (-bm25(file_content_fts)) AS backend_score
                 FROM file_content_fts
                 INNER JOIN files f ON f.path = file_content_fts.path
@@ -1845,12 +2007,15 @@ export class SQLiteGraphDatabase {
               offset,
             ) as Array<{
             path: string
-            config_relative_path: string
+            project_relative_path: string
             language: string
             content_hash: string
             workspace: string
+            category?: string | null
             embedding: Buffer | null
             content: string | null
+            namespace?: string | null
+            namespace_separator?: string | null
             backend_score: number
           }>)
         : (db
@@ -1858,12 +2023,15 @@ export class SQLiteGraphDatabase {
               `
                 SELECT
                   f.path,
-                  f.config_relative_path,
+                  f.project_relative_path,
                   f.language,
                   f.content_hash,
                   f.workspace,
+                  f.category,
                   f.embedding,
                   f.content,
+                  f.namespace,
+                  f.namespace_separator,
                   1.0 AS backend_score
                 FROM files f
                 WHERE f.content IS NOT NULL
@@ -1874,12 +2042,15 @@ export class SQLiteGraphDatabase {
             )
             .all(terms[0]!, ...filterParams, fetchLimit, offset) as Array<{
             path: string
-            config_relative_path: string
+            project_relative_path: string
             language: string
             content_hash: string
             workspace: string
+            category?: string | null
             embedding: Buffer | null
             content: string | null
+            namespace?: string | null
+            namespace_separator?: string | null
             backend_score: number
           }>)
 
@@ -2160,12 +2331,14 @@ export class SQLiteGraphDatabase {
    * @returns The result of read freshness latches.
    */
   readFreshnessLatches(workspaces: readonly string[]): FreshnessLatches {
-    const names = ['__graph__', ...new Set(workspaces)]
-    const placeholders = names.map(() => '?').join(', ')
-    const rows = this.statement(
-      `SELECT workspace, known_stale FROM freshness_latches WHERE workspace IN (${placeholders})`,
-    ).all(...names) as Array<{ workspace: string; known_stale: number }>
-    const values = new Map(rows.map((row) => [row.workspace, row.known_stale === 1]))
+    const names = [...new Set(['__graph__', ...workspaces])].sort()
+    const values = new Map<string, boolean>()
+    for (const chunk of chunksOf(names, getSqliteInputChunkSize(0))) {
+      const rows = this.statement(
+        `SELECT workspace, known_stale FROM freshness_latches WHERE workspace IN (${chunk.map(() => '?').join(', ')})`,
+      ).all(...chunk) as Array<{ workspace: string; known_stale: number }>
+      for (const row of rows) values.set(row.workspace, row.known_stale === 1)
+    }
     return {
       graph: values.get('__graph__') ?? false,
       workspaces: Object.fromEntries(
@@ -2258,14 +2431,19 @@ export class SQLiteGraphDatabase {
    * @returns Matching logical symbols in deterministic order.
    */
   findLogicalSymbolsByQualifiedNames(qualifiedNames: readonly string[]): LogicalSymbol[] {
-    const names = [...new Set(qualifiedNames.filter((name) => name.length > 0))]
+    const names = [...new Set(qualifiedNames.filter((name) => name.length > 0))].sort()
     if (names.length === 0) return []
-    const placeholders = names.map(() => '?').join(', ')
-    const rows = this.statement(
-      `SELECT id, workspace, surface, name, space, owner_id, member_kind, member_dispatch, member_accessor, native_kind, qualified_name
-       FROM logical_symbols WHERE qualified_name IN (${placeholders})`,
-    ).all(...names) as LogicalSymbolRow[]
-    return rows.map((row) => this.mapLogicalSymbolRow(row)).sort(compareLogicalSymbols)
+    const results = new Map<string, LogicalSymbol>()
+    for (const chunk of chunksOf(names, getSqliteInputChunkSize(0))) {
+      const placeholders = chunk.map(() => '?').join(', ')
+      for (const row of this.statement(
+        `SELECT id, workspace, surface, name, space, owner_id, member_kind, member_dispatch, member_accessor, native_kind, qualified_name FROM logical_symbols WHERE qualified_name IN (${placeholders})`,
+      ).all(...chunk) as LogicalSymbolRow[]) {
+        const symbol = this.mapLogicalSymbolRow(row)
+        results.set(symbol.id, symbol)
+      }
+    }
+    return [...results.values()].sort(compareLogicalSymbols)
   }
 
   /**
@@ -2276,12 +2454,7 @@ export class SQLiteGraphDatabase {
    */
   findLogicalDeclarations(logicalSymbolIds: readonly string[]): LogicalDeclaration[] {
     if (logicalSymbolIds.length === 0) return []
-    const placeholders = [...new Set(logicalSymbolIds)].map(() => '?').join(', ')
-    const rows = this.statement(
-      `SELECT logical_symbol_id, symbol_id, file_path, line, column_number, end_line, end_column, kind
-       FROM logical_declarations WHERE logical_symbol_id IN (${placeholders})`,
-    ).all(...new Set(logicalSymbolIds)) as LogicalDeclarationRow[]
-    return rows.map((row) => this.mapLogicalDeclarationRow(row)).sort(compareLogicalDeclarations)
+    return this.findDeclarations(logicalSymbolIds)
   }
 
   /**
@@ -2320,7 +2493,7 @@ export class SQLiteGraphDatabase {
   findLocalBindings(lookups: readonly LocalBindingLookup[]): LocalBinding[] {
     if (lookups.length === 0) return []
     const rows = this.statement(
-      `SELECT id, file_path, scope_id, local_name, space, target_id FROM local_bindings
+      `SELECT id, file_path, scope_id, local_name, space, target_id, start_line, start_column, end_line, end_column FROM local_bindings
        WHERE file_path = ? AND local_name = ?
          AND (? IS NULL OR scope_id = ?)
          AND (? IS NULL OR space = ?)`,
@@ -2350,13 +2523,20 @@ export class SQLiteGraphDatabase {
    */
   findResolutionSteps(fromIds: readonly string[]): ResolutionStep[] {
     if (fromIds.length === 0) return []
-    const ids = [...new Set(fromIds)]
-    const rows = this.statement(
-      `SELECT from_id, to_id, kind FROM resolution_steps WHERE from_id IN (${ids.map(() => '?').join(', ')})`,
-    ).all(...ids) as ResolutionStepRow[]
-    return rows
-      .map((row) => ({ fromId: row.from_id, toId: row.to_id, kind: row.kind }))
-      .sort(compareResolutionSteps)
+    const ids = [...new Set(fromIds)].sort()
+    const results = new Map<string, ResolutionStep>()
+    for (const chunk of chunksOf(ids, getSqliteInputChunkSize(0))) {
+      const rows = this.statement(
+        `SELECT from_id, to_id, kind FROM resolution_steps WHERE from_id IN (${chunk.map(() => '?').join(', ')})`,
+      ).all(...chunk) as ResolutionStepRow[]
+      for (const row of rows)
+        results.set(`${row.from_id}\u0000${row.to_id}\u0000${row.kind}`, {
+          fromId: row.from_id,
+          toId: row.to_id,
+          kind: row.kind,
+        })
+    }
+    return [...results.values()].sort(compareResolutionSteps)
   }
 
   /**
@@ -2367,12 +2547,15 @@ export class SQLiteGraphDatabase {
    */
   findIndexCoverage(filePaths: readonly string[]): IndexCoverage[] {
     if (filePaths.length === 0) return []
-    const paths = [...new Set(filePaths)]
-    const rows = this.statement(
-      `SELECT file_path, content_hash, status, reason, capabilities_json FROM index_coverage
-       WHERE file_path IN (${paths.map(() => '?').join(', ')})`,
-    ).all(...paths) as IndexCoverageRow[]
-    return rows
+    const paths = [...new Set(filePaths)].sort()
+    const rowsByPath = new Map<string, IndexCoverageRow>()
+    for (const chunk of chunksOf(paths, getSqliteInputChunkSize(0))) {
+      const rows = this.statement(
+        `SELECT file_path, content_hash, status, reason, capabilities_json FROM index_coverage WHERE file_path IN (${chunk.map(() => '?').join(', ')})`,
+      ).all(...chunk) as IndexCoverageRow[]
+      for (const row of rows) rowsByPath.set(row.file_path, row)
+    }
+    return [...rowsByPath.values()]
       .map((row) => ({
         filePath: row.file_path,
         contentHash: row.content_hash ?? undefined,
@@ -2522,6 +2705,30 @@ export class SQLiteGraphDatabase {
   }
 
   /**
+   * Asserts that every ordinary table exposes the columns the current DDL declares.
+   * A same-version database created by an older build can lack columns that
+   * `CREATE TABLE IF NOT EXISTS` never adds.
+   *
+   * @param db - The SQLite database instance to check after the DDL ran.
+   * @throws {GraphSchemaIncompatibleError} When a required table or column is missing.
+   */
+  private assertSchemaShape(db: SqliteDatabase): void {
+    for (const [table, required] of Object.entries(REQUIRED_COLUMNS)) {
+      const present = new Set(
+        (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map(
+          (column) => column.name,
+        ),
+      )
+      const missing = required.filter((column) => !present.has(column))
+      if (missing.length > 0) {
+        throw new GraphSchemaIncompatibleError(
+          `SQLite graph storage table ${table} is missing columns ${missing.join(', ')}; reindex to recreate derived storage`,
+        )
+      }
+    }
+  }
+
+  /**
    * Ensures the database schema version record exists and matches expected version.
    *
    * @throws {GraphSchemaIncompatibleError} When the schema version is incompatible.
@@ -2612,24 +2819,30 @@ export class SQLiteGraphDatabase {
   private insertFile(db: SqliteDatabase, file: FileNode): void {
     db.prepare(
       `
-        INSERT INTO files (path, config_relative_path, language, content_hash, workspace, embedding, content)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO files (path, project_relative_path, language, content_hash, workspace, category, embedding, content, namespace, namespace_separator)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(path) DO UPDATE SET
-          config_relative_path = excluded.config_relative_path,
+          project_relative_path = excluded.project_relative_path,
           language = excluded.language,
           content_hash = excluded.content_hash,
           workspace = excluded.workspace,
+          category = excluded.category,
           embedding = excluded.embedding,
-          content = excluded.content
+          content = excluded.content,
+          namespace = excluded.namespace,
+          namespace_separator = excluded.namespace_separator
       `,
     ).run(
       file.path,
-      file.configRelativePath,
+      file.projectRelativePath,
       file.language,
       file.contentHash,
       file.workspace,
+      file.category,
       this.serializeEmbedding(file.embedding),
       file.content ?? null,
+      file.namespace ?? null,
+      file.namespaceSeparator ?? null,
     )
   }
 
@@ -2642,23 +2855,29 @@ export class SQLiteGraphDatabase {
   private insertFiles(db: SqliteDatabase, files: readonly FileNode[]): void {
     executeBatchedInsert(
       db,
-      'INSERT INTO files (path, config_relative_path, language, content_hash, workspace, embedding, content)',
+      'INSERT INTO files (path, project_relative_path, language, content_hash, workspace, category, embedding, content, namespace, namespace_separator)',
       files.map((file) => [
         file.path,
-        file.configRelativePath,
+        file.projectRelativePath,
         file.language,
         file.contentHash,
         file.workspace,
+        file.category,
         this.serializeEmbedding(file.embedding),
         file.content ?? null,
+        file.namespace ?? null,
+        file.namespaceSeparator ?? null,
       ]),
       `ON CONFLICT(path) DO UPDATE SET
-        config_relative_path = excluded.config_relative_path,
+        project_relative_path = excluded.project_relative_path,
         language = excluded.language,
         content_hash = excluded.content_hash,
         workspace = excluded.workspace,
+        category = excluded.category,
         embedding = excluded.embedding,
-        content = excluded.content`,
+        content = excluded.content,
+        namespace = excluded.namespace,
+        namespace_separator = excluded.namespace_separator`,
     )
   }
 
@@ -2719,17 +2938,17 @@ export class SQLiteGraphDatabase {
   private insertDocument(db: SqliteDatabase, document: DocumentNode): void {
     db.prepare(
       `
-        INSERT INTO documents (path, config_relative_path, content_hash, content, workspace)
+        INSERT INTO documents (path, project_relative_path, content_hash, content, workspace)
         VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(path) DO UPDATE SET
-          config_relative_path = excluded.config_relative_path,
+          project_relative_path = excluded.project_relative_path,
           content_hash = excluded.content_hash,
           content = excluded.content,
           workspace = excluded.workspace
       `,
     ).run(
       document.path,
-      document.configRelativePath,
+      document.projectRelativePath,
       document.contentHash,
       document.content,
       document.workspace,
@@ -2745,16 +2964,16 @@ export class SQLiteGraphDatabase {
   private insertDocuments(db: SqliteDatabase, documents: readonly DocumentNode[]): void {
     executeBatchedInsert(
       db,
-      'INSERT INTO documents (path, config_relative_path, content_hash, content, workspace)',
+      'INSERT INTO documents (path, project_relative_path, content_hash, content, workspace)',
       documents.map((document) => [
         document.path,
-        document.configRelativePath,
+        document.projectRelativePath,
         document.contentHash,
         document.content,
         document.workspace,
       ]),
       `ON CONFLICT(path) DO UPDATE SET
-        config_relative_path = excluded.config_relative_path,
+        project_relative_path = excluded.project_relative_path,
         content_hash = excluded.content_hash,
         content = excluded.content,
         workspace = excluded.workspace`,
@@ -2771,7 +2990,7 @@ export class SQLiteGraphDatabase {
     executeBatchedInsert(
       db,
       `INSERT INTO symbols (
-        id, name, kind, file_path, parent_id, line, column_number, end_line, end_column,
+        id, name, kind, file_path, project_relative_path, parent_id, line, column_number, end_line, end_column,
         selection_start_line, selection_start_column, selection_end_line, selection_end_column,
         comment, search_text
       )`,
@@ -2780,6 +2999,7 @@ export class SQLiteGraphDatabase {
         symbol.name,
         symbol.kind,
         symbol.filePath,
+        symbol.projectRelativePath,
         symbol.parentId ?? null,
         symbol.line,
         symbol.column,
@@ -2796,6 +3016,7 @@ export class SQLiteGraphDatabase {
         name = excluded.name,
         kind = excluded.kind,
         file_path = excluded.file_path,
+        project_relative_path = excluded.project_relative_path,
         parent_id = excluded.parent_id,
         line = excluded.line,
         column_number = excluded.column_number,
@@ -2929,19 +3150,12 @@ export class SQLiteGraphDatabase {
    * @param filePath - File path parameter.
    */
   private deleteFileLocalState(db: SqliteDatabase, filePath: string): void {
-    const symbolIds = (
-      db.prepare('SELECT id FROM symbols WHERE file_path = ?').all(filePath) as Array<{
-        id: string
-      }>
-    ).map((row) => row.id)
-
-    if (symbolIds.length > 0) {
-      const placeholders = symbolIds.map(() => '?').join(', ')
-      db.prepare(
-        `DELETE FROM relations WHERE source IN (${placeholders}) OR target IN (${placeholders})`,
-      ).run(...symbolIds, ...symbolIds)
-      db.prepare(`DELETE FROM symbols WHERE id IN (${placeholders})`).run(...symbolIds)
-    }
+    db.prepare(
+      `DELETE FROM relations
+       WHERE source IN (SELECT id FROM symbols WHERE file_path = ?)
+          OR target IN (SELECT id FROM symbols WHERE file_path = ?)`,
+    ).run(filePath, filePath)
+    db.prepare('DELETE FROM symbols WHERE file_path = ?').run(filePath)
 
     db.prepare('DELETE FROM relations WHERE source = ? OR target = ?').run(filePath, filePath)
     db.prepare('DELETE FROM file_content_fts WHERE path = ?').run(filePath)
@@ -3021,18 +3235,44 @@ export class SQLiteGraphDatabase {
     direction: 'upstream' | 'downstream',
     frontier: readonly string[],
     relationTypes: readonly RelationTypeValue[],
-  ): RelationRow[] {
+  ): {
+    readonly rows: RelationRow[]
+    readonly omittedFiles: readonly { readonly path: string; readonly category: FileCategory }[]
+  } {
     const endpoint = direction === 'upstream' ? 'r.source' : 'r.target'
     const frontierEndpoint = direction === 'upstream' ? 'r.target' : 'r.source'
     const joins: string[] = []
     const conditions: string[] = []
     const filterParams: unknown[] = []
     const filter = input.filter
+    const admittedCategories = resolveAdmittedCategories(filter)
 
     let workspaceColumn: string
+    let categoryColumn: string | undefined
+    let filePathColumn: string | undefined
+
+    // Spec -> symbol coverage targets canonical logical symbols; expose their physical declarations
+    // so symbol admission (kind, workspace, category) applies to real source declarations.
+    const coversLogicalSymbols =
+      input.resource === 'symbol' &&
+      direction === 'downstream' &&
+      relationTypes.length === 1 &&
+      relationTypes[0] === RelationType.CoversSymbol
+    const selectedTarget = coversLogicalSymbols ? 'ld.symbol_id' : 'r.target'
+
     if (input.resource === 'symbol') {
-      joins.push(`JOIN symbols n ON n.id = ${endpoint}`, 'JOIN files f ON f.path = n.file_path')
+      if (coversLogicalSymbols) {
+        joins.push(
+          'JOIN logical_declarations ld ON ld.logical_symbol_id = r.target',
+          'JOIN symbols n ON n.id = ld.symbol_id',
+        )
+      } else {
+        joins.push(`JOIN symbols n ON n.id = ${endpoint}`)
+      }
+      joins.push('JOIN files f ON f.path = n.file_path')
       workspaceColumn = 'f.workspace'
+      categoryColumn = 'f.category'
+      filePathColumn = 'f.path'
       const kinds = [...new Set(filter?.kinds ?? [])].sort()
       if (kinds.length > 0) {
         conditions.push(`n.kind IN (${kinds.map(() => '?').join(', ')})`)
@@ -3041,9 +3281,16 @@ export class SQLiteGraphDatabase {
     } else if (input.resource === 'file') {
       joins.push(`JOIN files n ON n.path = ${endpoint}`)
       workspaceColumn = 'n.workspace'
+      categoryColumn = 'n.category'
+      filePathColumn = 'n.path'
     } else {
       joins.push(`JOIN specs n ON n.spec_id = ${endpoint}`)
       workspaceColumn = 'n.workspace'
+    }
+
+    if (categoryColumn !== undefined) {
+      conditions.push(`${categoryColumn} IN (${admittedCategories.map(() => '?').join(', ')})`)
+      filterParams.push(...admittedCategories)
     }
 
     const includedWorkspaces = [...new Set(filter?.workspaces ?? [])].sort()
@@ -3057,6 +3304,11 @@ export class SQLiteGraphDatabase {
       filterParams.push(...excludedWorkspaces)
     }
 
+    const nonAdmittedCategories =
+      categoryColumn === undefined
+        ? []
+        : FILE_CATEGORIES.filter((c) => !admittedCategories.includes(c))
+
     const fixedParameterCount = relationTypes.length + filterParams.length
     const frontierChunkSize = SQLITE_BATCH_PARAMETER_LIMIT - fixedParameterCount
     if (frontierChunkSize < 1) {
@@ -3064,7 +3316,9 @@ export class SQLiteGraphDatabase {
     }
 
     const rows: RelationRow[] = []
+    const omittedFiles: { path: string; category: FileCategory }[] = []
     const relationTypePlaceholders = relationTypes.map(() => '?').join(', ')
+
     for (const frontierChunk of chunksOf(frontier, frontierChunkSize)) {
       const frontierPlaceholders = frontierChunk.map(() => '?').join(', ')
       const predicateSql = [
@@ -3074,15 +3328,65 @@ export class SQLiteGraphDatabase {
       ].join(' AND ')
       rows.push(
         ...(this.statement(
-          `SELECT r.source, r.target, r.type, r.metadata_json
+          `SELECT r.source, ${selectedTarget} AS target, r.type, r.metadata_json
            FROM relations r
            ${joins.join('\n')}
            WHERE ${predicateSql}
-           ORDER BY r.source, r.type, r.target`,
+           ORDER BY r.source, r.type, target`,
         ).all(...frontierChunk, ...relationTypes, ...filterParams) as RelationRow[]),
       )
+
+      if (
+        categoryColumn !== undefined &&
+        filePathColumn !== undefined &&
+        nonAdmittedCategories.length > 0
+      ) {
+        const otherConditions: string[] = []
+        const otherParams: unknown[] = []
+        if (input.resource === 'symbol' && filter?.kinds !== undefined && filter.kinds.length > 0) {
+          const kinds = [...new Set(filter.kinds)].sort()
+          otherConditions.push(`n.kind IN (${kinds.map(() => '?').join(', ')})`)
+          otherParams.push(...kinds)
+        }
+        if (includedWorkspaces.length > 0) {
+          otherConditions.push(
+            `${workspaceColumn} IN (${includedWorkspaces.map(() => '?').join(', ')})`,
+          )
+          otherParams.push(...includedWorkspaces)
+        }
+        if (excludedWorkspaces.length > 0) {
+          otherConditions.push(
+            `${workspaceColumn} NOT IN (${excludedWorkspaces.map(() => '?').join(', ')})`,
+          )
+          otherParams.push(...excludedWorkspaces)
+        }
+
+        const nonAdmittedPlaceholders = nonAdmittedCategories.map(() => '?').join(', ')
+        const omittedPredicateSql = [
+          `${frontierEndpoint} IN (${frontierPlaceholders})`,
+          `r.type IN (${relationTypePlaceholders})`,
+          `${categoryColumn} IN (${nonAdmittedPlaceholders})`,
+          ...otherConditions,
+        ].join(' AND ')
+
+        const omittedRows = this.statement(
+          `SELECT DISTINCT ${filePathColumn} AS path, ${categoryColumn} AS category
+           FROM relations r
+           ${joins.join('\n')}
+           WHERE ${omittedPredicateSql}`,
+        ).all(
+          ...frontierChunk,
+          ...relationTypes,
+          ...nonAdmittedCategories,
+          ...otherParams,
+        ) as Array<{
+          path: string
+          category: FileCategory
+        }>
+        omittedFiles.push(...omittedRows)
+      }
     }
-    return rows
+    return { rows, omittedFiles }
   }
 
   /**
@@ -3125,12 +3429,16 @@ export class SQLiteGraphDatabase {
   private getRelationsByTargets(type: RelationTypeValue, targets: readonly string[]): Relation[] {
     const uniqueTargets = [...new Set(targets)].sort()
     if (uniqueTargets.length === 0) return []
-    const placeholders = uniqueTargets.map(() => '?').join(', ')
-    return this.readRelations(
-      this.statement(
+    const rowsByKey = new Map<string, RelationRow>()
+    for (const chunk of chunksOf(uniqueTargets, getSqliteInputChunkSize(1))) {
+      const placeholders = chunk.map(() => '?').join(', ')
+      const rows = this.statement(
         `SELECT source, target, type, metadata_json FROM relations WHERE type = ? AND target IN (${placeholders}) ORDER BY source, type, target`,
-      ).all(type, ...uniqueTargets) as RelationRow[],
-    )
+      ).all(type, ...chunk) as RelationRow[]
+      for (const row of rows)
+        rowsByKey.set(`${row.source}\u0000${row.type}\u0000${row.target}`, row)
+    }
+    return this.readRelations([...rowsByKey.values()]).sort(compareRelations)
   }
 
   /**
@@ -3247,7 +3555,7 @@ export class SQLiteGraphDatabase {
     executeBatchedInsert(
       db,
       `INSERT INTO logical_declarations (
-        logical_symbol_id, symbol_id, file_path, line, column_number, end_line, end_column, kind
+        logical_symbol_id, symbol_id, file_path, line, column_number, end_line, end_column, kind, occurrence_form
       )`,
       facts.declarations.map(({ logicalSymbolId, declaration }) => [
         logicalSymbolId,
@@ -3258,6 +3566,7 @@ export class SQLiteGraphDatabase {
         declaration.location.endLine ?? null,
         declaration.location.endColumn ?? null,
         declaration.kind,
+        declaration.form ?? declaration.occurrenceForm ?? DeclarationOccurrenceForm.Definition,
       ]),
     )
 
@@ -3275,7 +3584,7 @@ export class SQLiteGraphDatabase {
 
     executeBatchedInsert(
       db,
-      'INSERT INTO local_bindings (id, file_path, scope_id, local_name, space, target_id)',
+      'INSERT INTO local_bindings (id, file_path, scope_id, local_name, space, target_id, start_line, start_column, end_line, end_column)',
       facts.localBindings.map((binding) => [
         binding.id,
         binding.filePath,
@@ -3283,6 +3592,10 @@ export class SQLiteGraphDatabase {
         binding.localName,
         binding.space,
         binding.targetId ?? null,
+        binding.range.startLine,
+        binding.range.startColumn,
+        binding.range.endLine,
+        binding.range.endColumn,
       ]),
     )
 
@@ -3391,13 +3704,13 @@ export class SQLiteGraphDatabase {
     }
 
     const documentInsert = db.prepare(
-      'INSERT INTO document_fts (path, config_relative_path, content) VALUES (?, ?, ?)',
+      'INSERT INTO document_fts (path, project_relative_path, content) VALUES (?, ?, ?)',
     )
     const documentRows = db
-      .prepare('SELECT path, config_relative_path, content FROM documents')
-      .all() as Array<{ path: string; config_relative_path: string; content: string }>
+      .prepare('SELECT path, project_relative_path, content FROM documents')
+      .all() as Array<{ path: string; project_relative_path: string; content: string }>
     for (const row of documentRows) {
-      documentInsert.run(row.path, row.config_relative_path, row.content)
+      documentInsert.run(row.path, row.project_relative_path, row.content)
     }
 
     const fileContentInsert = db.prepare(
@@ -3495,31 +3808,46 @@ export class SQLiteGraphDatabase {
    *
    * @param row - Row parameter.
    * @param row.path - The path value.
-   * @param row.config_relative_path - The config relative path value.
+   * @param row.project_relative_path - The project relative path value.
    * @param row.language - The language value.
    * @param row.content_hash - The content hash value.
    * @param row.workspace - The workspace value.
    * @param row.embedding - The embedding value.
    * @param row.content - The content value.
+   * @param row.category - The category value.
+   * @param row.namespace - The namespace value.
+   * @param row.namespace_separator - The namespace separator value.
    * @returns The result of map file row.
    */
   private mapFileRow(row: {
     path: string
-    config_relative_path: string
+    project_relative_path: string
     language: string
     content_hash: string
     workspace: string
+    category?: string | null
     embedding: Buffer | null
     content: string | null
+    namespace?: string | null
+    namespace_separator?: string | null
   }): FileNode {
     return createFileNode({
       path: row.path,
-      configRelativePath: row.config_relative_path,
+      projectRelativePath: row.project_relative_path,
       language: row.language,
       contentHash: row.content_hash,
       workspace: row.workspace,
+      category: (row.category as FileCategory | undefined) ?? 'source',
       ...(row.embedding !== null ? { embedding: this.deserializeEmbedding(row.embedding) } : {}),
       ...(row.content !== null ? { content: row.content } : {}),
+      ...(row.namespace !== null && row.namespace !== undefined
+        ? {
+            namespace: row.namespace,
+            ...(row.namespace_separator !== null && row.namespace_separator !== undefined
+              ? { namespaceSeparator: row.namespace_separator }
+              : {}),
+          }
+        : {}),
     })
   }
 
@@ -3528,7 +3856,7 @@ export class SQLiteGraphDatabase {
    *
    * @param row - Row parameter.
    * @param row.path - The path value.
-   * @param row.config_relative_path - The config relative path value.
+   * @param row.project_relative_path - The project relative path value.
    * @param row.content_hash - The content hash value.
    * @param row.content - The content value.
    * @param row.workspace - The workspace value.
@@ -3536,14 +3864,14 @@ export class SQLiteGraphDatabase {
    */
   private mapDocumentRow(row: {
     path: string
-    config_relative_path: string
+    project_relative_path: string
     content_hash: string
     content: string
     workspace: string
   }): DocumentNode {
     return createDocumentNode({
       path: row.path,
-      configRelativePath: row.config_relative_path,
+      projectRelativePath: row.project_relative_path,
       contentHash: row.content_hash,
       content: row.content,
       workspace: row.workspace,
@@ -3558,6 +3886,7 @@ export class SQLiteGraphDatabase {
    * @param row.name - The name value.
    * @param row.kind - The kind value.
    * @param row.file_path - The file path value.
+   * @param row.project_relative_path - The project-relative path value.
    * @param row.parent_id - The parent id value.
    * @param row.line - The line value.
    * @param row.column_number - The column number value.
@@ -3575,6 +3904,7 @@ export class SQLiteGraphDatabase {
     name: string
     kind: string
     file_path: string
+    project_relative_path?: string
     parent_id: string | null
     line: number
     column_number: number
@@ -3590,6 +3920,7 @@ export class SQLiteGraphDatabase {
       name: row.name,
       kind: row.kind,
       filePath: row.file_path,
+      projectRelativePath: row.project_relative_path ?? row.file_path,
       line: row.line,
       column: row.column_number,
       endLine: row.end_line,
@@ -3646,6 +3977,12 @@ export class SQLiteGraphDatabase {
           endColumn: row.end_column ?? row.column_number,
         },
         kind: row.kind,
+        form:
+          (row.occurrence_form as DeclarationOccurrenceForm) ??
+          DeclarationOccurrenceForm.Definition,
+        occurrenceForm:
+          (row.occurrence_form as DeclarationOccurrenceForm) ??
+          DeclarationOccurrenceForm.Definition,
       },
     }
   }
@@ -3680,6 +4017,12 @@ export class SQLiteGraphDatabase {
       localName: row.local_name,
       space: row.space,
       targetId: row.target_id ?? undefined,
+      range: {
+        startLine: row.start_line,
+        startColumn: row.start_column,
+        endLine: row.end_line,
+        endColumn: row.end_column,
+      },
     }
   }
 
@@ -3867,6 +4210,21 @@ function compareLogicalSymbols(left: LogicalSymbol, right: LogicalSymbol): numbe
 }
 
 /**
+ * Orders symbols deterministically by location and identifier.
+ * @param left - First symbol.
+ * @param right - Second symbol.
+ * @returns Comparison result.
+ */
+function compareSymbolNodes(left: SymbolNode, right: SymbolNode): number {
+  return (
+    left.filePath.localeCompare(right.filePath) ||
+    left.line - right.line ||
+    left.column - right.column ||
+    left.id.localeCompare(right.id)
+  )
+}
+
+/**
  * Executes compare logical declarations operation.
  *
  * @param left - Left parameter.
@@ -3889,6 +4247,24 @@ function compareLogicalDeclarations(left: LogicalDeclaration, right: LogicalDecl
       String(right.declaration.location.column),
       right.declaration.symbolId,
     ],
+  )
+}
+
+/**
+ * Sorts declaration occurrences within one logical target by filePath, line, column, symbolId.
+ * @param left - First logical declaration to compare.
+ * @param right - Second logical declaration to compare.
+ * @returns Negative, zero, or positive ordering value.
+ */
+function compareDeclarationsWithinTarget(
+  left: LogicalDeclaration,
+  right: LogicalDeclaration,
+): number {
+  return (
+    left.declaration.location.filePath.localeCompare(right.declaration.location.filePath) ||
+    left.declaration.location.line - right.declaration.location.line ||
+    left.declaration.location.column - right.declaration.location.column ||
+    left.declaration.symbolId.localeCompare(right.declaration.symbolId)
   )
 }
 
@@ -4454,10 +4830,8 @@ function relationEndpointsExist(relation: Relation, ids: RelationEndpointIds): b
     case RelationType.CoversFile:
       return ids.specs.has(relation.source) && ids.files.has(relation.target)
     case RelationType.CoversSymbol:
-      return (
-        ids.specs.has(relation.source) &&
-        (ids.symbols.has(relation.target) || ids.logicalSymbols.has(relation.target))
-      )
+      // Coverage targets are canonical logical symbols; a physical declaration ID is rejected.
+      return ids.specs.has(relation.source) && ids.logicalSymbols.has(relation.target)
     default:
       return false
   }

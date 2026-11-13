@@ -1,0 +1,8 @@
+releases:
+  core:config: minor
+  code-graph:indexer: minor
+  code-graph:workspace-integration: minor
+  cli:graph-index: minor
+  code-graph:explain-graph-path: minor
+  sdk:run-graph-why: minor
+  cli:graph-why: minor

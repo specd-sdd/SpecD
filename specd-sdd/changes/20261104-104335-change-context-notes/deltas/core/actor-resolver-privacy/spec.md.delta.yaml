@@ -1,0 +1,30 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Privacy modes$'
+  content: |
+    The decorator MUST support three obfuscation modes:
+
+    - **`hash`**: Obfuscates the email using HMAC with a project-specific salt.
+    - **`mask`**: Partially masks the name and email parts (e.g. `j***z@e***.com`).
+    - **`anonymous`**: Replaces visible identity fields with a static "Anonymous" placeholder while retaining the pre-privacy actor id.
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Excluded actors$'
+  content: |
+    The decorator MUST NOT apply any obfuscation or metadata removal to actors listed in `excludeActors`.
+
+    - Comparison MUST be case-insensitive against both `name` and `email`.
+    - When an actor is excluded, the original identity fields are retained verbatim — including `providerId` and all `metadata` fields — together with the required pre-privacy actor id. This takes precedence over the "Metadata privacy" requirement.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Pre-privacy ID preservation
+
+    Finalize raw actor ID before exclusion checks, anonymous return, masking, providerId removal or metadata filtering. Preserve that dedicated id in all modes; never derive it from obfuscated fields or put it in filtered metadata/providerId. ID derivation follows core:actor-resolver-port and requires no configured privacy.salt. Existing hash-mode email HMAC retains its configured secret-salt contract unchanged. The derived name/email key is not a random secret; anonymous presentation intentionally retains a correlatable representation ID. Prevent loss of id on actor projection/copy/storage.

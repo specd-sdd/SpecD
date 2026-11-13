@@ -347,7 +347,7 @@ export class CompileContext {
 
     if (includeChangeSpecs) {
       for (const specId of change.specIds) {
-        const { workspace, capPath } = parseSpecId(specId)
+        const { workspace, capPath } = parseSpecId(specId, { workspaces })
         registerCollectedSpec({ workspace, capPath }, 'specIds', { protect: true })
       }
     }
@@ -397,7 +397,7 @@ export class CompileContext {
 
       const depSeen = new Set<string>()
       for (const specId of change.specIds) {
-        const { workspace, capPath } = parseSpecId(specId)
+        const { workspace, capPath } = parseSpecId(specId, { workspaces })
         const ws = workspaceMap.get(workspace)
         if (ws === undefined) continue
         const repo = ws.specRepo

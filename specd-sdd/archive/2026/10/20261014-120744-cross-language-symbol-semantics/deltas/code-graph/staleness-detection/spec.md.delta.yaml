@@ -1,0 +1,24 @@
+- op: added
+  description: 'Make the index lock self-healing: a lock owned by a dead process must not block indexing forever.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Centralized index lock control$'
+  content: |
+    ### Requirement: Stale index lock recovery
+
+    The index lock file SHALL be a version-two ownership record containing the owner `pid`, the owner process start time (`startedAt`, an opaque value that is stable for the life of that process and comparable for equality), and the ownership `token`. A version-one record (`pid` and `token` only) MUST remain readable and MUST be judged by `pid` liveness alone.
+
+    Lock acquisition and `assertGraphIndexUnlocked` SHALL classify an existing lock before reporting it busy:
+
+    - **live** when the owner `pid` is alive and, when both start times are available, the recorded `startedAt` equals the current start time of that `pid`;
+    - **stale** when the owner `pid` does not exist, or exists with a different start time (the operating system reused the pid), or the record is unreadable or malformed and its file is older than a bounded grace period.
+
+    A stale lock MUST be removed and acquisition MUST then proceed exactly as if no lock existed. Removal and the following exclusive creation MUST be race-safe: when two processes recover the same stale lock at once, exactly one acquires it and the other reports the graph busy. A live lock MUST still report the graph busy with the typed busy error. A pid whose liveness cannot be determined (for example insufficient permission to signal it) MUST be treated as live.
+
+    Recovery of a stale lock SHALL emit a warning through the host logging facility and MUST NOT change command output or exit code. `assertGraphIndexUnlocked` MUST NOT throw for a stale lock and MUST NOT remove it; only acquisition removes a stale lock.
+
+    The recovery logic SHALL live in the lock helper owned by this capability. Callers, including the isolated index supervisor, MUST NOT implement their own stale-lock detection.

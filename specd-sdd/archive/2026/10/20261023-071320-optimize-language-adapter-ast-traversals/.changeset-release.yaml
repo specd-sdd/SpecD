@@ -1,0 +1,6 @@
+releases:
+  code-graph:language-adapter: patch
+  code-graph:typescript-language-adapter: patch
+  code-graph:python-language-adapter: patch
+  code-graph:php-language-adapter: patch
+  code-graph:go-language-adapter: patch

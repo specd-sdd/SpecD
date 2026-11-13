@@ -3,8 +3,13 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:change", "core:storage", "core:repository-port"],
-  "implementation": [],
+  "dependsOn": ["core:change", "core:storage", "core:repository-port", "core:spec-id-format"],
+  "implementation": [
+    {
+      "file": "core:src/domain/archived-change-index-entry.ts",
+      "symbols": ["workspacesFromSpecIds"]
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "ArchiveListEntry: lightweight index row for fast archive listing without per-entry manifest reads.",

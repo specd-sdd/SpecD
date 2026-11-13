@@ -1,14 +1,23 @@
 /**
+ * Three-tier semantic categorization of indexed files.
+ */
+export type FileCategory = 'source' | 'test' | 'ignored'
+export const FILE_CATEGORIES: readonly FileCategory[] = ['source', 'test', 'ignored']
+
+/**
  * Represents a source file in the code graph.
  */
 export interface FileNode {
   readonly path: string
-  readonly configRelativePath: string
+  readonly projectRelativePath: string
   readonly language: string
   readonly contentHash: string
   readonly workspace: string
+  readonly category: FileCategory
   readonly embedding: Float32Array | undefined
   readonly content?: string | undefined
+  readonly namespace?: string | undefined
+  readonly namespaceSeparator?: string | undefined
 }
 
 /**
@@ -24,30 +33,44 @@ function normalizePath(filePath: string): string {
  * Creates a new FileNode with a normalized path.
  * @param params - The file node properties.
  * @param params.path - Workspace-relative file path.
- * @param params.configRelativePath - Path relative to the config directory.
+ * @param params.projectRelativePath - Path relative to the project root.
  * @param params.language - Language identifier.
  * @param params.contentHash - Content hash for incremental diffing.
  * @param params.workspace - Workspace name (e.g. 'core', 'cli').
+ * @param params.category - Optional file category, defaults to 'source'.
  * @param params.embedding - Optional vector embedding.
  * @param params.content - Optional full textual content.
+ * @param params.namespace - Optional file namespace.
+ * @param params.namespaceSeparator - Optional namespace separator.
  * @returns A FileNode value object.
  */
 export function createFileNode(params: {
   path: string
-  configRelativePath: string
+  projectRelativePath?: string
   language: string
   contentHash: string
   workspace: string
+  category?: FileCategory | undefined
   embedding?: Float32Array | undefined
   content?: string
+  namespace?: string | undefined
+  namespaceSeparator?: string | undefined
 }): FileNode {
-  return {
+  const node: FileNode = {
     path: normalizePath(params.path),
-    configRelativePath: normalizePath(params.configRelativePath),
+    projectRelativePath: normalizePath(params.projectRelativePath ?? params.path),
     language: params.language,
     contentHash: params.contentHash,
     workspace: params.workspace,
+    category: params.category ?? 'source',
     embedding: params.embedding ? new Float32Array(params.embedding) : undefined,
     content: params.content,
+    ...(params.namespace !== undefined
+      ? {
+          namespace: params.namespace,
+          namespaceSeparator: params.namespaceSeparator ?? '.',
+        }
+      : {}),
   }
+  return node
 }

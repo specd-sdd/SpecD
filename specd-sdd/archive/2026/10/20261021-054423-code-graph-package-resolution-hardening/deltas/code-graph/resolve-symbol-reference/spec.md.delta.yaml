@@ -1,0 +1,13 @@
+- op: modified
+  description: Make explicit that no generic dotted parser and no derived qualified name replace an absent adapter
+  selector:
+    type: section
+    matches: 'Requirement: Structured reference input'
+  content: |
+    `ResolveSymbolReference` SHALL accept a workspace, requested symbol text, and optional file, public surface, symbol-space, broad kind, member-semantics, owner, and build-context constraints. Structured identity fields SHALL be authoritative. Rendered canonical references MUST round-trip with escaping and MUST NOT be interpreted by ad hoc delimiter splitting.
+
+    A request whose text is `Tipo.miembro` or `Tipo::miembro` SHALL resolve by equality on stored `qualified_name`. It MUST NOT require a file, public surface, or language, and the resolver MUST NOT run every adapter or pick a default language for that lookup. `::` MUST compare as the stored dotted spelling. One match resolves that member. Every match MUST be returned. A supplied file or public surface SHALL filter those matches to symbols visible there. No remaining match is unresolved. The comparison uses only the `qualified_name` value stored in the graph: neither the resolver nor any persisted or session-backed store implementation answering the qualified-name query may derive a qualified name from an owner, a member, or other symbol fields to extend that equality. A logical symbol without stored `qualified_name` MUST NOT match an owner-qualified text query. Session-backed and persisted stores MUST therefore return the same candidates for equivalent facts.
+
+    Other human owner-qualified text SHALL be parsed by the language adapter selected from proven context, in this order: an explicit language, the language inferred from the file extension of an anchored file path, or the language inferred from the file extension of an anchored public-surface path. When none of those identifies an adapter, the selected adapter does not provide the `symbolReferenceSyntax` facet, or the facet returns no candidates for non-simple text, that other text MUST resolve as unresolved (`REFERENCE_UNPROVEN`). The resolver MUST NOT fall back to a generic dotted or delimiter parser, to another language's adapter, or to a default language for that text; an anchor without an adapter providing `symbolReferenceSyntax` (for example a Go package surface or a `.go` file) leaves such text unresolved.
+
+    Identifier case and normalization SHALL follow the source language. Path and workspace normalization SHALL remain separate from symbol normalization. `MemberForm` MUST NOT remain an input field.

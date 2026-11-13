@@ -1,0 +1,47 @@
+- op: modified
+  description: 'Route --all orchestration through the dedicated core batch use case'
+  selector:
+    type: section
+    matches: 'Requirement: Behaviour'
+  content: |
+    For single-spec validation targets, the command invokes the `ValidateArtifacts` use case, passing the change name, spec ID, and optionally the artifact ID from `--artifact`.
+
+    For `--all` validation targets, the command invokes `ValidateChangeBatch` and consumes its aggregated step results. The CLI MUST NOT reimplement artifact DAG scheduling, change-scoped versus spec-scoped branching, or batch failure aggregation locally.
+
+    The command MUST render file path details from the use case's structured file result metadata instead of recomputing expected paths in the CLI layer.
+- op: modified
+  description: 'Clarify that --all behavior is delegated to core while preserving the command contract'
+  selector:
+    type: section
+    matches: 'Requirement: Batch mode \(\-\-all\)'
+  content: |
+    With `--all`, the command invokes `ValidateChangeBatch`, which validates the change using the active schema's artifact DAG instead of looping `specIds` with a full multi-artifact pass per spec in the CLI layer.
+
+    `--all` is mutually exclusive with the `<workspace:capability-path>` positional — providing both exits with `error: --all and <specPath> are mutually exclusive`. Omitting both exits with `error: either <specPath> or --all is required`.
+
+    The delegated batch driver MUST walk `schema.artifactDag().topologicalOrder()`. For each artifact type in that order:
+
+    - **`scope: change`** — invoke `ValidateArtifacts` once for that artifact type with **no `specPath` field** in the use-case input (do not pass a placeholder `specIds[0]`).
+    - **`scope: spec`** — invoke `ValidateArtifacts` once per `specId` in the change for that artifact type.
+
+    When `--artifact <artifactId>` is combined with `--all`, the delegated batch driver MUST use the same topological walk but execute only steps whose artifact id matches `<artifactId>`.
+
+    Individual validation failures MUST NOT abort the batch early — all scheduled steps run and results are aggregated.
+
+    **Text output:** each scheduled step's result is printed as in single-spec mode (success or failure block), followed by a summary line reporting how many steps passed versus scheduled.
+
+    **JSON output:** `{ passed: <bool>, total: M, results: [{ spec: "<specId or null for change-scoped>", artifact: "<artifactId>", passed: <bool>, failures: [...], warnings: [...] }] }` — one entry per scheduled validation step. Each step MUST include a `warnings` array (possibly empty). Structural optimisation hints from the use case MAY be mapped into `warnings`; the field name MUST NOT be `notes` in batch JSON output.
+
+    The process exits with code 1 if any step has failures, 0 if all pass.
+- op: modified
+  description: 'Record the core batch use case dependency introduced by delegation'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+    - [`core:change`](../../core/change/spec.md) — artifact status, validation, approval invalidation
+    - [`core:validate-artifacts`](../../core/validate-artifacts/spec.md) — validation result shape and expected artifact file paths
+    - [`core:spec-id-format`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format
+    - [`core:preview-spec`](../../core/preview-spec/spec.md) — merged spec content and diff preview for review
+    - [`core:validate-change-batch`](../../core/validate-change-batch/spec.md) — core-owned batch scheduling contract for `--all`

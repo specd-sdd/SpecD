@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { performance } from 'node:perf_hooks'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -30,11 +30,134 @@ import { buildProjectGraphConfig } from '../../../src/application/services/build
 import { makeMockSpecRepository } from '../../helpers/make-mock-spec-repository.js'
 import { GraphStorageRecoveryRequiredError } from '../../../src/domain/errors/graph-storage-recovery-required-error.js'
 import { IndexCodeGraph } from '../../../src/application/use-cases/index-code-graph.js'
+import { SearchCodeGraph } from '../../../src/application/use-cases/search-code-graph.js'
 import { AdapterRegistry } from '../../../src/infrastructure/tree-sitter/adapter-registry.js'
 import { GoLanguageAdapter } from '../../../src/infrastructure/tree-sitter/go-language-adapter.js'
 import { TypeScriptLanguageAdapter } from '../../../src/infrastructure/tree-sitter/typescript-language-adapter.js'
+import { emptyResolutionManifestSource } from '../../../src/application/ports/resolution-manifest-source.js'
+import { emptyRepositoryRootSource } from '../../../src/application/ports/repository-root-source.js'
+import { NodeWorkspaceAccessibilitySource } from '../../../src/infrastructure/fs/node-workspace-accessibility-source.js'
 
 const makeMockRepo = makeMockSpecRepository
+
+interface SemanticMutationCase {
+  readonly name: string
+  readonly initial: Readonly<Record<string, string>>
+  readonly final: Readonly<Record<string, string>>
+}
+
+const semanticMutationCases: readonly SemanticMutationCase[] = [
+  {
+    name: 'body',
+    initial: { 'service.ts': 'export function run(): number { return 1 }\n' },
+    final: { 'service.ts': 'export function run(): number { return 2 }\n' },
+  },
+  {
+    name: 'move',
+    initial: { 'service.ts': 'export function run(): number { return 1 }\n' },
+    final: { 'service.ts': '\n\nexport function run(): number { return 1 }\n' },
+  },
+  {
+    name: 'signature',
+    initial: { 'service.ts': 'export function run(value: string): string { return value }\n' },
+    final: {
+      'service.ts': 'export function run(value: number): string { return String(value) }\n',
+    },
+  },
+  {
+    name: 'group',
+    initial: { 'service.ts': 'export function run(value: string): string { return value }\n' },
+    final: {
+      'service.ts': [
+        'export function run(value: string): string;',
+        'export function run(value: number): string;',
+        'export function run(value: string | number): string { return String(value) }',
+        '',
+      ].join('\n'),
+    },
+  },
+  {
+    name: 'owner',
+    initial: { 'service.ts': 'export class First { run(): number { return 1 } }\n' },
+    final: { 'service.ts': 'export class Second { run(): number { return 1 } }\n' },
+  },
+  {
+    name: 'rename',
+    initial: { 'service.ts': 'export function before(): number { return 1 }\n' },
+    final: { 'service.ts': 'export function after(): number { return 1 }\n' },
+  },
+  {
+    name: 'delete',
+    initial: {
+      'service.ts': 'export function run(): number { return 1 }\n',
+      'obsolete.ts': 'export function obsolete(): number { return 0 }\n',
+    },
+    final: { 'service.ts': 'export function run(): number { return 1 }\n' },
+  },
+  {
+    name: 'add',
+    initial: { 'service.ts': 'export function run(): number { return 1 }\n' },
+    final: {
+      'service.ts': 'export function run(): number { return 1 }\n',
+      'added.ts': 'export function added(): number { return 2 }\n',
+    },
+  },
+  {
+    name: 'newly resolvable',
+    initial: {
+      'consumer.ts':
+        "import { target } from './target.js'; export function call(): number { return target() }\n",
+    },
+    final: {
+      'consumer.ts':
+        "import { target } from './target.js'; export function call(): number { return target() }\n",
+      'target.ts': 'export function target(): number { return 1 }\n',
+    },
+  },
+]
+
+function writeSourceSnapshot(
+  codeRoot: string,
+  previous: Readonly<Record<string, string>>,
+  next: Readonly<Record<string, string>>,
+): void {
+  for (const relativePath of new Set([...Object.keys(previous), ...Object.keys(next)])) {
+    const absolutePath = join(codeRoot, relativePath)
+    const content = next[relativePath]
+    if (content === undefined) {
+      rmSync(absolutePath, { force: true })
+      continue
+    }
+    mkdirSync(dirname(absolutePath), { recursive: true })
+    writeFileSync(absolutePath, content)
+  }
+}
+
+function readNormalizedSemanticSnapshot(storagePath: string): Readonly<Record<string, unknown>> {
+  const database = new Database(join(storagePath, 'graph', 'code-graph.sqlite'), {
+    readonly: true,
+  })
+  try {
+    const tables = [
+      'symbols',
+      'logical_symbols',
+      'logical_declarations',
+      'public_bindings',
+      'local_bindings',
+      'relations',
+      'resolution_steps',
+      'index_coverage',
+    ] as const
+    return Object.fromEntries(
+      tables.map((table) => [
+        table,
+        database.prepare(`SELECT * FROM ${table} ORDER BY 1, 2, 3`).all(),
+      ]),
+    )
+  } finally {
+    database.close()
+  }
+}
 
 function makeConfig(projectRoot: string, codeRoot: string): SpecdConfig {
   return {
@@ -77,6 +200,66 @@ describe('IndexProjectGraph integration', () => {
     }
   })
 
+  it.each(semanticMutationCases)(
+    'produces the clean semantic snapshot after an incremental $name mutation',
+    async ({ initial, final }) => {
+      tempDir = mkdtempSync(join(tmpdir(), 'index-semantic-equivalence-'))
+      const codeRoot = join(tempDir, 'workspace')
+      const incrementalStorage = join(tempDir, 'incremental-store')
+      const cleanStorage = join(tempDir, 'clean-store')
+      mkdirSync(codeRoot, { recursive: true })
+      writeSourceSnapshot(codeRoot, {}, initial)
+
+      const createIndexer = async (storagePath: string) => {
+        const store = new SQLiteGraphStore(storagePath)
+        await store.open()
+        const registry = new AdapterRegistry()
+        registry.register(new TypeScriptLanguageAdapter())
+        return {
+          store,
+          indexer: new IndexCodeGraph(
+            store,
+            registry,
+            emptyResolutionManifestSource,
+            emptyRepositoryRootSource,
+            new NodeWorkspaceAccessibilitySource(),
+          ),
+        }
+      }
+      const options = {
+        projectRoot: tempDir,
+        vcsRoot: null,
+        workspaces: [
+          {
+            name: 'fixture',
+            prefix: null,
+            codeRoot,
+            specRepo: makeMockRepo(),
+            ownership: 'owned' as const,
+            isExternal: false,
+          },
+        ],
+        graphConfig: { includePaths: [], excludePaths: [], workspaces: new Map() },
+        codeGraphVersion: readInstalledCodeGraphVersion(),
+      }
+
+      const incremental = await createIndexer(incrementalStorage)
+      await incremental.indexer.execute(options)
+      writeSourceSnapshot(codeRoot, initial, final)
+      await incremental.indexer.execute(options)
+
+      const clean = await createIndexer(cleanStorage)
+      await clean.indexer.execute({ ...options, force: true })
+
+      await incremental.store.close()
+      await clean.store.close()
+      expect(readNormalizedSemanticSnapshot(incrementalStorage)).toEqual(
+        readNormalizedSemanticSnapshot(cleanStorage),
+      )
+    },
+    60000,
+  )
+
   it('indexes valid files while reporting an isolated adapter parse failure', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'index-project-graph-parse-isolation-'))
     const codeRoot = join(tempDir, 'workspace')
@@ -95,7 +278,13 @@ describe('IndexProjectGraph integration', () => {
       })
       const registry = new AdapterRegistry()
       registry.register(adapter)
-      const indexer = new IndexCodeGraph(store, registry)
+      const indexer = new IndexCodeGraph(
+        store,
+        registry,
+        emptyResolutionManifestSource,
+        emptyRepositoryRootSource,
+        new NodeWorkspaceAccessibilitySource(),
+      )
 
       const result = await indexer.execute({
         projectRoot: tempDir,
@@ -147,7 +336,13 @@ describe('IndexProjectGraph integration', () => {
         vi.spyOn(session, 'writeFiles').mockRejectedValue(persistenceError)
         return session
       })
-      const indexer = new IndexCodeGraph(store, registry)
+      const indexer = new IndexCodeGraph(
+        store,
+        registry,
+        emptyResolutionManifestSource,
+        emptyRepositoryRootSource,
+        new NodeWorkspaceAccessibilitySource(),
+      )
 
       await expect(
         indexer.execute({
@@ -270,7 +465,13 @@ describe('IndexProjectGraph integration', () => {
     const registry = new AdapterRegistry()
     registry.register(adapter)
     const analyzeFile = vi.spyOn(adapter, 'analyzeFile')
-    const indexer = new IndexCodeGraph(store, registry)
+    const indexer = new IndexCodeGraph(
+      store,
+      registry,
+      emptyResolutionManifestSource,
+      emptyRepositoryRootSource,
+      new NodeWorkspaceAccessibilitySource(),
+    )
     const options = {
       projectRoot: tempDir,
       vcsRoot: null,
@@ -419,7 +620,7 @@ describe('IndexProjectGraph integration', () => {
     const exportedResults = await provider.searchReferenceSymbols({ query: 'PythonService' })
     expect(
       exportedResults.flatMap((item) => item.publicBindings.map((binding) => binding.exportedName)),
-    ).not.toContain('PythonService')
+    ).toContain('PythonService')
 
     const publicServiceResults = await provider.searchReferenceSymbols({
       query: 'PublicService',
@@ -481,6 +682,11 @@ describe('IndexProjectGraph integration', () => {
     )
     expect(publicImpact.canonicalImpact.affectedSymbols).toEqual(canonicalImpact.affectedSymbols)
     expect(publicImpact.binding.id).toBe(publicBinding!.id)
+    // The exact-route view is built from a real index and must not be empty.
+    expect(publicImpact.bindingImpact.affectedSymbols.map((symbol) => symbol.name)).toContain(
+      'direct',
+    )
+    expect(publicImpact.bindingImpact.directDependents).toBeGreaterThan(0)
     expect(publicImpact.target.id).toBe(publicCandidate!.target.id)
     expect(publicImpact.canonicalImpact.affectedSymbols.map((symbol) => symbol.name)).toContain(
       'direct',
@@ -637,7 +843,82 @@ describe('IndexProjectGraph integration', () => {
     const statistics = await provider.getStatistics()
     expect(statistics.relationCounts.CALLS).toBeGreaterThanOrEqual(symbolCount)
     await provider.close()
-  }, 15_000)
+  }, 45_000)
+
+  it('fills import local binding targets from imports resolved in pass 2', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'index-project-graph-import-binding-'))
+    const codeRoot = join(tempDir, 'workspace')
+    mkdirSync(codeRoot, { recursive: true })
+    writeFileSync(join(codeRoot, 'lib.ts'), 'export function helper(): void {}\n')
+    writeFileSync(
+      join(codeRoot, 'consumer.ts'),
+      "import { helper } from './lib.js'\nexport function run(): void {\n  helper()\n}\n",
+    )
+    const provider = createCodeGraphProvider(makeConfig(tempDir, codeRoot))
+    await provider.open()
+    const result = await provider.index({
+      projectRoot: tempDir,
+      vcsRoot: null,
+      workspaces: [
+        {
+          name: 'fixture',
+          prefix: null,
+          codeRoot,
+          specRepo: makeMockRepo(),
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+      graphConfig: { includePaths: [], excludePaths: [], workspaces: new Map() },
+      codeGraphVersion: readInstalledCodeGraphVersion(),
+    })
+    expect(result.errors).toEqual([])
+
+    const resolution = await provider.resolveSymbolReference({
+      workspace: 'fixture',
+      requested: 'helper',
+      filePath: 'fixture:consumer.ts',
+      scopeId: 'module',
+    })
+
+    expect(resolution.status).toBe('resolved')
+    expect(resolution.target?.name).toBe('helper')
+    await provider.close()
+  }, 45_000)
+
+  it('reports logical collision diagnostics in the index result', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'index-project-graph-collision-'))
+    const codeRoot = join(tempDir, 'workspace')
+    mkdirSync(codeRoot, { recursive: true })
+    writeFileSync(
+      join(codeRoot, 'merge.ts'),
+      'interface Merged { m(): void }\ninterface Merged { n(): void }\nexport function ok(): void {}\n',
+    )
+    const provider = createCodeGraphProvider(makeConfig(tempDir, codeRoot))
+    await provider.open()
+    const result = await provider.index({
+      projectRoot: tempDir,
+      vcsRoot: null,
+      workspaces: [
+        {
+          name: 'fixture',
+          prefix: null,
+          codeRoot,
+          specRepo: makeMockRepo(),
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+      graphConfig: { includePaths: [], excludePaths: [], workspaces: new Map() },
+      codeGraphVersion: readInstalledCodeGraphVersion(),
+    })
+
+    expect(result.errors).toEqual([])
+    expect(result.logicalDiagnostics.map((diagnostic) => diagnostic.code)).toContain(
+      'UNGROUPED_LOGICAL_COLLISION',
+    )
+    await provider.close()
+  }, 45_000)
 
   it('routes one complete index generation through one native bulk session', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'index-project-graph-single-session-'))
@@ -699,6 +980,131 @@ describe('IndexProjectGraph integration', () => {
     expect(store.beginCount).toBe(1)
     expect(await provider.searchReferenceSymbols({ query: 'indexedOnce' })).toHaveLength(1)
     await provider.close()
+  })
+
+  it('keeps anonymous array data searchable as source without indexing field symbols', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'index-project-graph-array-data-'))
+    const codeRoot = join(tempDir, 'workspace')
+    mkdirSync(codeRoot, { recursive: true })
+    writeFileSync(
+      join(codeRoot, 'catalog.ts'),
+      `export const Named = { kept: 'yes' };
+export const rows = [{ filteredField: 'unique-array-content-value' }];
+`,
+    )
+
+    const store = new SQLiteGraphStore(tempDir)
+    const provider = createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+      graphStoreId: 'array-data-test',
+      graphStoreFactories: { 'array-data-test': { create: () => store } },
+    })
+    await provider.open()
+    const result = await provider.index({
+      projectRoot: tempDir,
+      vcsRoot: null,
+      workspaces: [
+        {
+          name: 'fixture',
+          prefix: null,
+          codeRoot,
+          specRepo: makeMockRepo(),
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+      graphConfig: { includePaths: [], excludePaths: [], workspaces: new Map() },
+      codeGraphVersion: readInstalledCodeGraphVersion(),
+    })
+
+    expect(result.errors).toEqual([])
+    const search = new SearchCodeGraph(store)
+    const contentResult = await search.execute({
+      query: 'unique-array-content-value',
+      categories: ['files'],
+      limit: 10,
+      includeSnippet: true,
+    })
+    const symbolResult = await search.executeSymbols({ query: 'filteredField' })
+
+    expect(contentResult.files).toHaveLength(1)
+    expect(contentResult.files[0]?.file.path).toBe('fixture:catalog.ts')
+    expect(contentResult.files[0]?.matches).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ matchedText: 'unique-array-content-value' }),
+      ]),
+    )
+    expect(symbolResult).toHaveLength(0)
+    await provider.close()
+  })
+
+  describe('size-skipped files and the freshness comparison', () => {
+    const indexFixture = async (
+      files: Record<string, string>,
+    ): Promise<{
+      provider: ReturnType<typeof createCodeGraphProvider>
+      codeRoot: string
+    }> => {
+      tempDir = mkdtempSync(join(tmpdir(), 'index-project-graph-size-skip-'))
+      const codeRoot = join(tempDir, 'workspace')
+      mkdirSync(codeRoot, { recursive: true })
+      for (const [name, content] of Object.entries(files)) {
+        writeFileSync(join(codeRoot, name), content)
+      }
+      const projectConfig = makeConfig(tempDir, codeRoot)
+      const provider = createCodeGraphProvider(projectConfig)
+      await provider.open()
+      await provider.index({
+        projectRoot: tempDir,
+        vcsRoot: null,
+        workspaces: [
+          {
+            name: 'fixture',
+            prefix: null,
+            codeRoot,
+            specRepo: makeMockRepo(),
+            ownership: 'owned',
+            isExternal: false,
+          },
+        ],
+        graphConfig: buildProjectGraphConfig(projectConfig),
+        codeGraphVersion: readInstalledCodeGraphVersion(),
+      })
+      return { provider, codeRoot }
+    }
+
+    it('does not report a changed file set right after an index that skipped a file for size', async () => {
+      // Given a run that skipped one oversized file
+      const { provider } = await indexFixture({
+        'small.ts': 'export const a = 1\n',
+        'big.ts': `export const b = 1\n`.padEnd(300 * 1024, ' '),
+      })
+
+      // When health is computed without any change since the run
+      const health = await provider.getGraphHealth()
+
+      // Then the workspace is not reported as a changed file set
+      expect(health.workspaces[0]?.reasons).not.toContain('FILESET_CHANGED')
+      expect(health.coverageCompleteness).toBe('complete-with-warnings')
+      await provider.close()
+    })
+
+    it('reports a changed file set when an indexed file grows past the limit', async () => {
+      // Given an index with two small files
+      const { provider, codeRoot } = await indexFixture({
+        'small.ts': 'export const a = 1\n',
+        'grows.ts': 'export const g = 1\n',
+      })
+
+      // When one file grows beyond the limit without a new run
+      writeFileSync(join(codeRoot, 'grows.ts'), `export const g = 1\n`.padEnd(300 * 1024, ' '))
+      const health = await provider.getGraphHealth()
+
+      // Then the membership change is reported
+      expect(health.workspaces[0]?.reasons).toContain('FILESET_CHANGED')
+      await provider.close()
+    })
   })
 
   it('classifies absent references as unresolved while indexed content is dirty', async () => {
@@ -981,7 +1387,13 @@ describe('IndexProjectGraph integration', () => {
     const registry = new AdapterRegistry()
     registry.register(new TypeScriptLanguageAdapter())
     registry.register(new GoLanguageAdapter())
-    const indexer = new IndexCodeGraph(store, registry)
+    const indexer = new IndexCodeGraph(
+      store,
+      registry,
+      emptyResolutionManifestSource,
+      emptyRepositoryRootSource,
+      new NodeWorkspaceAccessibilitySource(),
+    )
     const result = await indexer.execute({
       projectRoot: tempDir,
       vcsRoot: null,

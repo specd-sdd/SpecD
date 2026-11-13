@@ -8,7 +8,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(__dirname, '../../..')
 const docsCliDir = path.join(repoRoot, 'docs/cli')
 const guideCliFile = path.join(repoRoot, 'docs/guide/cli.md')
+const guideIndexFile = path.join(repoRoot, 'docs/guide/index.md')
 const indexCliFile = path.join(repoRoot, 'docs/cli/index.md')
+const graphCliFile = path.join(repoRoot, 'docs/cli/graph.md')
+const codeGraphFile = path.join(repoRoot, 'docs/code-graph/index.md')
+const sdkFile = path.join(repoRoot, 'docs/sdk/index.md')
+const symbolSemanticsAdr = path.join(repoRoot, 'docs/adr/0029-cross-language-symbol-semantics.md')
 
 /**
  * Resolves the documentation file for a given command name or its aliases.
@@ -41,6 +46,7 @@ describe('CLI Documentation Coverage (dynamic introspection)', () => {
 
   it('registers top-level command families in the CLI program', () => {
     expect(topLevelCommands.length).toBeGreaterThan(0)
+    expect(topLevelCommands.map((command) => command.name())).toContain('guide-sdk')
   })
 
   // 1. Check that every command family has a dedicated markdown reference in docs/cli/<name>.md
@@ -96,6 +102,34 @@ describe('CLI Documentation Coverage (dynamic introspection)', () => {
           `Command family 'specd ${cmd.name()}' (aliases: ${names.join(', ')}) is registered in the CLI but is not documented in 'docs/guide/cli.md'.`,
         ).toBe(true)
       }
+    })
+  })
+
+  describe('SDK guide discovery in docs/guide/index.md', () => {
+    it('directs integrators to guide-sdk without conflating it with the user guide', () => {
+      expect(fs.existsSync(guideIndexFile)).toBe(true)
+      const indexContent = fs.readFileSync(guideIndexFile, 'utf-8')
+
+      expect(indexContent).toContain('[SDK guide command reference](../cli/guide-sdk.md)')
+      expect(indexContent).toContain('`specd guide-sdk`')
+      expect(indexContent).toContain('`specd guide`')
+      expect(indexContent).toContain('SDK and package-reference collections for integrators')
+      expect(indexContent).toContain('user-facing guides')
+    })
+  })
+
+  describe('Cross-language symbol semantics references', () => {
+    it('documents the adapter, SDK, CLI, and architecture contracts', () => {
+      for (const file of [graphCliFile, codeGraphFile, sdkFile, symbolSemanticsAdr]) {
+        expect(fs.existsSync(file), `Expected ${file} to exist`).toBe(true)
+      }
+
+      expect(fs.readFileSync(codeGraphFile, 'utf8')).toContain('parser-authoritative policy')
+      expect(fs.readFileSync(sdkFile, 'utf8')).toContain('semanticCounts')
+      expect(fs.readFileSync(graphCliFile, 'utf8')).toContain('targetKind')
+      expect(fs.readFileSync(symbolSemanticsAdr, 'utf8')).toContain(
+        '## Decision Outcome Confirmation',
+      )
     })
   })
 

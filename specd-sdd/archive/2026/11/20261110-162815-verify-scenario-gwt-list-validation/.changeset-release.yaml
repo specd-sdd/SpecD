@@ -1,0 +1,4 @@
+releases:
+  schema-std:standard-schema: patch
+  schema-std:templates: patch
+  default:_global/continuous-integration: patch

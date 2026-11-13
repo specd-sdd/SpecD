@@ -429,6 +429,38 @@
 - **WHEN** `load()` is called
 - **THEN** that workspace's `schemasPath` is `null`
 
+### Requirement: Graph size limit fields
+
+#### Scenario: Declared values are exposed exactly
+
+- **GIVEN** a configuration that declares `maxFileBytes` and `largeFilePaths` at the project level and in one workspace
+- **WHEN** the loader resolves it
+- **THEN** the resolved configuration carries the declared values at each level
+
+#### Scenario: Undeclared values are not defaulted
+
+- **GIVEN** a configuration that declares neither field
+- **WHEN** the loader resolves it
+- **THEN** the fields are absent in the resolved configuration
+
+#### Scenario: An invalid limit names the key and its location
+
+- **GIVEN** a workspace `graph.maxFileBytes` of `-5`
+- **WHEN** the loader resolves the configuration
+- **THEN** it fails with a `ConfigValidationError` that names `maxFileBytes` and the workspace
+
+#### Scenario: Layer merge applies unchanged
+
+- **GIVEN** a base layer and a later layer that both declare the fields
+- **WHEN** the loader merges them
+- **THEN** the later `maxFileBytes` wins and the `largeFilePaths` entries are appended
+
+#### Scenario: Unknown keys remain rejected
+
+- **GIVEN** a `graph` block with an unknown key next to `maxFileBytes`
+- **WHEN** the loader validates it
+- **THEN** the unknown key is rejected
+
 ### Requirement: contextIncludeSpecs and contextExcludeSpecs pattern validation
 
 #### Scenario: Valid bare wildcard
@@ -466,6 +498,30 @@
 - **GIVEN** a workspace declares `contextIncludeSpecs` with an invalid pattern
 - **WHEN** `load()` is called
 - **THEN** `load()` throws `ConfigValidationError` identifying the workspace and field
+
+#### Scenario: Pattern with an uppercase segment rejected
+
+- **GIVEN** `contextIncludeSpecs: ['core:Auth/*']`
+- **WHEN** the configuration is loaded
+- **THEN** loading fails with `ConfigValidationError` because `Auth` violates the segment rule
+
+#### Scenario: Segment with a leading digit accepted
+
+- **GIVEN** `contextIncludeSpecs: ['core:2fa/*']`
+- **WHEN** the configuration is loaded
+- **THEN** the pattern is accepted, because the loader uses the canonical segment rule
+
+#### Scenario: One-character workspace qualifier rejected
+
+- **GIVEN** `contextIncludeSpecs: ['a:*']`
+- **WHEN** the configuration is loaded
+- **THEN** loading fails with `ConfigValidationError`
+
+#### Scenario: Loader keeps no private copy of the expressions
+
+- **WHEN** the loader source is inspected
+- **THEN** workspace names are checked with `isValidWorkspaceName` and patterns are checked through the shared pattern validation that delegates to `parseSpecPattern`
+- **AND** neither the loader nor the helpers it consumes declare a workspace or segment regex of their own
 
 ### Requirement: Schema plugins, schema overrides, and context entry mapping
 
@@ -532,3 +588,23 @@
 - **AND** the config file resolves to `C:/other/specd.yaml`
 - **WHEN** `load()` checks the config path
 - **THEN** it throws `ConfigValidationError`
+
+### Requirement: Workspace names use the shared rule
+
+#### Scenario: Invalid workspace name rejected
+
+- **GIVEN** `specd.yaml` declares a workspace named `Core`
+- **WHEN** the configuration is loaded
+- **THEN** loading fails with `ConfigValidationError`
+
+#### Scenario: Two-character workspace name accepted
+
+- **GIVEN** `specd.yaml` declares a workspace named `ab` with a valid `codeRoot`
+- **WHEN** the configuration is loaded
+- **THEN** the workspace is accepted
+
+#### Scenario: Device name rejected
+
+- **GIVEN** `specd.yaml` declares a workspace named `nul`
+- **WHEN** the configuration is loaded
+- **THEN** loading fails with `ConfigValidationError`

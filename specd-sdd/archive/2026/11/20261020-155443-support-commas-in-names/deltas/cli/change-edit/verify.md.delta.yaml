@@ -1,0 +1,63 @@
+- op: added
+  description: Raw value scenarios
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Command signature'
+  content: |
+    #### Scenario: Values are forwarded unchanged
+
+    - **WHEN** `specd change edit my-change --add-spec auth/register` is run
+    - **THEN** the command forwards `auth/register` to `EditChange` and the use case stores `default:auth/register`
+
+    #### Scenario: A value with a comma is one ID
+
+    - **WHEN** `specd change edit my-change --add-spec "auth/a,b"` is run
+    - **THEN** the command exits with code 1 with the `InvalidSpecIdError` message quoting `auth/a,b`
+    - **AND** stderr contains the full value `auth/a,b`
+
+    #### Scenario: Usage error precedes configuration resolution
+
+    - **GIVEN** no `specd.yaml` can be found
+    - **WHEN** `specd change edit my-change` is run with none of the edit flags
+    - **THEN** the command exits with code 1 and prints the usage error, not a configuration error
+
+    #### Scenario: Remove values are forwarded unchanged
+
+    - **WHEN** `specd change edit my-change --remove-spec auth/login` is run
+    - **THEN** the command forwards `auth/login` to `EditChange` as `removeSpecIds` without trimming, splitting, or qualifying it
+
+    #### Scenario: Command resolves no workspace itself
+
+    - **WHEN** the command source is inspected
+    - **THEN** it does not read `SpecdConfig` workspaces or ownership to validate `--add-spec`
+
+- op: added
+  description: Error mapping scenarios
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Error cases'
+  content: |
+    #### Scenario: Invalid spec ID
+
+    - **WHEN** `specd change edit my-change --add-spec "Bad Id"` is run
+    - **THEN** the command exits with code 1 with the `InvalidSpecIdError` message
+    - **AND** stderr quotes `Bad Id`
+
+    #### Scenario: Unknown workspace
+
+    - **WHEN** `specd change edit my-change --add-spec nope:auth/login` is run
+    - **THEN** the command exits with code 1 with the `WorkspaceNotFoundError` message
+
+    #### Scenario: Invalid invalidation policy
+
+    - **WHEN** `specd change edit my-change --invalidation-policy sugical` is run
+    - **THEN** the command exits with code 1 with the `InvalidInputError` message from `EditChange`
+    - **AND** no changes are made to the change
+
+- op: removed
+  description: The change may end with an empty specIds, as create-change allows
+  selector:
+    type: section
+    matches: 'Requirement: Invariant enforcement'

@@ -72,7 +72,7 @@
 - **AND** the persisted graph fingerprint matches the fingerprint for the current run
 - **WHEN** `IndexCodeGraph.execute()` is called
 - **THEN** `core:src/utils.ts` is removed from the store before bulk load
-- **AND** the re-extracted data is inserted via `bulkLoad()`
+- **AND** the re-extracted data is written through the bulk write session
 
 #### Scenario: Forced run ignores orphaned incremental state
 
@@ -161,24 +161,128 @@
 - **WHEN** file discovery runs
 - **THEN** `node_modules/lodash/index.js` is not in the discovered files
 
-#### Scenario: Paths prefixed with workspace name and config-relative path
+#### Scenario: Paths prefixed with workspace name and project-relative path
 
 - **GIVEN** the active `specd.yaml` lives at `/project/specd.yaml`
 - **AND** a workspace named `core` with codeRoot `/project/packages/core`
 - **AND** a file at `/project/packages/core/src/index.ts`
 - **WHEN** the indexer processes this workspace
 - **THEN** `FileNode.path` is `core:src/index.ts`
-- **AND** `FileNode.configRelativePath` is `packages/core/src/index.ts`
+- **AND** `FileNode.projectRelativePath` is `packages/core/src/index.ts`
 - **AND** `FileNode.workspace` is `core`
 
-#### Scenario: Config-relative path normalizes absolute parent traversal
+#### Scenario: Project-relative path normalizes absolute parent traversal
 
 - **GIVEN** the active `specd.yaml` lives at `/project/apps/web/specd.yaml`
 - **AND** a workspace named `core` with codeRoot `/project/packages/core`
 - **AND** a file at `/project/packages/core/src/index.ts`
 - **WHEN** the indexer processes this workspace
-- **THEN** `FileNode.configRelativePath` is `../../packages/core/src/index.ts`
+- **THEN** `FileNode.projectRelativePath` is `../../packages/core/src/index.ts`
 - **AND** it has forward slashes and no leading `./`
+
+### Requirement: Project-relative path evaluation
+
+#### Scenario: Anchored global pattern excludes inside a nested workspace
+
+- **GIVEN** project `graph.excludePaths: ['/app/vendors/*', '!/app/vendors/iccms', '!/app/vendors/iccms/**']` and workspace `backend` with `codeRoot` `app`
+- **WHEN** the indexer discovers the files of `backend`
+- **THEN** `backend:vendors/iccms/utils.php` is discovered
+- **AND** `backend:vendors/other/x.php` is not discovered
+
+#### Scenario: Directory pruning uses the project-relative path
+
+- **GIVEN** `app/tmp/` in the global exclusions and workspace `backend` with `codeRoot` `app`
+- **WHEN** discovery walks `app/tmp`
+- **THEN** the directory is pruned and none of its files is read
+
+#### Scenario: Global layer wins over workspace negation
+
+- **GIVEN** a path excluded by project `graph.excludePaths` and re-included by a workspace `!` negation
+- **WHEN** the workspace is discovered
+- **THEN** the path is not discovered
+
+#### Scenario: Synthetic spec-root exclusion cannot be negated by a workspace
+
+- **GIVEN** a filesystem-backed spec root and a workspace `!` negation covering it
+- **WHEN** the workspace is discovered
+- **THEN** the spec root files are not discovered as files or documents
+
+#### Scenario: Categorization uses the project-relative path
+
+- **GIVEN** project `ignorePaths: ['app/fixtures/**']` and a file `app/fixtures/a.php` in workspace `backend` (`codeRoot` `app`)
+- **WHEN** the file is categorized
+- **THEN** its category is `ignored`
+- **AND** its persisted identity is `backend:fixtures/a.php`
+
+#### Scenario: Default test patterns behave as before
+
+- **GIVEN** the built-in `testPaths` and files `packages/core/src/a.spec.ts` and `packages/core/test/b.ts`
+- **WHEN** they are categorized in workspace `core`
+- **THEN** both are `test`
+
+#### Scenario: Built-in default exclusions behave as before
+
+- **GIVEN** no configured `excludePaths` and `packages/core/node_modules/x/index.js`
+- **WHEN** workspace `core` is discovered
+- **THEN** the file is not discovered
+
+#### Scenario: Code root outside the project root
+
+- **GIVEN** a workspace with `codeRoot` outside the project root and an anchored global pattern
+- **WHEN** the workspace is discovered
+- **THEN** the run does not fail and the anchored pattern does not match its files
+
+#### Scenario: Visibility and health agree with indexing
+
+- **GIVEN** a file excluded only through a project-relative pattern
+- **WHEN** graph input visibility and graph health evaluate it
+- **THEN** both report it as excluded, as the indexer does
+
+#### Scenario: Health applies the size gate like indexing
+
+- **GIVEN** an oversized, non-exempt file that the indexer skips for size
+- **WHEN** graph health compares discovered content with the indexed content
+- **THEN** the file is not counted as discovered content, so health does not report content as not fresh because of it
+
+#### Scenario: Repository .gitignore applies below the VCS root
+
+- **GIVEN** a `.gitignore` at the VCS root ignoring `*.log` and a `codeRoot` below the VCS root containing `a.log`
+- **WHEN** the files of the workspace are discovered
+- **THEN** `a.log` is excluded by that `.gitignore` and `graph why` reports the `.gitignore` file and line
+
+#### Scenario: Explained decision equals indexing decision
+
+- **GIVEN** a path and a configuration
+- **WHEN** the evaluation functions return the decision with its winning rule
+- **THEN** the decision equals the one used by an indexing run for that path
+
+### Requirement: Workspace overlap diagnostic
+
+#### Scenario: File kept by two workspaces
+
+- **GIVEN** workspaces `backend` (`codeRoot` `app`) and `backoffice` (`codeRoot` `app/webroot`) with no excludes separating `app/webroot/iccomp.php`
+- **WHEN** the indexer runs
+- **THEN** the file is indexed as `backend:webroot/iccomp.php` and `backoffice:iccomp.php`
+- **AND** the result contains a diagnostic with `projectRelativePath` `app/webroot/iccomp.php` and owners `backend` and `backoffice`
+- **AND** the run succeeds
+
+#### Scenario: Partitioning by excludes yields no diagnostic
+
+- **GIVEN** two workspaces sharing one `codeRoot`, one keeping only `src/**` and the other only `tests/**` through `excludePaths`
+- **WHEN** the indexer runs
+- **THEN** no overlap diagnostic is reported
+
+#### Scenario: Diagnostics are bounded
+
+- **GIVEN** more overlapping files than the diagnostic list limit
+- **WHEN** the indexer runs
+- **THEN** the list is truncated and the total count is still reported
+
+#### Scenario: Overlap does not change incremental behaviour
+
+- **GIVEN** an overlapping file whose content is unchanged
+- **WHEN** an incremental run happens
+- **THEN** the file is skipped as usual and the diagnostic is still reported
 
 ### Requirement: Portable graph paths
 
@@ -225,6 +329,226 @@
 - **THEN** it contains compact facts and shared lookup indexes needed for Pass 2
 - **AND** it does not retain AST nodes, parser trees, or equivalent heavyweight parser-runtime objects
 
+#### Scenario: Retention is bounded across files and chunks
+
+- **GIVEN** a project of many files split into several chunks and an adapter that registers parser-owned resources for every file
+- **WHEN** the indexer analyses the files
+- **THEN** after each file has been analysed the session holds no parser-owned resource of an earlier file
+- **AND** the number of parser-owned resources held at any moment never exceeds those of the single file being analysed
+
+### Requirement: Parser resource lifecycle
+
+#### Scenario: Epoch is closed after every analysed file
+
+- **GIVEN** an adapter that registers a parser-owned resource with a disposal function for every file
+- **WHEN** the indexer analyses three files
+- **THEN** the disposal function of each file has run before the next file is analysed
+- **AND** the references held by the scope are dropped after each file
+
+#### Scenario: Files that exit early also close the epoch
+
+- **GIVEN** a document without a language adapter and a file with undecodable content among the files to process, next to files the adapter analyses
+- **WHEN** the indexer processes them
+- **THEN** the epoch is closed after each file, so no resource registered while handling one of them outlives it
+- **AND** each analysed file starts with an empty scope
+
+#### Scenario: Files skipped for size never open a scope
+
+- **GIVEN** a file over the size limit among the files of a run
+- **WHEN** the indexer runs
+- **THEN** no parser resource is registered for it and it produces a `file-skipped` event instead of processing events
+
+#### Scenario: Parse failure closes the epoch
+
+- **GIVEN** an adapter that registers a resource and then throws while analysing a file
+- **WHEN** the indexer analyses that file
+- **THEN** the resource is disposed
+- **AND** the error is collected as a per-file error and the run continues
+
+#### Scenario: Cancellation closes the epoch
+
+- **GIVEN** an indexing run that is cancelled while a file is being analysed
+- **WHEN** the run stops
+- **THEN** the resources registered for that file are disposed and no parser-owned resource remains reachable from the session
+
+#### Scenario: Persistence failure closes the epoch
+
+- **GIVEN** an indexing run whose bulk load fails after analysis
+- **WHEN** the run ends with the persistence error
+- **THEN** no parser-owned resource remains reachable from the session
+
+#### Scenario: A failing disposal does not mask the original error or stop the others
+
+- **GIVEN** two registered resources whose disposal functions fail, and an analysis that threw an error
+- **WHEN** the epoch is closed
+- **THEN** both disposal functions are attempted, in reverse registration order
+- **AND** the original error is the one reported for the file
+- **AND** each disposal failure is reported as a typed `resource-disposal-failed` diagnostic and does not fail the run
+
+#### Scenario: Garbage collection is requested when available
+
+- **GIVEN** a host that exposes a garbage-collection request
+- **WHEN** an epoch is closed
+- **THEN** the request is issued after the disposals and after the references are dropped
+
+#### Scenario: Missing garbage-collection request is harmless
+
+- **GIVEN** a host that does not expose a garbage-collection request
+- **WHEN** an epoch is closed
+- **THEN** the indexing run completes with the same result and no error
+
+#### Scenario: Adapters without parser-owned resources are unaffected
+
+- **GIVEN** a language adapter that registers nothing
+- **WHEN** files of that language are indexed
+- **THEN** the indexer produces the same result as before this requirement and closing the epoch is a no-op
+
+#### Scenario: The indexer is independent of the parsing library
+
+- **GIVEN** a test adapter built on a fake parsing library that requires explicit release
+- **WHEN** the adapter registers its resource with a disposal function
+- **THEN** the indexer disposes it without referring to any specific library type
+
+#### Scenario: No run-wide retention remains
+
+- **GIVEN** a completed indexing run
+- **WHEN** the session state is inspected
+- **THEN** the `napi-keepalive` adapter-state key does not exist
+- **AND** no collection of parser-owned resources is reachable from the session
+
+### Requirement: Per-file size limit
+
+#### Scenario: The default limit applies when nothing is configured
+
+- **GIVEN** no `maxFileBytes` at the project or workspace level and a source file of 262145 bytes
+- **WHEN** the indexer processes it
+- **THEN** the file is skipped for size with the applied limit 262144
+
+#### Scenario: A file exactly at the limit is indexed
+
+- **GIVEN** an effective limit of 1000 bytes and a file of exactly 1000 bytes
+- **WHEN** the indexer processes it
+- **THEN** the file is indexed
+
+#### Scenario: A limit of zero disables the check
+
+- **GIVEN** an effective `maxFileBytes` of `0` and a file of several megabytes that discovery keeps
+- **WHEN** the indexer processes it
+- **THEN** the file is read and indexed
+
+#### Scenario: A workspace limit replaces the project limit
+
+- **GIVEN** a project `maxFileBytes` of 1000, a workspace `maxFileBytes` of 5000, and a 3000-byte file in that workspace
+- **WHEN** the indexer processes it
+- **THEN** the file is indexed
+- **AND** a 3000-byte file in another workspace without an override is skipped
+
+#### Scenario: The size is measured in bytes on disk
+
+- **GIVEN** a file of 600 multibyte characters that occupy 1200 bytes and an effective limit of 1000
+- **WHEN** the indexer processes it
+- **THEN** the file is skipped for size
+
+#### Scenario: An oversized file is neither read nor hashed
+
+- **GIVEN** an oversized file and an instrumented filesystem
+- **WHEN** the indexer runs, including its change-detection phase
+- **THEN** no read of the file content is performed
+- **AND** no content hash is computed for it
+
+#### Scenario: The size is evaluated once per file
+
+- **GIVEN** a run that reuses the size in the change-detection and analysis phases
+- **WHEN** the indexer processes a file
+- **THEN** the filesystem metadata of that file is requested for the size decision a single time
+
+#### Scenario: Documents are subject to the limit
+
+- **GIVEN** a textual file without a language adapter that exceeds the limit
+- **WHEN** the indexer processes it
+- **THEN** no document node is created and the file is skipped for size
+
+#### Scenario: The limit applies to every category
+
+- **GIVEN** an oversized file that matches `testPaths` and another that matches `ignorePaths`
+- **WHEN** the indexer processes them
+- **THEN** both are skipped for size
+
+#### Scenario: A project-level exemption applies from the project root
+
+- **GIVEN** a project `largeFilePaths` entry `app/controllers/legacy.php` and an oversized file at that path
+- **WHEN** the indexer processes it
+- **THEN** the file is analysed
+- **AND** it is reported in the exempt-and-analysed list with its size
+
+#### Scenario: A workspace-level exemption applies from the project root
+
+- **GIVEN** a workspace with `codeRoot` `packages/api` and `largeFilePaths` entry `packages/api/generated/**`
+- **WHEN** the indexer processes an oversized file at `packages/api/generated/schema.ts`
+- **THEN** the file is analysed
+
+#### Scenario: Workspace and project exemptions are combined
+
+- **GIVEN** an exemption in the project list and another in the workspace list
+- **WHEN** the indexer processes the files of that workspace
+- **THEN** both files are exempt
+
+#### Scenario: An exemption does not bypass discovery exclusions
+
+- **GIVEN** an oversized file that is matched by both `excludePaths` and `largeFilePaths`
+- **WHEN** the indexer processes the project
+- **THEN** the file is not indexed and is reported as excluded, not as skipped for size
+
+#### Scenario: An exemption does not bypass the binary filter
+
+- **GIVEN** a file with a known binary extension listed in `largeFilePaths`
+- **WHEN** the indexer processes the project
+- **THEN** the file is filtered as binary
+
+#### Scenario: Skipped files are recorded in coverage
+
+- **GIVEN** a file skipped for size
+- **WHEN** the run completes
+- **THEN** the coverage entry has status `unsupported` and reason `file-too-large`
+- **AND** the size in bytes and the applied limit are reported by the run result and by the `file-skipped` event, and are not persisted in coverage
+- **AND** no file node, document node, symbol, or relation exists for the file
+
+#### Scenario: Lookups about a skipped file are unproven, not absent
+
+- **GIVEN** a file skipped for size that would declare a symbol
+- **WHEN** a consumer looks the file up, or reads the graph health
+- **THEN** no file node exists for it, so the lookup finds nothing indexed for that file
+- **AND** graph health reports `coverageCompleteness` `complete-with-warnings` with a `file-too-large` warning
+
+### Requirement: Size skip in incremental runs and dependents
+
+#### Scenario: A file that grows beyond the limit is removed from the graph
+
+- **GIVEN** a file that was indexed with its symbols and relations and now exceeds the effective limit
+- **WHEN** the next incremental run processes it
+- **THEN** its previous nodes, symbols, and relations are removed
+- **AND** its coverage records the size skip
+
+#### Scenario: A file that shrinks below the limit is indexed
+
+- **GIVEN** a file that was skipped for size and now falls below the limit
+- **WHEN** the next run processes it
+- **THEN** the file is indexed and its coverage becomes `indexed`
+
+#### Scenario: Raising the limit triggers the rebuild
+
+- **GIVEN** a graph built with a limit that skipped a file and a configuration whose limit now admits it
+- **WHEN** the next run starts
+- **THEN** the fingerprint mismatch triggers the rebuild defined for incompatible derivations
+- **AND** the file is indexed
+
+#### Scenario: Importing a skipped file keeps the import unresolved and the cause discoverable
+
+- **GIVEN** a file that imports a module whose file was skipped for size
+- **WHEN** Pass 2 resolves imports
+- **THEN** the import remains unresolved and no relation to the skipped file is created
+- **AND** the skipped file has a coverage entry with reason `file-too-large` and appears in the files skipped for size of the run result
+
 ### Requirement: Discovery fingerprint uses effective config
 
 #### Scenario: Synthetic spec-root exclusions affect fingerprint
@@ -240,6 +564,43 @@
 - **WHEN** the discovery fingerprint is computed
 - **THEN** those files do not change the digest
 - **AND** changing any one of them, while declared manifests stay unchanged, leaves the digest unchanged
+
+#### Scenario: Changing the size limit changes the fingerprint
+
+- **GIVEN** two runs over the same files whose effective `maxFileBytes` differs
+- **WHEN** the indexer computes the graph fingerprint for each run
+- **THEN** the fingerprints differ
+
+#### Scenario: Changing the size exemptions changes the fingerprint
+
+- **GIVEN** two runs over the same files where the effective `largeFilePaths` of one workspace differ
+- **WHEN** the indexer computes the graph fingerprint for each run
+- **THEN** the fingerprints differ
+
+#### Scenario: Equal effective limits give an equal fingerprint however they are declared
+
+- **GIVEN** one run that declares the default limit only at the project level and another that declares the same value for every workspace
+- **WHEN** the indexer computes the graph fingerprint for each run
+- **THEN** the fingerprints are equal
+
+#### Scenario: Path-semantics marker forces a rebuild of an older index
+
+- **GIVEN** an index persisted under `codeRoot`-relative semantics and an unchanged `specd.yaml`
+- **WHEN** the indexer computes the fingerprint under project-relative semantics
+- **THEN** the fingerprint differs from the persisted one
+- **AND** the run is a full rebuild with a mismatch reason
+
+#### Scenario: Changing a workspace testPaths or ignorePaths changes the fingerprint
+
+- **GIVEN** two runs where the effective `testPaths` or `ignorePaths` of one workspace differ
+- **WHEN** the indexer computes the fingerprint for each run
+- **THEN** the fingerprints differ
+
+#### Scenario: Changing a workspace codeRoot path changes the fingerprint
+
+- **GIVEN** two runs where a workspace's project-relative `codeRoot` differs
+- **WHEN** the indexer computes the fingerprint for each run
+- **THEN** the fingerprints differ
 
 ### Requirement: Adapter-sourced resolution fingerprint
 
@@ -316,6 +677,19 @@
 - **THEN** import resolution completes before shared scoped binding resolution consumes those candidates
 - **AND** derived `USES_TYPE`, `CONSTRUCTS`, or `CALLS` relations are emitted from the stored facts
 
+#### Scenario: Preparation and linking precede Pass 2
+
+- **GIVEN** a run with several workspaces and adapters providing `packageResolution` and `reExportLinking`
+- **WHEN** the indexer executes
+- **THEN** the package map is built before Pass 1
+- **AND** `prepare` is called once and re-export linking completes before the first `resolveImports` call
+
+#### Scenario: Hydrated workspaces are prepared
+
+- **GIVEN** an incremental run where only one workspace changed
+- **WHEN** `prepare` is called
+- **THEN** it receives every workspace, including the unchanged ones
+
 ### Requirement: Shared indexing session
 
 #### Scenario: Adapters and pass logic share the same run-scoped session
@@ -338,6 +712,26 @@
 - **WHEN** a later indexing phase needs a spec-to-symbol or symbol-to-spec lookup
 - **THEN** it reads that relationship from the same run-scoped session
 - **AND** it does not rebuild a parallel cross-entity cache outside the session
+
+#### Scenario: Hydrated files fill the qualified-name lookup
+
+- **GIVEN** an incremental run where a PHP class file is unchanged and hydrated from the store
+- **AND** a changed file imports that class by qualified name
+- **WHEN** imports are resolved
+- **THEN** the qualified-name lookup contains the hydrated class
+- **AND** the result equals a clean rebuild
+
+#### Scenario: Production importers never resolve to a test symbol
+
+- **GIVEN** a symbol in a test file with the same qualified name as no production symbol
+- **WHEN** a production file imports that qualified name
+- **THEN** the import does not resolve to the test symbol
+
+#### Scenario: A test importer resolves to a test helper
+
+- **GIVEN** a helper symbol declared in a test file
+- **WHEN** another test file imports it by qualified name
+- **THEN** the import resolves and `graph impact` on the helper lists the importing test as a dependent
 
 ### Requirement: Scoped binding environment resolution
 
@@ -367,8 +761,8 @@
 
 - **GIVEN** scoped binding resolution returns a dependency where `sourceSymbolId` equals `targetSymbolId`
 - **WHEN** Pass 2 converts resolved dependencies into graph relations
-- **THEN** that dependency is not staged for `bulkLoad()`
 - **AND** no self-edge is persisted in the graph store
+- **THEN** the bulk write session receives no staged row for that dependency
 
 #### Scenario: Indexer stays language-agnostic
 
@@ -376,6 +770,27 @@
 - **WHEN** Pass 2 builds scoped binding environments
 - **THEN** receiver lookup uses normalized adapter facts
 - **AND** `IndexCodeGraph` does not branch on concrete language identifiers for binding semantics
+
+#### Scenario: Type imported from another workspace produces USES_TYPE
+
+- **GIVEN** a function in workspace `app` whose parameter type is imported from workspace `graph`
+- **AND** the import resolved to a declaration in `graph`
+- **WHEN** Pass 2 resolves relations
+- **THEN** a `USES_TYPE` relation links the function to that declaration in `graph`
+
+#### Scenario: Import wins over a same-name local symbol
+
+- **GIVEN** workspace `app` declares an unrelated symbol named `Node`
+- **AND** a file in `app` imports a `Node` from workspace `graph` and uses it as a parameter type
+- **WHEN** Pass 2 resolves relations
+- **THEN** the `USES_TYPE` relation targets the `Node` of `graph`
+- **AND** no relation targets the local `Node`
+
+#### Scenario: Unimported name keeps the workspace lookup
+
+- **GIVEN** a parameter type name that no import binds and one symbol of that name in the workspace
+- **WHEN** Pass 2 resolves relations
+- **THEN** the relation targets that symbol as before
 
 ### Requirement: Chunked processing
 
@@ -414,6 +829,54 @@
 - **WHEN** a phase like discovery or pass 1 finishes
 - **THEN** the progress callback is fired immediately with the next phase label
 - **AND** this happens before synchronous heavy work begins, such as session index finalization or relation aggregation
+
+### Requirement: Typed indexing events
+
+#### Scenario: File activity is announced before processing
+
+- **GIVEN** an `onEvent` receiver and a file to process
+- **WHEN** the indexer starts that file
+- **THEN** a `file-activity` event with its path is delivered before the file is read
+
+#### Scenario: Files skipped by the analysis are announced and counted
+
+- **GIVEN** a document without a language adapter and a file with undecodable content among the files to process
+- **WHEN** the indexer traverses them
+- **THEN** each of them produces a `file-activity` event
+- **AND** each of them is counted in the progress counters
+
+#### Scenario: Files that never enter processing are not announced as activity
+
+- **GIVEN** a file over the size limit and a file excluded by discovery rules
+- **WHEN** the indexer runs
+- **THEN** neither produces a `file-activity` event
+- **AND** the oversized file produces a `file-skipped` event
+
+#### Scenario: Every file is announced with its size
+
+- **GIVEN** thousands of tiny files and one large file processed in one run
+- **WHEN** the run proceeds
+- **THEN** the receiver gets one `file-activity` event per file, each with the file size when it is known
+- **AND** the indexer applies no rate limit of its own
+
+#### Scenario: A size skip produces a typed event
+
+- **GIVEN** an oversized file
+- **WHEN** the indexer skips it
+- **THEN** a `file-skipped` event carries its path, `sizeBytes`, `limitBytes`, and the reason `file-too-large`
+
+#### Scenario: Events carry data and not sentences
+
+- **GIVEN** any event delivered to the receiver
+- **WHEN** it is inspected
+- **THEN** it has a stable `kind` and structured fields, and no human-readable message is required to interpret it
+
+#### Scenario: Omitting the receiver changes nothing
+
+- **GIVEN** a run without `onEvent`
+- **WHEN** it completes
+- **THEN** the result equals the result of the same run with a receiver
+- **AND** `onProgress` receives the same calls in both runs
 
 ### Requirement: Phase execution timing logging
 
@@ -468,12 +931,128 @@
 - **WHEN** the indexer builds the package map and the adapter resolves the re-export
 - **THEN** no cross-workspace binding is stored
 
-#### Scenario: First adapter identity wins once
+#### Scenario: Identity collision is reported
 
-- **GIVEN** two adapters could answer for the same workspace and only the first returns a package name
-- **WHEN** the map is built
-- **THEN** that first non-empty identity is stored
+- **GIVEN** two workspaces whose manifests declare the same package identity
+- **WHEN** the package map is built
+- **THEN** an error names both workspaces
+
+#### Scenario: Resolved package import persists binding, step, and IMPORTS
+
+- **GIVEN** `sdk` imports `SymbolNode` from `@specd/code-graph`
+- **WHEN** the run is committed
+- **THEN** the local binding has the target logical id
+- **AND** an `import:package` step exists from that binding to the public binding
+- **AND** an `IMPORTS` relation exists from the `sdk` file to the entry file
+
+#### Scenario: Unresolved import persists nothing
+
+- **GIVEN** a package import whose name the entry surface does not publish
+- **WHEN** the run is committed
+- **THEN** no binding target, step, or relation is stored
+- **AND** the reason `not-exported` appears only in non-persisted output
+
+#### Scenario: Unique name is not enough
+
+- **GIVEN** the imported name exists exactly once in the target workspace but not on its entry surface
+- **WHEN** the import is resolved
+- **THEN** it stays unresolved
+
+#### Scenario: Test files are not entries
+
+- **GIVEN** an entry candidate classified as a test
+- **WHEN** the helper filters entries
+- **THEN** the candidate is discarded
+
+#### Scenario: Adapters disagree on a name
+
+- **GIVEN** two entries publish the same name with different logical targets
+- **WHEN** the helper resolves the name
+- **THEN** the reason is `ambiguous` and nothing is persisted
+
+#### Scenario: External packages are counted, not reported as failures
+
+- **GIVEN** files that import `zod` and `node:fs`, which no workspace declares
+- **WHEN** the run completes
+- **THEN** `importDiagnostics.externalPackageImports` counts those imports
+- **AND** they are not part of `total`, `byReason`, or `samples`
+
+#### Scenario: Diagnostics summary is bounded
+
+- **GIVEN** more than 20 imports that fail with the same reason
+- **WHEN** the run completes
+- **THEN** `byReason` holds the exact count for that reason
+- **AND** `samples` holds at most 20 diagnostics for it
+
+#### Scenario: Helper reports its reasons
+
+- **GIVEN** an adapter without `packageResolution`, an unknown package, and a facet returning no indexed entry
+- **WHEN** each import is resolved
+- **THEN** the reasons are `facet-absent`, `package-unknown`, and `no-entry-surface` respectively
+
+#### Scenario: Every adapter is asked for an identity
+
+- **GIVEN** two registered adapters that both return an identity for one workspace
+- **WHEN** the package map is built
+- **THEN** both identities are stored for that workspace
 - **AND** the indexer still does not open either manifest itself
+
+#### Scenario: Each code root gets the repository root of its own repository
+
+- **GIVEN** a workspace inside the project repository and a workspace whose code root is in another repository
+- **WHEN** the package map is built
+- **THEN** `identity` receives the project repository root for the first workspace and the other repository's root for the second
+- **AND** the project root is not used as the boundary for the second
+
+#### Scenario: No detected VCS inspects only the code root
+
+- **GIVEN** a workspace whose code root is not inside any repository (the VCS detection falls back to the null adapter)
+- **WHEN** the package map is built
+- **THEN** `identity` receives no repository root
+- **AND** only the code root is inspected for the manifest
+
+#### Scenario: VCS detection failure is not fatal
+
+- **GIVEN** a VCS detection that throws for one code root
+- **WHEN** the package map is built
+- **THEN** that workspace is treated as having no detected repository
+- **AND** the run continues
+
+#### Scenario: Partial run maps and prepares every configured workspace
+
+- **GIVEN** workspaces A and B and a run that indexes only A
+- **AND** A imports a package declared by B
+- **WHEN** the run completes
+- **THEN** the import resolves to B
+- **AND** the result equals the result of a run that indexes both workspaces
+
+#### Scenario: Inaccessible workspace is skipped without failing the run
+
+- **GIVEN** a configured workspace whose repository is not cloned
+- **WHEN** the run executes
+- **THEN** a diagnostic is reported for that workspace
+- **AND** imports of its packages count as external
+- **AND** the other workspaces are indexed normally
+
+#### Scenario: Workspace accessibility is supplied through an application port
+
+- **GIVEN** a fake accessibility port that reports one configured code root as inaccessible and another as accessible
+- **WHEN** the indexing use case executes without a real filesystem
+- **THEN** it skips and diagnoses only the inaccessible workspace
+- **AND** the application use case makes no direct `node:fs` call
+
+#### Scenario: Accessibility probe failure is non-fatal
+
+- **GIVEN** the injected accessibility port throws while probing one configured workspace
+- **WHEN** the package map is built
+- **THEN** that workspace is diagnosed and treated as inaccessible
+- **AND** the other workspaces continue indexing
+
+#### Scenario: Adapter serving several languages is listed once
+
+- **GIVEN** one adapter that serves `typescript`, `tsx`, `javascript`, and `jsx` without `packageResolution`
+- **WHEN** the run completes
+- **THEN** `adaptersWithoutPackageResolution` lists that adapter once, by its first declared language
 
 ### Requirement: Spec dependency indexing
 
@@ -618,6 +1197,21 @@
 - **WHEN** it is indexed
 - **THEN** no node is created in the graph
 
+#### Scenario: Size-skip summary fields in the result
+
+- **GIVEN** a run in which twelve files exceed the limit and one exempt file exceeds it but is analysed
+- **WHEN** the run completes
+- **THEN** `filesSkippedForSize` is 12
+- **AND** `largestSkippedForSize` holds at least ten entries in descending size order and then by path, each with `filePath`, `projectRelativePath`, `sizeBytes`, and `limitBytes`
+- **AND** `sizeExemptAnalysed` lists the exempt file with its size
+
+#### Scenario: Result is unchanged when nothing exceeds the limit
+
+- **GIVEN** a run in which no file exceeds the effective limit
+- **WHEN** the run completes
+- **THEN** `filesSkippedForSize` is 0
+- **AND** `largestSkippedForSize` and `sizeExemptAnalysed` are empty
+
 ### Requirement: Prefer LLM-optimized description
 
 #### Scenario: Indexer uses optimized description
@@ -625,10 +1219,6 @@
 - **GIVEN** a spec with `optimizedDescription: "AI Summary"` and `description: "Manual"`
 - **WHEN** indexing the spec
 - **THEN** the resulting `SpecNode` in the graph has `description: "AI Summary"`
-
-\[object Object]
-
-\[object Object]
 
 ### Requirement: Reference fact indexing
 
@@ -646,6 +1236,21 @@
 - **THEN** declaration, logical-symbol, import, symbol, and binding indexes are built once for the session or file
 - **AND** resolving each relation uses indexed lookup instead of scanning all declarations, logical symbols, or public bindings
 - **AND** relation persistence remains chunked and deduplicated
+
+#### Scenario: Cross-file overrides connect to all overloaded super methods
+
+- **GIVEN** a base class or interface with multiple overloaded declarations of a method
+- **AND** a child class declaring an overriding method
+- **WHEN** cross-file override relations are derived
+- **THEN** `OVERRIDES` relations connect the overriding method to all overloaded super method declaration IDs
+- **AND** candidate targets beyond the first overload are not dropped
+
+#### Scenario: Property symbols are persisted with DEFINES relations
+
+- **GIVEN** files declaring properties inside classes, interfaces, structs, or enums
+- **WHEN** indexing commits
+- **THEN** property symbols are persisted with `kind: 'property'` and their container's `parentId`
+- **AND** `DEFINES` relations connect each file to its contained property symbols
 
 #### Scenario: Source content and symbol ranges are indexed atomically
 
@@ -683,6 +1288,29 @@
 - **THEN** that generation's public bindings are already stored
 - **AND** coverage does not read the pre-re-export declaration list only
 
+### Requirement: Classification-aware logical identity construction
+
+#### Scenario: Lexical bindings do not become logical symbols
+
+- **GIVEN** an adapter classifies a declaration as lexical-binding-only or physical-only
+- **WHEN** the indexing session registers declarations
+- **THEN** its physical evidence is retained
+- **AND** no canonical logical target is manufactured
+
+#### Scenario: Members use canonical logical owners
+
+- **GIVEN** an owned member and its container declaration
+- **WHEN** logical identities are constructed
+- **THEN** the canonical owner is registered before the member
+- **AND** lexical parent identity is used only as physical containment evidence
+
+#### Scenario: Declaration groups require explicit language evidence
+
+- **GIVEN** same-name declarations with similar broad kinds but no grouping evidence
+- **WHEN** logical targets are assembled
+- **THEN** they remain distinct
+- **AND** valid groups retain every declaration and its occurrence form metadata
+
 ### Requirement: Incompatible derivation rebuild
 
 #### Scenario: Incompatibility triggers visible full rebuild
@@ -697,6 +1325,22 @@
 - **THEN** semantic and source-content indexes are rebuilt after the single committed bulk session
 - **AND** no partially indexed generation becomes readable
 
+#### Scenario: Subset rebuild preserves other workspaces
+
+- **GIVEN** a store indexed for workspaces `core` and `cli`
+- **AND** a forced or fingerprint-mismatch run targets only workspace `core`
+- **WHEN** `IndexCodeGraph.execute()` completes
+- **THEN** every file, symbol, relation, and coverage record of `cli` is still present
+- **AND** only `core` data is cleared and regenerated
+
+#### Scenario: Whole-graph derivation mismatch recreates storage and rotates generation
+
+- **GIVEN** a stored derivation fingerprint that differs from the current one
+- **AND** the run indexes every stored workspace and owns its provider
+- **WHEN** project indexing runs
+- **THEN** storage is physically recreated and its generation rotates before extraction
+- **AND** the result reports the fingerprint-mismatch reason
+
 ### Requirement: Indexed-input observation capture
 
 #### Scenario: Indexing records every semantic input
@@ -705,6 +1349,67 @@
 - **WHEN** the bulk generation commits
 - **THEN** observations record logical identity, non-absolute locator, content hash, and available mtime, size, or revision evidence
 - **AND** workspace and aggregate stale latches are cleared only after success
+
+#### Scenario: A package identity collision does not keep the graph stale
+
+- **GIVEN** two workspaces whose manifests declare the same package identity and a graph whose latches are set
+- **WHEN** the indexer completes
+- **THEN** the collision is reported in `diagnostics` and `errors` is empty
+- **AND** observations are captured for every produced resource
+- **AND** the workspace and aggregate stale latches are cleared
+
+#### Scenario: A file that fails does not keep the graph stale
+
+- **GIVEN** a graph whose latches are set and a file whose analysis throws
+- **WHEN** the indexer completes and commits
+- **THEN** the failure is reported in `errors` and the file's coverage is `parse-failed`
+- **AND** the stale latches are cleared and observations are captured for the produced resources
+- **AND** the failed file has no observation
+
+#### Scenario: A run that does not commit keeps the latches
+
+- **GIVEN** a graph whose latches are set and a store failure while committing
+- **WHEN** the indexer aborts
+- **THEN** the latches and the previous observations are unchanged
+
+#### Scenario: A spec that fails has no observation
+
+- **GIVEN** a graph whose latches are set and a spec whose processing throws
+- **WHEN** the indexer completes and commits
+- **THEN** the failure is in `errors` under the spec identifier and no observation exists for that spec
+- **AND** the observations of the other resources are captured
+
+#### Scenario: A hashing failure is one parse-failed error
+
+- **GIVEN** a discovered file that cannot be read for hashing
+- **WHEN** the indexer completes
+- **THEN** `errors` holds one entry for that path and its coverage is `parse-failed`
+
+#### Scenario: A forced run records the content it read
+
+- **GIVEN** a graph in which a file changed and another file is new, and a forced run
+- **WHEN** the indexer completes
+- **THEN** each of those files has an observation carrying the hash of the content read by that run
+
+### Requirement: Retry of failed targets
+
+#### Scenario: A non-forced run retries a parse-failed file whose content did not change
+
+- **GIVEN** a file persisted with coverage `parse-failed` and a content hash equal to its current hash
+- **WHEN** a normal incremental run executes
+- **THEN** the file is analysed again
+
+#### Scenario: A retry that succeeds replaces the failure
+
+- **GIVEN** the same file and an adapter that now analyses it successfully
+- **WHEN** a normal incremental run executes
+- **THEN** the file is indexed, its coverage is `indexed`, and it has an observation
+
+#### Scenario: A retry that fails again leaves the failure reported
+
+- **GIVEN** the same file and an adapter that still fails
+- **WHEN** a normal incremental run executes
+- **THEN** the failure is in `errors` and in coverage, and the graph is not stale because of it
 
 ### Requirement: Bounded incremental relation construction
 
@@ -751,3 +1456,106 @@
 - **THEN** persistence includes all non-search transactional work
 - **AND** search-index timing covers only the backend search-index step in the changed run
 - **AND** the unchanged run reports zero search-index items and zero search-index duration
+
+### Requirement: Identity-sensitive incremental equivalence
+
+#### Scenario: Declaration mutation matches a clean rebuild
+
+- **GIVEN** a declaration is moved, renamed, added, deleted, regrouped, or assigned a different owner
+- **WHEN** incremental indexing and a clean rebuild reach identical final source and configuration
+- **THEN** their normalized logical symbols, declaration mappings, bindings, relations, evidence, and coverage are equal
+
+#### Scenario: Body edits rebuild affected consumers
+
+- **GIVEN** a body edit or newly resolvable target changes dependency semantics without changing a declaration header
+- **WHEN** incremental indexing computes its affected closure
+- **THEN** every semantically affected consumer is reconsidered
+- **AND** cleanup does not leave missing or stale incident relations
+
+#### Scenario: Incremental mutation matrix matches clean semantic state
+
+- **GIVEN** independent fixtures for body edits, declaration moves, signature changes, overload or merge-group changes, owner changes, renames, deletes, additions, and newly resolvable references
+- **WHEN** each fixture is indexed incrementally and from a clean database to the same final source
+- **THEN** normalized physical symbols, logical symbols, declaration mappings, bindings, public bindings, dependency relations, provenance, and coverage are identical
+- **AND** equality is checked by semantic content rather than aggregate row counts
+
+#### Scenario: Name-addressed imports match a clean rebuild
+
+- **GIVEN** PHP, Python, and Go projects whose imports are addressed by qualified name or namespace
+- **WHEN** one file changes in an incremental run
+- **THEN** the normalized semantic state equals a clean rebuild of the same final source
+
+### Requirement: Facet-driven language independence
+
+#### Scenario: Stub language resolves package imports without indexer change
+
+- **GIVEN** a stub adapter for a made-up language `zig2` with extension `.z2`, manifest `zig2.pkg`, and a `packageResolution` facet
+- **AND** workspace `lib` exports `Widget` and workspace `app` imports it through the made-up package specifier
+- **WHEN** both workspaces are indexed using the unmodified indexer
+- **THEN** the import resolves, with binding, step, and `IMPORTS`
+- **AND** the indexer source contains no reference to `zig2`, `.z2`, or `zig2.pkg`
+
+#### Scenario: Indexer source has no language branches for resolution
+
+- **WHEN** the indexer sources are searched for language identifiers, extensions, and manifest names of the built-in adapters
+- **THEN** none appears in package-import resolution code
+
+#### Scenario: Absent facet is skipped with a diagnostic
+
+- **GIVEN** an adapter that provides only the required core
+- **WHEN** the run executes
+- **THEN** its files are indexed normally
+- **AND** no package map entry or package import resolution exists for it
+- **AND** the adapter is listed in `importDiagnostics.adaptersWithoutPackageResolution`
+- **AND** the listing is not counted in `total`, `byReason`, or `samples`
+
+#### Scenario: A throwing identity does not stop the run
+
+- **GIVEN** an adapter whose `identity` throws for one workspace
+- **WHEN** the package map is built
+- **THEN** the error is recorded as an indexing error
+- **AND** the adapter is treated as without `packageResolution` for the rest of the run and is listed in `adaptersWithoutPackageResolution`
+- **AND** the same adapter's relative barrel re-exports are still linked
+- **AND** the other workspaces and adapters are still indexed
+
+### Requirement: Package import incremental closure
+
+#### Scenario: Entry change re-resolves importers in other workspaces
+
+- **GIVEN** `sdk` imports `SymbolNode` from `@specd/code-graph` and the graph is current
+- **WHEN** `code-graph:src/public.ts` stops exporting `SymbolNode` and an incremental run follows
+- **THEN** the importing `sdk` file is re-extracted
+- **AND** its binding target, step, and `IMPORTS` edge are removed
+
+#### Scenario: Barrel chain change reaches importers
+
+- **GIVEN** the name is published through `public.ts` → `index.ts` → `domain/index.ts`
+- **WHEN** `domain/index.ts` changes what it publishes
+- **THEN** importers of the package are re-resolved
+
+#### Scenario: Manifest change reaches importers
+
+- **GIVEN** the `exports` field of the target package changes
+- **WHEN** the next run computes the fingerprint
+- **THEN** the run is a full rebuild or re-resolves every importer, and equals a clean rebuild
+
+#### Scenario: Newly resolvable import is reconsidered
+
+- **GIVEN** a package import is unresolved because the target workspace is not configured
+- **WHEN** the workspace is added and the run is incremental
+- **THEN** the import resolves and equals a clean rebuild
+
+#### Scenario: Closure does not scan every file
+
+- **GIVEN** an incremental run that changes one entry file and adds no code file
+- **WHEN** the closure for that entry is computed
+- **THEN** the importers are found from persisted steps and hydrated bindings only
+- **AND** unrelated files are not read
+
+#### Scenario: Added files still re-extract files with possibly unresolved imports
+
+- **GIVEN** a run that adds a new code file
+- **WHEN** the closure is computed
+- **THEN** existing code files that may hold previously unresolved imports are re-extracted
+- **AND** an import whose target workspace file just appeared resolves and equals a clean rebuild
+- **AND** a run that adds only a non-code file (a document or an asset) does not trigger that re-extraction

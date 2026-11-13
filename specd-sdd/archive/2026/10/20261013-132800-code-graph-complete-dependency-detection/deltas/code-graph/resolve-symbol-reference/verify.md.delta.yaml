@@ -1,0 +1,25 @@
+- op: modified
+  description: 'Add scenario for resolving overload set candidate declarations without false ambiguity'
+  selector:
+    type: section
+    matches: 'Requirement: Logical canonical targets'
+  content: |
+    #### Scenario: Overloads form one logical symbol
+
+    - **GIVEN** a language-defined overload set has multiple declaration locations
+    - **WHEN** its reference is resolved
+    - **THEN** the result is one logical target containing every declaration occurrence
+    - **AND** it is not marked ambiguous
+
+    #### Scenario: Competing declarations remain ambiguous
+
+    - **GIVEN** two declarations do not form one language-defined symbol
+    - **WHEN** both satisfy the request
+    - **THEN** the result is ambiguous with both candidates
+
+    #### Scenario: Selector candidate declarations of same logical symbol resolve without ambiguity
+
+    - **GIVEN** selector resolution evaluates candidate declarations that all belong to the same logical symbol or overload set
+    - **WHEN** selector candidates are checked
+    - **THEN** status is `resolved` rather than `ambiguous`
+    - **AND** all declaration occurrences are retained on the resolved logical symbol

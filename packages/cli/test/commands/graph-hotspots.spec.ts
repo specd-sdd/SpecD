@@ -4,6 +4,7 @@ import {
   captureStderr,
   captureStdout,
   makeMockConfig,
+  makeMockKernel,
   makeProgram,
   mockProcessExit,
 } from './helpers.js'
@@ -14,6 +15,14 @@ vi.mock('../../src/commands/graph/resolve-graph-cli-context.js', () => ({
 
 vi.mock('../../src/commands/graph/with-provider.js', () => ({
   withProvider: vi.fn(),
+}))
+
+vi.mock('../../src/commands/graph/host-context.js', () => ({
+  createGraphHostContext: vi.fn(async (config, kernel) => ({
+    config,
+    kernel,
+    dispose: async () => {},
+  })),
 }))
 
 vi.mock('@specd/sdk', async () => {
@@ -29,11 +38,13 @@ import { registerGraphHotspots } from '../../src/commands/graph/hotspots.js'
 
 function setup() {
   const config = makeMockConfig()
+  const kernel = makeMockKernel()
+  kernel.project.getConfig.execute.mockReturnValue(config)
   vi.mocked(resolveGraphCliContext).mockResolvedValue({
     mode: 'configured',
     config,
     configFilePath: '/project/specd.yaml',
-    kernel: null,
+    kernel,
     host: null,
     projectRoot: '/project',
     vcsRoot: '/project',
@@ -255,5 +266,188 @@ describe('graph hotspots', () => {
     expect(docs).toContain(
       'Overriding `--min-risk`, `--limit`, or `--min-score` does not disable the other defaults',
     )
+  })
+
+  it('rejects invalid --category before computing hotspots', async () => {
+    const { getStderr } = setup()
+
+    const program = makeHotspotsProgram()
+    try {
+      await program.parseAsync(['node', 'specd', 'graph', 'hotspots', '--category', 'unknown'])
+    } catch {
+      /* ExitSentinel */
+    }
+
+    expect(getStderr()).toContain(
+      'invalid category "unknown". Expected one of: source, test, ignored',
+    )
+    expect(process.exit).toHaveBeenCalledWith(1)
+  })
+
+  it('rejects invalid category within comma-separated list', async () => {
+    const { getStderr } = setup()
+
+    const program = makeHotspotsProgram()
+    try {
+      await program.parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'hotspots',
+        '--category',
+        'source,invalid',
+      ])
+    } catch {
+      /* ExitSentinel */
+    }
+
+    expect(getStderr()).toContain(
+      'invalid category "invalid". Expected one of: source, test, ignored',
+    )
+    expect(process.exit).toHaveBeenCalledWith(1)
+  })
+
+  it('passes comma-separated categories to getHotspots', async () => {
+    const { mockProvider } = setup()
+
+    const program = makeHotspotsProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'hotspots', '--category', 'source,test'])
+
+    expect(mockProvider.getHotspots).toHaveBeenCalledWith(
+      expect.objectContaining({ categories: ['source', 'test'] }),
+    )
+  })
+
+  it('passes category flags (--include-tests, --include-ignored, --all, --category) to getHotspots', async () => {
+    const { mockProvider } = setup()
+
+    const program = makeHotspotsProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'hotspots', '--include-tests'])
+
+    expect(mockProvider.getHotspots).toHaveBeenCalledWith(
+      expect.objectContaining({ includeTests: true }),
+    )
+  })
+
+  it('displays omission notice in text mode when tests or ignored are omitted', async () => {
+    const { mockProvider, getStdout } = setup()
+    mockProvider.getHotspots.mockResolvedValue({
+      totalSymbols: 0,
+      entries: [],
+      omittedCounts: { tests: 5, ignored: 2 },
+    })
+
+    const program = makeHotspotsProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'hotspots', '--format', 'text'])
+
+    const stdout = getStdout()
+    expect(stdout).toContain(
+      'ℹ Excluded from results: 5 test files, 2 ignored files. Use --include-tests, --include-ignored, or --all to view them.',
+    )
+  })
+
+  it('includes omittedCounts in JSON mode', async () => {
+    const { mockProvider, getStdout } = setup()
+    mockProvider.getHotspots.mockResolvedValue({
+      totalSymbols: 0,
+      entries: [],
+      omittedCounts: { tests: 5, ignored: 0 },
+    })
+
+    const program = makeHotspotsProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'hotspots', '--format', 'json'])
+
+    const parsed = JSON.parse(getStdout())
+    expect(parsed.omittedCounts).toEqual({ tests: 5, ignored: 0 })
+  })
+
+  it('projects projectRelativePath and eliminates displayPath in JSON mode', async () => {
+    const { mockProvider, getStdout } = setup()
+    mockProvider.getHotspots.mockResolvedValue({
+      totalSymbols: 1,
+      entries: [
+        {
+          symbol: {
+            id: 'default:src/service.ts:class:AuthService:10:0',
+            name: 'AuthService',
+            kind: 'class',
+            filePath: 'default:src/service.ts',
+            projectRelativePath: 'src/service.ts',
+            line: 10,
+            column: 0,
+          },
+          score: 80,
+          directCallers: 5,
+          crossWorkspaceCallers: 2,
+          fileImporters: 3,
+          riskLevel: 'HIGH',
+        },
+      ],
+    })
+
+    const program = makeHotspotsProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'hotspots', '--format', 'json'])
+
+    const parsed = JSON.parse(getStdout()) as {
+      readonly totalSymbols: number
+      readonly entries: ReadonlyArray<Record<string, unknown>>
+    }
+    expect(parsed.entries).toHaveLength(1)
+    const entry = parsed.entries[0]!
+    expect(entry).toHaveProperty('projectRelativePath', 'src/service.ts')
+    expect(entry).toHaveProperty('workspace', 'default')
+    expect(entry).not.toHaveProperty('displayPath')
+    expect(entry.symbol as Record<string, unknown>).not.toHaveProperty('displayPath')
+  })
+
+  it('renders projectRelativePath and avoids displayPath in TOON and text modes', async () => {
+    const { mockProvider, getStdout } = setup()
+    mockProvider.getHotspots.mockResolvedValue({
+      totalSymbols: 1,
+      entries: [
+        {
+          symbol: {
+            id: 'default:src/service.ts:class:AuthService:10:0',
+            name: 'AuthService',
+            kind: 'class',
+            filePath: 'default:src/service.ts',
+            projectRelativePath: 'src/service.ts',
+            line: 10,
+            column: 0,
+          },
+          score: 80,
+          directCallers: 5,
+          crossWorkspaceCallers: 2,
+          fileImporters: 3,
+          riskLevel: 'HIGH',
+        },
+      ],
+    })
+
+    const programText = makeHotspotsProgram()
+    await programText.parseAsync(['node', 'specd', 'graph', 'hotspots', '--format', 'text'])
+    const textOutput = getStdout()
+    expect(textOutput).toContain('[default] src/service.ts:10')
+    expect(textOutput).not.toContain('displayPath')
+
+    const programToon = makeHotspotsProgram()
+    await programToon.parseAsync(['node', 'specd', 'graph', 'hotspots', '--format', 'toon'])
+    const toonOutput = getStdout()
+    expect(toonOutput).toContain('projectRelativePath')
+    expect(toonOutput).toContain('src/service.ts')
+    expect(toonOutput).not.toContain('displayPath')
+  })
+
+  it('renders "No hotspots found." in text mode when entries are empty', async () => {
+    const { mockProvider, getStdout } = setup()
+    mockProvider.getHotspots.mockResolvedValue({
+      totalSymbols: 0,
+      entries: [],
+      omittedCounts: { tests: 0, ignored: 0 },
+    })
+
+    const program = makeHotspotsProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'hotspots', '--format', 'text'])
+    expect(getStdout()).toContain('No hotspots found.')
   })
 })

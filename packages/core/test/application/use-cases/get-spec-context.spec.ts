@@ -62,8 +62,7 @@ describe('GetSpecContext', () => {
       makeGetSpecMetadata(new Map([['default', repo]])),
     )
     const result = await uc.execute({
-      workspace: 'default',
-      specPath: SpecPath.parse('auth/login'),
+      specId: 'default:auth/login',
     })
 
     expect(result.entries).toHaveLength(1)
@@ -80,8 +79,7 @@ describe('GetSpecContext', () => {
     const uc = new GetSpecContext(specRepos, makeContentHasher(), missingGetSpecMetadata)
     await expect(
       uc.execute({
-        workspace: 'nonexistent',
-        specPath: SpecPath.parse('auth/login'),
+        specId: 'nonexistent:auth/login',
       }),
     ).rejects.toThrow(WorkspaceNotFoundError)
   })
@@ -93,8 +91,7 @@ describe('GetSpecContext', () => {
     const uc = new GetSpecContext(specRepos, makeContentHasher(), missingGetSpecMetadata)
     await expect(
       uc.execute({
-        workspace: 'default',
-        specPath: SpecPath.parse('nonexistent/spec'),
+        specId: 'default:nonexistent/spec',
       }),
     ).rejects.toThrow(SpecNotFoundError)
   })
@@ -125,8 +122,7 @@ describe('GetSpecContext', () => {
       makeGetSpecMetadata(new Map([['default', repo]])),
     )
     const result = await uc.execute({
-      workspace: 'default',
-      specPath: SpecPath.parse('auth/login'),
+      specId: 'default:auth/login',
     })
 
     expect(result.entries).toHaveLength(1)
@@ -203,8 +199,7 @@ describe('GetSpecContext', () => {
       makeGetSpecMetadata(new Map([['default', repo]])),
     )
     const result = await uc.execute({
-      workspace: 'default',
-      specPath: SpecPath.parse('auth/login'),
+      specId: 'default:auth/login',
       followDeps: true,
     })
 
@@ -293,8 +288,7 @@ describe('GetSpecContext', () => {
       createBuiltinExtractorTransforms(),
     )
     const result = await uc.execute({
-      workspace: 'default',
-      specPath: SpecPath.parse('auth/login'),
+      specId: 'default:auth/login',
       followDeps: true,
     })
 
@@ -340,8 +334,7 @@ describe('GetSpecContext', () => {
     it('types missing-optimization when no optimization status is recorded', async () => {
       const uc = makeUc(stubGetSpecMetadata({ title: 'Login', description: 'Handles login' }))
       const result = await uc.execute({
-        workspace: 'default',
-        specPath: SpecPath.parse('auth/login'),
+        specId: 'default:auth/login',
         contextMode: 'summary',
         llmOptimizedContext: true,
       })
@@ -357,8 +350,7 @@ describe('GetSpecContext', () => {
         }),
       )
       const result = await uc.execute({
-        workspace: 'default',
-        specPath: SpecPath.parse('auth/login'),
+        specId: 'default:auth/login',
         contextMode: 'summary',
         llmOptimizedContext: true,
       })
@@ -377,8 +369,7 @@ describe('GetSpecContext', () => {
         ),
       )
       const result = await uc.execute({
-        workspace: 'default',
-        specPath: SpecPath.parse('auth/login'),
+        specId: 'default:auth/login',
         contextMode: 'summary',
       })
       expect(result.entries[0]!.stale).toBe(false)

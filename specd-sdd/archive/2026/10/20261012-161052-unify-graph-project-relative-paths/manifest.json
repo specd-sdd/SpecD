@@ -1,0 +1,1503 @@
+{
+  "name": "unify-graph-project-relative-paths",
+  "createdAt": "2026-10-12T16:10:52.623Z",
+  "updatedAt": "2026-10-13T14:47:14.268Z",
+  "description": "Unifies code-graph results to consistently expose projectRelativePath across symbols, files, documents, hotspots, and impact analyses while eliminating legacy configRelativePath, displayPath, and displayTargets. Upgrades SQLite store schema to version 14 with zero-join denormalized paths backed by ADR-0028. Introduces host-agnostic SDK orchestrators in @specd/sdk to decouple presentation from graph operations.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "cli:graph-search",
+    "cli:graph-hotspots",
+    "cli:graph-impact",
+    "sdk:run-graph-search",
+    "sdk:run-graph-hotspots",
+    "sdk:run-graph-impact",
+    "code-graph:symbol-model",
+    "code-graph:document-model",
+    "code-graph:workspace-integration",
+    "code-graph:sqlite-graph-store"
+  ],
+  "specDependsOn": {
+    "cli:graph-search": [
+      "cli:entrypoint",
+      "core:config",
+      "code-graph:composition",
+      "code-graph:document-model",
+      "code-graph:graph-store",
+      "cli:graph-cli-context",
+      "code-graph:resolve-symbol-reference",
+      "sdk:run-graph-search"
+    ],
+    "cli:graph-hotspots": [
+      "cli:entrypoint",
+      "cli:graph-cli-context",
+      "core:config",
+      "code-graph:composition",
+      "sdk:run-graph-hotspots"
+    ],
+    "cli:graph-impact": [
+      "cli:entrypoint",
+      "cli:graph-cli-context",
+      "core:config",
+      "code-graph:traversal",
+      "code-graph:workspace-integration",
+      "code-graph:resolve-symbol-reference",
+      "sdk:run-graph-impact"
+    ],
+    "sdk:run-graph-search": [
+      "sdk:host-context",
+      "sdk:with-open-graph-provider",
+      "core:config",
+      "code-graph:composition",
+      "code-graph:document-model"
+    ],
+    "sdk:run-graph-hotspots": [
+      "sdk:host-context",
+      "sdk:with-open-graph-provider",
+      "core:config",
+      "code-graph:composition",
+      "code-graph:hotspots"
+    ],
+    "sdk:run-graph-impact": [
+      "sdk:host-context",
+      "sdk:with-open-graph-provider",
+      "core:config",
+      "code-graph:traversal",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:symbol-model": [
+      "default:_global/conventions",
+      "default:_global/error-handling-conventions",
+      "code-graph:document-model"
+    ],
+    "code-graph:document-model": [
+      "code-graph:symbol-model",
+      "code-graph:graph-store",
+      "core:config"
+    ],
+    "code-graph:workspace-integration": ["core:config"],
+    "code-graph:sqlite-graph-store": [
+      "code-graph:graph-store",
+      "core:config",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "implementationTrackingStartedAt": "2026-10-12T16:58:23.808Z",
+  "trackedImplementationFiles": [
+    {
+      "file": "dev/scripts/graph-file-doc.js",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/project-relative-path.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/run-graph-search.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/run-graph-hotspots.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/run-graph-impact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/barrel.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/orchestration/project-relative-path.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/orchestration/run-graph-hotspots.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/orchestration/run-graph-impact.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/orchestration/run-graph-search.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/resolve-impact-file-selectors.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/search.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/hotspots.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/impact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/graph.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/code-graph.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-hotspots.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-impact.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-search.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/guide-sdk/guide-sdk.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/generated/guides-sdk.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/generated/guides.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/test/integration/sdk-catalog.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/sdk/index.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/adr/0028-denormalized-project-relative-paths-in-code-graph-sqlite-store.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/schema.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/symbol-node.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/file-node.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/document-node.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/source-location.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-database.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/services/graph-input-visibility.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/services/resolve-graph-selector.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/get-graph-health.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/in-memory-index-session.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/composition/code-graph-provider.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/ports/graph-store.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/file-analysis.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index-session.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-worker-protocol.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-worker.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "dev/scripts/symbol-inspect-poc.mjs",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/application/services/resolve-graph-selector.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/get-graph-health.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/search-code-graph.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/symbol-index.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/workspace-indexing.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/composition/code-graph-provider.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/ports/graph-store.contract.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/analyze-files-impact.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/compute-hotspots.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/scoped-binding-environment.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/traversal.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/value-objects/document-node.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/value-objects/file-node.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/helpers/in-memory-graph-store.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-graph-store.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-worker-lifecycle.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-worker-responsiveness.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/go-language-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/php-language-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/python-language-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/typescript-language-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/integration/sqlite-wide-traversal.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/value-objects/symbol-node.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "sdk:run-graph-search",
+      "file": "packages/sdk/src/orchestration/project-relative-path.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["toProjectRelativePath", "splitWorkspaceIdentity"]
+    },
+    {
+      "specId": "sdk:run-graph-hotspots",
+      "file": "packages/sdk/src/orchestration/project-relative-path.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["toProjectRelativePath", "splitWorkspaceIdentity"]
+    },
+    {
+      "specId": "sdk:run-graph-impact",
+      "file": "packages/sdk/src/orchestration/project-relative-path.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["toProjectRelativePath", "splitWorkspaceIdentity"]
+    },
+    {
+      "specId": "sdk:run-graph-search",
+      "file": "packages/sdk/src/orchestration/run-graph-search.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["runGraphSearch"]
+    },
+    {
+      "specId": "sdk:run-graph-hotspots",
+      "file": "packages/sdk/src/orchestration/run-graph-hotspots.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["runGraphHotspots"]
+    },
+    {
+      "specId": "sdk:run-graph-impact",
+      "file": "packages/sdk/src/orchestration/run-graph-impact.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["runGraphImpact"]
+    },
+    {
+      "specId": "cli:graph-impact",
+      "file": "packages/cli/src/commands/graph/resolve-impact-file-selectors.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["resolveImpactFileSelectors"]
+    },
+    {
+      "specId": "cli:graph-search",
+      "file": "packages/cli/src/commands/graph/search.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerGraphSearch"]
+    },
+    {
+      "specId": "cli:graph-hotspots",
+      "file": "packages/cli/src/commands/graph/hotspots.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerGraphHotspots"]
+    },
+    {
+      "specId": "cli:graph-impact",
+      "file": "packages/cli/src/commands/graph/impact.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerGraphImpact"]
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/src/infrastructure/sqlite/schema.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SQLITE_SCHEMA_VERSION", "SQLITE_SCHEMA_DDL"]
+    },
+    {
+      "specId": "code-graph:symbol-model",
+      "file": "packages/code-graph/src/domain/value-objects/symbol-node.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SymbolNode", "createSymbolNode"]
+    },
+    {
+      "specId": "code-graph:symbol-model",
+      "file": "packages/code-graph/src/domain/value-objects/file-node.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FileNode", "createFileNode"]
+    },
+    {
+      "specId": "code-graph:document-model",
+      "file": "packages/code-graph/src/domain/value-objects/document-node.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["DocumentNode", "createDocumentNode"]
+    },
+    {
+      "specId": "code-graph:symbol-model",
+      "file": "packages/code-graph/src/domain/value-objects/source-location.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SourceLocation"]
+    },
+    {
+      "specId": "code-graph:workspace-integration",
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["IndexCodeGraph"]
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["IndexCodeGraph"]
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-database.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SQLiteGraphDatabase"]
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SQLiteGraphStore"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:ba7158cc03380f45be04bf44eb22ec681da3bb4a6875705da7dc2e5009eb0a02"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:graph-search",
+          "filename": "deltas/cli/graph-search/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:05836d892e90f0c4ccdb4d3ef0c3832ca6c2aec8de427c34543350ca0c191bd8"
+        },
+        {
+          "key": "cli:graph-hotspots",
+          "filename": "deltas/cli/graph-hotspots/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d914574fbb4d22abdceeee82704ecded2e5c9e581191dc702b7bde043083213d"
+        },
+        {
+          "key": "cli:graph-impact",
+          "filename": "deltas/cli/graph-impact/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:dd983651bbbf3b453c47715e0e23d037d9bdc3d9ce0c23a0be03ad32fad3c62a"
+        },
+        {
+          "key": "sdk:run-graph-search",
+          "filename": "specs/sdk/run-graph-search/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:718adea3d2d2f112b567bd1549b391c403516a802829d6f1d5718125d0a9969f"
+        },
+        {
+          "key": "sdk:run-graph-hotspots",
+          "filename": "specs/sdk/run-graph-hotspots/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:a9e2d98fdee08d3c1d2e8483fdb9bda6ccd1623cbee83f8868a896742e501f4b"
+        },
+        {
+          "key": "sdk:run-graph-impact",
+          "filename": "specs/sdk/run-graph-impact/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:72ee95d6243876280496e804f67199542a94ae423e28c75fd7a7b84ca0ecd745"
+        },
+        {
+          "key": "code-graph:symbol-model",
+          "filename": "deltas/code-graph/symbol-model/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:02d345e7bc2ad83d83c56e2cd4157ba10005e93ec9b447971dec723ec5ff71d4"
+        },
+        {
+          "key": "code-graph:document-model",
+          "filename": "deltas/code-graph/document-model/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d839c6a25ee0bf26db9d79843cfdb5287bf7331800fc652a56965685098a4636"
+        },
+        {
+          "key": "code-graph:workspace-integration",
+          "filename": "deltas/code-graph/workspace-integration/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c6aabd2a51a7e731f90b45dacafe5dba32536044c303372f27b7c66e9adac0b3"
+        },
+        {
+          "key": "code-graph:sqlite-graph-store",
+          "filename": "deltas/code-graph/sqlite-graph-store/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f22524a68af4d1b18681574ebcb668537218c2b513086498c972a2a3f80f72a6"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:graph-search",
+          "filename": "deltas/cli/graph-search/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c346d7fefccb2fc9fb4cb044b1c9ad17f842dd80703523d38edcd70172794e67"
+        },
+        {
+          "key": "cli:graph-hotspots",
+          "filename": "deltas/cli/graph-hotspots/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:261f561b3c1a4b5d3ea20dfc89513553e5671d4afd7554ffc1ccbd29076af31a"
+        },
+        {
+          "key": "cli:graph-impact",
+          "filename": "deltas/cli/graph-impact/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:358e660192d31bb29522d64b7a7a35700f1a0ade9b31c277bfff4cc344d7c756"
+        },
+        {
+          "key": "sdk:run-graph-search",
+          "filename": "specs/sdk/run-graph-search/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:5a22eb435948fe27f8c91a9ee1e8b6ed529f9dc459debf51894551dfd95c58f7"
+        },
+        {
+          "key": "sdk:run-graph-hotspots",
+          "filename": "specs/sdk/run-graph-hotspots/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:49723bde00d366b1433be7c0b1ed9c368b1a7ba8b8784db7cb852d0712957c5d"
+        },
+        {
+          "key": "sdk:run-graph-impact",
+          "filename": "specs/sdk/run-graph-impact/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:7d73948cacf1f961f4c67de22ceb74cd305c15510e3faf9d0bb8d2f9b1d59b15"
+        },
+        {
+          "key": "code-graph:symbol-model",
+          "filename": "deltas/code-graph/symbol-model/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:92f50dafff0f3827000696092374d4be56eb5dbf0600ab0c1fc3027265632be5"
+        },
+        {
+          "key": "code-graph:document-model",
+          "filename": "deltas/code-graph/document-model/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a5887e08ef57e970900e71c7babc81a0d88eb97d3062334c9ff1eb0ac95ed1f2"
+        },
+        {
+          "key": "code-graph:workspace-integration",
+          "filename": "deltas/code-graph/workspace-integration/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a5bdc89ac3652cb46bfb4931305c1423ef026aa2ccd53acd51a5993174820767"
+        },
+        {
+          "key": "code-graph:sqlite-graph-store",
+          "filename": "deltas/code-graph/sqlite-graph-store/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1a4160e0878a2cb1ff4bd484bf86d0a1cdbae3ffd84e1827156803f57b9e0a61"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:89ab6fdc656f0d6a2c8d37541f2a77ca375080c310656fb54051f6ebc00c1aae"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:24c1221cf66933d2730174c4818703a6d6753b4ba85109772826b7e13b98cce0"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-10-12T16:10:52.623Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["cli:graph-search", "cli:graph-hotspots", "cli:graph-impact"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-12T16:10:52.642Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-search"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-hotspots"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-impact"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-search"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-hotspots"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-impact"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-12T16:14:40.406Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-12T16:20:18.020Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:graph-search", "cli:graph-hotspots", "cli:graph-impact"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:graph-search", "cli:graph-hotspots", "cli:graph-impact"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-12T16:28:20.586Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-12T16:42:14.509Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:graph-search", "cli:graph-hotspots", "cli:graph-impact"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:graph-search", "cli:graph-hotspots", "cli:graph-impact"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-12T16:42:14.509Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-12T16:42:56.845Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:graph-search", "cli:graph-hotspots", "cli:graph-impact"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:graph-search", "cli:graph-hotspots", "cli:graph-impact"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-12T16:42:56.846Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "sdk:run-graph-search"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:run-graph-hotspots"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:run-graph-impact"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:run-graph-search"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:run-graph-hotspots"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:run-graph-impact"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-12T16:47:57.224Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-12T16:48:53.784Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-12T16:58:23.808Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-12T19:20:55.017Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-hotspots",
+            "cli:graph-impact",
+            "sdk:run-graph-search",
+            "sdk:run-graph-hotspots",
+            "sdk:run-graph-impact"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-hotspots",
+            "cli:graph-impact",
+            "sdk:run-graph-search",
+            "sdk:run-graph-hotspots",
+            "sdk:run-graph-impact"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-12T19:20:55.017Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-12T19:25:14.427Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-13T05:14:25.506Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-hotspots",
+            "cli:graph-impact",
+            "sdk:run-graph-search",
+            "sdk:run-graph-hotspots",
+            "sdk:run-graph-impact"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-hotspots",
+            "cli:graph-impact",
+            "sdk:run-graph-search",
+            "sdk:run-graph-hotspots",
+            "sdk:run-graph-impact"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-13T05:14:25.506Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-13T05:17:14.629Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-hotspots",
+            "cli:graph-impact",
+            "sdk:run-graph-search",
+            "sdk:run-graph-hotspots",
+            "sdk:run-graph-impact"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-hotspots",
+            "cli:graph-impact",
+            "sdk:run-graph-search",
+            "sdk:run-graph-hotspots",
+            "sdk:run-graph-impact"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-13T05:17:14.635Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:symbol-model"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:document-model"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:workspace-integration"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:sqlite-graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:symbol-model"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:document-model"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:workspace-integration"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:sqlite-graph-store"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-13T05:21:05.993Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:sqlite-graph-store]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:sqlite-graph-store"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-hotspots",
+            "cli:graph-impact",
+            "sdk:run-graph-search",
+            "sdk:run-graph-hotspots",
+            "sdk:run-graph-impact",
+            "code-graph:symbol-model",
+            "code-graph:document-model",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-13T05:48:25.098Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-13T05:49:39.442Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-13T08:34:12.617Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-13T09:28:19.550Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-hotspots",
+            "cli:graph-impact",
+            "sdk:run-graph-search",
+            "sdk:run-graph-hotspots",
+            "sdk:run-graph-impact",
+            "code-graph:symbol-model",
+            "code-graph:document-model",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-hotspots",
+            "cli:graph-impact",
+            "sdk:run-graph-search",
+            "sdk:run-graph-hotspots",
+            "sdk:run-graph-impact",
+            "code-graph:symbol-model",
+            "code-graph:document-model",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-13T09:28:19.550Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-13T09:45:53.299Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-13T09:50:19.051Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-13T10:30:00.827Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-13T11:20:19.875Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-hotspots",
+            "cli:graph-impact",
+            "sdk:run-graph-search",
+            "sdk:run-graph-hotspots",
+            "sdk:run-graph-impact",
+            "code-graph:symbol-model",
+            "code-graph:document-model",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-hotspots",
+            "cli:graph-impact",
+            "sdk:run-graph-search",
+            "sdk:run-graph-hotspots",
+            "sdk:run-graph-impact",
+            "code-graph:symbol-model",
+            "code-graph:document-model",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-13T11:20:19.875Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-13T11:43:16.109Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-13T11:56:48.791Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-13T12:11:13.966Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-13T13:35:01.151Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-13T13:35:35.342Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-10-13T13:50:44.471Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Unifies code-graph results to consistently expose projectRelativePath across symbols, files, documents, hotspots, and impact analyses while eliminating legacy configRelativePath, displayPath, and displayTargets. Upgrades SQLite store schema to version 14 with zero-join denormalized paths backed by ADR-0028. Introduces host-agnostic SDK orchestrators in @specd/sdk to decouple presentation from graph operations."
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-10-13T13:52:08.625Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Tracked implementation files remain open for change \"unify-graph-project-relative-paths\". Resolve or ignore them first.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-10-13T14:43:19.544Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"cli:graph-search\" points outside workspace \"cli\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-13T14:47:14.266Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-10-13T14:47:14.915Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

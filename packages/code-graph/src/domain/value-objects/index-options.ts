@@ -1,5 +1,7 @@
 import { type ProjectWorkspace, type SpecMetadata } from '@specd/core'
+export { type ProjectWorkspace } from '@specd/core'
 import { type GetSpecMetadata } from '@specd/core'
+import { type IndexEventReceiver } from './index-event.js'
 
 /**
  * Progress callback invoked during indexing to report completion percentage and phase.
@@ -22,13 +24,37 @@ export interface ProjectGraphConfig {
   readonly includePaths?: readonly string[]
 
   /**
-   * Global exclusion patterns applied to file/document discovery.
+   * Optional global exclusion patterns applied to file/document discovery.
    *
    * These patterns are relative to the project root and are merged with
    * synthetic spec-root exclusions during effective discovery resolution.
    * Workspace-local excludes are additive on top of this global set.
    */
   readonly excludePaths?: readonly string[]
+
+  /**
+   * Optional project-level test file patterns.
+   */
+  readonly testPaths?: readonly string[]
+
+  /**
+   * Optional project-level ignored file patterns.
+   */
+  readonly ignorePaths?: readonly string[]
+
+  /**
+   * Maximum file size in bytes eligible for indexing across the project.
+   * Files exceeding this limit are skipped with coverage reason 'file-too-large'.
+   * When set to 0, file size limits are disabled.
+   * If omitted, the default (262144 bytes / 256 KiB) is applied during effective resolution.
+   */
+  readonly maxFileBytes?: number
+
+  /**
+   * Gitignore-syntax exemption patterns relative to the project root.
+   * Files matching these patterns are analysed even if they exceed maxFileBytes.
+   */
+  readonly largeFilePaths?: readonly string[]
 
   /**
    * Per-workspace graph overrides.
@@ -39,7 +65,7 @@ export interface ProjectGraphConfig {
     string,
     {
       /**
-       * Optional graph-visible include patterns (glob-syntax) relative to codeRoot.
+       * Optional graph-visible include patterns (glob-syntax) relative to the project root.
        * When set, only matching paths are eligible for indexing from this workspace.
        */
       readonly allowedPaths?: readonly string[]
@@ -51,10 +77,33 @@ export interface ProjectGraphConfig {
       readonly excludePaths?: readonly string[]
 
       /**
+       * Optional workspace-level test file patterns.
+       */
+      readonly testPaths?: readonly string[]
+
+      /**
+       * Optional workspace-level ignored file patterns.
+       */
+      readonly ignorePaths?: readonly string[]
+
+      /**
        * Whether `.gitignore` files are loaded and applied during file discovery.
        * Defaults to `true`. When `false`, only `excludePaths` governs exclusion.
        */
       readonly respectGitignore?: boolean
+
+      /**
+       * Maximum file size in bytes for files owned by this workspace.
+       * Replaces the project-level maxFileBytes setting.
+       * When set to 0, file size limits are disabled for this workspace.
+       */
+      readonly maxFileBytes?: number
+
+      /**
+       * Gitignore-syntax exemption patterns relative to the project root.
+       * Added to the project-level largeFilePaths set.
+       */
+      readonly largeFilePaths?: readonly string[]
     }
   >
 }
@@ -64,8 +113,8 @@ export interface ProjectGraphConfig {
  */
 export interface IndexOptions {
   /**
-   * The monorepo or project root directory.
-   * Used as the boundary for monorepo package resolution and project-global discovery.
+   * The directory of the project configuration.
+   * Anchors configuration, graph storage, and project-global discovery. Never a boundary for package resolution.
    */
   readonly projectRoot: string
 
@@ -75,6 +124,13 @@ export interface IndexOptions {
    * each workspace's repository instance.
    */
   readonly workspaces: readonly ProjectWorkspace[]
+
+  /**
+   * Every configured workspace, including workspaces not selected for this run. Used to map
+   * package identities and prepare manifests so a partial run resolves the same as a full run.
+   * Defaults to `workspaces` when omitted.
+   */
+  readonly configuredWorkspaces?: readonly ProjectWorkspace[]
 
   /**
    * Project-global graph configuration.
@@ -87,6 +143,12 @@ export interface IndexOptions {
    * Receives percentage (0-100) and phase/detail strings.
    */
   readonly onProgress?: IndexProgressCallback
+
+  /**
+   * Optional presentation-neutral indexing event receiver.
+   * Receives structured indexing events (activity, skips, resource disposal failures).
+   */
+  readonly onEvent?: IndexEventReceiver
 
   /**
    * Maximum byte budget for sequential processing chunks (default 20MB).
@@ -117,6 +179,15 @@ export interface IndexOptions {
    * reanalyse every selected input.
    */
   readonly force?: boolean
+
+  /**
+   * How to repair a stored graph derived with an incompatible fingerprint.
+   *
+   * `rebuild` (the default) clears and regenerates the derived graph in place. `fail` throws
+   * `GraphDerivationMismatchError` before any write when the run would replace the whole graph,
+   * so a caller that owns the provider can recreate storage physically and index again.
+   */
+  readonly derivationMismatch?: 'rebuild' | 'fail'
 
   /**
    * Materialized spec metadata source used for semantic fingerprinting during spec indexing.

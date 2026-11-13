@@ -1,0 +1,22 @@
+- op: added
+  description: Scenarios for tests verifying the cross-platform contract
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Fixtures are valid on Windows'
+  content: |
+    ### Requirement: Tests verify the cross-platform contract
+
+    #### Scenario: Windows branch exercised on a POSIX host
+
+    - **GIVEN** production code that rejects Windows reserved names or converts backslash paths
+    - **WHEN** its tests run on macOS or Linux
+    - **THEN** they exercise the Windows branch through `path.win32` or a stubbed `process.platform`
+
+    #### Scenario: Production rule restated in a test spec
+
+    - **WHEN** a test convention duplicates a production portability rule instead of referencing `_global/cross-platform`
+    - **THEN** the duplicate is removed and the reference is kept

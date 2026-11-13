@@ -59,6 +59,9 @@ export {
   type EditChangeResult,
   type SkipArtifact,
   type SkipArtifactInput,
+  type GetChangeSpecDeps,
+  type GetChangeSpecDepsInput,
+  type GetChangeSpecDepsResult,
   type UpdateSpecDepsInput,
   type UpdateSpecDepsResult,
   type ListSpecs,
@@ -164,6 +167,10 @@ export {
   type ValidationFileResult,
   type ValidationFileStatus,
   type ValidationWarning,
+  ValidateChangeBatch,
+  type ValidateChangeBatchInput,
+  type ValidateChangeBatchStepResult,
+  type ValidateChangeBatchResult,
   type CompileContext,
   type CompileContextInput,
   type CompileContextResult,
@@ -263,6 +270,7 @@ export {
   type InvalidateChangeResult,
   type GetSpecOutline,
   type GetSpecOutlineInput,
+  type GetSpecOutlineResult,
   type SpecOutlineResult,
   type GetProjectMetadata,
   type GetProjectMetadataResult,
@@ -334,6 +342,9 @@ export {
   type ArchiveChangeDeps,
   createValidateArtifacts,
   type ValidateArtifactsDeps,
+  createValidateChangeBatch,
+  type ValidateChangeBatchDeps,
+  resolveValidateChangeBatchDeps,
   createCompileContext,
   type CompileContextDeps,
   createValidateSpecs,
@@ -348,6 +359,8 @@ export {
   type ResolveSchemaDeps,
   createResolveChangeSchema,
   type ResolveChangeSchemaDeps,
+  createGetChangeSpecDeps,
+  type GetChangeSpecDepsDeps,
   createUpdateSpecDeps,
   type UpdateSpecDepsDeps,
   createInvalidateChange,
@@ -521,6 +534,10 @@ export {
   HappyPathNextUnavailableError,
   ApprovalRequiredError,
   InvalidSpecPathError,
+  InvalidSpecIdError,
+  InvalidSpecLockError,
+  InvalidSpecPatternError,
+  type WorkspaceNotFoundContext,
   ArtifactConflictError,
   ArtifactNotOptionalError,
   HookFailedError,
@@ -605,7 +622,20 @@ export {
   type SpecLockData,
   type SpecLockImplementationEntry,
 } from '@specd/core'
-export { parseSpecId } from '@specd/core'
+export {
+  parseSpecId,
+  isFullyQualifiedSpecId,
+  type ParseSpecIdOptions,
+  type ParsedSpecId,
+} from '@specd/core'
+export {
+  parseSpecPattern,
+  type ParseSpecPatternOptions,
+  type ParsedSpecPattern,
+  type SpecPatternKind,
+} from '@specd/core'
+export { isValidWorkspaceName, isValidCapabilitySegment } from '@specd/core'
+export { toLogicalFilePath } from '@specd/core'
 export { extractSpecSummary } from '@specd/core'
 export { inferFormat } from '@specd/core'
 export { safeRegex } from '@specd/core'

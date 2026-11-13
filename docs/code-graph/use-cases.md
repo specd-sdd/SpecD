@@ -1,3 +1,9 @@
+---
+title: Code-Graph Use Cases
+description: Primary use cases exported by the `@specd/code-graph` package.
+sidebar_position: 2
+---
+
 # Code-Graph Use Cases
 
 This document describes the primary use cases exported by the `@specd/code-graph` package.
@@ -10,31 +16,49 @@ Performs two-pass indexing of workspace files and specifications, extracts symbo
 
 ### Constructor
 
-`new IndexCodeGraph(store: GraphStore, registry: AdapterRegistryPort)`
+```typescript
+new IndexCodeGraph(
+  store: GraphStore,
+  registry: AdapterRegistryPort,
+  manifestSource: ResolutionManifestSource,
+  repositoryRoots: RepositoryRootSource,
+  workspaceAccessibility: WorkspaceAccessibilitySource,
+)
+```
 
 - **`store`** (`GraphStore`): The underlying database/persistence layer.
 - **`registry`** (`AdapterRegistryPort`): Registry of pluggable language adapters (e.g. tree-sitter language parsers) used to extract code semantics.
+- **`manifestSource`** (`ResolutionManifestSource`): Application port abstracting manifest reading and presence checks.
+- **`repositoryRoots`** (`RepositoryRootSource`): Application port providing the enclosing repository root boundary for code roots.
+- **`workspaceAccessibility`** (`WorkspaceAccessibilitySource`): Application port probing directory accessibility for configured workspaces prior to indexing. Probe failures are non-fatal.
 
 ### Execution
 
 ```typescript
 import { IndexCodeGraph } from '@specd/code-graph'
 
-const indexer = new IndexCodeGraph(store, registry)
+const indexer = new IndexCodeGraph(
+  store,
+  registry,
+  manifestSource,
+  repositoryRoots,
+  workspaceAccessibility,
+)
 const result = await indexer.execute(options)
 ```
 
 #### Input Parameters (`IndexOptions`)
 
-| Field              | Type                          | Required | Description                                                                       |
-| :----------------- | :---------------------------- | :------- | :-------------------------------------------------------------------------------- |
-| `projectRoot`      | `string`                      | yes      | The absolute directory path of the project.                                       |
-| `workspaces`       | `readonly ProjectWorkspace[]` | yes      | Workspace definitions including prefixes, ownership, and roots.                   |
-| `graphConfig`      | `ProjectGraphConfig`          | yes      | Project-global graph exclude paths and workspace configuration overrides.         |
-| `onProgress`       | `IndexProgressCallback`       | no       | Callback invoked periodically to report percentage (0-100) and phase description. |
-| `chunkBytes`       | `number`                      | no       | Sequential chunk processing budget in bytes (default 20MB).                       |
-| `vcsRef`           | `string`                      | no       | Current VCS reference hash stored as metadata on completion.                      |
-| `codeGraphVersion` | `string`                      | no       | Version string used in derivation fingerprinting.                                 |
+| Field              | Type                          | Required | Description                                                                          |
+| :----------------- | :---------------------------- | :------- | :----------------------------------------------------------------------------------- |
+| `projectRoot`      | `string`                      | yes      | The absolute directory path of the project.                                          |
+| `workspaces`       | `readonly ProjectWorkspace[]` | yes      | Workspace definitions including prefixes, ownership, and roots.                      |
+| `graphConfig`      | `ProjectGraphConfig`          | yes      | Project-global graph exclude paths and workspace configuration overrides.            |
+| `onProgress`       | `IndexProgressCallback`       | no       | Callback invoked periodically to report percentage (0-100) and phase description.    |
+| `chunkBytes`       | `number`                      | no       | Sequential chunk processing budget in bytes (default 20MB).                          |
+| `vcsRef`           | `string`                      | no       | Current VCS reference hash stored as metadata on completion.                         |
+| `codeGraphVersion` | `string`                      | no       | Version string used in derivation fingerprinting.                                    |
+| `onEvent`          | `IndexEventReceiver`          | no       | Optional receiver for typed indexing events (`file-activity`, `file-skipped`, etc.). |
 
 #### Returns: `Promise<IndexResult>`
 
@@ -45,16 +69,35 @@ interface IndexResult {
   readonly documentsIndexed: number
   readonly filesRemoved: number
   readonly filesSkipped: number
+  readonly filesSkippedForSize: number
+  readonly largestSkippedForSize: readonly SizeSkippedFile[]
+  readonly sizeExemptAnalysed: readonly SizeExemptFile[]
   readonly specsDiscovered: number
   readonly specsIndexed: number
   readonly errors: readonly IndexError[]
+  readonly diagnostics: readonly IndexError[]
   readonly duration: number
   readonly workspaces: readonly WorkspaceIndexBreakdown[]
   readonly vcsRef: string | null
-  readonly graphFingerprint: string | null
+  readonly graphFingerprint: string
+  readonly fullRebuild: boolean
   readonly fullRebuildReason: string | null
+  readonly phaseMetrics: IndexPhaseMetrics
+  readonly coverage: IndexRunCoverageSummary
+  readonly coverageDiagnostics: readonly IndexCoverageDiagnostic[]
+  readonly logicalDiagnostics: readonly LogicalDeclarationDiagnostic[]
+  readonly importDiagnostics: ImportDiagnosticSummary
 }
 ```
+
+### Execution Lifecycle: Size Gate and Parser Epochs
+
+1. **Size Gate Evaluation:** For every candidate file, `IndexCodeGraph` checks filesystem size before reading bytes. If the size strictly exceeds effective `maxFileBytes` (default: 256 KiB) and the file is not exempt in `largeFilePaths`, the file is marked skipped (`file-too-large`), counted in `filesSkippedForSize`, and excluded from analysis.
+2. **Per-File Parser Epoch:** Each admitted source file is parsed inside an isolated `ParserResourceScope`. Adapters register their parser AST trees and disposal callbacks in `session.parserResources`.
+3. **Deterministic Cleanup & Yield:** Once the file's symbols and facts are extracted (or if an error throws), `closeParserResourceEpoch` runs:
+   - Disposes all registered resources in LIFO order.
+   - Invokes `globalThis.gc()` if available to clean up native V8 handle wrappers.
+   - Yields the event loop via `setImmediate` to allow libuv/V8 finalizers to run before the next file begins.
 
 ---
 
@@ -82,15 +125,19 @@ function discoverFiles(
 
 #### Options (`DiscoverFilesOptions`)
 
-| Field              | Type                | Required | Description                                                                   |
-| :----------------- | :------------------ | :------- | :---------------------------------------------------------------------------- |
-| `excludePaths`     | `readonly string[]` | no       | Gitignore-syntax exclusion rules replacing defaults entirely.                 |
-| `respectGitignore` | `boolean`           | no       | Whether to load and respect local `.gitignore` files (defaults to `true`).    |
-| `allowedPaths`     | `readonly string[]` | no       | Glob-syntax inclusion rules (when present, only matching paths are returned). |
+| Field                   | Type                | Required | Description                                                                                                                        |
+| :---------------------- | :------------------ | :------- | :--------------------------------------------------------------------------------------------------------------------------------- |
+| `excludePaths`          | `readonly string[]` | no       | Global exclusion layer: gitignore-syntax rules replacing defaults entirely, matched against the project-relative subject.          |
+| `workspaceExcludePaths` | `readonly string[]` | no       | Workspace exclusion layer, evaluated after `excludePaths`; its `!` negations cannot re-include what the global layer excluded.     |
+| `pathBase`              | `string`            | no       | Project-relative directory of `root` (`''` when `root` is the project root). Patterns are matched against `pathBase + '/' + path`. |
+| `respectGitignore`      | `boolean`           | no       | Whether to load and respect local `.gitignore` files (defaults to `true`).                                                         |
+| `allowedPaths`          | `readonly string[]` | no       | Glob-syntax inclusion rules, project-relative (when present, only matching paths are returned).                                    |
 
 #### Returns: `string[]`
 
 An array of absolute paths to discovered files.
+
+`createDiscoveryEvaluator(root, options)` exposes the per-entry decision (`included`, or `excluded` with the stage `gitignore`, `global-exclude`, `workspace-exclude` or `allowed-paths`, the deciding rule and, for `.gitignore`, its project-relative file and line). `discoverFiles` and `ExplainGraphPath` share it, so an explanation cannot drift from indexing.
 
 ---
 
@@ -121,6 +168,12 @@ const health = await createGetGraphHealth().execute({
 Returns `GraphStatistics` fields plus `stale`, `currentRef`, and `fingerprintMismatch`.
 
 **Consumers:** `specd graph stats`, `project status --graph`, SDK `buildProjectStatusSnapshot`.
+
+### ExplainGraphPath
+
+Explains why one path is excluded, classified or indexed, running the same evaluation functions as the indexer (`createDiscoveryEvaluator`, `createFileSizeGate`, `explainFileCategory`). Created with `createExplainGraphPath()` and reached from hosts through `CodeGraphProvider.explainPath(path)` or `runGraphWhy` in `@specd/sdk`. Input is a project-relative path, an absolute path or `workspace:path`. The result (`ExplainGraphPathResult`) lists one candidate per workspace whose code root contains the path, each with eight ordered steps (`binary-extension`, `gitignore`, `global-exclude`, `workspace-exclude`, `allowed-paths`, `size-limit`, `category`, `adapter`), the candidate verdict, category, node kind and `inGraph`, plus top-level `verdict`, `owners` and `diagnostics`. It never writes to the graph or the filesystem. Errors: `UNKNOWN_WORKSPACE`, `INVALID_GRAPH_WHY_PATH`, and `GRAPH_WHY_REQUIRES_CONFIG` when the provider has no `specd.yaml`.
+
+`IndexResult` also carries `workspaceOverlaps` (up to 25 `{ projectRelativePath, workspaces }`) and `workspaceOverlapCount` for files kept by more than one workspace in the run.
 
 ### IndexProjectGraph
 

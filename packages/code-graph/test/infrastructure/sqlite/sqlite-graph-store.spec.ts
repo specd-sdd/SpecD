@@ -34,6 +34,7 @@ import {
   createLogicalSymbol,
   assignQualifiedNames,
   createPublicBinding,
+  DeclarationOccurrenceForm,
   SymbolSpace,
 } from '../../../src/domain/value-objects/symbol-reference.js'
 import { SQLiteGraphStore } from '../../../src/infrastructure/sqlite/sqlite-graph-store.js'
@@ -41,9 +42,11 @@ import { SQLiteWorkerClient } from '../../../src/infrastructure/sqlite/sqlite-wo
 import { GraphStoreRecreateRequiresClosedError } from '../../../src/domain/errors/graph-store-recreate-requires-closed-error.js'
 import { GraphStorageRecoveryRequiredError } from '../../../src/domain/errors/graph-storage-recovery-required-error.js'
 import {
+  REQUIRED_COLUMNS,
   SQLITE_SCHEMA_DDL,
   SQLITE_SCHEMA_VERSION,
 } from '../../../src/infrastructure/sqlite/schema.js'
+import { readStorageGeneration } from '../../../src/infrastructure/storage-generation.js'
 import { graphStoreContractTests } from '../../domain/ports/graph-store.contract.js'
 
 let tempDir: string | undefined
@@ -75,28 +78,28 @@ describe('SQLiteGraphStore', () => {
   async function seedImpactFrontierFixture(store: SQLiteGraphStore) {
     const coreFile = createFileNode({
       path: 'core:src/impact-source.ts',
-      configRelativePath: 'src/impact-source.ts',
+      projectRelativePath: 'src/impact-source.ts',
       language: 'typescript',
       contentHash: 'sha256:impact-core',
       workspace: 'core',
     })
     const cliFile = createFileNode({
       path: 'cli:src/impact-source.ts',
-      configRelativePath: 'src/impact-source.ts',
+      projectRelativePath: 'src/impact-source.ts',
       language: 'typescript',
       contentHash: 'sha256:impact-cli',
       workspace: 'cli',
     })
     const targetFile = createFileNode({
       path: 'code-graph:src/impact-target.ts',
-      configRelativePath: 'src/impact-target.ts',
+      projectRelativePath: 'src/impact-target.ts',
       language: 'typescript',
       contentHash: 'sha256:impact-target',
       workspace: 'code-graph',
     })
     const quotedFile = createFileNode({
       path: 'quoted:src/impact-source.ts',
-      configRelativePath: 'src/impact-source.ts',
+      projectRelativePath: 'src/impact-source.ts',
       language: 'typescript',
       contentHash: 'sha256:impact-quoted',
       workspace: "quoted' OR 1=1 --",
@@ -182,18 +185,50 @@ describe('SQLiteGraphStore', () => {
           target: targetSpec.specId,
           type: RelationType.DependsOn,
         }),
-        createRelation({
-          source: targetSpec.specId,
-          target: targetFile.path,
-          type: RelationType.CoversFile,
-        }),
-        createRelation({
-          source: targetSpec.specId,
-          target: targetSymbol.id,
-          type: RelationType.CoversSymbol,
-        }),
       ],
     })
+
+    // Symbol coverage targets the logical symbol, as indexing writes it. Replacing reference
+    // facts resets coverage, so file coverage is recorded together with it.
+    const targetLogical = createLogicalSymbol({
+      workspace: 'code-graph',
+      surface: targetFile.path,
+      name: 'target',
+      space: SymbolSpace.Value,
+      ownerId: undefined,
+      memberSemantics: undefined,
+    })
+    await store.replaceReferenceFacts({
+      logicalSymbols: [targetLogical],
+      declarations: [
+        {
+          logicalSymbolId: targetLogical.id,
+          declaration: {
+            symbolId: targetSymbol.id,
+            logicalId: targetLogical.id,
+            location: { filePath: targetFile.path, line: 1, column: 0, endLine: 1, endColumn: 10 },
+            kind: SymbolKind.Function,
+            form: DeclarationOccurrenceForm.Definition,
+          },
+        },
+      ],
+      publicBindings: [],
+      localBindings: [],
+      steps: [],
+      coverage: [],
+    })
+    await store.addRelations([
+      createRelation({
+        source: targetSpec.specId,
+        target: targetFile.path,
+        type: RelationType.CoversFile,
+      }),
+      createRelation({
+        source: targetSpec.specId,
+        target: targetLogical.id,
+        type: RelationType.CoversSymbol,
+      }),
+    ])
 
     return {
       coreFile,
@@ -403,13 +438,459 @@ describe('SQLiteGraphStore', () => {
     ])
   })
 
+  it('avoids worker dispatch for empty newly chunked lookup inputs', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-empty-chunked-lookups-'))
+    const store = new SQLiteGraphStore(tempDir)
+    const sendRequest = vi.spyOn(SQLiteWorkerClient.prototype, 'sendRequest')
+    sendRequest.mockResolvedValue({ graph: false, workspaces: {} })
+
+    await expect(store.findDirectlyAffectedFiles([])).resolves.toEqual([])
+    await expect(store.getCoveringSpecsForFiles([])).resolves.toEqual([])
+    await expect(store.getCoveringSpecsForSymbols([])).resolves.toEqual([])
+    await expect(store.findLogicalSymbolsByQualifiedNames([])).resolves.toEqual([])
+    await expect(store.findLogicalSymbolsByIds([])).resolves.toEqual([])
+    await expect(store.findDeclarations([])).resolves.toEqual([])
+    await expect(store.findLogicalDeclarationsByDeclarationIds([])).resolves.toEqual([])
+    await expect(store.findPublicBindings([])).resolves.toEqual([])
+    await expect(store.findPublicBindingsByExportedNames([])).resolves.toEqual([])
+    await expect(store.findResolutionSteps([])).resolves.toEqual([])
+    await expect(store.findIndexCoverage([])).resolves.toEqual([])
+    await expect(store.getFreshnessLatches([])).resolves.toEqual({ graph: false, workspaces: {} })
+
+    expect(sendRequest.mock.calls).toEqual([['readFreshnessLatches', { workspaces: [] }]])
+  })
+
+  it('dispatches one worker operation for each oversized chunked lookup', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-chunked-lookup-rpc-'))
+    const store = new SQLiteGraphStore(tempDir)
+    const sendRequest = vi.spyOn(SQLiteWorkerClient.prototype, 'sendRequest')
+    sendRequest.mockResolvedValue([])
+    const filePaths = Array.from({ length: 901 }, (_, index) => `core:src/${String(index)}.ts`)
+    const ids = filePaths.map((path) => `logical:${path}`)
+
+    await Promise.all([
+      store.findDirectlyAffectedFiles(filePaths),
+      store.getCoveringSpecsForFiles(filePaths),
+      store.findLogicalSymbolsByIds(ids),
+      store.findResolutionSteps(ids),
+      store.findIndexCoverage(filePaths),
+      store.findSymbols({ filePaths }),
+    ])
+
+    expect(sendRequest.mock.calls.map(([method]) => method)).toEqual([
+      'findDirectlyAffectedFiles',
+      'getCoveringSpecsForFiles',
+      'findLogicalSymbolsByIds',
+      'findResolutionSteps',
+      'findIndexCoverage',
+      'findSymbols',
+    ])
+  })
+
+  it('chunks repeated affected-file path parameters at the budget boundary', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-affected-file-boundary-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const changedFiles = Array.from({ length: 447 }, (_, index) =>
+      createFileNode({
+        path: `core:src/changed-${String(index).padStart(3, '0')}.ts`,
+        projectRelativePath: `src/changed-${String(index).padStart(3, '0')}.ts`,
+        language: 'typescript',
+        contentHash: `sha256:changed-${String(index)}`,
+        workspace: 'core',
+      }),
+    )
+    const affectedFiles = changedFiles.map((changed, index) =>
+      createFileNode({
+        path: `core:src/affected-${String(index).padStart(3, '0')}.ts`,
+        projectRelativePath: `src/affected-${String(index).padStart(3, '0')}.ts`,
+        language: 'typescript',
+        contentHash: `sha256:affected-${String(index)}`,
+        workspace: 'core',
+      }),
+    )
+    const relations = changedFiles.map((changed, index) =>
+      createRelation({
+        source: affectedFiles[index]!.path,
+        target: changed.path,
+        type: RelationType.Imports,
+      }),
+    )
+    await store.bulkLoad({
+      files: [...changedFiles, ...affectedFiles],
+      symbols: [],
+      specs: [],
+      relations,
+    })
+
+    const expected = affectedFiles
+      .map((file) => file.path)
+      .sort((left, right) => left.localeCompare(right))
+    const belowBoundaryExpected = affectedFiles
+      .slice(0, 446)
+      .map((file) => file.path)
+      .sort((left, right) => left.localeCompare(right))
+    const request = [
+      ...changedFiles.map((file) => file.path).reverse(),
+      changedFiles[0]!.path,
+      'missing',
+    ]
+    await expect(
+      store.findDirectlyAffectedFiles(changedFiles.slice(0, 446).map((file) => file.path)),
+    ).resolves.toEqual(belowBoundaryExpected)
+    await expect(store.findDirectlyAffectedFiles(request)).resolves.toEqual(expected)
+    await store.close()
+  })
+
+  it('chunks fixed relation-type coverage lookups at the budget boundary', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-coverage-boundary-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const spec = createSpecNode({
+      specId: 'core:coverage-boundary',
+      path: 'specs/coverage-boundary',
+      title: 'Coverage boundary',
+      contentHash: 'sha256:coverage-boundary',
+      workspace: 'core',
+    })
+    const files = Array.from({ length: 900 }, (_, index) =>
+      createFileNode({
+        path: `core:src/covered-${String(index).padStart(3, '0')}.ts`,
+        projectRelativePath: `src/covered-${String(index).padStart(3, '0')}.ts`,
+        language: 'typescript',
+        contentHash: `sha256:covered-${String(index)}`,
+        workspace: 'core',
+      }),
+    )
+    const symbols = files.map((file, index) =>
+      createSymbolNode({
+        name: `covered${String(index)}`,
+        kind: SymbolKind.Function,
+        filePath: file.path,
+        line: 1,
+        column: 0,
+      }),
+    )
+    const logicalSymbols = symbols.map((symbol) =>
+      createLogicalSymbol({
+        workspace: 'core',
+        surface: 'src/covered.ts',
+        name: symbol.name,
+        space: SymbolSpace.Value,
+        ownerId: undefined,
+        memberSemantics: undefined,
+      }),
+    )
+    const relations = [
+      ...files.map((file) =>
+        createRelation({ source: spec.specId, target: file.path, type: RelationType.CoversFile }),
+      ),
+      ...logicalSymbols.map((symbol) =>
+        createRelation({ source: spec.specId, target: symbol.id, type: RelationType.CoversSymbol }),
+      ),
+    ]
+    await store.replaceReferenceFacts({
+      logicalSymbols,
+      declarations: [],
+      publicBindings: [],
+      localBindings: [],
+      steps: [],
+      coverage: [],
+    })
+    await store.bulkLoad({ files, symbols, specs: [spec], relations })
+
+    const fileTargets = [...files.map((file) => file.path).reverse(), files[0]!.path, 'missing']
+    const symbolTargets = [
+      ...logicalSymbols.map((symbol) => symbol.id).reverse(),
+      logicalSymbols[0]!.id,
+      'missing',
+    ]
+    const fileCoverage = await store.getCoveringSpecsForFiles(fileTargets)
+    const symbolCoverage = await store.getCoveringSpecsForSymbols(symbolTargets)
+
+    expect(fileCoverage).toHaveLength(900)
+    expect(symbolCoverage).toHaveLength(900)
+    expect(fileCoverage).toEqual(
+      [...fileCoverage].sort(
+        (left, right) =>
+          left.source.localeCompare(right.source) ||
+          left.type.localeCompare(right.type) ||
+          left.target.localeCompare(right.target),
+      ),
+    )
+    expect(symbolCoverage).toEqual(
+      [...symbolCoverage].sort(
+        (left, right) =>
+          left.source.localeCompare(right.source) ||
+          left.type.localeCompare(right.type) ||
+          left.target.localeCompare(right.target),
+      ),
+    )
+    await store.close()
+  })
+
+  it('chunks freshness latches and index coverage lookups above the safe budget', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-freshness-coverage-chunk-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const workspaces = Array.from({ length: 901 }, (_, index) => `workspace-${String(index)}`)
+    const files = workspaces.map((workspace, index) =>
+      createFileNode({
+        path: `${workspace}:src/index.ts`,
+        projectRelativePath: 'src/index.ts',
+        language: 'typescript',
+        contentHash: `sha256:coverage-${String(index)}`,
+        workspace,
+      }),
+    )
+    const session = store.beginBulkIndexSession()
+    await session.writeFiles(files)
+    await session.writeReferenceFacts({
+      logicalSymbols: [],
+      declarations: [],
+      publicBindings: [],
+      localBindings: [],
+      steps: [],
+      coverage: files.map((file) => ({
+        filePath: file.path,
+        contentHash: file.contentHash,
+        status: 'indexed' as const,
+        reason: undefined,
+        capabilities: [],
+      })),
+    })
+    await session.commit()
+    await store.markWorkspacesAndGraphStaleSinceLastIndex(workspaces)
+
+    const latches = await store.getFreshnessLatches([...workspaces, workspaces[0]!, 'missing'])
+    const coverage = await store.findIndexCoverage([
+      ...files.map((file) => file.path).reverse(),
+      files[0]!.path,
+      'missing',
+    ])
+
+    expect(latches.graph).toBe(true)
+    expect(latches.workspaces).toEqual(
+      Object.fromEntries([
+        ...workspaces.map((workspace) => [workspace, true] as const),
+        ['missing', false],
+      ]),
+    )
+    const expectedCoveragePaths = files
+      .map((file) => file.path)
+      .sort((left, right) => left.localeCompare(right))
+    expect(coverage.map((item) => item.filePath)).toEqual(expectedCoveragePaths)
+    expect(
+      (
+        await store.findIndexCoverage([
+          'missing',
+          files[0]!.path,
+          ...files.map((file) => file.path),
+        ])
+      ).map((item) => item.filePath),
+    ).toEqual(expectedCoveragePaths)
+    await store.close()
+  })
+
+  it('chunks logical-reference lookup families above the safe budget', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-logical-reference-chunk-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const logicalSymbols = Array.from({ length: 901 }, (_, index) => {
+      const symbol = createLogicalSymbol({
+        workspace: 'core',
+        surface: 'core:src/references.ts',
+        name: `Reference${String(index)}`,
+        space: SymbolSpace.Value,
+        ownerId: undefined,
+        memberSemantics: undefined,
+      })
+      return { ...symbol, qualifiedName: `Reference.${String(index)}` }
+    })
+    const publicBindings = logicalSymbols.map((symbol, index) =>
+      createPublicBinding({
+        surface: 'core',
+        exportedName: `Reference${String(index)}`,
+        space: SymbolSpace.Value,
+        targetId: symbol.id,
+      }),
+    )
+    const declarations = logicalSymbols.map((symbol, index) => ({
+      logicalSymbolId: symbol.id,
+      declaration: {
+        logicalId: symbol.id,
+        symbolId: `symbol:${String(index)}`,
+        location: {
+          filePath: 'core:src/references.ts',
+          line: index + 1,
+          column: 0,
+          endLine: index + 1,
+          endColumn: 1,
+        },
+        kind: SymbolKind.Variable,
+      },
+    }))
+    const steps = logicalSymbols.map((symbol, index) => ({
+      fromId: symbol.id,
+      toId: `resolved:${String(index)}`,
+      kind: 'export' as const,
+    }))
+    await store.replaceReferenceFacts({
+      logicalSymbols,
+      declarations,
+      publicBindings,
+      localBindings: [],
+      steps,
+      coverage: [],
+    })
+
+    const ids = [
+      ...logicalSymbols.map((symbol) => symbol.id).reverse(),
+      logicalSymbols[0]!.id,
+      'missing',
+    ]
+    const names = [
+      ...publicBindings.map((binding) => binding.exportedName).reverse(),
+      publicBindings[0]!.exportedName,
+      'missing',
+    ]
+    const storedQualifiedNames = logicalSymbols.map((symbol) => symbol.qualifiedName ?? '')
+    const qualifiedNames = [
+      ...storedQualifiedNames.reverse(),
+      storedQualifiedNames[0] ?? '',
+      'missing',
+    ]
+    const expectedLogicalIds = [...logicalSymbols]
+      .sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id))
+      .map((symbol) => symbol.id)
+    const expectedDeclarationIds = [...declarations]
+      .reverse()
+      .map((declaration) => declaration.declaration.symbolId)
+    const expectedBindingIds = [...publicBindings]
+      .sort(
+        (left, right) =>
+          left.surface.localeCompare(right.surface) ||
+          left.exportedName.localeCompare(right.exportedName) ||
+          left.space.localeCompare(right.space) ||
+          (left.targetId ?? '').localeCompare(right.targetId ?? '') ||
+          left.id.localeCompare(right.id),
+      )
+      .map((binding) => binding.id)
+    const expectedStepKeys = [...steps]
+      .sort(
+        (left, right) =>
+          left.fromId.localeCompare(right.fromId) ||
+          left.toId.localeCompare(right.toId) ||
+          left.kind.localeCompare(right.kind),
+      )
+      .map((step) => `${step.fromId}\u0000${step.toId}\u0000${step.kind}`)
+
+    expect((await store.findLogicalSymbolsByIds(ids)).map((symbol) => symbol.id)).toEqual(
+      expectedLogicalIds,
+    )
+    expect(
+      (await store.findDeclarations(ids)).map((declaration) => declaration.declaration.symbolId),
+    ).toEqual(expectedDeclarationIds)
+    expect(
+      (await store.findPublicBindingsByExportedNames(names)).map((binding) => binding.id),
+    ).toEqual(expectedBindingIds)
+    expect(
+      (await store.findLogicalSymbolsByQualifiedNames(qualifiedNames)).map((symbol) => symbol.id),
+    ).toEqual(expectedLogicalIds)
+    expect(
+      (await store.findResolutionSteps(ids)).map(
+        (step) => `${step.fromId}\u0000${step.toId}\u0000${step.kind}`,
+      ),
+    ).toEqual(expectedStepKeys)
+    expect(
+      (await store.findLogicalSymbolsByIds([...ids].reverse())).map((symbol) => symbol.id),
+    ).toEqual(expectedLogicalIds)
+    await store.close()
+  })
+
+  it('round-trips declaration occurrence forms, preserves reverse mapping order, and chunks reverse lookups', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-occurrence-forms-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+
+    const count = 1200
+    const logicalSymbols = Array.from({ length: count }, (_, index) =>
+      createLogicalSymbol({
+        workspace: 'core',
+        surface: 'src/items.ts',
+        name: `item${String(index)}`,
+        space: SymbolSpace.Value,
+        ownerId: undefined,
+        memberSemantics: undefined,
+      }),
+    )
+
+    const forms = [
+      DeclarationOccurrenceForm.Definition,
+      DeclarationOccurrenceForm.Signature,
+      DeclarationOccurrenceForm.Implementation,
+    ] as const
+
+    const declarations = logicalSymbols.map((logical, index) => {
+      const form = forms[index % forms.length]!
+      return {
+        logicalSymbolId: logical.id,
+        declaration: {
+          symbolId: `core:src/items.ts:function:item${String(index)}:${String(index + 1)}:0`,
+          logicalId: logical.id,
+          location: {
+            filePath: 'core:src/items.ts',
+            line: index + 1,
+            column: 0,
+            endLine: index + 1,
+            endColumn: 10,
+          },
+          kind: SymbolKind.Function,
+          form,
+          occurrenceForm: form,
+        },
+      }
+    })
+
+    await store.replaceReferenceFacts({
+      logicalSymbols,
+      declarations,
+      publicBindings: [],
+      localBindings: [],
+      steps: [],
+      coverage: [],
+    })
+
+    // Forward mapping round-trip with occurrenceForm
+    const forward = await store.findDeclarations([logicalSymbols[0]!.id, logicalSymbols[1]!.id])
+    expect(forward).toHaveLength(2)
+    expect(forward[0]!.declaration.form).toBe(DeclarationOccurrenceForm.Definition)
+    expect(forward[0]!.declaration.occurrenceForm).toBe(DeclarationOccurrenceForm.Definition)
+    expect(forward[1]!.declaration.form).toBe(DeclarationOccurrenceForm.Signature)
+    expect(forward[1]!.declaration.occurrenceForm).toBe(DeclarationOccurrenceForm.Signature)
+
+    // Reverse mapping order preservation across chunked input (>900)
+    const reversedDeclIds = [...declarations.map((d) => d.declaration.symbolId)].reverse()
+    const reverseResults = await store.findLogicalDeclarationsByDeclarationIds(reversedDeclIds)
+    expect(reverseResults).toHaveLength(count)
+    expect(reverseResults.map((r) => r.declaration.symbolId)).toEqual(reversedDeclIds)
+    expect(reverseResults[0]!.declaration.form).toBe(
+      declarations[declarations.length - 1]!.declaration.form,
+    )
+    expect(reverseResults[0]!.declaration.occurrenceForm).toBe(
+      declarations[declarations.length - 1]!.declaration.occurrenceForm,
+    )
+
+    await store.close()
+  })
+
   it('accounts for all bind parameters when chunking ids together with relation types', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-rel-types-chunk-'))
     const store = new SQLiteGraphStore(tempDir)
     await store.open()
     const file = createFileNode({
       path: 'core:src/rel-chunk.ts',
-      configRelativePath: 'src/rel-chunk.ts',
+      projectRelativePath: 'src/rel-chunk.ts',
       language: 'typescript',
       contentHash: 'sha256:rel-chunk',
       workspace: 'core',
@@ -485,7 +966,7 @@ describe('SQLiteGraphStore', () => {
       )
       const file = createFileNode({
         path: `core:src/ring-${String(symbolCount)}.ts`,
-        configRelativePath: `src/ring-${String(symbolCount)}.ts`,
+        projectRelativePath: `src/ring-${String(symbolCount)}.ts`,
         language: 'typescript',
         contentHash: `sha256:ring-${String(symbolCount)}`,
         workspace: 'core',
@@ -535,7 +1016,7 @@ describe('SQLiteGraphStore', () => {
     await store.open()
     const file = createFileNode({
       path: 'core:src/wide.ts',
-      configRelativePath: 'src/wide.ts',
+      projectRelativePath: 'src/wide.ts',
       language: 'typescript',
       contentHash: 'sha256:wide',
       workspace: 'core',
@@ -618,7 +1099,7 @@ describe('SQLiteGraphStore', () => {
     const files = Array.from({ length: 905 }, (_, index) =>
       createFileNode({
         path: `core:src/bulk-${String(index)}.ts`,
-        configRelativePath: `src/bulk-${String(index)}.ts`,
+        projectRelativePath: `src/bulk-${String(index)}.ts`,
         language: 'typescript',
         contentHash: `sha256:bulk-${String(index)}`,
         workspace: 'core',
@@ -627,7 +1108,7 @@ describe('SQLiteGraphStore', () => {
     const documents = Array.from({ length: 905 }, (_, index) =>
       createDocumentNode({
         path: `root:docs/bulk-${String(index)}.md`,
-        configRelativePath: `docs/bulk-${String(index)}.md`,
+        projectRelativePath: `docs/bulk-${String(index)}.md`,
         contentHash: `sha256:doc-${String(index)}`,
         content: `# Doc ${String(index)}`,
         workspace: 'root',
@@ -687,17 +1168,36 @@ describe('SQLiteGraphStore', () => {
     await store.open()
     const baseline = createFileNode({
       path: 'core:src/baseline.ts',
-      configRelativePath: 'src/baseline.ts',
+      projectRelativePath: 'src/baseline.ts',
       language: 'typescript',
       contentHash: 'sha256:baseline',
       workspace: 'core',
       content: 'export const baseline = true',
     })
-    await store.upsertFile(baseline, [], [])
+    const baselineSymbol = createSymbolNode({
+      name: 'baseline',
+      kind: SymbolKind.Variable,
+      filePath: baseline.path,
+      line: 1,
+      column: 13,
+    })
+    const baselineTarget = createSymbolNode({
+      name: 'baselineTarget',
+      kind: SymbolKind.Function,
+      filePath: baseline.path,
+      line: 2,
+      column: 0,
+    })
+    const baselineRelation = createRelation({
+      source: baselineSymbol.id,
+      target: baselineTarget.id,
+      type: RelationType.Calls,
+    })
+    await store.upsertFile(baseline, [baselineSymbol, baselineTarget], [baselineRelation])
 
     const staged = createFileNode({
-      path: 'core:src/staged.ts',
-      configRelativePath: 'src/staged.ts',
+      path: baseline.path,
+      projectRelativePath: baseline.projectRelativePath,
       language: 'typescript',
       contentHash: 'sha256:staged',
       workspace: 'core',
@@ -712,6 +1212,7 @@ describe('SQLiteGraphStore', () => {
       memberSemantics: undefined,
     })
     const session = store.beginBulkIndexSession()
+    await session.removeFiles([baseline.path])
     await session.writeFiles([staged])
     await session.writeReferenceFacts({
       logicalSymbols: [logical, logical],
@@ -724,7 +1225,149 @@ describe('SQLiteGraphStore', () => {
 
     await expect(session.commit()).rejects.toThrow()
     expect(await store.getFile(baseline.path)).toEqual(baseline)
-    expect(await store.getFile(staged.path)).toBeUndefined()
+    expect(await store.findSymbols({ filePath: baseline.path })).toEqual([
+      baselineSymbol,
+      baselineTarget,
+    ])
+    expect(
+      await store.getIncomingSymbolRelations([baselineTarget.id], [RelationType.Calls]),
+    ).toEqual([baselineRelation])
+    await expect(
+      store.searchSourceContentCandidates({
+        normalizedQuery: 'baseline',
+        rawTerms: ['baseline'],
+        expandedTerms: [],
+        limit: 10,
+      }),
+    ).resolves.toMatchObject({ candidates: [{ file: { path: baseline.path } }] })
+    await store.close()
+  })
+
+  it('rolls back a direct file upsert when relation persistence fails after cleanup', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-upsert-rollback-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const baseline = createFileNode({
+      path: 'core:src/direct-rollback.ts',
+      projectRelativePath: 'src/direct-rollback.ts',
+      language: 'typescript',
+      contentHash: 'sha256:direct-rollback-baseline',
+      workspace: 'core',
+      content: 'export const directRollbackBaselineNeedle = true',
+    })
+    const retainedFile = createFileNode({
+      path: 'core:src/direct-rollback-retained.ts',
+      projectRelativePath: 'src/direct-rollback-retained.ts',
+      language: 'typescript',
+      contentHash: 'sha256:direct-rollback-retained',
+      workspace: 'core',
+    })
+    const baselineSymbols = [
+      createSymbolNode({
+        name: 'directRollbackIncomingTarget',
+        kind: SymbolKind.Function,
+        filePath: baseline.path,
+        line: 1,
+        column: 0,
+      }),
+      createSymbolNode({
+        name: 'directRollbackOutgoingSource',
+        kind: SymbolKind.Function,
+        filePath: baseline.path,
+        line: 2,
+        column: 0,
+      }),
+    ]
+    const retainedSymbol = createSymbolNode({
+      name: 'directRollbackRetained',
+      kind: SymbolKind.Function,
+      filePath: retainedFile.path,
+      line: 1,
+      column: 0,
+    })
+    const baselineRelations = [
+      createRelation({
+        source: retainedSymbol.id,
+        target: baselineSymbols[0]!.id,
+        type: RelationType.Calls,
+      }),
+      createRelation({
+        source: baselineSymbols[1]!.id,
+        target: retainedSymbol.id,
+        type: RelationType.Calls,
+      }),
+      createRelation({
+        source: baseline.path,
+        target: retainedFile.path,
+        type: RelationType.Imports,
+      }),
+    ]
+    await store.upsertFile(retainedFile, [retainedSymbol], [])
+    await store.upsertFile(baseline, baselineSymbols, baselineRelations)
+
+    const replacement = createFileNode({
+      ...baseline,
+      contentHash: 'sha256:direct-rollback-replacement',
+      content: 'export const directRollbackReplacementNeedle = true',
+    })
+    const replacementSymbols = [
+      createSymbolNode({
+        name: 'directRollbackReplacementSource',
+        kind: SymbolKind.Function,
+        filePath: replacement.path,
+        line: 1,
+        column: 0,
+      }),
+      createSymbolNode({
+        name: 'directRollbackReplacementTarget',
+        kind: SymbolKind.Function,
+        filePath: replacement.path,
+        line: 2,
+        column: 0,
+      }),
+    ]
+    const invalidMetadataRelation = createRelation({
+      source: replacementSymbols[0]!.id,
+      target: replacementSymbols[1]!.id,
+      type: RelationType.Calls,
+      metadata: { invalid: 1n },
+    })
+
+    await expect(
+      store.upsertFile(replacement, replacementSymbols, [invalidMetadataRelation]),
+    ).rejects.toThrow()
+    expect(await store.getFile(baseline.path)).toEqual(baseline)
+    expect(await store.findSymbols({ filePath: baseline.path })).toEqual(baselineSymbols)
+    expect(
+      await store.getIncomingSymbolRelations([baselineSymbols[0]!.id], [RelationType.Calls]),
+    ).toEqual([baselineRelations[0]])
+    expect(
+      await store.getOutgoingSymbolRelations([baselineSymbols[1]!.id], [RelationType.Calls]),
+    ).toEqual([baselineRelations[1]])
+    expect(await store.getImportees(baseline.path)).toEqual([baselineRelations[2]])
+    expect(
+      (
+        await store.searchSourceContentCandidates({
+          normalizedQuery: 'directRollbackBaselineNeedle',
+          rawTerms: ['directRollbackBaselineNeedle'],
+          expandedTerms: [],
+          limit: 10,
+        })
+      ).candidates.map((candidate) => candidate.file.path),
+    ).toEqual([baseline.path])
+    expect(
+      (
+        await store.searchSourceContentCandidates({
+          normalizedQuery: 'directRollbackReplacementNeedle',
+          rawTerms: ['directRollbackReplacementNeedle'],
+          expandedTerms: [],
+          limit: 10,
+        })
+      ).candidates,
+    ).toEqual([])
+    expect(
+      await store.getOutgoingSymbolRelations([replacementSymbols[0]!.id], [RelationType.Calls]),
+    ).toEqual([])
     await store.close()
   })
 
@@ -734,7 +1377,7 @@ describe('SQLiteGraphStore', () => {
     await store.open()
     const original = createFileNode({
       path: 'core:src/incremental.ts',
-      configRelativePath: 'src/incremental.ts',
+      projectRelativePath: 'src/incremental.ts',
       language: 'typescript',
       contentHash: 'sha256:original',
       workspace: 'core',
@@ -770,7 +1413,7 @@ describe('SQLiteGraphStore', () => {
 
     const file = createFileNode({
       path: 'src/types.ts',
-      configRelativePath: '',
+      projectRelativePath: '',
       language: 'typescript',
       contentHash: 'sha256:abc',
       workspace: '/project',
@@ -864,7 +1507,7 @@ describe('SQLiteGraphStore', () => {
 
     const file = createFileNode({
       path: 'src/kernel.ts',
-      configRelativePath: '',
+      projectRelativePath: '',
       language: 'typescript',
       contentHash: 'sha256:kernel',
       workspace: '/project',
@@ -915,6 +1558,63 @@ describe('SQLiteGraphStore', () => {
     expect(existsSync(join(tempDir, 'graph', 'code-graph.sqlite'))).toBe(false)
     expect(existsSync(join(tempDir, 'graph', 'storage.epoch'))).toBe(true)
     expect(existsSync(join(tempDir, 'graph', 'index.lock'))).toBe(true)
+  })
+
+  it('recreate removes only the database files and rotates the storage epoch', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    await store.close()
+    const graphDir = join(tempDir, 'graph')
+    writeFileSync(join(graphDir, 'code-graph.sqlite-wal'), 'wal')
+    writeFileSync(join(graphDir, 'code-graph.sqlite-shm'), 'shm')
+    writeFileSync(join(graphDir, 'index.lock'), 'lease\n')
+    const generationBefore = readStorageGeneration(tempDir)
+
+    await store.recreate()
+
+    expect(existsSync(join(graphDir, 'code-graph.sqlite'))).toBe(false)
+    expect(existsSync(join(graphDir, 'code-graph.sqlite-wal'))).toBe(false)
+    expect(existsSync(join(graphDir, 'code-graph.sqlite-shm'))).toBe(false)
+    expect(existsSync(join(graphDir, 'index.lock'))).toBe(true)
+    expect(existsSync(join(graphDir, 'storage.epoch'))).toBe(true)
+    expect(readStorageGeneration(tempDir).token).not.toBe(generationBefore.token)
+  })
+
+  it('rejects a same-version database whose table lost a required column, then recovers', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-shape-'))
+    const databasePath = join(tempDir, 'graph', 'code-graph.sqlite')
+    const initialStore = new SQLiteGraphStore(tempDir)
+    await initialStore.open()
+    await initialStore.close()
+    const db = new Database(databasePath)
+    db.exec('ALTER TABLE logical_declarations DROP COLUMN occurrence_form')
+    db.close()
+
+    const brokenStore = new SQLiteGraphStore(tempDir)
+    let brokenError: unknown
+    try {
+      await brokenStore.open()
+    } catch (err) {
+      brokenError = err
+    }
+    expect(brokenError).toBeInstanceOf(GraphStorageRecoveryRequiredError)
+    expect(brokenError).toMatchObject({ reason: 'SCHEMA_INCOMPATIBLE' })
+
+    await brokenStore.recreate()
+    await brokenStore.open()
+    await brokenStore.close()
+  })
+
+  it('derives REQUIRED_COLUMNS from the DDL for every ordinary table', () => {
+    expect(REQUIRED_COLUMNS['logical_declarations']).toContain('occurrence_form')
+    expect(REQUIRED_COLUMNS['symbols']).toContain('selection_end_column')
+    expect(REQUIRED_COLUMNS['local_bindings']).toContain('end_column')
+    expect(Object.keys(REQUIRED_COLUMNS)).not.toContain('symbol_fts')
+    for (const columns of Object.values(REQUIRED_COLUMNS)) {
+      expect(columns).not.toContain('PRIMARY')
+      expect(columns).not.toContain('FOREIGN')
+    }
   })
 
   it('retries a locked WAL file while recreating the store', async () => {
@@ -987,14 +1687,21 @@ describe('SQLiteGraphStore', () => {
   })
 
   it('declares sqlite schema version and fts-backed ddl', () => {
-    expect(SQLITE_SCHEMA_VERSION).toBe(12)
+    expect(SQLITE_SCHEMA_VERSION).toBe(16)
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS files')
+    expect(SQLITE_SCHEMA_DDL).toContain('project_relative_path TEXT NOT NULL')
+    expect(SQLITE_SCHEMA_DDL).not.toContain('config_relative_path')
+    expect(SQLITE_SCHEMA_DDL).toContain("category TEXT NOT NULL DEFAULT 'source'")
+    expect(SQLITE_SCHEMA_DDL).toContain('idx_files_category')
     expect(SQLITE_SCHEMA_DDL).toContain('content TEXT')
+    expect(SQLITE_SCHEMA_DDL).toContain('namespace TEXT')
+    expect(SQLITE_SCHEMA_DDL).toContain('namespace_separator TEXT')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS documents')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE VIRTUAL TABLE IF NOT EXISTS symbol_fts')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE VIRTUAL TABLE IF NOT EXISTS spec_fts')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE VIRTUAL TABLE IF NOT EXISTS document_fts')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS logical_declarations')
+    expect(SQLITE_SCHEMA_DDL).toContain('occurrence_form TEXT NOT NULL')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS public_bindings')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS local_bindings')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS resolution_steps')
@@ -1011,6 +1718,7 @@ describe('SQLiteGraphStore', () => {
       'CREATE INDEX IF NOT EXISTS idx_logical_symbols_qualified_name ON logical_symbols(qualified_name)',
     )
     expect(SQLITE_SCHEMA_DDL).not.toContain('member_form')
+    expect(SQLITE_SCHEMA_DDL).not.toContain('ALTER TABLE')
     expect(SQLITE_SCHEMA_DDL).toContain(
       'CREATE TABLE IF NOT EXISTS public_bindings (\n  id TEXT PRIMARY KEY,\n  surface TEXT NOT NULL,\n  exported_name TEXT NOT NULL,\n  space TEXT NOT NULL,\n  target_id TEXT\n);',
     )
@@ -1019,39 +1727,44 @@ describe('SQLiteGraphStore', () => {
     )
   })
 
-  it.each(['10', '11'])('rejects schema version %s without altering the table', async (version) => {
-    const dir = mkdtempSync(join(tmpdir(), `code-graph-sqlite-schema-v${version}-`))
-    const databasePath = join(dir, 'graph', 'code-graph.sqlite')
-    const initialStore = new SQLiteGraphStore(dir)
-    await initialStore.open()
-    await initialStore.close()
-    const db = new Database(databasePath)
-    const before = db.prepare('PRAGMA table_info(logical_symbols)').all()
-    db.prepare('UPDATE meta SET value = ? WHERE key = ?').run(version, 'schemaVersion')
-    db.close()
+  it.each(['10', '11', '12', '13', '14', '15', '17'])(
+    'rejects schema version %s without altering the table',
+    async (version) => {
+      const dir = mkdtempSync(join(tmpdir(), `code-graph-sqlite-schema-v${version}-`))
+      const databasePath = join(dir, 'graph', 'code-graph.sqlite')
+      const initialStore = new SQLiteGraphStore(dir)
+      await initialStore.open()
+      await initialStore.close()
+      const db = new Database(databasePath)
+      const before = db.prepare('PRAGMA table_info(logical_symbols)').all()
+      db.prepare('UPDATE meta SET value = ? WHERE key = ?').run(version, 'schemaVersion')
+      db.close()
 
-    const incompatibleStore = new SQLiteGraphStore(dir)
-    const openError = await incompatibleStore.open().catch((error: unknown) => error)
-    expect(openError).toBeInstanceOf(GraphStorageRecoveryRequiredError)
-    if (!(openError instanceof Error)) throw openError
-    expect(openError.message).toContain(
-      `SQLite graph storage schema ${version} is incompatible with expected 12`,
-    )
+      const incompatibleStore = new SQLiteGraphStore(dir)
+      const openError = await incompatibleStore.open().catch((error: unknown) => error)
+      expect(openError).toBeInstanceOf(GraphStorageRecoveryRequiredError)
+      if (!(openError instanceof Error)) throw openError
+      expect(openError.message).toContain(
+        `SQLite graph storage schema ${version} is incompatible with expected ${SQLITE_SCHEMA_VERSION}`,
+      )
 
-    const afterDb = new Database(databasePath, { readonly: true })
-    try {
-      expect(afterDb.prepare('PRAGMA table_info(logical_symbols)').all()).toEqual(before)
-      expect(afterDb.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({
-        value: version,
-      })
-    } finally {
-      afterDb.close()
-      rmSync(dir, { recursive: true, force: true })
-    }
-  })
+      const afterDb = new Database(databasePath, { readonly: true })
+      try {
+        expect(afterDb.prepare('PRAGMA table_info(logical_symbols)').all()).toEqual(before)
+        expect(afterDb.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual(
+          {
+            value: version,
+          },
+        )
+      } finally {
+        afterDb.close()
+        rmSync(dir, { recursive: true, force: true })
+      }
+    },
+  )
 
-  it('reopens schema 12 without rebuilding stored member rows', async () => {
-    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-schema-v11-'))
+  it('reopens current schema 16 without rebuilding stored member rows', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-schema-v16-'))
     const owner = createLogicalSymbol({
       workspace: 'core',
       surface: 'core:src/edit.ts',
@@ -1154,6 +1867,56 @@ describe('SQLiteGraphStore', () => {
     }
   })
 
+  it('rejects schema 15 for reads and recreates it as schema 16 with a new storage epoch', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-schema-v15-rebuild-'))
+    const databasePath = join(tempDir, 'graph', 'code-graph.sqlite')
+    const initialStore = new SQLiteGraphStore(tempDir)
+    await initialStore.open()
+    await initialStore.close()
+    const generationBefore = readStorageGeneration(tempDir)
+
+    const oldDb = new Database(databasePath)
+    oldDb.prepare("UPDATE meta SET value = '15' WHERE key = 'schemaVersion'").run()
+    const columnsBefore = oldDb.prepare('PRAGMA table_info(files)').all()
+    oldDb.close()
+
+    const incompatibleStore = new SQLiteGraphStore(tempDir)
+    let openError: unknown
+    try {
+      await incompatibleStore.open()
+    } catch (err) {
+      openError = err
+    }
+    expect(openError).toBeInstanceOf(GraphStorageRecoveryRequiredError)
+    expect(openError).toMatchObject({
+      reason: 'SCHEMA_INCOMPATIBLE',
+    })
+    expect(readStorageGeneration(tempDir).token).toBe(generationBefore.token)
+
+    const rejectedDb = new Database(databasePath, { readonly: true })
+    expect(rejectedDb.prepare('PRAGMA table_info(files)').all()).toEqual(columnsBefore)
+    rejectedDb.close()
+
+    await incompatibleStore.recreate()
+    expect(readStorageGeneration(tempDir).token).not.toBe(generationBefore.token)
+    await incompatibleStore.open()
+    await incompatibleStore.close()
+
+    const rebuiltDb = new Database(databasePath, { readonly: true })
+    try {
+      expect(rebuiltDb.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual(
+        { value: '16' },
+      )
+      const rebuiltColumns = rebuiltDb.prepare('PRAGMA table_info(files)').all() as Array<{
+        name: string
+      }>
+      expect(rebuiltColumns.map((column) => column.name)).toContain('namespace')
+      expect(rebuiltColumns.map((column) => column.name)).toContain('namespace_separator')
+    } finally {
+      rebuiltDb.close()
+    }
+  })
+
   it('creates the v10 workspace and kind indexes and rejects a version-9 store', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-schema-v10-'))
     const databasePath = join(tempDir, 'graph', 'code-graph.sqlite')
@@ -1176,7 +1939,7 @@ describe('SQLiteGraphStore', () => {
 
     const incompatibleStore = new SQLiteGraphStore(tempDir)
     await expect(incompatibleStore.open()).rejects.toThrow(
-      'SQLite graph storage schema 9 is incompatible with expected 12',
+      `SQLite graph storage schema 9 is incompatible with expected ${SQLITE_SCHEMA_VERSION}`,
     )
     expect(existsSync(databasePath)).toBe(true)
   })
@@ -1195,7 +1958,7 @@ describe('SQLiteGraphStore', () => {
 
     const incompatibleStore = new SQLiteGraphStore(tempDir)
     await expect(incompatibleStore.open()).rejects.toThrow(
-      'SQLite graph storage schema 9 is incompatible with expected 12',
+      `SQLite graph storage schema 9 is incompatible with expected ${SQLITE_SCHEMA_VERSION}`,
     )
     expect(existsSync(databasePath)).toBe(true)
   })
@@ -1265,7 +2028,7 @@ describe('SQLiteGraphStore', () => {
     await store.open()
     const file = createFileNode({
       path: 'C:/repo/src/a.ts',
-      configRelativePath: 'src/a.ts',
+      projectRelativePath: 'src/a.ts',
       language: 'typescript',
       contentHash: 'sha256:drive',
       workspace: 'repo',
@@ -1295,7 +2058,7 @@ describe('SQLiteGraphStore', () => {
     await store.open()
     const file = createFileNode({
       path: 'code-graph:src/alpha.ts',
-      configRelativePath: 'src/alpha.ts',
+      projectRelativePath: 'src/alpha.ts',
       language: 'typescript',
       contentHash: 'sha256:alpha',
       workspace: 'code-graph',
@@ -1370,7 +2133,7 @@ describe('SQLiteGraphStore', () => {
 
     const file = createFileNode({
       path: 'src/snippet.ts',
-      configRelativePath: '',
+      projectRelativePath: '',
       language: 'typescript',
       contentHash: 'sha256:snippet',
       workspace: 'core',
@@ -1422,14 +2185,14 @@ describe('SQLiteGraphStore', () => {
 
     const fileOne = createFileNode({
       path: 'src/alpha.ts',
-      configRelativePath: '',
+      projectRelativePath: '',
       language: 'typescript',
       contentHash: 'sha256:alpha',
       workspace: '/project',
     })
     const fileTwo = createFileNode({
       path: 'src/beta.ts',
-      configRelativePath: '',
+      projectRelativePath: '',
       language: 'typescript',
       contentHash: 'sha256:beta',
       workspace: '/project',
@@ -1476,12 +2239,86 @@ describe('SQLiteGraphStore', () => {
     await store.close()
   })
 
+  it('chunks findSymbols file-path filters within the SQLite parameter budget', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-find-symbols-chunk-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const files = Array.from({ length: 901 }, (_, index) =>
+      createFileNode({
+        path: `core:src/chunk-${String(index)}.ts`,
+        projectRelativePath: `src/chunk-${String(index)}.ts`,
+        language: 'typescript',
+        contentHash: `sha256:chunk-${String(index)}`,
+        workspace: 'core',
+      }),
+    )
+    const symbols = files.map((file, index) =>
+      createSymbolNode({
+        name: 'Chunked',
+        kind: SymbolKind.Function,
+        filePath: file.path,
+        line: index + 1,
+        column: 0,
+      }),
+    )
+    const sameFileSymbols = [
+      createSymbolNode({
+        name: 'Chunked',
+        kind: SymbolKind.Function,
+        filePath: files[0]!.path,
+        line: 2,
+        column: 0,
+      }),
+      createSymbolNode({
+        name: 'Chunked',
+        kind: SymbolKind.Function,
+        filePath: files[0]!.path,
+        line: 1,
+        column: 2,
+      }),
+      createSymbolNode({
+        name: 'Chunked',
+        kind: SymbolKind.Function,
+        filePath: files[0]!.path,
+        line: 1,
+        column: 1,
+      }),
+    ]
+    const allSymbols = [...symbols, ...sameFileSymbols]
+    await store.bulkLoad({ files, symbols: allSymbols, specs: [], relations: [] })
+
+    const results = await store.findSymbols({
+      filePaths: [...files.map((file) => file.path), files[0]!.path, 'core:src/missing.ts'],
+      name: 'chunked',
+    })
+
+    const expectedIds = [...allSymbols]
+      .sort(
+        (left, right) =>
+          left.filePath.localeCompare(right.filePath) ||
+          left.line - right.line ||
+          left.column - right.column ||
+          left.id.localeCompare(right.id),
+      )
+      .map((symbol) => symbol.id)
+    expect(results.map((symbol) => symbol.id)).toEqual(expectedIds)
+    expect(
+      (
+        await store.findSymbols({
+          filePaths: [...files].reverse().map((file) => file.path),
+          name: 'chunked',
+        })
+      ).map((symbol) => symbol.id),
+    ).toEqual(results.map((symbol) => symbol.id))
+    await store.close()
+  })
+
   it('expands specd/code-shaped queries before applying sqlite ranking', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
 
     const file = createFileNode({
       path: 'core:src/archive.ts',
-      configRelativePath: 'packages/core/src/archive.ts',
+      projectRelativePath: 'packages/core/src/archive.ts',
       language: 'typescript',
       contentHash: 'sha256:archive',
       workspace: 'core',
@@ -1522,14 +2359,14 @@ describe('SQLiteGraphStore', () => {
     })
     const strongDocument = createDocumentNode({
       path: 'core:docs/architecture.md',
-      configRelativePath: 'docs/architecture.md',
+      projectRelativePath: 'docs/architecture.md',
       contentHash: 'sha256:doc-strong',
       content: 'Architecture document',
       workspace: 'core',
     })
     const weakDocument = createDocumentNode({
       path: 'core:docs/notes.md',
-      configRelativePath: 'docs/notes.md',
+      projectRelativePath: 'docs/notes.md',
       contentHash: 'sha256:doc-weak',
       content: 'docs/architecture.md docs/architecture.md docs/architecture.md',
       workspace: 'core',
@@ -1560,7 +2397,7 @@ describe('SQLiteGraphStore', () => {
     tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
     const file = createFileNode({
       path: 'core:src/identity.ts',
-      configRelativePath: 'packages/core/src/identity.ts',
+      projectRelativePath: 'packages/core/src/identity.ts',
       language: 'typescript',
       contentHash: 'sha256:identity-file',
       workspace: 'core',
@@ -1584,7 +2421,7 @@ describe('SQLiteGraphStore', () => {
     })
     const document = createDocumentNode({
       path: 'root:docs/identity.md',
-      configRelativePath: 'docs/identity.md',
+      projectRelativePath: 'docs/identity.md',
       contentHash: 'sha256:identity-document',
       content: '# Identity',
       workspace: 'root',
@@ -1613,7 +2450,7 @@ describe('SQLiteGraphStore', () => {
       { spec: { specId: spec.specId } },
     ])
     await expect(
-      store.searchDocuments({ query: document.configRelativePath }),
+      store.searchDocuments({ query: document.projectRelativePath }),
     ).resolves.toMatchObject([{ document: { path: document.path } }])
     await store.close()
   })
@@ -1623,7 +2460,7 @@ describe('SQLiteGraphStore', () => {
 
     const file = createFileNode({
       path: 'core:src/repository.ts',
-      configRelativePath: 'packages/core/src/repository.ts',
+      projectRelativePath: 'packages/core/src/repository.ts',
       language: 'typescript',
       contentHash: 'sha256:token-order',
       workspace: 'core',
@@ -1688,7 +2525,7 @@ describe('SQLiteGraphStore', () => {
 
     const sourceFile = createFileNode({
       path: 'src/consumer.ts',
-      configRelativePath: '',
+      projectRelativePath: '',
       language: 'typescript',
       contentHash: 'sha256:consumer',
       workspace: '/project',
@@ -1738,7 +2575,7 @@ describe('SQLiteGraphStore', () => {
       tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
       const file = createFileNode({
         path: 'src/artifacts.ts',
-        configRelativePath: '',
+        projectRelativePath: '',
         language: 'typescript',
         contentHash: 'sha256:abc',
         workspace: 'core',
@@ -1765,7 +2602,7 @@ describe('SQLiteGraphStore', () => {
       tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
       const file = createFileNode({
         path: 'src/logic.ts',
-        configRelativePath: '',
+        projectRelativePath: '',
         language: 'typescript',
         contentHash: 'sha256:abc',
         workspace: 'core',
@@ -1801,7 +2638,7 @@ describe('SQLiteGraphStore', () => {
       tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
       const file1 = createFileNode({
         path: 'src/status.ts',
-        configRelativePath: '',
+        projectRelativePath: '',
         language: 'typescript',
         contentHash: 'sha256:1',
         workspace: 'core',
@@ -1815,7 +2652,7 @@ describe('SQLiteGraphStore', () => {
       })
       const file2 = createFileNode({
         path: 'src/lifecycle.ts',
-        configRelativePath: '',
+        projectRelativePath: '',
         language: 'typescript',
         contentHash: 'sha256:2',
         workspace: 'core',
@@ -1849,7 +2686,7 @@ describe('SQLiteGraphStore', () => {
       tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
       const file = createFileNode({
         path: 'src/relevance.ts',
-        configRelativePath: '',
+        projectRelativePath: '',
         language: 'typescript',
         contentHash: 'sha256:3',
         workspace: 'core',
@@ -1905,14 +2742,14 @@ describe('SQLiteGraphStore', () => {
       await session.writeFiles([
         createFileNode({
           path: 'core:src/a.ts',
-          configRelativePath: 'src/a.ts',
+          projectRelativePath: 'src/a.ts',
           language: 'typescript',
           contentHash: 'sha256:a',
           workspace: 'core',
         }),
         createFileNode({
           path: 'core:src/b.ts',
-          configRelativePath: 'src/b.ts',
+          projectRelativePath: 'src/b.ts',
           language: 'typescript',
           contentHash: 'sha256:b',
           workspace: 'core',
@@ -1956,5 +2793,493 @@ describe('SQLiteGraphStore', () => {
 
       await store.close()
     })
+  })
+
+  it('removes a file with more symbols than the former variable limit allowed', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-large-file-remove-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const file = createFileNode({
+      path: 'core:src/generated.ts',
+      projectRelativePath: 'src/generated.ts',
+      language: 'typescript',
+      contentHash: 'sha256:generated',
+      workspace: 'core',
+      content: 'export const removedLargeFileNeedle = true',
+    })
+    const retainedFile = createFileNode({
+      path: 'core:src/retained-remove.ts',
+      projectRelativePath: 'src/retained-remove.ts',
+      language: 'typescript',
+      contentHash: 'sha256:retained-remove',
+      workspace: 'core',
+    })
+    const retainedSymbol = createSymbolNode({
+      name: 'retainedRemove',
+      kind: SymbolKind.Function,
+      filePath: retainedFile.path,
+      line: 1,
+      column: 0,
+    })
+    const symbols = Array.from({ length: 16_384 }, (_, index) =>
+      createSymbolNode({
+        name: `generated${String(index)}`,
+        kind: SymbolKind.Variable,
+        filePath: file.path,
+        line: index + 1,
+        column: 0,
+      }),
+    )
+    const relations = [
+      createRelation({
+        source: retainedSymbol.id,
+        target: symbols[0]!.id,
+        type: RelationType.Calls,
+      }),
+      createRelation({
+        source: symbols[1]!.id,
+        target: retainedSymbol.id,
+        type: RelationType.Calls,
+      }),
+      createRelation({
+        source: file.path,
+        target: retainedFile.path,
+        type: RelationType.Imports,
+      }),
+    ]
+    await store.upsertFile(retainedFile, [retainedSymbol], [])
+    await store.upsertFile(file, symbols, relations)
+
+    await expect(store.removeFile(file.path)).resolves.toBeUndefined()
+    expect(await store.getFile(file.path)).toBeUndefined()
+    expect(await store.findSymbols({ filePath: file.path })).toEqual([])
+    expect(await store.getIncomingSymbolRelations([symbols[0]!.id], [RelationType.Calls])).toEqual(
+      [],
+    )
+    expect(await store.getOutgoingSymbolRelations([symbols[1]!.id], [RelationType.Calls])).toEqual(
+      [],
+    )
+    expect(await store.getImportees(file.path)).toEqual([])
+    expect(
+      (
+        await store.searchSourceContentCandidates({
+          normalizedQuery: 'removedLargeFileNeedle',
+          rawTerms: ['removedLargeFileNeedle'],
+          expandedTerms: [],
+          limit: 10,
+        })
+      ).candidates,
+    ).toEqual([])
+    expect(await store.getFile(retainedFile.path)).toEqual(retainedFile)
+    await store.close()
+  })
+
+  it('replaces a file with more symbols than the former variable limit allowed', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-large-file-upsert-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const file = createFileNode({
+      path: 'core:src/generated-replace.ts',
+      projectRelativePath: 'src/generated-replace.ts',
+      language: 'typescript',
+      contentHash: 'sha256:generated-before',
+      workspace: 'core',
+      content: 'export const replacedLargeFileNeedle = true',
+    })
+    const retainedFile = createFileNode({
+      path: 'core:src/retained-replace.ts',
+      projectRelativePath: 'src/retained-replace.ts',
+      language: 'typescript',
+      contentHash: 'sha256:retained-replace',
+      workspace: 'core',
+    })
+    const retainedSymbol = createSymbolNode({
+      name: 'retainedReplace',
+      kind: SymbolKind.Function,
+      filePath: retainedFile.path,
+      line: 1,
+      column: 0,
+    })
+    const oldSymbols = Array.from({ length: 16_384 }, (_, index) =>
+      createSymbolNode({
+        name: `old${String(index)}`,
+        kind: SymbolKind.Variable,
+        filePath: file.path,
+        line: index + 1,
+        column: 0,
+      }),
+    )
+    const replacement = createFileNode({
+      path: file.path,
+      projectRelativePath: file.projectRelativePath,
+      language: file.language,
+      contentHash: 'sha256:generated-after',
+      workspace: file.workspace,
+      content: 'export const replacementLargeFileNeedle = true',
+    })
+    const replacementSymbol = createSymbolNode({
+      name: 'replacement',
+      kind: SymbolKind.Variable,
+      filePath: file.path,
+      line: 1,
+      column: 0,
+    })
+    const oldRelations = [
+      createRelation({
+        source: retainedSymbol.id,
+        target: oldSymbols[0]!.id,
+        type: RelationType.Calls,
+      }),
+      createRelation({
+        source: oldSymbols[1]!.id,
+        target: retainedSymbol.id,
+        type: RelationType.Calls,
+      }),
+      createRelation({
+        source: file.path,
+        target: retainedFile.path,
+        type: RelationType.Imports,
+      }),
+    ]
+    await store.upsertFile(retainedFile, [retainedSymbol], [])
+    await store.upsertFile(file, oldSymbols, oldRelations)
+
+    await expect(store.upsertFile(replacement, [replacementSymbol], [])).resolves.toBeUndefined()
+    expect(await store.getFile(file.path)).toEqual(replacement)
+    expect(await store.findSymbols({ filePath: file.path })).toEqual([replacementSymbol])
+    expect(
+      await store.getIncomingSymbolRelations([oldSymbols[0]!.id], [RelationType.Calls]),
+    ).toEqual([])
+    expect(
+      await store.getOutgoingSymbolRelations([oldSymbols[1]!.id], [RelationType.Calls]),
+    ).toEqual([])
+    expect(await store.getImportees(file.path)).toEqual([])
+    expect(
+      (
+        await store.searchSourceContentCandidates({
+          normalizedQuery: 'replacedLargeFileNeedle',
+          rawTerms: ['replacedLargeFileNeedle'],
+          expandedTerms: [],
+          limit: 10,
+        })
+      ).candidates,
+    ).toEqual([])
+    expect(
+      (
+        await store.searchSourceContentCandidates({
+          normalizedQuery: 'replacementLargeFileNeedle',
+          rawTerms: ['replacementLargeFileNeedle'],
+          expandedTerms: [],
+          limit: 10,
+        })
+      ).candidates.map((candidate) => candidate.file.path),
+    ).toEqual([file.path])
+    await store.close()
+  })
+
+  it('replaces a large file during bulk commit without exceeding SQLite variables', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-large-file-bulk-replace-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const file = createFileNode({
+      path: 'core:src/generated-bulk.ts',
+      projectRelativePath: 'src/generated-bulk.ts',
+      language: 'typescript',
+      contentHash: 'sha256:generated-bulk',
+      workspace: 'core',
+      content: 'export const replacedBulkLargeFileNeedle = true',
+    })
+    const retainedFile = createFileNode({
+      path: 'core:src/retained-bulk.ts',
+      projectRelativePath: 'src/retained-bulk.ts',
+      language: 'typescript',
+      contentHash: 'sha256:retained-bulk',
+      workspace: 'core',
+    })
+    const retainedSymbol = createSymbolNode({
+      name: 'retainedBulk',
+      kind: SymbolKind.Function,
+      filePath: retainedFile.path,
+      line: 1,
+      column: 0,
+    })
+    const symbols = Array.from({ length: 16_384 }, (_, index) =>
+      createSymbolNode({
+        name: `bulk${String(index)}`,
+        kind: SymbolKind.Variable,
+        filePath: file.path,
+        line: index + 1,
+        column: 0,
+      }),
+    )
+    const oldRelations = [
+      createRelation({
+        source: retainedSymbol.id,
+        target: symbols[0]!.id,
+        type: RelationType.Calls,
+      }),
+      createRelation({
+        source: symbols[1]!.id,
+        target: retainedSymbol.id,
+        type: RelationType.Calls,
+      }),
+      createRelation({
+        source: file.path,
+        target: retainedFile.path,
+        type: RelationType.Imports,
+      }),
+    ]
+    await store.upsertFile(retainedFile, [retainedSymbol], [])
+    await store.upsertFile(file, symbols, oldRelations)
+    const replacement = createFileNode({
+      path: file.path,
+      projectRelativePath: file.projectRelativePath,
+      language: file.language,
+      contentHash: 'sha256:generated-bulk-replaced',
+      workspace: file.workspace,
+      content: 'export const replacementBulkLargeFileNeedle = true',
+    })
+    const replacementSymbol = createSymbolNode({
+      name: 'bulkReplacement',
+      kind: SymbolKind.Variable,
+      filePath: file.path,
+      line: 1,
+      column: 0,
+    })
+    const session = store.beginBulkIndexSession()
+    await session.removeFiles([file.path])
+    await session.writeFiles([replacement])
+    await session.writeSymbols([replacementSymbol])
+
+    await expect(session.commit()).resolves.toBeUndefined()
+    expect(await store.getFile(file.path)).toEqual(replacement)
+    expect(await store.findSymbols({ filePath: file.path })).toEqual([replacementSymbol])
+    expect(await store.getIncomingSymbolRelations([symbols[0]!.id], [RelationType.Calls])).toEqual(
+      [],
+    )
+    expect(await store.getOutgoingSymbolRelations([symbols[1]!.id], [RelationType.Calls])).toEqual(
+      [],
+    )
+    expect(await store.getImportees(file.path)).toEqual([])
+    expect(
+      (
+        await store.searchSourceContentCandidates({
+          normalizedQuery: 'replacedBulkLargeFileNeedle',
+          rawTerms: ['replacedBulkLargeFileNeedle'],
+          expandedTerms: [],
+          limit: 10,
+        })
+      ).candidates,
+    ).toEqual([])
+    expect(
+      (
+        await store.searchSourceContentCandidates({
+          normalizedQuery: 'replacementBulkLargeFileNeedle',
+          rawTerms: ['replacementBulkLargeFileNeedle'],
+          expandedTerms: [],
+          limit: 10,
+        })
+      ).candidates.map((candidate) => candidate.file.path),
+    ).toEqual([file.path])
+    expect(await store.getFile(retainedFile.path)).toEqual(retainedFile)
+    await store.close()
+  })
+
+  it('persists and hydrates file categories for test, ignored, and source files', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-file-category-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+
+    const sourceFile = createFileNode({
+      path: 'core:src/service.ts',
+      projectRelativePath: 'src/service.ts',
+      language: 'typescript',
+      contentHash: 'sha256:source',
+      workspace: 'core',
+      category: 'source',
+    })
+    const testFile = createFileNode({
+      path: 'core:test/service.spec.ts',
+      projectRelativePath: 'test/service.spec.ts',
+      language: 'typescript',
+      contentHash: 'sha256:test',
+      workspace: 'core',
+      category: 'test',
+    })
+    const ignoredFile = createFileNode({
+      path: 'core:dist/bundle.js',
+      projectRelativePath: 'dist/bundle.js',
+      language: 'javascript',
+      contentHash: 'sha256:ignored',
+      workspace: 'core',
+      category: 'ignored',
+    })
+
+    await store.upsertFile(sourceFile, [], [])
+    await store.upsertFile(testFile, [], [])
+    await store.upsertFile(ignoredFile, [], [])
+
+    expect(await store.getFile(sourceFile.path)).toEqual(sourceFile)
+    expect(await store.getFile(testFile.path)).toEqual(testFile)
+    expect(await store.getFile(ignoredFile.path)).toEqual(ignoredFile)
+
+    expect((await store.getFile(sourceFile.path))?.category).toBe('source')
+    expect((await store.getFile(testFile.path))?.category).toBe('test')
+    expect((await store.getFile(ignoredFile.path))?.category).toBe('ignored')
+
+    await store.close()
+  })
+
+  it('Namespace round-trips through the files table', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-namespace-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+
+    const fileWithNamespace = createFileNode({
+      path: 'core:src/Service.php',
+      projectRelativePath: 'packages/core/src/Service.php',
+      language: 'php',
+      contentHash: 'sha256:ns1',
+      workspace: 'core',
+      namespace: 'App\\Services',
+      namespaceSeparator: '\\',
+    })
+    const fileWithoutNamespace = createFileNode({
+      path: 'core:src/index.ts',
+      projectRelativePath: 'packages/core/src/index.ts',
+      language: 'typescript',
+      contentHash: 'sha256:ns2',
+      workspace: 'core',
+    })
+
+    await store.upsertFile(fileWithNamespace, [], [])
+    await store.upsertFile(fileWithoutNamespace, [], [])
+
+    const fetchedWithNs = await store.getFile(fileWithNamespace.path)
+    expect(fetchedWithNs).toEqual(fileWithNamespace)
+    expect(fetchedWithNs?.namespace).toBe('App\\Services')
+    expect(fetchedWithNs?.namespaceSeparator).toBe('\\')
+
+    const fetchedWithoutNs = await store.getFile(fileWithoutNamespace.path)
+    expect(fetchedWithoutNs).toEqual(fileWithoutNamespace)
+    expect(fetchedWithoutNs?.namespace).toBeUndefined()
+    expect(fetchedWithoutNs?.namespaceSeparator).toBeUndefined()
+
+    // Test getFilesByPaths
+    const batch = await store.getFilesByPaths([fileWithNamespace.path, fileWithoutNamespace.path])
+    expect(batch[0]?.namespace).toBe('App\\Services')
+    expect(batch[0]?.namespaceSeparator).toBe('\\')
+    expect(batch[1]?.namespace).toBeUndefined()
+
+    // Test getAllFiles
+    const all = await store.getAllFiles()
+    const found = all.find((f) => f.path === fileWithNamespace.path)
+    expect(found?.namespace).toBe('App\\Services')
+    expect(found?.namespaceSeparator).toBe('\\')
+
+    await store.close()
+  })
+
+  it('persists and retrieves denormalized project_relative_path on symbol records', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-symbol-projrel-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+
+    const file = createFileNode({
+      path: 'core:src/service.ts',
+      projectRelativePath: 'packages/core/src/service.ts',
+      language: 'typescript',
+      contentHash: 'sha256:service',
+      workspace: 'core',
+    })
+    const symbol = createSymbolNode({
+      name: 'runService',
+      kind: SymbolKind.Function,
+      filePath: file.path,
+      projectRelativePath: 'packages/core/src/service.ts',
+      line: 10,
+      column: 2,
+    })
+
+    await store.upsertFile(file, [symbol], [])
+
+    const found = await store.findSymbols({ filePath: file.path })
+    expect(found).toHaveLength(1)
+    expect(found[0]!.projectRelativePath).toBe('packages/core/src/service.ts')
+
+    const byId = await store.getSymbolsByIds([symbol.id])
+    expect(byId).toHaveLength(1)
+    expect(byId[0]!.projectRelativePath).toBe('packages/core/src/service.ts')
+
+    await store.close()
+  })
+
+  it('applies kind-tiered ranking as a deterministic tie-breaker for equal relevance matches', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-tie-breaker-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+
+    const file = createFileNode({
+      path: 'core:src/processor.ts',
+      projectRelativePath: 'packages/core/src/processor.ts',
+      language: 'typescript',
+      contentHash: 'sha256:processor',
+      workspace: 'core',
+    })
+    const classSymbol = createSymbolNode({
+      name: 'Processor',
+      kind: SymbolKind.Class,
+      filePath: file.path,
+      line: 1,
+      column: 0,
+    })
+    const funcSymbol = createSymbolNode({
+      name: 'Processor',
+      kind: SymbolKind.Function,
+      filePath: file.path,
+      line: 10,
+      column: 0,
+    })
+    const typeSymbol = createSymbolNode({
+      name: 'Processor',
+      kind: SymbolKind.Type,
+      filePath: file.path,
+      line: 20,
+      column: 0,
+    })
+    const propSymbol = createSymbolNode({
+      name: 'Processor',
+      kind: SymbolKind.Property,
+      filePath: file.path,
+      line: 30,
+      column: 0,
+    })
+    const varSymbol = createSymbolNode({
+      name: 'Processor',
+      kind: SymbolKind.Variable,
+      filePath: file.path,
+      line: 40,
+      column: 0,
+    })
+
+    await store.upsertFile(file, [varSymbol, propSymbol, typeSymbol, funcSymbol, classSymbol], [])
+
+    const hits = await store.searchSymbols({ query: 'Processor' })
+    const matchedKinds = hits.map((hit) => hit.symbol.kind)
+
+    expect(matchedKinds.indexOf(SymbolKind.Class)).toBeLessThan(
+      matchedKinds.indexOf(SymbolKind.Function),
+    )
+    expect(matchedKinds.indexOf(SymbolKind.Function)).toBeLessThan(
+      matchedKinds.indexOf(SymbolKind.Type),
+    )
+    expect(matchedKinds.indexOf(SymbolKind.Type)).toBeLessThan(
+      matchedKinds.indexOf(SymbolKind.Property),
+    )
+    expect(matchedKinds.indexOf(SymbolKind.Type)).toBeLessThan(
+      matchedKinds.indexOf(SymbolKind.Variable),
+    )
+
+    await store.close()
   })
 })

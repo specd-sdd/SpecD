@@ -1,0 +1,40 @@
+- op: modified
+  description: 'Add class attributes, dataclass fields, and Protocol fields Property extraction scenario'
+  selector:
+    type: section
+    matches: 'Requirement: Declaration extraction and ranges'
+  content: |
+    #### Scenario: Nested declarations retain parser ranges
+
+    - **GIVEN** a module function, a nested class with decorated methods, and module assignments
+    - **WHEN** symbols are extracted
+    - **THEN** supported constructs have the expected broad kinds
+    - **AND** every selection range is contained by its complete parser range
+    - **AND** nested functions inside function bodies are not approximated as supported declarations
+
+    #### Scenario: Class attributes and dataclass fields extract as Property kind
+
+    - **GIVEN** a Python class declaring class attributes, dataclass fields, and Protocol field annotations
+    - **WHEN** symbols are extracted
+    - **THEN** each field and class attribute is assigned `SymbolKind.Property`
+    - **AND** its `parentId` is set to the enclosing class symbol ID
+
+- op: modified
+  description: 'Add decorator calls and field type relations scenario'
+  selector:
+    type: section
+    matches: 'Requirement: Scoped bindings, calls, annotations, and construction'
+  content: |
+    #### Scenario: Annotation-proven receiver wins over runtime alias
+
+    - **GIVEN** one annotated parameter call and one monkey-patched attribute call
+    - **WHEN** scoped facts and relations are built
+    - **THEN** the annotated target can produce type and call evidence
+    - **AND** the monkey-patched target does not produce a guessed relation
+
+    #### Scenario: Decorators and field annotations emit relations
+
+    - **GIVEN** a function decorated with a resolvable decorator and a dataclass field annotated with a known type
+    - **WHEN** relations are built
+    - **THEN** the decorator emits a `CALLS` relation
+    - **AND** the field annotation emits a `USES_TYPE` relation to the referenced type symbol

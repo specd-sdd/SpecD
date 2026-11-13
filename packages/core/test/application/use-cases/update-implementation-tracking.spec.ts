@@ -1,9 +1,12 @@
 import path from 'node:path'
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { UpdateImplementationTracking } from '../../../src/application/use-cases/update-implementation-tracking.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { ImplementationFileNotFoundError } from '../../../src/application/errors/implementation-file-not-found-error.js'
 import { SpecNotFoundError } from '../../../src/application/errors/spec-not-found-error.js'
+import { InvalidInputError } from '../../../src/domain/errors/invalid-input-error.js'
+import { InvalidSpecIdError } from '../../../src/domain/errors/invalid-spec-id-error.js'
+import { WorkspaceNotFoundError } from '../../../src/domain/errors/workspace-not-found-error.js'
 import { makeSpec } from '../../helpers/make-spec.js'
 import {
   makeChangeRepository,
@@ -14,6 +17,8 @@ import {
 } from './helpers.js'
 
 const PROJECT_ROOT = '/test'
+const COMMA_NAME =
+  'docs/SpecD — Análisis de identidad LogicalSymbol, dependencias y casos de uso.md'
 
 function hostFiles(files: Record<string, string>): Record<string, string> {
   return Object.fromEntries(
@@ -29,13 +34,18 @@ function hostFiles(files: Record<string, string>): Record<string, string> {
 function makeUpdate(
   repo: ReturnType<typeof makeChangeRepository>,
   files: Record<string, string> = {},
-  specRepositories?: ReadonlyMap<string, ReturnType<typeof makeSpecRepository>>,
+  specRepositories: ReadonlyMap<string, ReturnType<typeof makeSpecRepository>> = new Map([
+    ['core', makeSpecRepository()],
+    ['default', makeSpecRepository()],
+  ]),
+  platform: NodeJS.Platform = process.platform,
 ) {
   return new UpdateImplementationTracking(
     repo,
     makeFileReader(hostFiles(files)),
     PROJECT_ROOT,
     specRepositories,
+    platform,
   )
 }
 
@@ -432,7 +442,7 @@ describe('UpdateImplementationTracking', () => {
       ).rejects.toThrow(SpecNotFoundError)
     })
 
-    it('throws SpecNotFoundError when specId has unknown workspace', async () => {
+    it('throws WorkspaceNotFoundError when specId has unknown workspace', async () => {
       const change = changeInImplementing('unknown-ws', ['core:change'])
       const repo = makeChangeRepository([change])
       const uc = makeUpdate(
@@ -448,7 +458,7 @@ describe('UpdateImplementationTracking', () => {
           file: 'src/entry.ts',
           specId: 'unknown-workspace:some-spec',
         }),
-      ).rejects.toThrow(SpecNotFoundError)
+      ).rejects.toThrow(WorkspaceNotFoundError)
     })
 
     it('rejects batch add atomically and tracks no files when specId is invalid', async () => {
@@ -475,6 +485,543 @@ describe('UpdateImplementationTracking', () => {
 
       expect(change.trackedImplementationFiles).toEqual([])
       expect(change.implementationLinks).toEqual([])
+    })
+
+    it('rejects an invalid specId syntax before mutating', async () => {
+      const change = changeInImplementing('invalid-spec-syntax', ['core:change'])
+      const repo = makeChangeRepository([change])
+      const uc = makeUpdate(
+        repo,
+        { '/test/src/a.ts': 'export const a = 1;' },
+        new Map([['core', makeSpecRepository({ specs: [] })]]),
+      )
+
+      await expect(
+        uc.execute({
+          name: 'invalid-spec-syntax',
+          action: 'add',
+          file: 'src/a.ts',
+          specId: 'Core/Foo',
+        }),
+      ).rejects.toThrow(InvalidSpecIdError)
+      expect(change.trackedImplementationFiles).toEqual([])
+    })
+
+    it('normalizes a bare specId to fully qualified', async () => {
+      const change = changeInImplementing('bare-spec', ['default:auth/login'])
+      const repo = makeChangeRepository([change])
+      const uc = makeUpdate(
+        repo,
+        { '/test/src/login.ts': 'export const login = 1;' },
+        new Map([['default', makeSpecRepository({ specs: [] })]]),
+      )
+
+      const result = await uc.execute({
+        name: 'bare-spec',
+        action: 'add',
+        file: 'src/login.ts',
+        specId: 'auth/login',
+      })
+
+      expect(result.implementationTracking.links[0]!.specId).toBe('default:auth/login')
+    })
+  })
+
+  describe('whole file names', () => {
+    it('matches a comma-containing name exactly on ignore', async () => {
+      const change = changeInImplementing('comma-name')
+      change.trackImplementationFile(COMMA_NAME, 'open')
+      const repo = makeChangeRepository([change])
+      const uc = makeUpdate(repo, { [`/test/${COMMA_NAME}`]: '# notes' })
+
+      const result = await uc.execute({
+        name: 'comma-name',
+        action: 'ignore',
+        file: COMMA_NAME,
+      })
+
+      expect(
+        result.implementationTracking.trackedFiles.find((f) => f.file === COMMA_NAME)?.state,
+      ).toBe('ignored')
+    })
+
+    it('quotes the whole missing comma name', async () => {
+      const change = changeInImplementing('missing-comma')
+      const repo = makeChangeRepository([change])
+      const uc = makeUpdate(repo, {})
+
+      await expect(
+        uc.execute({
+          name: 'missing-comma',
+          action: 'ignore',
+          file: 'a,b.md',
+        }),
+      ).rejects.toThrow('Implementation file "a,b.md" does not exist')
+    })
+
+    it('preserves leading and trailing spaces in the name', async () => {
+      const spaced = ' docs/ spaced name.md '
+      const change = changeInImplementing('spaced-name')
+      const repo = makeChangeRepository([change])
+      const uc = makeUpdate(repo, { [`/test/${spaced}`]: 'x' })
+
+      const result = await uc.execute({
+        name: 'spaced-name',
+        action: 'add',
+        file: spaced,
+        specId: 'core:change',
+      })
+
+      expect(result.implementationTracking.trackedFiles.some((f) => f.file === spaced)).toBe(true)
+    })
+
+    it('preserves quotes, backslashes, and non-ASCII on linux', async () => {
+      const weird = 'docs/"quoted" — Análisis\\notes.md'
+      const change = changeInImplementing('weird-name')
+      const repo = makeChangeRepository([change])
+      const uc = makeUpdate(repo, { [`/test/${weird}`]: 'x' }, undefined, 'linux')
+
+      const result = await uc.execute({
+        name: 'weird-name',
+        action: 'add',
+        file: weird,
+        specId: 'core:change',
+      })
+
+      expect(result.implementationTracking.trackedFiles.some((f) => f.file === weird)).toBe(true)
+    })
+
+    it('accepts an SDK-style files array', async () => {
+      const change = changeInImplementing('sdk-files')
+      const repo = makeChangeRepository([change])
+      const uc = makeUpdate(repo, {
+        '/test/src/a.ts': 'a',
+        '/test/src/b.ts': 'b',
+      })
+
+      const result = await uc.execute({
+        name: 'sdk-files',
+        action: 'add',
+        files: ['src/a.ts', 'src/b.ts'],
+        specId: 'core:change',
+      })
+
+      expect(result.implementationTracking.trackedFiles.map((f) => f.file).sort()).toEqual([
+        'src/a.ts',
+        'src/b.ts',
+      ])
+    })
+  })
+
+  describe('platform path normalization', () => {
+    it('on win32 normalizes backslashes and matches tracked forward-slash paths', async () => {
+      const change = changeInImplementing('win-norm')
+      change.trackImplementationFile('packages/core/x.ts', 'open')
+      const repo = makeChangeRepository([change])
+      const uc = makeUpdate(repo, { '/test/packages/core/x.ts': 'export {}' }, undefined, 'win32')
+
+      const result = await uc.execute({
+        name: 'win-norm',
+        action: 'resolve',
+        file: 'packages\\core\\x.ts',
+      })
+
+      expect(result.implementationTracking.trackedFiles).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ file: 'packages/core/x.ts', state: 'resolved' }),
+        ]),
+      )
+    })
+
+    it('on linux keeps a backslash as part of the file name', async () => {
+      const change = changeInImplementing('linux-backslash')
+      const repo = makeChangeRepository([change])
+      const uc = makeUpdate(repo, { '/test/back\\slash.md': 'x' }, undefined, 'linux')
+
+      const result = await uc.execute({
+        name: 'linux-backslash',
+        action: 'add',
+        file: 'back\\slash.md',
+        specId: 'core:change',
+      })
+
+      expect(
+        result.implementationTracking.trackedFiles.some((f) => f.file === 'back\\slash.md'),
+      ).toBe(true)
+    })
+
+    it('on win32 keeps a comma in a normalized path', async () => {
+      const change = changeInImplementing('win-comma')
+      const repo = makeChangeRepository([change])
+      const uc = makeUpdate(
+        repo,
+        { '/test/docs/Análisis, dependencias.md': 'x' },
+        undefined,
+        'win32',
+      )
+
+      const result = await uc.execute({
+        name: 'win-comma',
+        action: 'add',
+        file: 'docs\\Análisis, dependencias.md',
+        specId: 'core:change',
+      })
+
+      expect(
+        result.implementationTracking.trackedFiles.some(
+          (f) => f.file === 'docs/Análisis, dependencias.md',
+        ),
+      ).toBe(true)
+    })
+
+    it('normalizes a win32 batch entry by entry', async () => {
+      const change = changeInImplementing('win-batch')
+      const repo = makeChangeRepository([change])
+      const uc = makeUpdate(
+        repo,
+        {
+          '/test/packages/core/a.ts': 'a',
+          '/test/packages/core/b.ts': 'b',
+        },
+        undefined,
+        'win32',
+      )
+
+      const result = await uc.execute({
+        name: 'win-batch',
+        action: 'add',
+        files: ['packages\\core\\a.ts', 'packages\\core\\b.ts'],
+        specId: 'core:change',
+      })
+
+      expect(result.implementationTracking.trackedFiles.map((f) => f.file).sort()).toEqual([
+        'packages/core/a.ts',
+        'packages/core/b.ts',
+      ])
+    })
+
+    it('leaves earlier files open when a four-file resolve batch has a missing fourth', async () => {
+      const change = changeInImplementing('batch-missing-fourth')
+      change.trackImplementationFile('src/a.ts', 'open')
+      change.trackImplementationFile('src/b.ts', 'open')
+      change.trackImplementationFile('src/c.ts', 'open')
+      const repo = makeChangeRepository([change])
+      const uc = makeUpdate(repo, {
+        '/test/src/a.ts': 'a',
+        '/test/src/b.ts': 'b',
+        '/test/src/c.ts': 'c',
+      })
+
+      await expect(
+        uc.execute({
+          name: 'batch-missing-fourth',
+          action: 'resolve',
+          files: ['src/a.ts', 'src/b.ts', 'src/c.ts', 'src/missing.ts'],
+        }),
+      ).rejects.toThrow(ImplementationFileNotFoundError)
+
+      expect([...change.trackedImplementationFiles].map((f) => [f.file, f.state]).sort()).toEqual([
+        ['src/a.ts', 'open'],
+        ['src/b.ts', 'open'],
+        ['src/c.ts', 'open'],
+      ])
+    })
+  })
+
+  describe('audit hardening: whole names and batches', () => {
+    it('treats files: ["a.md", "b, c.md"] as exactly two files', async () => {
+      const change = changeInImplementing('two-files')
+      const repo = makeChangeRepository([change])
+      const uc = makeUpdate(repo, { '/test/a.md': 'a', '/test/b, c.md': 'b' })
+
+      const result = await uc.execute({
+        name: 'two-files',
+        action: 'add',
+        files: ['a.md', 'b, c.md'],
+        specId: 'core:change',
+      })
+
+      expect(result.implementationTracking.trackedFiles.map((f) => f.file).sort()).toEqual([
+        'a.md',
+        'b, c.md',
+      ])
+    })
+
+    it('stores quotes, backslashes (linux) and non-ASCII names byte for byte', async () => {
+      const names = ['"quoted".md', 'back\\slash.md', 'ñandú.md']
+      const change = changeInImplementing('byte-names')
+      const repo = makeChangeRepository([change])
+      const uc = makeUpdate(
+        repo,
+        Object.fromEntries(names.map((n) => [`/test/${n}`, 'x'])),
+        undefined,
+        'linux',
+      )
+
+      const result = await uc.execute({
+        name: 'byte-names',
+        action: 'add',
+        files: names,
+        specId: 'core:change',
+      })
+
+      expect(result.implementationTracking.trackedFiles.map((f) => f.file).sort()).toEqual(
+        [...names].sort(),
+      )
+    })
+
+    it('on win32 ignore normalizes a name that contains a comma', async () => {
+      const change = changeInImplementing('win-ignore')
+      change.trackImplementationFile('docs/Análisis, dependencias.md', 'open')
+      const repo = makeChangeRepository([change])
+      const uc = makeUpdate(repo, {}, undefined, 'win32')
+
+      const result = await uc.execute({
+        name: 'win-ignore',
+        action: 'ignore',
+        file: 'docs\\Análisis, dependencias.md',
+      })
+
+      expect(result.implementationTracking.trackedFiles).toEqual([
+        expect.objectContaining({ file: 'docs/Análisis, dependencias.md', state: 'ignored' }),
+      ])
+    })
+
+    it('on win32 normalizes ignore, resolve, unresolve and remove batches', async () => {
+      const change = changeInImplementing('win-actions')
+      change.trackImplementationFile('a/x.ts', 'open')
+      change.trackImplementationFile('a/y.ts', 'open')
+      const files = { '/test/a/x.ts': 'x', '/test/a/y.ts': 'y' }
+      const repo = makeChangeRepository([change])
+      const uc = makeUpdate(repo, files, undefined, 'win32')
+      const batch = ['a\\x.ts', 'a\\y.ts']
+      const states = (r: Awaited<ReturnType<typeof uc.execute>>) =>
+        r.implementationTracking.trackedFiles.map((f) => `${f.file}:${f.state}`).sort()
+
+      expect(
+        states(await uc.execute({ name: 'win-actions', action: 'ignore', files: batch })),
+      ).toEqual(['a/x.ts:ignored', 'a/y.ts:ignored'])
+      expect(
+        states(await uc.execute({ name: 'win-actions', action: 'resolve', files: batch })),
+      ).toEqual(['a/x.ts:resolved', 'a/y.ts:resolved'])
+      expect(
+        states(await uc.execute({ name: 'win-actions', action: 'unresolve', files: batch })),
+      ).toEqual(['a/x.ts:open', 'a/y.ts:open'])
+
+      await uc.execute({
+        name: 'win-actions',
+        action: 'add',
+        files: batch,
+        specId: 'core:change',
+      })
+      const removed = await uc.execute({
+        name: 'win-actions',
+        action: 'remove',
+        files: batch,
+        specId: 'core:change',
+      })
+      expect(removed.implementationTracking.links).toEqual([])
+    })
+
+    it('persists a two-file ignore with a single ChangeRepository.mutate call', async () => {
+      const change = changeInImplementing('one-mutate')
+      change.trackImplementationFile('src/a.ts', 'open')
+      change.trackImplementationFile('src/b.ts', 'open')
+      const repo = makeChangeRepository([change])
+      const mutateSpy = vi.spyOn(repo, 'mutate')
+      const uc = makeUpdate(repo, {})
+
+      await uc.execute({ name: 'one-mutate', action: 'ignore', files: ['src/a.ts', 'src/b.ts'] })
+
+      expect(mutateSpy).toHaveBeenCalledTimes(1)
+    })
+
+    it('collapses duplicate batch entries', async () => {
+      const change = changeInImplementing('dupes')
+      const repo = makeChangeRepository([change])
+      const uc = makeUpdate(repo, { '/test/src/a.ts': 'a' })
+
+      const result = await uc.execute({
+        name: 'dupes',
+        action: 'add',
+        files: ['src/a.ts', 'src/a.ts'],
+        specId: 'core:change',
+      })
+
+      expect(result.implementationTracking.trackedFiles).toHaveLength(1)
+    })
+
+    it('combines file and files: file first, then files', async () => {
+      const change = changeInImplementing('combined')
+      const repo = makeChangeRepository([change])
+      const uc = makeUpdate(repo, { '/test/x': 'x', '/test/y': 'y' })
+
+      const result = await uc.execute({
+        name: 'combined',
+        action: 'add',
+        file: 'x',
+        files: ['y'],
+        specId: 'core:change',
+      })
+
+      expect(result.implementationTracking.trackedFiles.map((f) => f.file)).toEqual(['x', 'y'])
+    })
+
+    it('quotes the original win32 value when a file is missing', async () => {
+      const change = changeInImplementing('win-missing')
+      const repo = makeChangeRepository([change])
+      const uc = makeUpdate(repo, {}, undefined, 'win32')
+
+      await expect(
+        uc.execute({
+          name: 'win-missing',
+          action: 'add',
+          file: 'a\\b.ts',
+          specId: 'core:change',
+        }),
+      ).rejects.toThrow('a\\b.ts')
+    })
+
+    it.each(['add', 'remove'] as const)(
+      'rejects %s without specId with InvalidInputError and leaves the change untouched',
+      async (action) => {
+        const change = changeInImplementing(`no-spec-${action}`)
+        const repo = makeChangeRepository([change])
+        const mutateSpy = vi.spyOn(repo, 'mutate')
+        const uc = makeUpdate(repo, { '/test/src/a.ts': 'a' })
+
+        const err = await uc
+          .execute({ name: `no-spec-${action}`, action, file: 'src/a.ts' })
+          .catch((e: unknown) => e)
+
+        expect(err).toBeInstanceOf(InvalidInputError)
+        expect((err as Error).message).toBe(`specId is required for action "${action}"`)
+        expect(mutateSpy).not.toHaveBeenCalled()
+        expect(change.trackedImplementationFiles).toEqual([])
+      },
+    )
+
+    it('reports a malformed specId before the first file failure', async () => {
+      const change = changeInImplementing('bad-spec')
+      const repo = makeChangeRepository([change])
+      const uc = makeUpdate(repo, {})
+
+      await expect(
+        uc.execute({
+          name: 'bad-spec',
+          action: 'add',
+          file: 'src/missing.ts',
+          specId: 'Bad Id',
+        }),
+      ).rejects.toThrow(InvalidSpecIdError)
+    })
+  })
+
+  describe('case comparison follows the host platform', () => {
+    it.each(['win32', 'darwin'] as const)(
+      'collapses case aliases within one new add batch on %s',
+      async (platform) => {
+        const change = changeInImplementing('new-case-batch')
+        const repo = makeChangeRepository([change])
+        const mutateSpy = vi.spyOn(repo, 'mutate')
+        const uc = makeUpdate(repo, { '/test/Docs/Notes.md': 'content' }, undefined, platform)
+
+        const result = await uc.execute({
+          name: 'new-case-batch',
+          action: 'add',
+          files: ['Docs/Notes.md', 'docs/notes.md'],
+          specId: 'core:change',
+        })
+
+        expect(result.implementationTracking.trackedFiles.map((entry) => entry.file)).toEqual([
+          'Docs/Notes.md',
+        ])
+        expect(result.implementationTracking.links.map((entry) => entry.file)).toEqual([
+          'Docs/Notes.md',
+        ])
+        expect(mutateSpy).toHaveBeenCalledTimes(1)
+      },
+    )
+
+    it('keeps new case variants distinct on Linux', async () => {
+      const change = changeInImplementing('new-case-linux')
+      const repo = makeChangeRepository([change])
+      const uc = makeUpdate(
+        repo,
+        { '/test/Docs/Notes.md': 'upper', '/test/docs/notes.md': 'lower' },
+        undefined,
+        'linux',
+      )
+
+      const result = await uc.execute({
+        name: 'new-case-linux',
+        action: 'add',
+        files: ['Docs/Notes.md', 'docs/notes.md'],
+        specId: 'core:change',
+      })
+
+      expect(result.implementationTracking.trackedFiles.map((entry) => entry.file)).toEqual([
+        'Docs/Notes.md',
+        'docs/notes.md',
+      ])
+      expect(result.implementationTracking.links.map((entry) => entry.file)).toEqual([
+        'Docs/Notes.md',
+        'docs/notes.md',
+      ])
+    })
+
+    it.each(['win32', 'darwin'] as const)(
+      'treats a case-only difference as the same tracked file on %s and keeps the recorded spelling',
+      async (platform) => {
+        const change = changeInImplementing('case-insensitive')
+        change.trackImplementationFile('Docs/Notes.md', 'open')
+        const repo = makeChangeRepository([change])
+        const uc = makeUpdate(repo, { '/test/Docs/Notes.md': 'content' }, undefined, platform)
+
+        const result = await uc.execute({
+          name: 'case-insensitive',
+          action: 'resolve',
+          file: 'docs/notes.md',
+        })
+
+        expect(result.implementationTracking.trackedFiles).toEqual([
+          { file: 'Docs/Notes.md', state: 'resolved' },
+        ])
+      },
+    )
+
+    it('keeps case-only differences distinct on a case-sensitive host', async () => {
+      const change = changeInImplementing('case-sensitive')
+      change.trackImplementationFile('Docs/Notes.md', 'open')
+      const repo = makeChangeRepository([change])
+      const uc = makeUpdate(repo, { '/test/docs/notes.md': 'content' }, undefined, 'linux')
+
+      await expect(
+        uc.execute({ name: 'case-sensitive', action: 'resolve', file: 'docs/notes.md' }),
+      ).rejects.toThrow(ImplementationFileNotFoundError)
+      expect(change.trackedImplementationFiles).toEqual([{ file: 'Docs/Notes.md', state: 'open' }])
+    })
+  })
+
+  describe('specId validation for start', () => {
+    it('rejects a malformed specId and does not activate tracking', async () => {
+      const change = changeInImplementing('start-bad-spec')
+      const repo = makeChangeRepository([change])
+      const uc = makeUpdate(repo)
+
+      await expect(
+        uc.execute({ name: 'start-bad-spec', action: 'start', specId: 'Bad Id' }),
+      ).rejects.toThrow(InvalidSpecIdError)
+    })
+
+    it('reports when tracking started', async () => {
+      const change = changeInImplementing('start-ok')
+      const repo = makeChangeRepository([change])
+      const uc = makeUpdate(repo)
+
+      const result = await uc.execute({ name: 'start-ok', action: 'start' })
+
+      expect(result.trackingStartedAt).toBeInstanceOf(Date)
     })
   })
 })

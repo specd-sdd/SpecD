@@ -65,7 +65,7 @@ The DAG is strictly acyclic. An artifact cannot be drafted or validated until al
 - **Purpose**: Concrete test scenarios verifying requirement satisfaction.
 - **Conventions**:
   - One-to-one parity with `spec.md`: every `### Requirement: <Title>` in `spec.md` has a corresponding heading in `verify.md`.
-  - Structured GIVEN/WHEN/THEN behavior scenarios under `#### Scenario: <Name>`.
+  - Structured GIVEN/WHEN/THEN behavior scenarios under `#### Scenario: <Name>`, where scenario bodies MUST use Markdown list items for GWT clauses and structural validation enforces at least one `WHEN` and one `THEN` list item (`GIVEN` is optional).
 
 ### 4. design (`design.md`)
 

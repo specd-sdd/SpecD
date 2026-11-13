@@ -1,19 +1,39 @@
 import path from 'node:path'
+import {
+  type ImportDiagnostic,
+  type PackageEntry,
+  type PackageEntryRequest,
+  type PackagePreparationContext,
+  type PackageResolutionFacet,
+  type RelativeImportResolutionFacet,
+  type QualifiedNameResolutionFacet,
+  type SymbolReferenceSyntaxFacet,
+} from '../../domain/value-objects/language-adapter-facets.js'
 import { parse } from '@ast-grep/napi'
 import { type SgNode } from '@ast-grep/napi'
 import {
   type LanguageAdapter,
   type AdapterAnalyzeContext,
+  type AdapterDeclarationPolicy,
   type ImportResolutionContext,
   type ResolvedImports,
   type RelationBuildContext,
 } from '../../domain/value-objects/language-adapter.js'
-import { type SymbolNode, createSymbolNode } from '../../domain/value-objects/symbol-node.js'
+import {
+  type SourceRange,
+  type SymbolNode,
+  createSymbolNode,
+} from '../../domain/value-objects/symbol-node.js'
 import { type Relation, createRelation } from '../../domain/value-objects/relation.js'
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
-import { findManifestField } from './find-manifest-field.js'
-import { splitWorkspaceIdentity } from '../../domain/services/split-workspace-identity.js'
+import { canonical, findPackageManifest, type ManifestInspection } from './find-manifest-field.js'
+import {
+  isAbsoluteGraphFilesystemPath,
+  resolveGraphPath,
+  splitWorkspaceIdentity,
+  toPortableGraphPath,
+} from '../../domain/services/split-workspace-identity.js'
 import {
   parseDottedMemberReference,
   renderDottedMemberReference,
@@ -22,7 +42,6 @@ import { type ImportDeclaration } from '../../domain/value-objects/import-declar
 import { ImportDeclarationKind } from '../../domain/value-objects/import-declaration-kind.js'
 import { BindingSourceKind, type BindingFact } from '../../domain/value-objects/binding-fact.js'
 import { CallForm, type CallFact } from '../../domain/value-objects/call-fact.js'
-import { type SourceLocation } from '../../domain/value-objects/source-location.js'
 import { ensureLanguagesRegistered } from './register-languages.js'
 import {
   type FileAnalysisDraft,
@@ -43,11 +62,21 @@ import {
 import {
   buildHierarchyReferenceFacts,
   buildLogicalDeclarationFacts,
-  containsSymbolRange,
   createAdapterDeclarationDescriptor,
+  createCallableContainmentIndex,
+  createDeclarationSymbolIndex,
+  createImportedHierarchyMetadata,
+  createPhysicalOnlyDeclarationDescriptor,
   type AdapterHierarchyDescriptor,
+  type CallableContainmentIndex,
+  type DeclarationSymbolIndex,
+  getStructuralWorkObserver,
+  type StructuralWorkObserver,
   withEnclosingTypeParents,
+  WHOLE_FILE_START,
 } from './reference-fact-helpers.js'
+
+const PHP_CALLABLE_KINDS = new Set<SymbolKind>([SymbolKind.Function, SymbolKind.Method])
 
 /**
  * Represents a dynamic loader fact extracted from a PHP file.
@@ -61,15 +90,6 @@ export interface DynamicLoaderFact {
 }
 
 /**
- * Internal PHP scope representation.
- */
-interface PhpScopeInfo {
-  readonly name: string
-  readonly line: number
-  readonly text: string
-}
-
-/**
  * Serialized PHP type representation for the parser state.
  */
 interface SerializedPhpTypeInfo {
@@ -79,6 +99,12 @@ interface SerializedPhpTypeInfo {
   readonly extendsNames: readonly string[]
   readonly implementsNames: readonly string[]
   readonly traitNames: readonly string[]
+  /** Parser range of each written name, aligned with `extendsNames`. */
+  readonly extendsRanges: readonly SourceRange[]
+  /** Parser range of each written name, aligned with `implementsNames`. */
+  readonly implementsRanges: readonly SourceRange[]
+  /** Parser range of each written name, aligned with `traitNames`. */
+  readonly traitRanges: readonly SourceRange[]
   readonly methodsByName: Record<string, string>
   readonly memberSymbolIds: readonly string[]
   readonly memberFormsById: Readonly<Record<string, MemberSemantics>>
@@ -92,7 +118,34 @@ interface PhpParserState {
   readonly typeInfos: readonly SerializedPhpTypeInfo[]
   readonly requireRelations: readonly Relation[]
   readonly dynamicLoaders: readonly DynamicLoaderFact[]
-  readonly scopes: readonly PhpScopeInfo[]
+}
+
+/** Session state key holding the Composer package that owns each workspace. */
+const PHP_PACKAGE_OWNERS_KEY = 'php-package-owners'
+
+/** One workspace and the Composer package whose autoload prefixes it owns. */
+interface PhpPackageOwner {
+  readonly workspace: string
+  readonly codeRoot: string
+  readonly packageName: string
+}
+
+/** Parsed Composer manifest data cached per workspace code root. */
+export interface ComposerManifestData {
+  readonly packageRoot: string
+  readonly canonicalCodeRoot: string
+  readonly name?: string | undefined
+  readonly psr4: Array<[string, string]>
+  readonly autoloadDevDirs: ReadonlySet<string>
+}
+
+/** Immutable Composer metadata prepared once per workspace in an indexing session. */
+interface PhpResolutionSessionState {
+  readonly kind: 'php-resolution-metadata'
+  readonly psr4ByCodeRoot: ReadonlyMap<string, readonly (readonly [string, string])[]>
+  /** Workspace name by code root, for building workspace-prefixed file ids. */
+  readonly workspaceByCodeRoot?: ReadonlyMap<string, string> | undefined
+  readonly manifestByCodeRoot?: ReadonlyMap<string, ComposerManifestData | null> | undefined
 }
 
 /**
@@ -107,6 +160,21 @@ function isFileOnlyImport(declaration: ImportDeclaration): boolean {
     declaration.kind === ImportDeclarationKind.Require ||
     declaration.kind === ImportDeclarationKind.Blank
   )
+}
+
+/**
+ * Converts an AST node range into a 1-based-line source range.
+ * @param node - AST node to locate.
+ * @returns Source range of the node.
+ */
+function phpNodeRange(node: SgNode): SourceRange {
+  const range = node.range()
+  return {
+    startLine: range.start.line + 1,
+    startColumn: range.start.column,
+    endLine: range.end.line + 1,
+    endColumn: range.end.column,
+  }
 }
 
 /**
@@ -151,8 +219,8 @@ function getCakeTargetCandidates(
   return relCandidates.map((candidate) =>
     prefix
       ? `${prefix}${candidate}`
-      : path.isAbsolute(rawPath)
-        ? path.resolve(path.dirname(rawPath), '..', candidate)
+      : isAbsoluteGraphFilesystemPath(rawPath)
+        ? resolveGraphPath(filePath, `../${candidate}`)
         : candidate,
   )
 }
@@ -182,8 +250,8 @@ function getCodeIgniterTargetCandidates(
   return relCandidates.map((candidate) =>
     prefix
       ? `${prefix}${candidate}`
-      : path.isAbsolute(rawPath)
-        ? path.resolve(path.dirname(rawPath), '..', candidate)
+      : isAbsoluteGraphFilesystemPath(rawPath)
+        ? resolveGraphPath(filePath, `../${candidate}`)
         : candidate,
   )
 }
@@ -253,70 +321,16 @@ function extractComment(node: SgNode): string | undefined {
 }
 
 /**
- * Computes a source location from a string offset.
- * @param filePath - Workspace-prefixed file path.
- * @param content - Source content.
- * @param index - Zero-based string offset.
- * @returns Source location for the offset.
- */
-function locationFromIndex(filePath: string, content: string, index: number): SourceLocation {
-  const prefix = content.slice(0, Math.max(index, 0))
-  const lines = prefix.split('\n')
-  return {
-    filePath,
-    line: lines.length,
-    column: lines.at(-1)?.length ?? 0,
-    endLine: undefined,
-    endColumn: undefined,
-  }
-}
-
-/**
- * Finds the innermost PHP symbol starting before a source line.
- * @param symbols - Symbols extracted from the current file.
- * @param line - One-based source line.
- * @returns Matching symbol id, or undefined.
- */
-function findEnclosingSymbolIdByLine(
-  symbols: readonly SymbolNode[],
-  line: number,
-): string | undefined {
-  return [...symbols]
-    .filter((symbol) => symbol.line <= line)
-    .sort((left, right) => {
-      if (left.line !== right.line) return right.line - left.line
-      return right.column - left.column
-    })[0]?.id
-}
-
-/**
  * Splits a workspace-prefixed file path into prefix and relative/absolute path.
+ * Absolute filesystem paths (POSIX, drive-letter, UNC) are returned without a workspace prefix.
  * @param filePath - The file path to split.
  * @returns Prefix and normalized path portion.
  */
 function splitWorkspacePath(filePath: string): { prefix: string; path: string } {
-  if (filePath.startsWith('/')) return { prefix: '', path: filePath }
+  if (isAbsoluteGraphFilesystemPath(filePath)) return { prefix: '', path: filePath }
   const identity = splitWorkspaceIdentity(filePath)
   if (identity === null) return { prefix: '', path: filePath }
   return { prefix: `${identity.workspace}:`, path: identity.relativePath }
-}
-
-/**
- * Resolves a path relative to a source file while preserving workspace prefixes.
- * @param fromFile - The source file path.
- * @param target - The relative or absolute target path.
- * @returns The resolved path.
- */
-function resolveFromFilePath(fromFile: string, target: string): string {
-  if (target.startsWith('/')) return target
-
-  const { prefix, path: rawPath } = splitWorkspacePath(fromFile)
-  if (path.isAbsolute(rawPath)) {
-    return path.resolve(path.dirname(rawPath), target)
-  }
-
-  const resolved = path.posix.normalize(path.posix.join(path.posix.dirname(rawPath), target))
-  return `${prefix}${resolved}`
 }
 
 /**
@@ -352,18 +366,141 @@ function getPhpClassTail(value: string): string {
 }
 
 /**
- * Classifies a PHP method from its declaration name and modifier line.
- * @param symbol - Extracted method declaration.
- * @param lines - Complete source split into lines.
+ * Direct member evidence for an owner in PHP.
+ */
+export interface PhpDirectMemberEvidence {
+  readonly ownerSymbolId: string
+  readonly symbol: SymbolNode
+  readonly node: SgNode
+  readonly semantics: MemberSemantics
+}
+
+/**
+ * Classifies a PHP method from its declaration name and the direct modifiers of its definition.
+ * Modifiers are read directly from the parser node of the method itself, never by scanning the owner class.
+ * @param symbol - Extracted method declaration symbol.
+ * @param memberNode - AST node of the method declaration.
  * @returns Proven shared member form.
  */
-function phpMemberSemantics(symbol: SymbolNode, lines: readonly string[]): MemberSemantics {
+function phpMemberSemantics(symbol: SymbolNode, memberNode: SgNode): MemberSemantics {
   if (symbol.name.toLowerCase() === '__construct') return { kind: MemberKind.Constructor }
-  const declarationLine = lines[symbol.line - 1] ?? ''
-  if (/\bstatic\s+function\b/i.test(declarationLine)) {
-    return { kind: MemberKind.Method, dispatch: MemberDispatch.Static }
+  const isStatic = memberNode.children().some((child) => nodeKind(child) === 'static_modifier')
+  return {
+    kind: MemberKind.Method,
+    dispatch: isStatic ? MemberDispatch.Static : MemberDispatch.Instance,
   }
-  return { kind: MemberKind.Method, dispatch: MemberDispatch.Instance }
+}
+
+/**
+ * Collects direct-member evidence for a PHP class-like owner without descending into method bodies.
+ * @param ownerNode - Class-like AST node (class, interface, enum, trait).
+ * @param ownerSymbol - Symbol corresponding to the owner.
+ * @param symbols - Declaration symbol index for exact symbol lookup.
+ * @param observer - Optional observer recording structural work.
+ * @returns Array of direct member evidence in source order.
+ */
+export function collectPhpDirectMemberEvidence(
+  ownerNode: SgNode,
+  ownerSymbol: SymbolNode,
+  symbols: DeclarationSymbolIndex,
+  observer?: StructuralWorkObserver,
+): readonly PhpDirectMemberEvidence[] {
+  let bodyNode: SgNode | undefined
+  for (const child of ownerNode.children()) {
+    const k = nodeKind(child)
+    if (k === 'declaration_list' || k === 'enum_declaration_list') {
+      bodyNode = child
+      break
+    }
+  }
+  if (!bodyNode) return []
+
+  const results: PhpDirectMemberEvidence[] = []
+
+  for (const member of bodyNode.children()) {
+    observer?.record('owner-member-node-visited')
+    const mk = nodeKind(member)
+
+    if (mk === 'method_declaration') {
+      const nameNode = member.field('name')
+      const name = nameNode?.text()
+      if (!name) continue
+      const line = member.range().start.line + 1
+      const col = member.range().start.column
+      const symbol = symbols.find(SymbolKind.Method, name, line, col)
+      if (!symbol) continue
+      const semantics = phpMemberSemantics(symbol, member)
+      results.push({
+        ownerSymbolId: ownerSymbol.id,
+        symbol,
+        node: member,
+        semantics,
+      })
+    } else if (mk === 'property_declaration') {
+      for (const propChild of member.children()) {
+        if (nodeKind(propChild) !== 'property_element') continue
+        const varName = propChild.field('name')
+        if (!varName) continue
+        const name = varName.text().replace(/^\$/, '')
+        if (!name) continue
+        const line = member.range().start.line + 1
+        const col = member.range().start.column
+        const symbol = symbols.find(SymbolKind.Property, name, line, col)
+        if (!symbol) continue
+        results.push({
+          ownerSymbolId: ownerSymbol.id,
+          symbol,
+          node: member,
+          semantics: {
+            kind: MemberKind.Property,
+            dispatch: MemberDispatch.Instance,
+          },
+        })
+      }
+    } else if (mk === 'const_declaration') {
+      for (const constChild of member.children()) {
+        if (nodeKind(constChild) !== 'const_element') continue
+        const nameNode = constChild.child(0)
+        if (nameNode && nodeKind(nameNode) === 'name') {
+          const name = nameNode.text()
+          const line = constChild.range().start.line + 1
+          const col = constChild.range().start.column
+          const symbol = symbols.find(SymbolKind.Property, name, line, col)
+          if (!symbol) continue
+          results.push({
+            ownerSymbolId: ownerSymbol.id,
+            symbol,
+            node: constChild,
+            semantics: {
+              kind: MemberKind.Property,
+              dispatch: MemberDispatch.Instance,
+            },
+          })
+        }
+      }
+    } else if (mk === 'enum_case') {
+      const nameNode = member.field('name') ?? member.children().find((c) => nodeKind(c) === 'name')
+      const name = nameNode?.text()
+      if (name) {
+        const line = member.range().start.line + 1
+        const col = member.range().start.column
+        const symbol = symbols.find(SymbolKind.Property, name, line, col)
+        if (symbol) {
+          results.push({
+            ownerSymbolId: ownerSymbol.id,
+            symbol,
+            node: member,
+            semantics: {
+              kind: MemberKind.Property,
+              dispatch: MemberDispatch.Instance,
+            },
+          })
+        }
+      }
+    }
+  }
+
+  return results
 }
 
 /**
@@ -388,19 +525,6 @@ interface LoaderBinding {
 }
 
 /**
- * Resolver that detects framework-specific dynamic loader patterns.
- */
-interface LoaderResolver {
-  readonly id: string
-  scan(
-    filePath: string,
-    content: string,
-    symbols: SymbolNode[],
-    filePaths?: Set<string>,
-  ): LoaderBinding[]
-}
-
-/**
  * Represents a local PHP class-like declaration and the methods it owns.
  */
 interface PhpTypeInfo {
@@ -410,6 +534,12 @@ interface PhpTypeInfo {
   readonly extendsNames: readonly string[]
   readonly implementsNames: readonly string[]
   readonly traitNames: readonly string[]
+  /** Parser range of each written name, aligned with `extendsNames`. */
+  readonly extendsRanges: readonly SourceRange[]
+  /** Parser range of each written name, aligned with `implementsNames`. */
+  readonly implementsRanges: readonly SourceRange[]
+  /** Parser range of each written name, aligned with `traitNames`. */
+  readonly traitRanges: readonly SourceRange[]
   readonly methodsByName: ReadonlyMap<string, string>
   readonly memberSymbolIds: readonly string[]
   readonly memberFormsById: ReadonlyMap<string, MemberSemantics>
@@ -429,620 +559,143 @@ function getCakePackageKind(packageName: string): 'model' | 'controller' | 'comp
 }
 
 /**
- * Escapes a string so it can be embedded safely inside a RegExp source.
- * @param value - Raw string value.
- * @returns The escaped string.
+ * Parsed Composer manifest data extracted during single-pass inspection.
  */
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+interface ParsedComposerManifest {
+  readonly name?: string | undefined
+  readonly psr4: Array<[string, string]>
+  readonly autoloadDevDirs: ReadonlySet<string>
 }
 
 /**
- * Returns whether a loader binding is declared within a given lexical scope.
- * @param scopeText - The function or method body text.
- * @param binding - Loader binding candidate.
- * @returns True when the scope contains the binding declaration.
+ * Inspects a candidate composer.json manifest.
+ * @param content - Manifest content.
+ * @param manifestPath - Absolute manifest path.
+ * @returns Manifest inspection result.
  */
-function bindingAppearsInScope(scopeText: string, binding: LoaderBinding): boolean {
-  if (binding.scope !== 'method') return true
-  const quotedValue = `['"]${escapeRegExp(binding.value)}['"]`
-  switch (binding.via) {
-    case 'loadModel':
-      return new RegExp(`(?:\\$this->)?loadModel\\(\\s*${quotedValue}\\s*\\)`).test(scopeText)
-    case 'loadController':
-      return new RegExp(`(?:\\$this->)?loadController\\(\\s*${quotedValue}\\s*\\)`).test(scopeText)
-    case 'loadComponent':
-      return new RegExp(`(?:\\$this->)?loadComponent\\(\\s*${quotedValue}\\s*\\)`).test(scopeText)
-    case 'App::import':
-      return new RegExp(`App::import\\([^\\n]*${quotedValue}`).test(scopeText)
-    case 'ClassRegistry::init':
-      return new RegExp(`ClassRegistry::init\\(\\s*${quotedValue}\\s*\\)`).test(scopeText)
-    case 'load.model':
-      return new RegExp(`\\$this->load->model\\(\\s*${quotedValue}\\s*\\)`).test(scopeText)
-    case 'load.library':
-      return new RegExp(`\\$this->load->library\\(\\s*${quotedValue}\\s*\\)`).test(scopeText)
-    case 'Yii::createObject':
-      return new RegExp(
-        `Yii::createObject\\(\\s*(?:${quotedValue}|${escapeRegExp(binding.value)}::class)\\s*\\)`,
-      ).test(scopeText)
-    case 'Zend_Loader::loadClass':
-      return new RegExp(`Zend_Loader::loadClass\\(\\s*${quotedValue}\\s*\\)`).test(scopeText)
-    case 'app':
-      return new RegExp(
-        `\\bapp\\(\\s*(?:${quotedValue}|${escapeRegExp(binding.value)}::class)\\s*\\)`,
-      ).test(scopeText)
-    case 'resolve':
-      return new RegExp(
-        `\\bresolve\\(\\s*(?:${quotedValue}|${escapeRegExp(binding.value)}::class)\\s*\\)`,
-      ).test(scopeText)
-    case '$this->get':
-      return new RegExp(
-        `\\$this->get\\(\\s*(?:${quotedValue}|${escapeRegExp(binding.value)}::class)\\s*\\)`,
-      ).test(scopeText)
-    case 'uses':
-      return new RegExp(`\\buses\\(\\s*${quotedValue}\\s*\\)`).test(scopeText)
-    default:
-      return false
-  }
-}
-
-/**
- * Picks the first candidate path that already appears in the indexed symbol pool.
- * Falls back to the first candidate when no match is found.
- * @param candidates - Candidate file paths.
- * @param symbols - Symbol pool available during extraction.
- * @param filePaths - Set of available file paths.
- * @returns Selected target path, or undefined when no candidates exist.
- */
-function selectCandidatePath(
-  candidates: string[],
-  symbols: SymbolNode[],
-  filePaths?: Set<string>,
-): string | undefined {
-  if (candidates.length === 0) return undefined
-  if (filePaths) {
-    return candidates.find((candidate) => filePaths.has(candidate)) ?? candidates[0]
-  }
-  const indexedFiles = new Set(symbols.map((symbol) => symbol.filePath))
-  return candidates.find((candidate) => indexedFiles.has(candidate)) ?? candidates[0]
-}
-
-/**
- * Resolves CakePHP model/controller/component paths from a source file.
- * @param filePath - The importing file path.
- * @param value - The logical dependency name.
- * @param kind - The Cake target kind.
- * @param symbols - Indexed symbol pool.
- * @param filePaths - Set of available file paths.
- * @returns The resolved target path, or undefined.
- */
-function resolveCakeTarget(
-  filePath: string,
-  value: string,
-  kind: 'model' | 'controller' | 'component',
-  symbols: SymbolNode[],
-  filePaths?: Set<string>,
-): string | undefined {
-  const { prefix, path: rawPath } = splitWorkspacePath(filePath)
-  const isAppStyle = rawPath.startsWith('app/')
-  const stem = toPhpFileStem(value)
-
-  const relCandidates =
-    kind === 'model'
-      ? isAppStyle
-        ? [`app/models/${stem}.php`, `app/models/default/${stem}.php`]
-        : [`models/${stem}.php`, `src/Models/${value.replaceAll('\\', '/')}.php`]
-      : kind === 'controller'
-        ? isAppStyle
-          ? [`app/controllers/${stem}_controller.php`, `app/controllers/${stem}.php`]
-          : [
-              `controllers/${stem}_controller.php`,
-              `src/Controllers/${value.replaceAll('\\', '/')}.php`,
-            ]
-        : isAppStyle
-          ? [
-              `app/controllers/components/${stem}.php`,
-              `app/controllers/components/${stem}_component.php`,
-            ]
-          : [
-              `controllers/components/${stem}.php`,
-              `controllers/components/${stem}_component.php`,
-              `src/Controller/Component/${value.replaceAll('\\', '/')}.php`,
-            ]
-
-  const candidates = relCandidates.map((candidate) =>
-    prefix
-      ? `${prefix}${candidate}`
-      : path.isAbsolute(rawPath)
-        ? path.resolve(path.dirname(rawPath), '..', candidate)
-        : candidate,
-  )
-  return selectCandidatePath(candidates, symbols, filePaths)
-}
-
-/**
- * Resolves CodeIgniter-style target files.
- * @param filePath - The importing file path.
- * @param value - The logical dependency name.
- * @param kind - CodeIgniter target kind.
- * @param symbols - Indexed symbol pool.
- * @param filePaths - Set of available file paths.
- * @returns The resolved target path, or undefined.
- */
-function resolveCodeIgniterTarget(
-  filePath: string,
-  value: string,
-  kind: 'model' | 'library' | 'helper',
-  symbols: SymbolNode[],
-  filePaths?: Set<string>,
-): string | undefined {
-  const { prefix, path: rawPath } = splitWorkspacePath(filePath)
-  const root = rawPath.startsWith('application/') ? 'application' : 'app'
-  const stem = toPhpFileStem(value)
-  const relCandidates =
-    kind === 'model'
-      ? [`${root}/models/${stem}.php`]
-      : kind === 'library'
-        ? [`${root}/libraries/${stem}.php`]
-        : [`${root}/helpers/${stem}_helper.php`, `${root}/helpers/${stem}.php`]
-
-  const candidates = relCandidates.map((candidate) =>
-    prefix
-      ? `${prefix}${candidate}`
-      : path.isAbsolute(rawPath)
-        ? path.resolve(path.dirname(rawPath), '..', candidate)
-        : candidate,
-  )
-  return selectCandidatePath(candidates, symbols, filePaths)
-}
-
-/**
- * Resolves dotted Yii import paths.
- * @param filePath - The importing file path.
- * @param value - The dotted Yii alias.
- * @param symbols - Indexed symbol pool.
- * @param filePaths - Set of available file paths.
- * @returns The resolved target path, or undefined.
- */
-function resolveYiiImportTarget(
-  filePath: string,
-  value: string,
-  symbols: SymbolNode[],
-  filePaths?: Set<string>,
-): string | undefined {
-  const { prefix } = splitWorkspacePath(filePath)
-  const rel = value.startsWith('application.')
-    ? `protected/${value.slice('application.'.length).replaceAll('.', '/')}.php`
-    : value.replaceAll('.', '/') + '.php'
-  const candidates = prefix ? [`${prefix}${rel}`] : [rel]
-  return selectCandidatePath(candidates, symbols, filePaths)
-}
-
-/**
- * Resolves generic namespace/path-based loader values against common PHP locations.
- * @param filePath - The importing file path.
- * @param value - Loader value.
- * @param symbols - Indexed symbol pool.
- * @param filePaths - Set of available file paths.
- * @returns The resolved target path, or undefined.
- */
-function resolveGenericPhpTarget(
-  filePath: string,
-  value: string,
-  symbols: SymbolNode[],
-  filePaths?: Set<string>,
-): string | undefined {
-  const { prefix } = splitWorkspacePath(filePath)
-  const namespaced = value.replaceAll('\\', '/')
-  const relCandidates = [`src/${namespaced}.php`, `app/${namespaced}.php`, `lib/${namespaced}.php`]
-  const candidates = relCandidates.map((candidate) =>
-    prefix ? `${prefix}${candidate}` : candidate,
-  )
-  return selectCandidatePath(candidates, symbols, filePaths)
-}
-
-/**
- * Resolves an explicit class literal or qualified class reference to a PHP file.
- * @param filePath - Source file path.
- * @param value - Explicit class reference or qualified class name.
- * @param symbols - Indexed symbol pool.
- * @param filePaths - Set of available file paths.
- * @returns The resolved target path, or undefined.
- */
-function resolveFrameworkClassLiteralTarget(
-  filePath: string,
-  value: string,
-  symbols: SymbolNode[],
-  filePaths?: Set<string>,
-): string | undefined {
-  const normalized = value
-    .replace(/^\\+/, '')
-    .replace(/::class$/, '')
-    .trim()
-  if (!normalized || !/[A-Z_\\]/.test(normalized)) return undefined
-  return resolveGenericPhpTarget(filePath, normalized, symbols, filePaths)
-}
-
-/**
- * Parses a literal PHP array body into string entries.
- * @param body - Array body text from `array(...)` or `[...]`.
- * @returns Literal string entries.
- */
-function parseLiteralPhpArrayEntries(body: string): string[] {
-  const entries: string[] = []
-  const regex = /['"]([^'"]+)['"]/g
-  for (const match of body.matchAll(regex)) {
-    const value = match[1]?.trim()
-    if (value) entries.push(value)
-  }
-  return entries
-}
-
-/**
- * Derives local aliases assigned from already-known aliases within the same scope.
- * @param scopeText - Method or function body text.
- * @param aliases - Mutable alias map.
- * @returns Nothing.
- */
-function seedAssignedAliases(scopeText: string, aliases: Map<string, string>): void {
-  for (const [alias, targetPath] of Array.from(aliases.entries())) {
-    const escapedAlias = escapeRegExp(alias)
-    const assignmentRegex = new RegExp(
-      `(\\$[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*${escapedAlias}\\b`,
-      'g',
-    )
-    for (const match of scopeText.matchAll(assignmentRegex)) {
-      if (match[1]) aliases.set(match[1], targetPath)
+function inspectComposerManifest(
+  content: string,
+  manifestPath: string,
+): ManifestInspection<ParsedComposerManifest> {
+  try {
+    const pkg = JSON.parse(content) as {
+      name?: unknown
+      autoload?: { 'psr-4'?: Record<string, string | string[]> }
+      'autoload-dev'?: { 'psr-4'?: Record<string, string | string[]> }
     }
-  }
-}
+    const manifestDir = path.dirname(manifestPath)
+    const prefixDirs = new Map<string, string[]>()
+    const autoloadDevDirs = new Set<string>()
 
-/**
- * Derives method-local aliases created from deterministic construction or acquisition flows.
- * @param scopeText - Method or function body text.
- * @param bindingsByValue - Map of normalized binding values to target paths.
- * @returns Newly discovered local aliases.
- */
-function extractExplicitConstructedInstanceAliases(
-  scopeText: string,
-  bindingsByValue: ReadonlyMap<string, string>,
-): Map<string, string> {
-  const aliases = new Map<string, string>()
-  const patterns = [
-    /(\$[A-Za-z_][A-Za-z0-9_]*)\s*=\s*new\s+\\?([A-Za-z_][A-Za-z0-9_\\]*)\s*\(/g,
-    /(\$[A-Za-z_][A-Za-z0-9_]*)\s*=\s*Yii::createObject\(\s*\\?([A-Za-z_][A-Za-z0-9_\\]*)::class\s*\)/g,
-    /(\$[A-Za-z_][A-Za-z0-9_]*)\s*=\s*app\(\s*\\?([A-Za-z_][A-Za-z0-9_\\]*)::class\s*\)/g,
-    /(\$[A-Za-z_][A-Za-z0-9_]*)\s*=\s*resolve\(\s*\\?([A-Za-z_][A-Za-z0-9_\\]*)::class\s*\)/g,
-    /(\$[A-Za-z_][A-Za-z0-9_]*)\s*=\s*\$this->get\(\s*\\?([A-Za-z_][A-Za-z0-9_\\]*)::class\s*\)/g,
-  ] as const
-
-  for (const pattern of patterns) {
-    for (const match of scopeText.matchAll(pattern)) {
-      const alias = match[1]
-      const value = match[2]
-      if (!alias || !value) continue
-      const normalized = getPhpClassTail(value)
-      const targetPath = bindingsByValue.get(value) ?? bindingsByValue.get(normalized)
-      if (targetPath) aliases.set(alias, targetPath)
+    for (const [prefix, relDirs] of Object.entries(pkg.autoload?.['psr-4'] ?? {})) {
+      const dirs = (Array.isArray(relDirs) ? relDirs : [relDirs]).filter(
+        (d): d is string => typeof d === 'string',
+      )
+      const existing = prefixDirs.get(prefix) ?? []
+      for (const relDir of dirs) {
+        const abs = toPortableGraphPath(canonical(path.resolve(manifestDir, relDir)))
+        if (!existing.includes(abs)) existing.push(abs)
+      }
+      prefixDirs.set(prefix, existing)
     }
-  }
 
-  return aliases
-}
-
-/**
- * Creates a regex-driven loader resolver.
- * @param params - Resolver configuration.
- * @param params.id - Stable resolver id.
- * @param params.regex - Pattern that captures the interesting literal argument.
- * @param params.via - Metadata identifier for the matched loader.
- * @param params.resolveTarget - Target resolution function.
- * @param params.aliases - Alias derivation function.
- * @param params.valueIndex - Match group index for the captured value.
- * @param params.scope - Lexical scope where the binding applies.
- * @returns A loader resolver.
- */
-function createRegexResolver(params: {
-  id: string
-  regex: RegExp
-  via: string
-  resolveTarget: (
-    filePath: string,
-    value: string,
-    symbols: SymbolNode[],
-    filePaths?: Set<string>,
-  ) => string | undefined
-  aliases?: (value: string) => string[]
-  valueIndex?: number
-  scope?: 'file' | 'class' | 'method'
-}): LoaderResolver {
-  const valueIndex = params.valueIndex ?? 2
-  return {
-    id: params.id,
-    scan(
-      filePath: string,
-      content: string,
-      symbols: SymbolNode[],
-      filePaths?: Set<string>,
-    ): LoaderBinding[] {
-      const bindings: LoaderBinding[] = []
-      for (const match of content.matchAll(params.regex)) {
-        const value = match[valueIndex]
-        if (!value) continue
-        bindings.push({
-          via: params.via,
-          value,
-          targetPath: params.resolveTarget(filePath, value, symbols, filePaths),
-          aliasNames: (params.aliases ?? buildAliasNames)(value),
-          scope: params.scope ?? 'method',
-        })
+    for (const [prefix, relDirs] of Object.entries(pkg['autoload-dev']?.['psr-4'] ?? {})) {
+      const dirs = (Array.isArray(relDirs) ? relDirs : [relDirs]).filter(
+        (d): d is string => typeof d === 'string',
+      )
+      const existing = prefixDirs.get(prefix) ?? []
+      for (const relDir of dirs) {
+        const abs = toPortableGraphPath(canonical(path.resolve(manifestDir, relDir)))
+        autoloadDevDirs.add(abs)
+        if (!existing.includes(abs)) existing.push(abs)
       }
-      return bindings
-    },
+      prefixDirs.set(prefix, existing)
+    }
+
+    const psr4: Array<[string, string]> = []
+    for (const [prefix, dirs] of prefixDirs) {
+      for (const dir of dirs) {
+        psr4.push([prefix, dir])
+      }
+    }
+    psr4.sort((a, b) => b[0].length - a[0].length)
+
+    const parsedName = typeof pkg.name === 'string' && pkg.name.trim() !== '' ? pkg.name : undefined
+    const parsed: ParsedComposerManifest = {
+      name: parsedName,
+      psr4,
+      autoloadDevDirs,
+    }
+
+    if (parsedName !== undefined) {
+      return { kind: 'match', value: parsed }
+    }
+    return { kind: 'fallback', value: parsed }
+  } catch {
+    return { kind: 'skip' }
   }
 }
-
-/**
- * Resolver registry for framework-specific dynamic loaders.
- */
-export const LOADER_RESOLVERS: ReadonlyArray<LoaderResolver> = [
-  {
-    id: 'cake-load-model',
-    scan(
-      filePath: string,
-      content: string,
-      symbols: SymbolNode[],
-      filePaths?: Set<string>,
-    ): LoaderBinding[] {
-      const bindings: LoaderBinding[] = []
-      const regex =
-        /\$this->loadModel\(\s*(['"])([^'"]+)\1\s*\)|\bloadModel\(\s*(['"])([^'"]+)\3\s*\)/g
-      for (const match of content.matchAll(regex)) {
-        const matchText = match[0] ?? ''
-        const matchIndex = match.index ?? 0
-        const prefix = content.slice(Math.max(0, matchIndex - 2), matchIndex)
-        if (!matchText.startsWith('$this->') && (prefix === '->' || prefix === '::')) continue
-        const value = match[2] ?? match[4]
-        if (!value) continue
-        bindings.push({
-          via: 'loadModel',
-          value,
-          targetPath: resolveCakeTarget(filePath, value, 'model', symbols, filePaths),
-          aliasNames: buildAliasNames(value),
-          scope: 'method',
-        })
-      }
-      return bindings
-    },
-  },
-  {
-    id: 'cake-load-controller',
-    scan(
-      filePath: string,
-      content: string,
-      symbols: SymbolNode[],
-      filePaths?: Set<string>,
-    ): LoaderBinding[] {
-      const bindings: LoaderBinding[] = []
-      const regex =
-        /\$this->loadController\(\s*(['"])([^'"]+)\1\s*\)|\bloadController\(\s*(['"])([^'"]+)\3\s*\)/g
-      for (const match of content.matchAll(regex)) {
-        const matchText = match[0] ?? ''
-        const matchIndex = match.index ?? 0
-        const prefix = content.slice(Math.max(0, matchIndex - 2), matchIndex)
-        if (!matchText.startsWith('$this->') && (prefix === '->' || prefix === '::')) continue
-        const value = match[2] ?? match[4]
-        if (!value) continue
-        bindings.push({
-          via: 'loadController',
-          value,
-          targetPath: resolveCakeTarget(filePath, value, 'controller', symbols, filePaths),
-          aliasNames: buildAliasNames(value),
-          scope: 'method',
-        })
-      }
-      return bindings
-    },
-  },
-  {
-    id: 'cake-load-component',
-    scan(
-      filePath: string,
-      content: string,
-      symbols: SymbolNode[],
-      filePaths?: Set<string>,
-    ): LoaderBinding[] {
-      const bindings: LoaderBinding[] = []
-      const regex =
-        /\$this->loadComponent\(\s*(['"])([^'"]+)\1\s*\)|\bloadComponent\(\s*(['"])([^'"]+)\3\s*\)/g
-      for (const match of content.matchAll(regex)) {
-        const matchText = match[0] ?? ''
-        const matchIndex = match.index ?? 0
-        const prefix = content.slice(Math.max(0, matchIndex - 2), matchIndex)
-        if (!matchText.startsWith('$this->') && (prefix === '->' || prefix === '::')) continue
-        const value = match[2] ?? match[4]
-        if (!value) continue
-        bindings.push({
-          via: 'loadComponent',
-          value,
-          targetPath: resolveCakeTarget(filePath, value, 'component', symbols, filePaths),
-          aliasNames: buildAliasNames(value),
-          scope: 'method',
-        })
-      }
-      return bindings
-    },
-  },
-  createRegexResolver({
-    id: 'cake-app-uses',
-    regex: /\bApp::uses\(\s*(['"])([^'"]+)\1\s*,\s*(['"])([^'"]+)\3\s*\)/g,
-    via: 'App::uses',
-    valueIndex: 2,
-    resolveTarget: () => undefined,
-    scope: 'file',
-  }),
-  {
-    id: 'cake-global-uses',
-    scan(
-      filePath: string,
-      content: string,
-      symbols: SymbolNode[],
-      filePaths?: Set<string>,
-    ): LoaderBinding[] {
-      const bindings: LoaderBinding[] = []
-      const regex = /\buses\(\s*(['"])([^'"]+)\1\s*\)/g
-      for (const match of content.matchAll(regex)) {
-        const matchIndex = match.index ?? 0
-        const prefix = content.slice(Math.max(0, matchIndex - 2), matchIndex)
-        if (prefix === '->' || prefix === '::') continue
-        const value = match[2]
-        if (!value) continue
-        bindings.push({
-          via: 'uses',
-          value,
-          targetPath: resolveCakeTarget(filePath, value, 'model', symbols, filePaths),
-          aliasNames: buildAliasNames(value),
-          scope: 'file',
-        })
-      }
-      return bindings
-    },
-  },
-  {
-    id: 'cake-app-import',
-    scan(
-      filePath: string,
-      content: string,
-      symbols: SymbolNode[],
-      filePaths?: Set<string>,
-    ): LoaderBinding[] {
-      const bindings: LoaderBinding[] = []
-      const regex = /\bApp::import\(\s*(['"])([^'"]+)\1\s*,\s*(['"])([^'"]+)\3\s*\)/g
-      for (const match of content.matchAll(regex)) {
-        const typeName = match[2]
-        const value = match[4]
-        if (!typeName || !value) continue
-        const normalized = typeName.toLowerCase()
-        const targetPath =
-          normalized === 'model'
-            ? resolveCakeTarget(filePath, value, 'model', symbols, filePaths)
-            : normalized === 'controller'
-              ? resolveCakeTarget(filePath, value, 'controller', symbols, filePaths)
-              : normalized === 'component'
-                ? resolveCakeTarget(filePath, value, 'component', symbols, filePaths)
-                : undefined
-        bindings.push({
-          via: 'App::import',
-          value,
-          targetPath,
-          aliasNames: buildAliasNames(value),
-          scope: 'file',
-        })
-      }
-      return bindings
-    },
-  },
-  createRegexResolver({
-    id: 'cake-class-registry',
-    regex: /\bClassRegistry::init\(\s*(['"])([^'"]+)\1\s*\)/g,
-    via: 'ClassRegistry::init',
-    resolveTarget: (filePath, value, symbols) =>
-      resolveCakeTarget(filePath, value, 'model', symbols),
-  }),
-  createRegexResolver({
-    id: 'ci-model',
-    regex: /\$this->load->model\(\s*(['"])([^'"]+)\1\s*\)/g,
-    via: 'load.model',
-    resolveTarget: (filePath, value, symbols) =>
-      resolveCodeIgniterTarget(filePath, value, 'model', symbols),
-  }),
-  createRegexResolver({
-    id: 'ci-library',
-    regex: /\$this->load->library\(\s*(['"])([^'"]+)\1\s*\)/g,
-    via: 'load.library',
-    resolveTarget: (filePath, value, symbols) =>
-      resolveCodeIgniterTarget(filePath, value, 'library', symbols),
-  }),
-  createRegexResolver({
-    id: 'ci-helper',
-    regex: /\$this->load->helper\(\s*(['"])([^'"]+)\1\s*\)/g,
-    via: 'load.helper',
-    resolveTarget: (filePath, value, symbols) =>
-      resolveCodeIgniterTarget(filePath, value, 'helper', symbols),
-    aliases: () => [],
-  }),
-  createRegexResolver({
-    id: 'yii-import',
-    regex: /\bYii::import\(\s*(['"])([^'"]+)\1\s*\)/g,
-    via: 'Yii::import',
-    resolveTarget: resolveYiiImportTarget,
-  }),
-  {
-    id: 'yii-create-object',
-    scan(
-      filePath: string,
-      content: string,
-      symbols: SymbolNode[],
-      filePaths?: Set<string>,
-    ): LoaderBinding[] {
-      const bindings: LoaderBinding[] = []
-      const regex =
-        /\bYii::createObject\(\s*(?:(['"])([^'"]+)\1|(\\?[A-Za-z_][A-Za-z0-9_\\]*)::class)\s*\)/g
-      for (const match of content.matchAll(regex)) {
-        const value = match[2] ?? match[3]
-        if (!value) continue
-        bindings.push({
-          via: 'Yii::createObject',
-          value,
-          targetPath: resolveFrameworkClassLiteralTarget(filePath, value, symbols, filePaths),
-          aliasNames: buildAliasNames(value),
-          scope: 'method',
-        })
-      }
-      return bindings
-    },
-  },
-  createRegexResolver({
-    id: 'laravel-app-class',
-    regex: /\bapp\(\s*(\\?[A-Za-z_][A-Za-z0-9_\\]*)::class\s*\)/g,
-    via: 'app',
-    valueIndex: 1,
-    resolveTarget: resolveFrameworkClassLiteralTarget,
-  }),
-  createRegexResolver({
-    id: 'laravel-resolve-class',
-    regex: /\bresolve\(\s*(\\?[A-Za-z_][A-Za-z0-9_\\]*)::class\s*\)/g,
-    via: 'resolve',
-    valueIndex: 1,
-    resolveTarget: resolveFrameworkClassLiteralTarget,
-  }),
-  createRegexResolver({
-    id: 'symfony-get-class',
-    regex: /\$this->get\(\s*(\\?[A-Za-z_][A-Za-z0-9_\\]*)::class\s*\)/g,
-    via: '$this->get',
-    valueIndex: 1,
-    resolveTarget: resolveFrameworkClassLiteralTarget,
-  }),
-  createRegexResolver({
-    id: 'zend-loader',
-    regex: /\bZend_Loader::loadClass\(\s*(['"])([^'"]+)\1\s*\)/g,
-    via: 'Zend_Loader::loadClass',
-    resolveTarget: resolveFrameworkClassLiteralTarget,
-  }),
-  createRegexResolver({
-    id: 'drupal-service',
-    regex: /\\Drupal::service\(\s*(['"])([^'"]+)\1\s*\)/g,
-    via: 'Drupal::service',
-    resolveTarget: () => undefined,
-    aliases: () => [],
-  }),
-]
 
 /**
  * Language adapter for PHP files using tree-sitter via ast-grep.
  * Extracts functions, classes, methods, interfaces, enums, traits, and constants.
  */
 export class PhpLanguageAdapter implements LanguageAdapter {
+  private readonly packageResolutionFacet: PackageResolutionFacet = {
+    identity: (codeRoot, repoRoot, report) => this.getPackageIdentity(codeRoot, repoRoot, report),
+    prepare: (context) => this.preparePackages(context),
+    matchSpecifier: (specifier, knownPackages, session) =>
+      this.matchQualifiedNameToPackage(specifier, knownPackages, session),
+    entrySurface: (request) => this.qualifiedNameEntries(request),
+  }
+
+  /**
+   * Package identity, autoload preparation, qualified-name matching, and the package entry surface.
+   * @returns The facet this adapter provides.
+   */
+  get packageResolution(): PackageResolutionFacet {
+    return this.packageResolutionFacet
+  }
+
+  private readonly relativeImportResolutionFacet: RelativeImportResolutionFacet = {
+    resolve: (fromFile, specifier) => this.resolveRelativeImportPath(fromFile, specifier),
+  }
+
+  /**
+   * Relative module specifier to candidate files.
+   * @returns The facet this adapter provides.
+   */
+  get relativeImportResolution(): RelativeImportResolutionFacet {
+    return this.relativeImportResolutionFacet
+  }
+
+  private readonly qualifiedNameResolutionFacet: QualifiedNameResolutionFacet = {
+    build: (namespace, symbolName) => this.buildQualifiedName(namespace, symbolName),
+    resolveToPath: (qualifiedName, codeRoot, session) =>
+      this.resolveQualifiedNameFromSession(qualifiedName, codeRoot, session),
+  }
+
+  /**
+   * Qualified-name construction and qualified-name to file mapping.
+   * @returns The facet this adapter provides.
+   */
+  get qualifiedNameResolution(): QualifiedNameResolutionFacet {
+    return this.qualifiedNameResolutionFacet
+  }
+
+  private readonly symbolReferenceSyntaxFacet: SymbolReferenceSyntaxFacet = {
+    parse: (text) => this.parseSymbolReference(text),
+    render: (symbol, ownerPath) => this.renderSymbolReference(symbol, ownerPath),
+  }
+
+  /**
+   * Member reference syntax.
+   * @returns The facet this adapter provides.
+   */
+  get symbolReferenceSyntax(): SymbolReferenceSyntaxFacet {
+    return this.symbolReferenceSyntaxFacet
+  }
+
   /**
    * Declares deterministic PHP reference semantics.
    * @returns Supported reference capabilities.
@@ -1057,21 +710,19 @@ export class PhpLanguageAdapter implements LanguageAdapter {
       buildContext: false,
     }
   }
-  private readonly psr4Cache = new Map<string, Array<[string, string]>>()
 
   /**
-   * Resolves a package from specifier.
-   * @param specifier - The package specifier.
-   * @param knownPackages - Known package names.
-   * @returns Package identity, or undefined.
+   * Declares deterministic PHP declaration and containment semantics.
+   * @returns Declaration classification and parser-authoritative policy.
    */
-  resolvePackageFromSpecifier(specifier: string, knownPackages: string[]): string | undefined {
-    // PHP resolves imports using fully qualified class names (FQN) rather than package-specifiers.
-    // Therefore, package-specifier resolution is not used and always returns undefined.
-    if (!specifier || knownPackages.length === 0) {
-      return undefined
+  declarationPolicy(): AdapterDeclarationPolicy {
+    return {
+      languageIds: ['php'],
+      supportsLogicalDeclarationGroups: false,
+      supportsPhysicalOnlyDeclarations: true,
+      callableContainerKinds: PHP_CALLABLE_KINDS,
+      structuralFactsAreParserAuthoritative: true,
     }
-    return undefined
   }
 
   /**
@@ -1087,7 +738,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
    * @param text - Human reference text.
    * @returns One owner-then-member candidate, or none.
    */
-  parseSymbolReference(text: string): ParsedSymbolReference {
+  private parseSymbolReference(text: string): ParsedSymbolReference {
     return parseDottedMemberReference(text)
   }
 
@@ -1097,7 +748,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
    * @param ownerPath - Owner simple names.
    * @returns Generic dotted spelling and native `::` spelling.
    */
-  renderSymbolReference(
+  private renderSymbolReference(
     symbol: LogicalSymbol,
     ownerPath: readonly string[],
   ): { readonly generic: string; readonly native: string } {
@@ -1126,18 +777,11 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     content: string,
     context: AdapterAnalyzeContext,
   ): FileAnalysisDraft {
+    this.prepareResolutionMetadata(context)
     ensureLanguagesRegistered()
     const sgRoot = parse('php', content)
-    // Keep the parsed SgRoot instance alive in the session state to prevent
-    // V8 garbage collection from running its native Rust finalizer during
-    // event loop yields. This avoids a SIGSEGV segmentation fault caused
-    // by a native concurrency/double-free bug in @ast-grep/napi.
-    let keepAlive = context.session.getAdapterState<unknown[]>('napi-keepalive')
-    if (!keepAlive) {
-      keepAlive = []
-      context.session.setAdapterState('napi-keepalive', keepAlive)
-    }
-    keepAlive.push(sgRoot)
+    // Register the parsed root in the session's parser resource scope for epoch lifecycle management.
+    context.session.parserResources.register(sgRoot)
     const root = sgRoot.root()
     const symbols: SymbolNode[] = []
     const seenSymbol = new Set<string>()
@@ -1183,25 +827,54 @@ export class PhpLanguageAdapter implements LanguageAdapter {
 
     const imports: ImportDeclaration[] = []
     this.extractNamespaceUse(root, imports)
-    const requirePattern =
-      /\b(?:require|require_once|include|include_once)\s*(?:\(?\s*)['"]([^'"]+)['"]/g
-    for (const match of content.matchAll(requirePattern)) {
-      const specifier = match[1]
-      if (specifier !== undefined) {
-        imports.push({
-          originalName: '',
-          localName: '',
-          specifier,
-          isRelative: specifier.startsWith('.'),
-          kind: ImportDeclarationKind.Require,
-        })
+    const walkRequires = (node: SgNode): void => {
+      const k = nodeKind(node)
+      if (
+        k === 'require_expression' ||
+        k === 'require_once_expression' ||
+        k === 'include_expression' ||
+        k === 'include_once_expression'
+      ) {
+        for (const child of node.children()) {
+          const ck = nodeKind(child)
+          if (ck === 'encapsed_string' || ck === 'string') {
+            const specifier = child.text().replace(/^['"]|['"]$/g, '')
+            if (specifier && !specifier.includes('$')) {
+              imports.push({
+                originalName: '',
+                localName: '',
+                specifier,
+                isRelative: specifier.startsWith('.'),
+                kind: ImportDeclarationKind.Require,
+              })
+            }
+          }
+        }
+      }
+      for (const child of node.children()) {
+        walkRequires(child)
       }
     }
+    walkRequires(root)
 
-    const bindingFacts = this.extractBindingFactsFromData(filePath, content, symbols, imports)
-    const callFacts = this.extractCallFactsFromData(filePath, content, symbols)
+    const observer = getStructuralWorkObserver(this)
+    const declarationIndex = createDeclarationSymbolIndex(symbols, observer)
+    const callableIndex = createCallableContainmentIndex(
+      symbols,
+      { callableKinds: PHP_CALLABLE_KINDS },
+      observer,
+    )
+    const bindingFacts = this.extractBindingFactsFromData(
+      root,
+      filePath,
+      content,
+      symbols,
+      imports,
+      callableIndex,
+    )
+    const callFacts = this.extractCallFactsFromData(root, filePath, content, symbols, callableIndex)
 
-    const typeInfos = this.collectPhpTypeInfo(filePath, content, symbols)
+    const typeInfos = this.collectPhpTypeInfo(root, filePath, symbols, declarationIndex, observer)
     const serializedInfos = typeInfos.map((info) => {
       const methodsByName: Record<string, string> = {}
       const memberFormsById: Record<string, MemberSemantics> = {}
@@ -1216,28 +889,8 @@ export class PhpLanguageAdapter implements LanguageAdapter {
       }
     })
 
-    const requireRelations = this.extractRequireRelations(filePath, content)
-    const rawDynamicLoaders = this.collectRawDynamicLoaders(filePath, content)
-
-    const scopes: Array<{ name: string; line: number; text: string }> = []
-    const walkScopes = (node: SgNode): void => {
-      const kind = nodeKind(node)
-      if (kind === 'function_definition' || kind === 'method_declaration') {
-        const name = node.field('name')?.text()
-        if (name) {
-          scopes.push({
-            name,
-            line: node.range().start.line + 1,
-            text: node.text(),
-          })
-        }
-        return
-      }
-      for (const child of node.children()) {
-        walkScopes(child)
-      }
-    }
-    walkScopes(root)
+    const requireRelations = this.extractRequireRelations(root, filePath)
+    const rawDynamicLoaders = this.collectRawDynamicLoaders(root, filePath)
 
     const referenceFacts = this.buildReferenceFacts(
       context.workspaceName,
@@ -1249,7 +902,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     )
     return {
       language: 'php',
-      ...(namespace ? { namespace } : {}),
+      ...(namespace ? { namespace, namespaceSeparator: '\\' } : {}),
       symbols: withEnclosingTypeParents(symbols),
       imports,
       bindingFacts,
@@ -1260,7 +913,6 @@ export class PhpLanguageAdapter implements LanguageAdapter {
         typeInfos: serializedInfos,
         requireRelations,
         dynamicLoaders: rawDynamicLoaders,
-        scopes,
       },
     }
   }
@@ -1296,28 +948,53 @@ export class PhpLanguageAdapter implements LanguageAdapter {
         formByMemberSymbolId.set(methodId, form)
       }
     }
-    const declarationDescriptors = symbols.map((symbol) =>
-      createAdapterDeclarationDescriptor({
+
+    const symbolCountByKey = new Map<string, number>()
+    for (const symbol of symbols) {
+      const ownerId = ownerByMemberSymbolId.get(symbol.id)
+      const space =
+        symbol.kind === SymbolKind.Class ||
+        symbol.kind === SymbolKind.Interface ||
+        symbol.kind === SymbolKind.Enum ||
+        symbol.kind === SymbolKind.Type
+          ? SymbolSpace.Type
+          : SymbolSpace.Value
+      const key = `${surface}:${ownerId ?? ''}:${space}:${symbol.name}`
+      symbolCountByKey.set(key, (symbolCountByKey.get(key) ?? 0) + 1)
+    }
+
+    const declarationDescriptors = symbols.map((symbol) => {
+      const ownerId = ownerByMemberSymbolId.get(symbol.id)
+      const space =
+        symbol.kind === SymbolKind.Class ||
+        symbol.kind === SymbolKind.Interface ||
+        symbol.kind === SymbolKind.Enum ||
+        symbol.kind === SymbolKind.Type
+          ? SymbolSpace.Type
+          : SymbolSpace.Value
+      const key = `${surface}:${ownerId ?? ''}:${space}:${symbol.name}`
+      if ((symbolCountByKey.get(key) ?? 0) > 1) {
+        return createPhysicalOnlyDeclarationDescriptor({
+          symbol,
+          reason: 'conflicting-declaration',
+        })
+      }
+      return createAdapterDeclarationDescriptor({
         symbol,
         surface,
-        space:
-          symbol.kind === SymbolKind.Class ||
-          symbol.kind === SymbolKind.Interface ||
-          symbol.kind === SymbolKind.Enum ||
-          symbol.kind === SymbolKind.Type
-            ? SymbolSpace.Type
-            : SymbolSpace.Value,
-        ownerSymbolId: ownerByMemberSymbolId.get(symbol.id),
-        requiresOwner: symbol.kind === SymbolKind.Method,
+        space,
+        ownerSymbolId: ownerId,
+        requiresOwner: symbol.kind === SymbolKind.Method || symbol.kind === SymbolKind.Property,
+        groupKey: symbol.id,
         memberSemantics:
-          symbol.kind === SymbolKind.Method
+          symbol.kind === SymbolKind.Method || symbol.kind === SymbolKind.Property
             ? (formByMemberSymbolId.get(symbol.id) ?? {
-                kind: MemberKind.Method,
+                kind: symbol.kind === SymbolKind.Property ? MemberKind.Property : MemberKind.Method,
                 dispatch: MemberDispatch.Instance,
               })
             : undefined,
-      }),
-    )
+      })
+    })
     const logicalFacts = buildLogicalDeclarationFacts({
       workspace,
       declarations: declarationDescriptors,
@@ -1325,7 +1002,9 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     const hierarchyDescriptors: AdapterHierarchyDescriptor[] = []
     for (const info of typeInfos) {
       info.extendsNames.forEach((parentName, precedence) => {
-        const parentSymbolId = typeSymbolIdByName.get(parentName)
+        const parentSymbolId = parentName.includes('\\')
+          ? undefined
+          : typeSymbolIdByName.get(parentName)
         if (parentSymbolId) {
           hierarchyDescriptors.push({
             childSymbolId: info.symbolId,
@@ -1336,7 +1015,9 @@ export class PhpLanguageAdapter implements LanguageAdapter {
         }
       })
       info.implementsNames.forEach((parentName, precedence) => {
-        const parentSymbolId = typeSymbolIdByName.get(parentName)
+        const parentSymbolId = parentName.includes('\\')
+          ? undefined
+          : typeSymbolIdByName.get(parentName)
         if (parentSymbolId) {
           hierarchyDescriptors.push({
             childSymbolId: info.symbolId,
@@ -1347,7 +1028,9 @@ export class PhpLanguageAdapter implements LanguageAdapter {
         }
       })
       info.traitNames.forEach((parentName, precedence) => {
-        const parentSymbolId = typeSymbolIdByName.get(parentName)
+        const parentSymbolId = parentName.includes('\\')
+          ? undefined
+          : typeSymbolIdByName.get(parentName)
         if (parentSymbolId) {
           hierarchyDescriptors.push({
             childSymbolId: info.symbolId,
@@ -1371,10 +1054,13 @@ export class PhpLanguageAdapter implements LanguageAdapter {
           localName: item.localName,
           space: SymbolSpace.Type,
           targetId: undefined,
+          range: item.range ?? WHOLE_FILE_START,
         }),
       )
     return {
       declarations: logicalFacts.declarations,
+      logicalSymbols: logicalFacts.retainedLogicalSymbols,
+      diagnostics: logicalFacts.diagnostics,
       publicBindings: [],
       localBindings,
       hierarchy: hierarchyFacts.hierarchy,
@@ -1395,11 +1081,12 @@ export class PhpLanguageAdapter implements LanguageAdapter {
   resolveImports(analysis: FileAnalysis, context: ImportResolutionContext): ResolvedImports {
     const importMap = new Map<string, string>()
     const fileImports: string[] = []
-    const { session, qualifiedNames, codeRoot, repoRoot } = context
+    const diagnostics: ImportDiagnostic[] = []
+    const { session, qualifiedNames, codeRoot } = context
 
     for (const imp of analysis.imports) {
       if (isFileOnlyImport(imp)) {
-        const resolved = this.resolveFileImport(imp, analysis.filePath, session, codeRoot, repoRoot)
+        const resolved = this.resolveFileImport(imp, analysis.filePath, session, codeRoot)
         if (resolved !== undefined) {
           fileImports.push(resolved)
         }
@@ -1418,6 +1105,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
               .find((s) => s.name === imp.originalName)
             if (target) {
               importMap.set(imp.localName, target.id)
+              fileImports.push(target.filePath)
               break
             }
           }
@@ -1429,17 +1117,49 @@ export class PhpLanguageAdapter implements LanguageAdapter {
           continue
         }
 
-        if (this.resolveQualifiedNameToPath && codeRoot) {
-          const resolvedPath = this.resolveQualifiedNameToPath(imp.specifier, codeRoot, repoRoot)
-          if (resolvedPath) {
-            fileImports.push(resolvedPath)
-            continue
+        // No class with this exact qualified name is indexed: the owning package's PSR-4
+        // prefix still proves which file the import depends on.
+        const entries = context.packageEntryFiles(imp.specifier)
+        if (entries.status === 'resolved') {
+          const first = entries.entries[0]
+          if (first !== undefined) {
+            const isImporterTest = session.getFileCategory(analysis.filePath) === 'test'
+            const isTargetTest = session.getFileCategory(first.filePath) === 'test'
+            if (isImporterTest || !isTargetTest) {
+              fileImports.push(first.filePath)
+              continue
+            }
           }
         }
+        // A workspace without a Composer `name` has no package identity, but its own PSR-4 map
+        // still proves the file. Only an indexed file is ever a dependency.
+        const ownOut = { excludedForNonTest: false }
+        const ownFile =
+          codeRoot === undefined
+            ? undefined
+            : this.resolveQualifiedNameFromSession(
+                imp.specifier,
+                codeRoot,
+                session,
+                analysis.filePath,
+                ownOut,
+              )
+        if (ownFile !== undefined) {
+          fileImports.push(ownFile)
+          continue
+        }
+        diagnostics.push({
+          filePath: analysis.filePath,
+          specifier: imp.specifier,
+          reason:
+            entries.status === 'resolved' || ownOut.excludedForNonTest
+              ? 'not-exported'
+              : entries.reason,
+        })
       }
     }
 
-    return { importMap, fileImports }
+    return { importMap, fileImports: [...new Set(fileImports)], steps: [], diagnostics }
   }
 
   /**
@@ -1448,7 +1168,6 @@ export class PhpLanguageAdapter implements LanguageAdapter {
    * @param filePath - Importing file path.
    * @param session - Index session.
    * @param codeRoot - Workspace code root.
-   * @param repoRoot - Repository root.
    * @returns Resolved file path, or undefined.
    */
   private resolveFileImport(
@@ -1456,7 +1175,6 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     filePath: string,
     session: IndexSession,
     codeRoot?: string,
-    repoRoot?: string,
   ): string | undefined {
     if (imp.isRelative && this.resolveRelativeImportPath) {
       const resolved = this.resolveRelativeImportPath(filePath, imp.specifier)
@@ -1464,8 +1182,8 @@ export class PhpLanguageAdapter implements LanguageAdapter {
       return candidates.find((candidatePath) => session.findSymbolsByFile(candidatePath).length > 0)
     }
 
-    if (!imp.isRelative && this.resolveQualifiedNameToPath && codeRoot) {
-      return this.resolveQualifiedNameToPath(imp.specifier, codeRoot, repoRoot)
+    if (!imp.isRelative && codeRoot) {
+      return this.resolveQualifiedNameFromSession(imp.specifier, codeRoot, session, filePath)
     }
 
     return undefined
@@ -1479,7 +1197,6 @@ export class PhpLanguageAdapter implements LanguageAdapter {
    */
   buildRelations(analysis: FileAnalysis, context: RelationBuildContext): Relation[] {
     const relations: Relation[] = []
-    const seen = new Set<string>()
 
     for (const symbol of analysis.symbols) {
       relations.push(
@@ -1506,18 +1223,20 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     const phpState = analysis.parserState as PhpParserState | undefined
     if (!phpState) return relations
 
-    const scopes = phpState.scopes ?? []
     const requireRelations = phpState.requireRelations ?? []
     const dynamicLoaders = phpState.dynamicLoaders ?? []
 
-    relations.push(...requireRelations)
+    relations.push(
+      ...requireRelations.filter(
+        (relation) => context.session.getFileId(relation.target) !== undefined,
+      ),
+    )
 
     const dynamicBindings: LoaderBinding[] = []
     for (const loader of dynamicLoaders) {
-      const targetPath =
-        loader.candidates.find(
-          (candidate: string) => context.session.getFileId(candidate) !== undefined,
-        ) ?? loader.candidates[0]
+      const targetPath = loader.candidates.find(
+        (candidate: string) => context.session.getFileId(candidate) !== undefined,
+      )
       dynamicBindings.push({
         via: loader.via,
         value: loader.value,
@@ -1530,68 +1249,15 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     relations.push(...this.extractDynamicLoaderRelations(analysis.filePath, dynamicBindings))
     relations.push(...this.extractHierarchyRelationsFromState(analysis, context))
 
-    const currentFileSymbols = analysis.symbols
-    for (const scope of scopes) {
-      const callerId = currentFileSymbols.find(
-        (s) => s.name === scope.name && s.line === scope.line,
-      )?.id
-      if (!callerId) continue
-
-      const scopeText = scope.text
-      const aliases = new Map<string, string>()
-      const bindingsByValue = new Map<string, string>()
-      for (const binding of dynamicBindings) {
-        if (!binding.targetPath) continue
-        bindingsByValue.set(binding.value, binding.targetPath)
-        bindingsByValue.set(getPhpClassTail(binding.value), binding.targetPath)
-        if (!bindingAppearsInScope(scopeText, binding)) continue
-        for (const alias of binding.aliasNames) {
-          aliases.set(alias, binding.targetPath)
-        }
-      }
-
-      seedAssignedAliases(scopeText, aliases)
-
-      for (const [alias, targetPath] of extractExplicitConstructedInstanceAliases(
-        scopeText,
-        bindingsByValue,
-      )) {
-        aliases.set(alias, targetPath)
-      }
-
-      seedAssignedAliases(scopeText, aliases)
-
-      const orderedAliases = Array.from(aliases.keys())
-        .sort((a, b) => b.length - a.length)
-        .map((alias) => escapeRegExp(alias))
-        .join('|')
-
-      if (orderedAliases.length === 0) continue
-
-      const callRegex = new RegExp(`(${orderedAliases})->([A-Za-z_][A-Za-z0-9_]*)\\s*\\(`, 'g')
-      for (const match of scopeText.matchAll(callRegex)) {
-        const alias = match[1]
-        const methodName = match[2]
-        if (!alias || !methodName) continue
-        const targetPath = aliases.get(alias)
-        if (!targetPath) continue
-        const callee = context.session
-          .findSymbolsByFile(targetPath)
-          .find((symbol) => symbol.kind === SymbolKind.Method && symbol.name === methodName)
-        if (!callee) continue
-        const key = `${callerId}->${callee.id}`
-        if (seen.has(key)) continue
-        seen.add(key)
-        relations.push(
-          createRelation({
-            source: callerId,
-            target: callee.id,
-            type: RelationType.Calls,
-          }),
-        )
-      }
-    }
-
+    context.session.addRelations(
+      relations.filter(
+        (relation) =>
+          relation.type === RelationType.Extends ||
+          relation.type === RelationType.Implements ||
+          (relation.type === RelationType.UsesType &&
+            relation.metadata?.['hierarchyKind'] === 'trait'),
+      ),
+    )
     return relations
   }
 
@@ -1615,8 +1281,13 @@ export class PhpLanguageAdapter implements LanguageAdapter {
 
     for (const info of infos) {
       for (const [precedence, parentName] of info.extendsNames.entries()) {
-        const importedId = context.resolvedImports.importMap.get(parentName)
-        const localTarget = infoByName.get(parentName)
+        const { importedId, localTarget } = this.resolveWrittenType(
+          parentName,
+          analysis,
+          context,
+          infos,
+          infoByName,
+        )
         const targetId = importedId ?? localTarget?.symbolId
         if (!targetId) continue
 
@@ -1628,7 +1299,15 @@ export class PhpLanguageAdapter implements LanguageAdapter {
               source: info.symbolId,
               target: targetId,
               type: RelationType.Extends,
-              metadata: { precedence },
+              metadata:
+                importedId === targetId && info.extendsRanges[precedence] !== undefined
+                  ? createImportedHierarchyMetadata({
+                      clauseRange: info.extendsRanges[precedence],
+                      precedence,
+                      requestedName: parentName,
+                      resolvedTargetSymbolId: targetId,
+                    })
+                  : { precedence },
             }),
           )
         }
@@ -1639,8 +1318,13 @@ export class PhpLanguageAdapter implements LanguageAdapter {
       }
 
       for (const [precedence, contractName] of info.implementsNames.entries()) {
-        const importedId = context.resolvedImports.importMap.get(contractName)
-        const localTarget = infoByName.get(contractName)
+        const { importedId, localTarget } = this.resolveWrittenType(
+          contractName,
+          analysis,
+          context,
+          infos,
+          infoByName,
+        )
         const targetId = importedId ?? localTarget?.symbolId
         if (!targetId) continue
 
@@ -1652,7 +1336,15 @@ export class PhpLanguageAdapter implements LanguageAdapter {
               source: info.symbolId,
               target: targetId,
               type: RelationType.Implements,
-              metadata: { precedence },
+              metadata:
+                importedId === targetId && info.implementsRanges[precedence] !== undefined
+                  ? createImportedHierarchyMetadata({
+                      clauseRange: info.implementsRanges[precedence],
+                      precedence,
+                      requestedName: contractName,
+                      resolvedTargetSymbolId: targetId,
+                    })
+                  : { precedence },
             }),
           )
         }
@@ -1661,9 +1353,88 @@ export class PhpLanguageAdapter implements LanguageAdapter {
           this.addPhpOverrideRelationsFromState(info, localTarget, relations, seen)
         }
       }
+
+      for (const [precedence, traitName] of info.traitNames.entries()) {
+        const { importedId, localTarget } = this.resolveWrittenType(
+          traitName,
+          analysis,
+          context,
+          infos,
+          infoByName,
+        )
+        const targetId = importedId ?? localTarget?.symbolId
+        if (!targetId) continue
+        const key = `${info.symbolId}:${RelationType.UsesType}:${targetId}:trait`
+        if (seen.has(key)) continue
+        seen.add(key)
+        relations.push(
+          createRelation({
+            source: info.symbolId,
+            target: targetId,
+            type: RelationType.UsesType,
+            metadata:
+              importedId === targetId && info.traitRanges[precedence] !== undefined
+                ? {
+                    ...createImportedHierarchyMetadata({
+                      clauseRange: info.traitRanges[precedence],
+                      precedence,
+                      requestedName: traitName,
+                      resolvedTargetSymbolId: targetId,
+                    }),
+                    hierarchyKind: 'trait',
+                  }
+                : { precedence, hierarchyKind: 'trait' },
+          }),
+        )
+      }
     }
 
     return relations
+  }
+
+  /**
+   * Resolves a hierarchy name exactly as written in the source.
+   * Unqualified names use imports and same-file types. Qualified names resolve through the
+   * namespace-qualified symbol map only, so `Other\\Base` never matches an unrelated `Base`.
+   * @param written - Type name spelling from the extends/implements/use clause.
+   * @param analysis - Analyzed file carrying its namespace and `use` imports.
+   * @param context - Relation build context holding resolved imports and the session.
+   * @param infos - Same-file type declarations.
+   * @param infoByName - Same-file type declarations keyed by simple name.
+   * @returns The imported target id and same-file target, when proven.
+   */
+  private resolveWrittenType(
+    written: string,
+    analysis: FileAnalysis,
+    context: RelationBuildContext,
+    infos: readonly SerializedPhpTypeInfo[],
+    infoByName: ReadonlyMap<string, SerializedPhpTypeInfo>,
+  ): { importedId: string | undefined; localTarget: SerializedPhpTypeInfo | undefined } {
+    if (!written.includes('\\')) {
+      return {
+        importedId: context.resolvedImports.importMap.get(written),
+        localTarget: infoByName.get(written),
+      }
+    }
+    let qualified: string
+    if (written.startsWith('\\')) {
+      qualified = written.slice(1)
+    } else {
+      const [first = '', ...rest] = written.split('\\')
+      const alias = analysis.imports.find((declaration) => declaration.localName === first)
+      qualified =
+        alias !== undefined
+          ? [alias.specifier, ...rest].join('\\')
+          : analysis.namespace !== undefined && analysis.namespace.length > 0
+            ? `${analysis.namespace}\\${written}`
+            : written
+    }
+    const importedId = context.session.findSymbolByQualifiedName(qualified)
+    return {
+      importedId,
+      localTarget:
+        importedId === undefined ? undefined : infos.find((info) => info.symbolId === importedId),
+    }
   }
 
   /**
@@ -1718,207 +1489,470 @@ export class PhpLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Collects PHP type information including class, interface, and trait structures.
+   * Collects PHP type information including class, interface, and trait structures via AST traversal.
+   * @param root - The root AST node.
    * @param filePath - The path of the file being analyzed.
-   * @param content - The content of the file.
    * @param symbols - Existing symbol nodes to reference.
+   * @param declarationIndex - Optional exact declaration index for symbol lookup.
+   * @param observer - Optional observer recording structural work.
    * @returns An array of PHP type information structures.
    */
   private collectPhpTypeInfo(
+    root: SgNode,
     filePath: string,
-    content: string,
     symbols: SymbolNode[],
+    declarationIndex?: DeclarationSymbolIndex,
+    observer?: StructuralWorkObserver,
   ): PhpTypeInfo[] {
+    const declIndex = declarationIndex ?? createDeclarationSymbolIndex(symbols, observer)
     const infos: PhpTypeInfo[] = []
-    const lines = content.split('\n')
-    const typeRegex =
-      /\b(class|interface|trait|enum)\s+([A-Za-z_][A-Za-z0-9_]*)\b(?:\s*:\s*[A-Za-z0-9_\\]+)?(?:\s+extends\s+([A-Za-z0-9_\\,\s]+?))?(?:\s+implements\s+([A-Za-z0-9_\\,\s]+?))?\s*\{/g
 
-    for (const match of content.matchAll(typeRegex)) {
-      const rawKind = match[1]
-      const name = match[2]
-      if (!rawKind || !name) continue
-      const line = content.slice(0, match.index ?? 0).split('\n').length
-      const kind =
-        rawKind === 'class'
-          ? SymbolKind.Class
-          : rawKind === 'interface'
-            ? SymbolKind.Interface
-            : rawKind === 'enum'
-              ? SymbolKind.Enum
-              : SymbolKind.Type
-      const ownerSymbol = symbols.find(
-        (symbol) =>
-          symbol.filePath === filePath &&
-          symbol.kind === kind &&
-          symbol.name === name &&
-          symbol.line === line,
-      )
-      if (!ownerSymbol) continue
-      const symbolId = ownerSymbol.id
+    const walk = (node: SgNode): void => {
+      const k = nodeKind(node)
+      if (
+        k === 'class_declaration' ||
+        k === 'interface_declaration' ||
+        k === 'enum_declaration' ||
+        k === 'trait_declaration'
+      ) {
+        const nameNode = node.field('name')
+        const name = nameNode?.text()
+        if (name) {
+          const kind =
+            k === 'class_declaration'
+              ? SymbolKind.Class
+              : k === 'interface_declaration'
+                ? SymbolKind.Interface
+                : k === 'enum_declaration'
+                  ? SymbolKind.Enum
+                  : SymbolKind.Type
+          const line = node.range().start.line + 1
+          const col = node.range().start.column
+          const ownerSymbol = declIndex.find(kind, name, line, col)
 
-      let endLine = lines.length
-      let braceDepth = 0
-      for (let idx = line - 1; idx < lines.length; idx++) {
-        const current = lines[idx] ?? ''
-        braceDepth += (current.match(/\{/g) ?? []).length
-        braceDepth -= (current.match(/\}/g) ?? []).length
-        if (idx >= line && braceDepth === 0) {
-          endLine = idx + 1
-          break
+          if (ownerSymbol) {
+            const extendsNames: string[] = []
+            const implementsNames: string[] = []
+            const traitNames: string[] = []
+            const extendsRanges: SourceRange[] = []
+            const implementsRanges: SourceRange[] = []
+            const traitRanges: SourceRange[] = []
+
+            for (const child of node.children()) {
+              const ck = nodeKind(child)
+              if (ck === 'base_clause') {
+                const walkBase = (bn: SgNode): void => {
+                  const bk = nodeKind(bn)
+                  if (bk === 'name' || bk === 'qualified_name') {
+                    const written = bn.text().trim()
+                    if (written.length > 0) {
+                      extendsNames.push(written)
+                      extendsRanges.push(phpNodeRange(bn))
+                    }
+                    return
+                  }
+                  for (const bc of bn.children()) walkBase(bc)
+                }
+                walkBase(child)
+              } else if (ck === 'class_interface_clause') {
+                const walkInterface = (inNode: SgNode): void => {
+                  const ik = nodeKind(inNode)
+                  if (ik === 'name' || ik === 'qualified_name') {
+                    const written = inNode.text().trim()
+                    if (written.length > 0) {
+                      implementsNames.push(written)
+                      implementsRanges.push(phpNodeRange(inNode))
+                    }
+                    return
+                  }
+                  for (const ic of inNode.children()) walkInterface(ic)
+                }
+                walkInterface(child)
+              } else if (ck === 'declaration_list') {
+                for (const member of child.children()) {
+                  if (nodeKind(member) === 'use_declaration') {
+                    if (member.text().includes('{')) continue
+
+                    for (const useChild of member.children()) {
+                      const uk = nodeKind(useChild)
+                      if (uk === 'name' || uk === 'qualified_name') {
+                        const written = useChild.text().trim()
+                        if (written.length > 0) {
+                          traitNames.push(written)
+                          traitRanges.push(phpNodeRange(useChild))
+                        }
+                      } else if (uk === 'use_list' || uk === 'use_clause') {
+                        const walkUse = (un: SgNode): void => {
+                          const ukind = nodeKind(un)
+                          if (ukind === 'name' || ukind === 'qualified_name') {
+                            const written = un.text().trim()
+                            if (written.length > 0) {
+                              traitNames.push(written)
+                              traitRanges.push(phpNodeRange(un))
+                            }
+                            return
+                          }
+                          for (const uc of un.children()) walkUse(uc)
+                        }
+                        walkUse(useChild)
+                      }
+                    }
+                  }
+                }
+              }
+            }
+
+            const methodsByName = new Map<string, string>()
+            const memberSymbolIds: string[] = []
+            const memberFormsById = new Map<string, MemberSemantics>()
+            const directMembers = collectPhpDirectMemberEvidence(
+              node,
+              ownerSymbol,
+              declIndex,
+              observer,
+            )
+            for (const dm of directMembers) {
+              memberSymbolIds.push(dm.symbol.id)
+              if (dm.symbol.kind === SymbolKind.Method) {
+                methodsByName.set(dm.symbol.name, dm.symbol.id)
+              }
+              memberFormsById.set(dm.symbol.id, dm.semantics)
+            }
+
+            infos.push({
+              name,
+              symbolId: ownerSymbol.id,
+              kind,
+              extendsNames,
+              implementsNames,
+              traitNames,
+              extendsRanges,
+              implementsRanges,
+              traitRanges,
+              methodsByName,
+              memberSymbolIds,
+              memberFormsById,
+            })
+          }
         }
       }
 
-      const methodsByName = new Map<string, string>()
-      const memberSymbolIds: string[] = []
-      const memberFormsById = new Map<string, MemberSemantics>()
-      for (const symbol of symbols) {
-        if (
-          symbol.filePath !== filePath ||
-          (symbol.kind !== SymbolKind.Method && symbol.kind !== SymbolKind.Variable)
-        ) {
-          continue
-        }
-        if (!containsSymbolRange(ownerSymbol, symbol)) continue
-        memberSymbolIds.push(symbol.id)
-        if (symbol.kind !== SymbolKind.Method) continue
-        methodsByName.set(symbol.name, symbol.id)
-        memberFormsById.set(symbol.id, phpMemberSemantics(symbol, lines))
+      for (const child of node.children()) {
+        walk(child)
       }
-
-      const traitNames = lines
-        .slice(line, endLine - 1)
-        .flatMap((entry) => {
-          const traitUse = entry.match(/^\s*use\s+([^;{]+);\s*$/i)?.[1]
-          return traitUse === undefined ? [] : traitUse.split(',')
-        })
-        .map((entry) => getPhpClassTail(entry.trim()))
-        .filter((entry) => entry.length > 0)
-
-      infos.push({
-        name,
-        symbolId,
-        kind,
-        extendsNames: (match[3] ?? '')
-          .split(',')
-          .map((entry) => getPhpClassTail(entry.trim()))
-          .filter((entry) => entry.length > 0),
-        implementsNames: (match[4] ?? '')
-          .split(',')
-          .map((entry) => getPhpClassTail(entry.trim()))
-          .filter((entry) => entry.length > 0),
-        traitNames,
-        methodsByName,
-        memberSymbolIds,
-        memberFormsById,
-      })
     }
 
+    walk(root)
     return infos
   }
 
   /**
-   * Extracts binding facts from source code content and imports.
+   * Extracts binding facts from source code content and imports via AST traversal.
+   * @param root - The root AST node.
    * @param filePath - The file path.
-   * @param content - The file content.
-   * @param _symbols - The extracted symbols.
+   * @param _content - The file content.
+   * @param symbols - The extracted symbols.
    * @param imports - The resolved imports.
+   * @param callableIndex - Optional prebuilt callable containment index for the file.
    * @returns An array of extracted binding facts.
    */
   private extractBindingFactsFromData(
+    root: SgNode,
     filePath: string,
-    content: string,
-    _symbols: SymbolNode[],
+    _content: string,
+    symbols: SymbolNode[],
     imports: ImportDeclaration[],
+    callableIndex?: CallableContainmentIndex,
   ): BindingFact[] {
     const facts: BindingFact[] = []
     const seen = new Set<string>()
+    const callables =
+      callableIndex ??
+      createCallableContainmentIndex(symbols, {
+        callableKinds: PHP_CALLABLE_KINDS,
+      })
 
     const addFact = (
       name: string,
       sourceKind: BindingSourceKind,
       targetName: string | undefined,
-      index: number,
+      line: number,
+      column: number,
+      endLine = line,
+      endColumn = column,
+      scopeId?: string,
+      targetSymbolId?: string,
     ): void => {
-      const location = locationFromIndex(filePath, content, index)
-      const key = `${name}:${sourceKind}:${targetName ?? ''}:${location.line}:${location.column}`
+      const location = { filePath, line, column, endLine, endColumn }
+      const key = `${name}:${sourceKind}:${targetName ?? ''}:${scopeId ?? ''}:${location.line}:${location.column}`
       if (seen.has(key)) return
       seen.add(key)
       facts.push({
         name,
         filePath,
-        scopeId: filePath,
+        scopeId: scopeId ?? callables.find({ line, column })?.id ?? filePath,
         sourceKind,
         location,
         targetName,
-        targetSymbolId: undefined,
+        targetSymbolId,
         targetFilePath: undefined,
         metadata: undefined,
       })
     }
 
     for (const declaration of imports) {
-      if (declaration.localName.length === 0) continue
-      addFact(declaration.localName, BindingSourceKind.ImportedType, declaration.originalName, 0)
+      if (!declaration.localName || declaration.localName.length === 0) continue
+      addFact(declaration.localName, BindingSourceKind.ImportedType, declaration.originalName, 1, 0)
     }
 
-    const typedParameterPattern = /\b([A-Z][A-Za-z0-9_\\]*)\s+\$([A-Za-z_][A-Za-z0-9_]*)/g
-    for (const match of content.matchAll(typedParameterPattern)) {
-      const targetName = match[1]?.split('\\').at(-1)
-      const name = match[2]
-      if (name === undefined || targetName === undefined) continue
-      addFact(name, BindingSourceKind.Parameter, targetName, match.index ?? 0)
-    }
+    const walk = (node: SgNode): void => {
+      const k = nodeKind(node)
+      if (
+        k === 'class_declaration' ||
+        k === 'trait_declaration' ||
+        k === 'interface_declaration' ||
+        k === 'enum_declaration'
+      ) {
+        const typeName = node.field('name')?.text()
+        const line = node.range().start.line + 1
+        const typeSymbol = symbols.find(
+          (symbol) =>
+            symbol.filePath === filePath && symbol.name === typeName && symbol.line === line,
+        )
+        if (typeName !== undefined && typeSymbol !== undefined) {
+          // The class name is visible file-wide; `self`/`static` name the class inside its body.
+          addFact(
+            typeName,
+            BindingSourceKind.FileGlobal,
+            typeName,
+            line,
+            node.range().start.column,
+            line,
+            node.range().start.column,
+            filePath,
+            typeSymbol.id,
+          )
+          for (const receiver of ['self', 'static']) {
+            addFact(
+              receiver,
+              BindingSourceKind.Receiver,
+              typeName,
+              line,
+              node.range().start.column,
+              line,
+              node.range().start.column,
+              typeSymbol.id,
+              typeSymbol.id,
+            )
+          }
+          const baseClause = node.children().find((child) => nodeKind(child) === 'base_clause')
+          const baseName = baseClause
+            ?.children()
+            .find((child) => ['name', 'qualified_name'].includes(nodeKind(child)))
+            ?.text()
+            .trim()
+          if (baseName !== undefined && baseName.length > 0) {
+            addFact(
+              'parent',
+              BindingSourceKind.Receiver,
+              getPhpClassTail(baseName),
+              line,
+              node.range().start.column,
+              line,
+              node.range().start.column,
+              typeSymbol.id,
+            )
+          }
+        }
+      } else if (k === 'simple_parameter') {
+        const varNode =
+          node.field('name') ?? node.children().find((c) => nodeKind(c) === 'variable_name')
+        const typeNode =
+          node.field('type') ??
+          node.children().find((c) => {
+            const ck = nodeKind(c)
+            return (
+              ck === 'named_type' ||
+              ck === 'name' ||
+              ck === 'qualified_name' ||
+              ck === 'primitive_type'
+            )
+          })
+        if (varNode && typeNode) {
+          const varName = varNode.text().replace(/^\$/, '')
+          const targetName = getPhpClassTail(typeNode.text().trim())
+          if (varName && targetName && /^[A-Z]/.test(targetName)) {
+            addFact(
+              varName,
+              BindingSourceKind.Parameter,
+              targetName,
+              node.range().start.line + 1,
+              node.range().start.column,
+            )
+          }
+        }
+      } else if (k === 'function_definition' || k === 'method_declaration') {
+        const retTypeNode =
+          node.field('return_type') ?? node.children().find((c) => nodeKind(c) === 'return_type')
+        if (retTypeNode) {
+          const targetName = getPhpClassTail(retTypeNode.text().replace(/^:\s*/, '').trim())
+          if (targetName && /^[A-Z]/.test(targetName)) {
+            addFact(
+              targetName,
+              BindingSourceKind.ReturnType,
+              targetName,
+              retTypeNode.range().start.line + 1,
+              retTypeNode.range().start.column,
+            )
+          }
+        }
+      } else if (k === 'property_declaration') {
+        for (const child of node.children()) {
+          if (nodeKind(child) !== 'property_element') continue
+          const varName = child.field('name')?.text()
+          if (varName === '$uses') {
+            for (const peChild of child.children()) {
+              if (nodeKind(peChild) === 'array_creation_expression') {
+                const walkArray = (an: SgNode): void => {
+                  const ak = nodeKind(an)
+                  if (ak === 'string' || ak === 'encapsed_string') {
+                    const targetName = an.text().replace(/^['"]|['"]$/g, '')
+                    if (targetName) {
+                      addFact(
+                        targetName,
+                        BindingSourceKind.FrameworkManaged,
+                        targetName,
+                        an.range().start.line + 1,
+                        an.range().start.column,
+                      )
+                    }
+                  }
+                  for (const ac of an.children()) walkArray(ac)
+                }
+                walkArray(peChild)
+              }
+            }
+          }
+        }
+      } else if (k === 'assignment_expression') {
+        const left = node.field('left') ?? node.children()[0]
+        const right = node.field('right') ?? node.children().at(-1)
+        const localName = left?.text().replace(/^\$/, '')
+        if (localName && right) {
+          const findTargetName = (candidate: SgNode): string | undefined => {
+            const candidateKind = nodeKind(candidate)
+            if (candidateKind === 'object_creation_expression') {
+              const classNode =
+                candidate.field('class') ??
+                candidate.children().find((child) => {
+                  const childKind = nodeKind(child)
+                  return childKind === 'name' || childKind === 'qualified_name'
+                })
+              return classNode ? getPhpClassTail(classNode.text().trim()) : undefined
+            }
+            if (candidateKind === 'member_access_expression') {
+              const objectText = candidate.field('object')?.text()
+              const memberName = candidate.field('name')?.text()
+              if (objectText === '$this' && memberName) return memberName
+            }
+            if (candidateKind === 'class_constant_access_expression') {
+              const text = candidate.text().trim()
+              if (text.endsWith('::class')) return getPhpClassTail(text.slice(0, -7).trim())
+            }
+            for (const child of candidate.children()) {
+              const targetName = findTargetName(child)
+              if (targetName) return targetName
+            }
+            return undefined
+          }
+          const targetName = findTargetName(right)
+          if (targetName) {
+            addFact(
+              localName,
+              BindingSourceKind.ConstructorCall,
+              targetName,
+              node.range().start.line + 1,
+              node.range().start.column,
+            )
+          }
+        }
+      } else if (k === 'member_call_expression') {
+        const objectText = node.field('object')?.text()
+        const methodName = node.field('name')?.text()
+        const frameworkMethod =
+          objectText === '$this' &&
+          (methodName === 'loadModel' ||
+            methodName === 'loadController' ||
+            methodName === 'loadComponent')
+        if (frameworkMethod) {
+          const args = node.children().find((child) => nodeKind(child) === 'arguments')
+          const firstArg = args?.children().find((child) => nodeKind(child) === 'argument')
+          const literal = firstArg
+            ?.children()
+            .find((child) => nodeKind(child) === 'string' || nodeKind(child) === 'encapsed_string')
+          const targetName = literal?.text().replace(/^['"]|['"]$/g, '')
+          if (targetName) {
+            addFact(
+              getPhpClassTail(targetName),
+              BindingSourceKind.FrameworkManaged,
+              getPhpClassTail(targetName),
+              node.range().start.line + 1,
+              node.range().start.column,
+            )
+          }
+        }
+      }
 
-    const returnPattern = /:\s*([A-Z][A-Za-z0-9_\\]*)/g
-    for (const match of content.matchAll(returnPattern)) {
-      const targetName = match[1]?.split('\\').at(-1)
-      if (targetName === undefined) continue
-      addFact(targetName, BindingSourceKind.ReturnType, targetName, match.index ?? 0)
-    }
-
-    const usesPattern = /\$uses\s*=\s*(?:array\s*\(([^)]*)\)|\[([^\]]*)\])/g
-    for (const match of content.matchAll(usesPattern)) {
-      const list = match[1] ?? match[2] ?? ''
-      for (const item of list.matchAll(/['"]([A-Za-z_][A-Za-z0-9_]*)['"]/g)) {
-        const targetName = item[1]
-        if (targetName === undefined) continue
-        addFact(targetName, BindingSourceKind.FrameworkManaged, targetName, match.index ?? 0)
+      for (const child of node.children()) {
+        walk(child)
       }
     }
 
+    walk(root)
     return facts
   }
 
   /**
-   * Extracts call facts from file content using symbols.
+   * Extracts call facts from AST nodes using symbols for caller containment.
+   * @param root - The root AST node.
    * @param filePath - The file path.
-   * @param content - The file content.
+   * @param _content - The file content.
    * @param symbols - Existing symbol nodes to map callers.
+   * @param callableIndex - Optional prebuilt callable containment index for the file.
    * @returns An array of extracted call facts.
    */
   private extractCallFactsFromData(
+    root: SgNode,
     filePath: string,
-    content: string,
+    _content: string,
     symbols: SymbolNode[],
+    callableIndex?: CallableContainmentIndex,
   ): CallFact[] {
     const facts: CallFact[] = []
     const seen = new Set<string>()
+    const callables =
+      callableIndex ??
+      createCallableContainmentIndex(symbols, {
+        callableKinds: PHP_CALLABLE_KINDS,
+      })
 
     const addFact = (
       form: CallForm,
       name: string,
       receiverName: string | undefined,
-      index: number,
+      line: number,
+      column: number,
+      endLine = line,
+      endColumn = column,
     ): void => {
-      const location = locationFromIndex(filePath, content, index)
+      const location = { filePath, line, column, endLine, endColumn }
       const key = `${form}:${receiverName ?? ''}:${name}:${location.line}:${location.column}`
       if (seen.has(key)) return
-      seen.add(key)
+      const callerSymbol = callables.find({ line: location.line, column: location.column })
       facts.push({
         filePath,
-        scopeId: filePath,
-        callerSymbolId: findEnclosingSymbolIdByLine(symbols, location.line),
+        scopeId: callerSymbol?.id ?? filePath,
+        callerSymbolId: callerSymbol?.id,
         form,
         name,
         receiverName,
@@ -1929,21 +1963,96 @@ export class PhpLanguageAdapter implements LanguageAdapter {
       })
     }
 
-    const newPattern = /\bnew\s+([A-Za-z_\\][A-Za-z0-9_\\]*)\s*\(/g
-    for (const match of content.matchAll(newPattern)) {
-      const targetName = match[1]?.split('\\').at(-1)
-      if (targetName === undefined) continue
-      addFact(CallForm.Constructor, targetName, undefined, match.index ?? 0)
+    const walk = (node: SgNode): void => {
+      const k = nodeKind(node)
+      if (k === 'object_creation_expression') {
+        const classChild =
+          node.field('class') ??
+          node.children().find((c) => {
+            const ck = nodeKind(c)
+            return ck === 'name' || ck === 'qualified_name'
+          })
+        const className = classChild ? getPhpClassTail(classChild.text().trim()) : undefined
+        if (className) {
+          addFact(
+            CallForm.Constructor,
+            className,
+            undefined,
+            node.range().start.line + 1,
+            node.range().start.column,
+          )
+        }
+      } else if (k === 'function_call_expression') {
+        const callee = node.field('function')
+        if (callee && ['name', 'qualified_name'].includes(nodeKind(callee))) {
+          addFact(
+            CallForm.Free,
+            getPhpClassTail(callee.text().trim()),
+            undefined,
+            node.range().start.line + 1,
+            node.range().start.column,
+            node.range().end.line + 1,
+            node.range().end.column,
+          )
+        }
+      } else if (k === 'scoped_call_expression') {
+        const scope = node.field('scope')
+        const nameNode = node.field('name')
+        if (scope && nameNode && nodeKind(nameNode) === 'name') {
+          const scopeKind = nodeKind(scope)
+          const receiverName =
+            scopeKind === 'relative_scope'
+              ? scope.text().trim()
+              : scopeKind === 'name' || scopeKind === 'qualified_name'
+                ? getPhpClassTail(scope.text().trim())
+                : undefined
+          if (receiverName) {
+            addFact(
+              CallForm.Static,
+              nameNode.text(),
+              receiverName,
+              node.range().start.line + 1,
+              node.range().start.column,
+              node.range().end.line + 1,
+              node.range().end.column,
+            )
+          }
+        }
+      } else if (k === 'member_call_expression') {
+        const objNode = node.field('object')
+        const nameNode = node.field('name')
+        if (objNode && nameNode) {
+          const methodName = nameNode.text()
+          let receiverName: string | undefined
+          if (nodeKind(objNode) === 'member_access_expression') {
+            const innerObj = objNode.field('object')?.text()
+            const innerProp = objNode.field('name')?.text()
+            if (innerObj === '$this' && innerProp) {
+              receiverName = innerProp
+            }
+          } else if (nodeKind(objNode) === 'variable_name') {
+            receiverName = objNode.text().replace(/^\$/, '')
+          }
+          if (receiverName) {
+            addFact(
+              CallForm.Member,
+              methodName,
+              receiverName,
+              node.range().start.line + 1,
+              node.range().start.column,
+              node.range().end.line + 1,
+              node.range().end.column,
+            )
+          }
+        }
+      }
+
+      for (const child of node.children()) {
+        walk(child)
+      }
     }
 
-    const frameworkCallPattern = /\$this->([A-Za-z_][A-Za-z0-9_]*)->([A-Za-z_][A-Za-z0-9_]*)\s*\(/g
-    for (const match of content.matchAll(frameworkCallPattern)) {
-      const receiverName = match[1]
-      const name = match[2]
-      if (receiverName === undefined || name === undefined) continue
-      addFact(CallForm.Member, name, receiverName, match.index ?? 0)
-    }
-
+    walk(root)
     return facts
   }
 
@@ -2045,6 +2154,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
           const nameNode = child.field('name')
           const name = nameNode?.text()
           if (name) addSymbol(name, SymbolKind.Enum, child, nameNode, commentFor(child))
+          this.walkClassBody(child, addSymbol)
           break
         }
         case 'trait_declaration': {
@@ -2101,19 +2211,42 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     const commentFor = (target: SgNode): string | undefined => extractComment(target)
 
     for (const child of classNode.children()) {
-      if (nodeKind(child) !== 'declaration_list') continue
+      if (nodeKind(child) !== 'declaration_list' && nodeKind(child) !== 'enum_declaration_list')
+        continue
       for (const member of child.children()) {
-        if (nodeKind(member) === 'method_declaration') {
+        const memberKind = nodeKind(member)
+        if (memberKind === 'method_declaration') {
           const nameNode = member.field('name')
           const name = nameNode?.text()
           if (name) addSymbol(name, SymbolKind.Method, member, nameNode, commentFor(member))
-        } else if (nodeKind(member) === 'property_declaration') {
+        } else if (memberKind === 'property_declaration') {
           for (const propChild of member.children()) {
             if (nodeKind(propChild) !== 'property_element') continue
             const varName = propChild.field('name')
             if (!varName) continue
             const name = varName.text().replace(/^\$/, '')
-            if (name) addSymbol(name, SymbolKind.Variable, member, varName, commentFor(member))
+            if (name) addSymbol(name, SymbolKind.Property, member, varName, commentFor(member))
+          }
+        } else if (memberKind === 'const_declaration') {
+          for (const constChild of member.children()) {
+            if (nodeKind(constChild) !== 'const_element') continue
+            const nameNode = constChild.child(0)
+            if (nameNode && nodeKind(nameNode) === 'name') {
+              addSymbol(
+                nameNode.text(),
+                SymbolKind.Property,
+                constChild,
+                nameNode,
+                commentFor(member),
+              )
+            }
+          }
+        } else if (memberKind === 'enum_case') {
+          const nameNode =
+            member.field('name') ?? member.children().find((c) => nodeKind(c) === 'name')
+          const name = nameNode?.text()
+          if (name) {
+            addSymbol(name, SymbolKind.Property, member, nameNode, commentFor(member))
           }
         }
       }
@@ -2126,7 +2259,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
    * @param symbolName - Symbol name string.
    * @returns Qualified name.
    */
-  buildQualifiedName(namespace: string, symbolName: string): string {
+  private buildQualifiedName(namespace: string, symbolName: string): string {
     return `${namespace}\\${symbolName}`
   }
 
@@ -2139,77 +2272,277 @@ export class PhpLanguageAdapter implements LanguageAdapter {
   }
 
   /**
+   * Reads and parses composer.json once per workspace, caching compact manifest data on the session.
+   * @param codeRoot - Workspace root path.
+   * @param repoRoot - Repo root path.
+   * @param session - Current indexing session.
+   * @returns Parsed Composer manifest data, or undefined.
+   */
+  private readComposerManifest(
+    codeRoot: string,
+    repoRoot: string | undefined,
+    session: IndexSession,
+  ): ComposerManifestData | undefined {
+    const key = 'php-resolution-metadata'
+    const state = session.getAdapterState<PhpResolutionSessionState>(key)
+    const manifestByCodeRoot = new Map(state?.manifestByCodeRoot ?? [])
+    if (manifestByCodeRoot.has(codeRoot)) {
+      const cached = manifestByCodeRoot.get(codeRoot)
+      return cached ?? undefined
+    }
+
+    const result = findPackageManifest<ParsedComposerManifest>(
+      codeRoot,
+      'composer.json',
+      inspectComposerManifest,
+      repoRoot,
+    )
+    if (result.match === undefined) {
+      manifestByCodeRoot.set(codeRoot, null)
+      session.setAdapterState<PhpResolutionSessionState>(key, {
+        kind: 'php-resolution-metadata',
+        psr4ByCodeRoot: state?.psr4ByCodeRoot ?? new Map(),
+        ...(state?.workspaceByCodeRoot === undefined
+          ? {}
+          : { workspaceByCodeRoot: state.workspaceByCodeRoot }),
+        manifestByCodeRoot,
+      })
+      return undefined
+    }
+
+    const canonicalCodeRoot = toPortableGraphPath(canonical(codeRoot))
+    const data: ComposerManifestData = {
+      packageRoot: result.match.packageRoot,
+      canonicalCodeRoot,
+      name: result.match.value.name,
+      psr4: result.match.value.psr4,
+      autoloadDevDirs: result.match.value.autoloadDevDirs,
+    }
+
+    manifestByCodeRoot.set(codeRoot, data)
+    const psr4ByCodeRoot = new Map(state?.psr4ByCodeRoot ?? [])
+    psr4ByCodeRoot.set(codeRoot, data.psr4)
+
+    session.setAdapterState<PhpResolutionSessionState>(key, {
+      kind: 'php-resolution-metadata',
+      psr4ByCodeRoot,
+      ...(state?.workspaceByCodeRoot === undefined
+        ? {}
+        : { workspaceByCodeRoot: state.workspaceByCodeRoot }),
+      manifestByCodeRoot,
+    })
+
+    return data
+  }
+
+  /**
    * Retrieves the package identity from composer.json.
    * @param codeRoot - Workspace root path.
    * @param repoRoot - Repo root path.
+   * @param report - Optional callback to report skipped manifests.
    * @returns Package name, or undefined.
    */
-  getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined {
-    return findManifestField(
-      codeRoot,
-      'composer.json',
-      (content) => {
-        const pkg = JSON.parse(content) as { name?: string }
-        return pkg.name
-      },
-      repoRoot,
-    )
-  }
-
-  /**
-   * Builds PSR-4 namespace mapping from composer.json if present.
-   * @param codeRoot - Workspace root path.
-   * @param repoRoot - Repo root path.
-   * @returns PSR-4 mapping entries.
-   */
-  private buildPsr4Map(codeRoot: string, repoRoot?: string): Array<[string, string]> {
-    const serialized = findManifestField(
-      codeRoot,
-      'composer.json',
-      (content) => {
-        const pkg = JSON.parse(content) as {
-          autoload?: { 'psr-4'?: Record<string, string> }
-          'autoload-dev'?: { 'psr-4'?: Record<string, string> }
-        }
-        const merged = { ...pkg.autoload?.['psr-4'], ...pkg['autoload-dev']?.['psr-4'] }
-        return Object.keys(merged).length > 0 ? JSON.stringify(merged) : undefined
-      },
-      repoRoot,
-    )
-    if (!serialized) {
-      this.psr4Cache.set(codeRoot, [])
-      return []
-    }
-    const entries = JSON.parse(serialized) as Record<string, string>
-    const map: Array<[string, string]> = Object.entries(entries).map(([prefix, relDir]) => [
-      prefix,
-      path.resolve(codeRoot, relDir),
-    ])
-    map.sort((a, b) => b[0].length - a[0].length)
-    this.psr4Cache.set(codeRoot, map)
-    return map
-  }
-
-  /**
-   * Resolves a qualified name to a file path.
-   * @param qualifiedName - PHP qualified name.
-   * @param codeRoot - Workspace root path.
-   * @param repoRoot - Repo root path.
-   * @returns Resolved file path, or undefined.
-   */
-  resolveQualifiedNameToPath(
-    qualifiedName: string,
+  private getPackageIdentity(
     codeRoot: string,
     repoRoot?: string,
+    report?: (message: string) => void,
   ): string | undefined {
-    const map = this.psr4Cache.get(codeRoot) ?? this.buildPsr4Map(codeRoot, repoRoot)
-    for (const [prefix, dir] of map) {
-      if (qualifiedName.startsWith(prefix)) {
-        const relative = qualifiedName.slice(prefix.length).replace(/\\/g, path.sep)
-        return path.join(dir, relative + '.php')
+    const result = findPackageManifest<ParsedComposerManifest>(
+      codeRoot,
+      'composer.json',
+      inspectComposerManifest,
+      repoRoot,
+    )
+    for (const skipped of result.skipped) {
+      report?.(`Package manifest skipped (no identity): ${skipped}`)
+    }
+    return result.match?.value.name
+  }
+
+  /**
+   * Prepares the Composer autoload prefixes and package owner of every workspace, once per run.
+   * Workspaces that were only hydrated in an incremental run are included.
+   * @param context - Session, workspaces, and repository root.
+   */
+  private preparePackages(context: PackagePreparationContext): void {
+    const key = 'php-resolution-metadata'
+    const existing = context.session.getAdapterState<PhpResolutionSessionState>(key)
+    const workspaceByCodeRoot = new Map(existing?.workspaceByCodeRoot ?? [])
+    const owners: PhpPackageOwner[] = []
+
+    for (const workspace of context.workspaces) {
+      workspaceByCodeRoot.set(workspace.codeRoot, workspace.name)
+      const data = this.readComposerManifest(
+        workspace.codeRoot,
+        workspace.repoRoot,
+        context.session,
+      )
+      if (data?.name !== undefined) {
+        owners.push({
+          workspace: workspace.name,
+          codeRoot: workspace.codeRoot,
+          packageName: data.name,
+        })
       }
     }
+
+    const state = context.session.getAdapterState<PhpResolutionSessionState>(key)
+    context.session.setAdapterState<PhpResolutionSessionState>(key, {
+      kind: 'php-resolution-metadata',
+      psr4ByCodeRoot: state?.psr4ByCodeRoot ?? new Map(),
+      workspaceByCodeRoot,
+      manifestByCodeRoot: state?.manifestByCodeRoot,
+    })
+    context.session.setAdapterState<readonly PhpPackageOwner[]>(PHP_PACKAGE_OWNERS_KEY, owners)
+  }
+
+  /**
+   * Finds the known Composer package whose autoload prefix is the longest match of a qualified name.
+   * @param qualifiedName - Fully qualified PHP name as written in a `use` import.
+   * @param knownPackages - Known package identities.
+   * @param session - Session holding the prepared autoload prefixes.
+   * @returns The owning package identity, or `undefined` when no prefix matches.
+   */
+  private matchQualifiedNameToPackage(
+    qualifiedName: string,
+    knownPackages: readonly string[],
+    session: IndexSession,
+  ): string | undefined {
+    const owners = session.getAdapterState<readonly PhpPackageOwner[]>(PHP_PACKAGE_OWNERS_KEY)
+    const metadata = session.getAdapterState<PhpResolutionSessionState>('php-resolution-metadata')
+    if (owners === undefined || metadata === undefined) return undefined
+    const name = qualifiedName.replace(/^\\/, '')
+    let best: { readonly length: number; readonly packageName: string } | undefined
+    for (const owner of owners) {
+      if (!knownPackages.includes(owner.packageName)) continue
+      for (const [prefix] of metadata.psr4ByCodeRoot.get(owner.codeRoot) ?? []) {
+        if (name.startsWith(prefix) && (best === undefined || prefix.length > best.length)) {
+          best = { length: prefix.length, packageName: owner.packageName }
+        }
+      }
+    }
+    return best?.packageName
+  }
+
+  /**
+   * Maps a qualified name to the class files its owning package publishes through PSR-4.
+   * @param request - Qualified name, matched package, owning workspace, and session.
+   * @returns Workspace-prefixed candidate files in longest-prefix order.
+   */
+  private qualifiedNameEntries(request: PackageEntryRequest): readonly PackageEntry[] {
+    const owners =
+      request.session.getAdapterState<readonly PhpPackageOwner[]>(PHP_PACKAGE_OWNERS_KEY)
+    const metadata =
+      request.session.getAdapterState<PhpResolutionSessionState>('php-resolution-metadata')
+    const owner = owners?.find(
+      (item) => item.workspace === request.workspace && item.packageName === request.packageName,
+    )
+    if (owner === undefined || metadata === undefined) return []
+    const map = metadata.psr4ByCodeRoot.get(owner.codeRoot) ?? []
+    const manifest = metadata.manifestByCodeRoot?.get(owner.codeRoot)
+    const name = request.specifier.replace(/^\\/, '')
+    const entries: PackageEntry[] = []
+    const canonicalOwnerRoot = manifest?.canonicalCodeRoot ?? owner.codeRoot
+    for (const absolute of this.resolveQualifiedNameCandidates(name, map)) {
+      const rel = toPortableGraphPath(path.relative(canonicalOwnerRoot, absolute))
+      if (rel.startsWith('..') || path.isAbsolute(rel) || isAbsoluteGraphFilesystemPath(rel))
+        continue
+      const filePath = `${owner.workspace}:${rel}`
+      entries.push({ filePath, surface: filePath })
+    }
+    return entries
+  }
+
+  /**
+   * Prepares immutable Composer resolution metadata before Pass 2 begins.
+   * @param context - Adapter analysis context owning the run-scoped session.
+   */
+  private prepareResolutionMetadata(context: AdapterAnalyzeContext): void {
+    const codeRoot = context.codeRoot
+    if (codeRoot === undefined) return
+    this.readComposerManifest(codeRoot, context.repoRoot, context.session)
+    const key = 'php-resolution-metadata'
+    const state = context.session.getAdapterState<PhpResolutionSessionState>(key)
+    const workspaceByCodeRoot = new Map(state?.workspaceByCodeRoot ?? [])
+    workspaceByCodeRoot.set(codeRoot, context.workspaceName)
+    context.session.setAdapterState<PhpResolutionSessionState>(key, {
+      kind: 'php-resolution-metadata',
+      psr4ByCodeRoot: state?.psr4ByCodeRoot ?? new Map(),
+      workspaceByCodeRoot,
+      manifestByCodeRoot: state?.manifestByCodeRoot,
+    })
+  }
+
+  /**
+   * Resolves one qualified name only from session-prepared PSR-4 entries.
+   * Only an indexed file is returned, as its indexed file id.
+   * @param qualifiedName - PHP qualified name.
+   * @param codeRoot - Workspace root whose metadata was prepared.
+   * @param session - Current indexing session.
+   * @param importingFilePath - Optional path of importing file to check test status.
+   * @param out - Optional output parameter to record whether candidates were excluded for non-test importer.
+   * @param out.excludedForNonTest - Flag indicating candidates were excluded.
+   * @returns Resolved target path, or undefined.
+   */
+  private resolveQualifiedNameFromSession(
+    qualifiedName: string,
+    codeRoot: string,
+    session: IndexSession,
+    importingFilePath?: string,
+    out?: { excludedForNonTest?: boolean },
+  ): string | undefined {
+    const metadata = session.getAdapterState<PhpResolutionSessionState>('php-resolution-metadata')
+    const map = metadata?.psr4ByCodeRoot.get(codeRoot)
+    if (map === undefined) return undefined
+    const workspace = metadata?.workspaceByCodeRoot?.get(codeRoot)
+    if (workspace === undefined) return undefined
+    const isImportingTest =
+      importingFilePath !== undefined && session.getFileCategory(importingFilePath) === 'test'
+    const manifest = metadata?.manifestByCodeRoot?.get(codeRoot)
+    const autoloadDevDirs = manifest?.autoloadDevDirs ?? new Set<string>()
+    const canonicalCodeRoot = manifest?.canonicalCodeRoot ?? codeRoot
+
+    for (const absolute of this.resolveQualifiedNameCandidates(qualifiedName, map)) {
+      const rel = toPortableGraphPath(path.relative(canonicalCodeRoot, absolute))
+      if (rel.startsWith('..') || path.isAbsolute(rel) || isAbsoluteGraphFilesystemPath(rel))
+        continue
+      const targetId = `${workspace}:${rel}`
+      if (session.getFileId(targetId) === undefined) continue
+
+      const targetCategory = session.getFileCategory(targetId)
+      const inAutoloadDev = [...autoloadDevDirs].some((devDir) => {
+        const dRel = toPortableGraphPath(path.relative(devDir, absolute))
+        return (
+          !dRel.startsWith('..') && !path.isAbsolute(dRel) && !isAbsoluteGraphFilesystemPath(dRel)
+        )
+      })
+      if (!isImportingTest && (targetCategory === 'test' || inAutoloadDev)) {
+        if (out !== undefined) out.excludedForNonTest = true
+        continue
+      }
+      return targetId
+    }
     return undefined
+  }
+
+  /**
+   * Lists every PSR-4 file candidate for a qualified name, longest prefix first.
+   * @param qualifiedName - PHP qualified name.
+   * @param map - Normalized prefix-to-directory entries.
+   * @returns Candidate target paths in deterministic order.
+   */
+  private resolveQualifiedNameCandidates(
+    qualifiedName: string,
+    map: readonly (readonly [string, string])[],
+  ): string[] {
+    const candidates: string[] = []
+    for (const [prefix, dir] of map) {
+      if (qualifiedName.startsWith(prefix)) {
+        const relative = qualifiedName.slice(prefix.length).replaceAll('\\', '/')
+        candidates.push(toPortableGraphPath(path.join(dir, `${relative}.php`)))
+      }
+    }
+    return candidates
   }
 
   /**
@@ -2218,31 +2551,62 @@ export class PhpLanguageAdapter implements LanguageAdapter {
    * @param content - PHP content.
    * @returns Array of relations.
    */
-  private extractRequireRelations(filePath: string, content: string): Relation[] {
+  /**
+   * Extracts require relations from AST nodes.
+   * @param root - The root AST node.
+   * @param filePath - File path.
+   * @returns Array of relations.
+   */
+  private extractRequireRelations(root: SgNode, filePath: string): Relation[] {
     const relations: Relation[] = []
-    const requireRegex =
-      /\b(?:require|require_once|include|include_once)\s*\(?\s*(['"])([^'"$][^'"]*)\1\s*\)?/g
-    for (const match of content.matchAll(requireRegex)) {
-      const value = match[2]
-      if (!value || value.includes("' .") || value.includes('" .')) continue
-      relations.push(
-        createRelation({
-          source: filePath,
-          target: resolveFromFilePath(filePath, value),
-          type: RelationType.Imports,
-        }),
-      )
+    const seen = new Set<string>()
+
+    const walk = (node: SgNode): void => {
+      const k = nodeKind(node)
+      if (
+        k === 'require_expression' ||
+        k === 'require_once_expression' ||
+        k === 'include_expression' ||
+        k === 'include_once_expression'
+      ) {
+        for (const child of node.children()) {
+          const ck = nodeKind(child)
+          if (ck === 'string' || ck === 'encapsed_string') {
+            const value = child.text().replace(/^['"]|['"]$/g, '')
+            if (value && !value.includes('$') && !value.includes("' .") && !value.includes('" .')) {
+              const target = resolveGraphPath(filePath, value)
+              const key = `${filePath}->${target}`
+              if (!seen.has(key)) {
+                seen.add(key)
+                relations.push(
+                  createRelation({
+                    source: filePath,
+                    target,
+                    type: RelationType.Imports,
+                  }),
+                )
+              }
+            }
+          }
+        }
+      }
+
+      for (const child of node.children()) {
+        walk(child)
+      }
     }
+
+    walk(root)
     return relations
   }
 
   /**
-   * Collects raw dynamic loader facts from file content.
+   * Collects raw dynamic loader facts from AST nodes.
+   * @param root - The root AST node.
    * @param filePath - File path.
-   * @param content - PHP content.
    * @returns Array of dynamic loader facts.
    */
-  private collectRawDynamicLoaders(filePath: string, content: string): DynamicLoaderFact[] {
+  private collectRawDynamicLoaders(root: SgNode, filePath: string): DynamicLoaderFact[] {
     const facts: DynamicLoaderFact[] = []
     const seen = new Set<string>()
 
@@ -2259,275 +2623,346 @@ export class PhpLanguageAdapter implements LanguageAdapter {
       facts.push({ via, value, candidates, aliasNames, scope })
     }
 
-    for (const match of content.matchAll(
-      /\$this->loadModel\(\s*(['"])([^'"]+)\1\s*\)|\bloadModel\(\s*(['"])([^'"]+)\3\s*\)/g,
-    )) {
-      const matchText = match[0] ?? ''
-      const matchIndex = match.index ?? 0
-      const prefix = content.slice(Math.max(0, matchIndex - 2), matchIndex)
-      if (!matchText.startsWith('$this->') && (prefix === '->' || prefix === '::')) continue
-      const value = match[2] ?? match[4]
-      if (value) {
-        addFact(
-          'loadModel',
-          value,
-          getCakeTargetCandidates(filePath, value, 'model'),
-          buildAliasNames(value),
-          'method',
-        )
+    const getArgNode = (callNode: SgNode, index: number): SgNode | undefined => {
+      const argsNode = callNode.children().find((c) => nodeKind(c) === 'arguments')
+      if (!argsNode) return undefined
+      const args = argsNode.children().filter((c) => nodeKind(c) === 'argument')
+      return args[index]
+    }
+
+    const extractStringLiteral = (argNode: SgNode | undefined): string | undefined => {
+      if (!argNode) return undefined
+      for (const child of argNode.children()) {
+        const k = nodeKind(child)
+        if (k === 'string' || k === 'encapsed_string') {
+          return child.text().replace(/^['"]|['"]$/g, '')
+        }
+      }
+      const text = argNode.text().trim()
+      if (
+        (text.startsWith("'") && text.endsWith("'")) ||
+        (text.startsWith('"') && text.endsWith('"'))
+      ) {
+        return text.slice(1, -1)
+      }
+      return undefined
+    }
+
+    const extractClassLiteral = (argNode: SgNode | undefined): string | undefined => {
+      if (!argNode) return undefined
+      for (const child of argNode.children()) {
+        const k = nodeKind(child)
+        if (k === 'class_constant_access_expression') {
+          const text = child.text().trim()
+          if (text.endsWith('::class')) {
+            return text.slice(0, -7).trim()
+          }
+        }
+      }
+      const text = argNode.text().trim()
+      if (text.endsWith('::class')) {
+        return text.slice(0, -7).trim()
+      }
+      return undefined
+    }
+
+    const extractStringOrClassLiteral = (argNode: SgNode | undefined): string | undefined => {
+      return extractStringLiteral(argNode) ?? extractClassLiteral(argNode)
+    }
+
+    const walk = (node: SgNode): void => {
+      const k = nodeKind(node)
+      if (k === 'property_declaration') {
+        for (const child of node.children()) {
+          if (nodeKind(child) !== 'property_element') continue
+          const varName = child.field('name')?.text()
+          if (varName === '$uses') {
+            for (const peChild of child.children()) {
+              if (nodeKind(peChild) === 'array_creation_expression') {
+                const walkArray = (an: SgNode): void => {
+                  const ak = nodeKind(an)
+                  if (ak === 'string' || ak === 'encapsed_string') {
+                    const value = an.text().replace(/^['"]|['"]$/g, '')
+                    if (value) {
+                      addFact(
+                        'usesProperty',
+                        value,
+                        getCakeTargetCandidates(filePath, value, 'model'),
+                        buildAliasNames(value),
+                        'class',
+                      )
+                    }
+                  }
+                  for (const ac of an.children()) walkArray(ac)
+                }
+                walkArray(peChild)
+              }
+            }
+          }
+        }
+      } else if (k === 'member_call_expression') {
+        const objNode = node.field('object')
+        const nameNode = node.field('name')
+        const methodName = nameNode?.text()
+        const objText = objNode?.text()
+
+        if (objText === '$this') {
+          if (methodName === 'loadModel') {
+            const val = extractStringLiteral(getArgNode(node, 0))
+            if (val) {
+              addFact(
+                'loadModel',
+                val,
+                getCakeTargetCandidates(filePath, val, 'model'),
+                buildAliasNames(val),
+                'method',
+              )
+            }
+          } else if (methodName === 'loadController') {
+            const val = extractStringLiteral(getArgNode(node, 0))
+            if (val) {
+              addFact(
+                'loadController',
+                val,
+                getCakeTargetCandidates(filePath, val, 'controller'),
+                buildAliasNames(val),
+                'method',
+              )
+            }
+          } else if (methodName === 'loadComponent') {
+            const val = extractStringLiteral(getArgNode(node, 0))
+            if (val) {
+              addFact(
+                'loadComponent',
+                val,
+                getCakeTargetCandidates(filePath, val, 'component'),
+                buildAliasNames(val),
+                'method',
+              )
+            }
+          } else if (methodName === 'get') {
+            const val = extractClassLiteral(getArgNode(node, 0))
+            if (val) {
+              addFact(
+                '$this->get',
+                val,
+                getFrameworkClassLiteralTargetCandidates(filePath, val),
+                buildAliasNames(val),
+                'method',
+              )
+            }
+          }
+        } else if (objText === '$this->load') {
+          if (methodName === 'model') {
+            const val = extractStringLiteral(getArgNode(node, 0))
+            if (val) {
+              addFact(
+                'load.model',
+                val,
+                getCodeIgniterTargetCandidates(filePath, val, 'model'),
+                buildAliasNames(val),
+                'method',
+              )
+            }
+          } else if (methodName === 'library') {
+            const val = extractStringLiteral(getArgNode(node, 0))
+            if (val) {
+              addFact(
+                'load.library',
+                val,
+                getCodeIgniterTargetCandidates(filePath, val, 'library'),
+                buildAliasNames(val),
+                'method',
+              )
+            }
+          } else if (methodName === 'helper') {
+            const val = extractStringLiteral(getArgNode(node, 0))
+            if (val) {
+              addFact(
+                'load.helper',
+                val,
+                getCodeIgniterTargetCandidates(filePath, val, 'helper'),
+                [],
+                'method',
+              )
+            }
+          }
+        }
+      } else if (k === 'scoped_call_expression') {
+        const scopeNode = node.field('scope')
+        const nameNode = node.field('name')
+        const scope = scopeNode?.text()?.replace(/^\\/, '')
+        const name = nameNode?.text()
+
+        if (scope === 'App') {
+          if (name === 'uses') {
+            const value = extractStringLiteral(getArgNode(node, 0))
+            const packageName = extractStringLiteral(getArgNode(node, 1))
+            const kind = value && packageName ? getCakePackageKind(packageName) : undefined
+            if (value && kind) {
+              addFact(
+                'App::uses',
+                value,
+                getCakeTargetCandidates(filePath, value, kind),
+                buildAliasNames(value),
+                'file',
+              )
+            } else if (value) {
+              addFact('App::uses', value, [], buildAliasNames(value), 'file')
+            }
+          } else if (name === 'import') {
+            const typeName = extractStringLiteral(getArgNode(node, 0))
+            const value = extractStringLiteral(getArgNode(node, 1))
+            if (typeName && value) {
+              const normalized = typeName.toLowerCase()
+              const candidates =
+                normalized === 'model'
+                  ? getCakeTargetCandidates(filePath, value, 'model')
+                  : normalized === 'controller'
+                    ? getCakeTargetCandidates(filePath, value, 'controller')
+                    : normalized === 'component'
+                      ? getCakeTargetCandidates(filePath, value, 'component')
+                      : []
+              addFact('App::import', value, candidates, buildAliasNames(value), 'file')
+            }
+          }
+        } else if (scope === 'ClassRegistry') {
+          if (name === 'init') {
+            const value = extractStringLiteral(getArgNode(node, 0))
+            if (value) {
+              addFact(
+                'ClassRegistry::init',
+                value,
+                getCakeTargetCandidates(filePath, value, 'model'),
+                buildAliasNames(value),
+                'method',
+              )
+            }
+          }
+        } else if (scope === 'Yii') {
+          if (name === 'import') {
+            const value = extractStringLiteral(getArgNode(node, 0))
+            if (value) {
+              addFact(
+                'Yii::import',
+                value,
+                getYiiImportTargetCandidates(filePath, value),
+                buildAliasNames(value),
+                'method',
+              )
+            }
+          } else if (name === 'createObject') {
+            const value = extractStringOrClassLiteral(getArgNode(node, 0))
+            if (value) {
+              addFact(
+                'Yii::createObject',
+                value,
+                getFrameworkClassLiteralTargetCandidates(filePath, value),
+                buildAliasNames(value),
+                'method',
+              )
+            }
+          }
+        } else if (scope === 'Zend_Loader') {
+          if (name === 'loadClass') {
+            const value = extractStringLiteral(getArgNode(node, 0))
+            if (value) {
+              addFact(
+                'Zend_Loader::loadClass',
+                value,
+                getFrameworkClassLiteralTargetCandidates(filePath, value),
+                buildAliasNames(value),
+                'method',
+              )
+            }
+          }
+        } else if (scope === 'Drupal') {
+          if (name === 'service') {
+            const value = extractStringLiteral(getArgNode(node, 0))
+            if (value) {
+              addFact('Drupal::service', value, [], [], 'method')
+            }
+          }
+        }
+      } else if (k === 'function_call_expression') {
+        const funcNode = node.field('function')
+        const funcName = funcNode?.text()
+
+        if (funcName === 'app') {
+          const value = extractClassLiteral(getArgNode(node, 0))
+          if (value) {
+            addFact(
+              'app',
+              value,
+              getFrameworkClassLiteralTargetCandidates(filePath, value),
+              buildAliasNames(value),
+              'method',
+            )
+          }
+        } else if (funcName === 'resolve') {
+          const value = extractClassLiteral(getArgNode(node, 0))
+          if (value) {
+            addFact(
+              'resolve',
+              value,
+              getFrameworkClassLiteralTargetCandidates(filePath, value),
+              buildAliasNames(value),
+              'method',
+            )
+          }
+        } else if (funcName === 'uses') {
+          const value = extractStringLiteral(getArgNode(node, 0))
+          if (value) {
+            addFact(
+              'uses',
+              value,
+              getCakeTargetCandidates(filePath, value, 'model'),
+              buildAliasNames(value),
+              'file',
+            )
+          }
+        } else if (funcName === 'loadModel') {
+          const value = extractStringLiteral(getArgNode(node, 0))
+          if (value) {
+            addFact(
+              'loadModel',
+              value,
+              getCakeTargetCandidates(filePath, value, 'model'),
+              buildAliasNames(value),
+              'method',
+            )
+          }
+        } else if (funcName === 'loadController') {
+          const value = extractStringLiteral(getArgNode(node, 0))
+          if (value) {
+            addFact(
+              'loadController',
+              value,
+              getCakeTargetCandidates(filePath, value, 'controller'),
+              buildAliasNames(value),
+              'method',
+            )
+          }
+        } else if (funcName === 'loadComponent') {
+          const value = extractStringLiteral(getArgNode(node, 0))
+          if (value) {
+            addFact(
+              'loadComponent',
+              value,
+              getCakeTargetCandidates(filePath, value, 'component'),
+              buildAliasNames(value),
+              'method',
+            )
+          }
+        }
+      }
+
+      for (const child of node.children()) {
+        walk(child)
       }
     }
 
-    for (const match of content.matchAll(
-      /\$this->loadController\(\s*(['"])([^'"]+)\1\s*\)|\bloadController\(\s*(['"])([^'"]+)\3\s*\)/g,
-    )) {
-      const matchText = match[0] ?? ''
-      const matchIndex = match.index ?? 0
-      const prefix = content.slice(Math.max(0, matchIndex - 2), matchIndex)
-      if (!matchText.startsWith('$this->') && (prefix === '->' || prefix === '::')) continue
-      const value = match[2] ?? match[4]
-      if (value) {
-        addFact(
-          'loadController',
-          value,
-          getCakeTargetCandidates(filePath, value, 'controller'),
-          buildAliasNames(value),
-          'method',
-        )
-      }
-    }
-
-    for (const match of content.matchAll(
-      /\$this->loadComponent\(\s*(['"])([^'"]+)\1\s*\)|\bloadComponent\(\s*(['"])([^'"]+)\3\s*\)/g,
-    )) {
-      const matchText = match[0] ?? ''
-      const matchIndex = match.index ?? 0
-      const prefix = content.slice(Math.max(0, matchIndex - 2), matchIndex)
-      if (!matchText.startsWith('$this->') && (prefix === '->' || prefix === '::')) continue
-      const value = match[2] ?? match[4]
-      if (value) {
-        addFact(
-          'loadComponent',
-          value,
-          getCakeTargetCandidates(filePath, value, 'component'),
-          buildAliasNames(value),
-          'method',
-        )
-      }
-    }
-
-    for (const match of content.matchAll(
-      /\bApp::uses\(\s*(['"])([^'"]+)\1\s*,\s*(['"])([^'"]+)\3\s*\)/g,
-    )) {
-      const value = match[2]
-      const packageName = match[4]
-      const kind = value && packageName ? getCakePackageKind(packageName) : undefined
-      if (value && kind) {
-        addFact(
-          'App::uses',
-          value,
-          getCakeTargetCandidates(filePath, value, kind),
-          buildAliasNames(value),
-          'file',
-        )
-      } else if (value) {
-        addFact('App::uses', value, [], buildAliasNames(value), 'file')
-      }
-    }
-
-    for (const match of content.matchAll(/\buses\(\s*(['"])([^'"]+)\1\s*\)/g)) {
-      const matchIndex = match.index ?? 0
-      const prefix = content.slice(Math.max(0, matchIndex - 2), matchIndex)
-      if (prefix === '->' || prefix === '::') continue
-      const value = match[2]
-      if (value) {
-        addFact(
-          'uses',
-          value,
-          getCakeTargetCandidates(filePath, value, 'model'),
-          buildAliasNames(value),
-          'file',
-        )
-      }
-    }
-
-    for (const match of content.matchAll(
-      /\bApp::import\(\s*(['"])([^'"]+)\1\s*,\s*(['"])([^'"]+)\3\s*\)/g,
-    )) {
-      const typeName = match[2]
-      const value = match[4]
-      if (typeName && value) {
-        const normalized = typeName.toLowerCase()
-        const candidates =
-          normalized === 'model'
-            ? getCakeTargetCandidates(filePath, value, 'model')
-            : normalized === 'controller'
-              ? getCakeTargetCandidates(filePath, value, 'controller')
-              : normalized === 'component'
-                ? getCakeTargetCandidates(filePath, value, 'component')
-                : []
-        addFact('App::import', value, candidates, buildAliasNames(value), 'file')
-      }
-    }
-
-    for (const match of content.matchAll(/\bClassRegistry::init\(\s*(['"])([^'"]+)\1\s*\)/g)) {
-      const value = match[2]
-      if (value) {
-        addFact(
-          'ClassRegistry::init',
-          value,
-          getCakeTargetCandidates(filePath, value, 'model'),
-          buildAliasNames(value),
-          'method',
-        )
-      }
-    }
-
-    for (const match of content.matchAll(/\$this->load->model\(\s*(['"])([^'"]+)\1\s*\)/g)) {
-      const value = match[2]
-      if (value) {
-        addFact(
-          'load.model',
-          value,
-          getCodeIgniterTargetCandidates(filePath, value, 'model'),
-          buildAliasNames(value),
-          'method',
-        )
-      }
-    }
-
-    for (const match of content.matchAll(/\$this->load->library\(\s*(['"])([^'"]+)\1\s*\)/g)) {
-      const value = match[2]
-      if (value) {
-        addFact(
-          'load.library',
-          value,
-          getCodeIgniterTargetCandidates(filePath, value, 'library'),
-          buildAliasNames(value),
-          'method',
-        )
-      }
-    }
-
-    for (const match of content.matchAll(/\$this->load->helper\(\s*(['"])([^'"]+)\1\s*\)/g)) {
-      const value = match[2]
-      if (value) {
-        addFact(
-          'load.helper',
-          value,
-          getCodeIgniterTargetCandidates(filePath, value, 'helper'),
-          [],
-          'method',
-        )
-      }
-    }
-
-    for (const match of content.matchAll(/\bYii::import\(\s*(['"])([^'"]+)\1\s*\)/g)) {
-      const value = match[2]
-      if (value) {
-        addFact(
-          'Yii::import',
-          value,
-          getYiiImportTargetCandidates(filePath, value),
-          buildAliasNames(value),
-          'method',
-        )
-      }
-    }
-
-    for (const match of content.matchAll(
-      /\bYii::createObject\(\s*(?:(['"])([^'"]+)\1|(\\?[A-Za-z_][A-Za-z0-9_\\]*)::class)\s*\)/g,
-    )) {
-      const value = match[2] ?? match[3]
-      if (value) {
-        addFact(
-          'Yii::createObject',
-          value,
-          getFrameworkClassLiteralTargetCandidates(filePath, value),
-          buildAliasNames(value),
-          'method',
-        )
-      }
-    }
-
-    for (const match of content.matchAll(/\bapp\(\s*(\\?[A-Za-z_][A-Za-z0-9_\\]*)::class\s*\)/g)) {
-      const value = match[1]
-      if (value) {
-        addFact(
-          'app',
-          value,
-          getFrameworkClassLiteralTargetCandidates(filePath, value),
-          buildAliasNames(value),
-          'method',
-        )
-      }
-    }
-
-    for (const match of content.matchAll(
-      /\bresolve\(\s*(\\?[A-Za-z_][A-Za-z0-9_\\]*)::class\s*\)/g,
-    )) {
-      const value = match[1]
-      if (value) {
-        addFact(
-          'resolve',
-          value,
-          getFrameworkClassLiteralTargetCandidates(filePath, value),
-          buildAliasNames(value),
-          'method',
-        )
-      }
-    }
-
-    for (const match of content.matchAll(
-      /\$this->get\(\s*(\\?[A-Za-z_][A-Za-z0-9_\\]*)::class\s*\)/g,
-    )) {
-      const value = match[1]
-      if (value) {
-        addFact(
-          '$this->get',
-          value,
-          getFrameworkClassLiteralTargetCandidates(filePath, value),
-          buildAliasNames(value),
-          'method',
-        )
-      }
-    }
-
-    for (const match of content.matchAll(/\bZend_Loader::loadClass\(\s*(['"])([^'"]+)\1\s*\)/g)) {
-      const value = match[2]
-      if (value) {
-        addFact(
-          'Zend_Loader::loadClass',
-          value,
-          getFrameworkClassLiteralTargetCandidates(filePath, value),
-          buildAliasNames(value),
-          'method',
-        )
-      }
-    }
-
-    for (const match of content.matchAll(/\\Drupal::service\(\s*(['"])([^'"]+)\1\s*\)/g)) {
-      const value = match[2]
-      if (value) {
-        addFact('Drupal::service', value, [], [], 'method')
-      }
-    }
-
-    const usesPropRegex =
-      /\b(?:var|public|protected)\s+\$uses\s*=\s*(?:array\(([\s\S]*?)\)|\[([\s\S]*?)\])\s*;/g
-    for (const match of content.matchAll(usesPropRegex)) {
-      const entries = parseLiteralPhpArrayEntries(match[1] ?? match[2] ?? '')
-      for (const value of entries) {
-        addFact(
-          'usesProperty',
-          value,
-          getCakeTargetCandidates(filePath, value, 'model'),
-          buildAliasNames(value),
-          'class',
-        )
-      }
-    }
-
+    walk(root)
     return facts
   }
 
@@ -2562,13 +2997,14 @@ export class PhpLanguageAdapter implements LanguageAdapter {
    * @param specifier - Relative specifier.
    * @returns Candidates array or string path.
    */
-  resolveRelativeImportPath(fromFile: string, specifier: string): string | string[] {
+  private resolveRelativeImportPath(fromFile: string, specifier: string): string | string[] {
     const identity = splitWorkspaceIdentity(fromFile)
     const wsPrefix = identity === null ? '' : `${identity.workspace}:`
-    const relFile = identity === null ? fromFile : identity.relativePath
+    const relFile = toPortableGraphPath(identity === null ? fromFile : identity.relativePath)
+    const portableSpecifier = toPortableGraphPath(specifier)
 
     const relDir = relFile.substring(0, relFile.lastIndexOf('/'))
-    const parts = specifier.split('/')
+    const parts = portableSpecifier.split('/')
     const segments = relDir ? relDir.split('/') : []
 
     for (const part of parts) {

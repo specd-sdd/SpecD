@@ -1,0 +1,5 @@
+releases:
+  code-graph:go-language-adapter: minor
+  code-graph:python-language-adapter: minor
+  code-graph:symbol-model: minor
+  code-graph:language-adapter: minor

@@ -1,0 +1,32 @@
+- op: removed
+  description: 'Remove obsolete stdin input scenarios'
+  selector:
+    type: section
+    matches: 'Requirement: Input payload'
+
+- op: removed
+  description: 'Remove obsolete delegation scenarios'
+  selector:
+    type: section
+    matches: 'Requirement: Delegation'
+
+- op: added
+  description: 'Verify project update-metadata is removed'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: project update-metadata is removed
+
+    #### Scenario: update-metadata command is not registered
+
+    - **WHEN** the CLI `project` parent command's subcommands are inspected
+    - **THEN** no `update-metadata` command, or any alias of it, is registered
+
+    #### Scenario: Agents persist optimized context through project optimized-context set
+
+    - **GIVEN** an agent needs to persist LLM-optimized project context
+    - **WHEN** the agent looks for a supported CLI command
+    - **THEN** it uses `specd project optimized-context set`
+    - **AND** `specd project update-metadata` is not available

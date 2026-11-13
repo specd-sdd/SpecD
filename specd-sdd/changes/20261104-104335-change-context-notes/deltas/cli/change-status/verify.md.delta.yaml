@@ -1,0 +1,27 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Text status omits duplicated review file lists$'
+  content: |
+    Scenarios:
+
+    #### Scenario: Reduced review and contextual notes
+
+    - **GIVEN** Core supplies current review facts, a multiline overlap note and canonical blockers
+    - **WHEN** status renders every supported format
+    - **THEN** review has only required/affectedArtifacts in structured formats and no duplicated text paths
+    - **AND** note text supplies context without overlapDetail or local blocker filtering
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Text-only notes across formats
+
+    #### Scenario: Technical metadata is absent in every status format
+
+    - **GIVEN** one note contains multiline text plus author/ID/policy
+    - **WHEN** status renders text, JSON and TOON
+    - **THEN** only its text appears in the note projection and no raw aggregate serialization leaks details

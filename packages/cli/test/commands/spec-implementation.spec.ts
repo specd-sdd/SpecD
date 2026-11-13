@@ -47,7 +47,7 @@ describe('spec implementation', () => {
     await program.parseAsync(['node', 'specd', 'spec', 'implementation', 'list', 'auth/login'])
 
     expect(kernel.specs.getPersistedImplementation.execute).toHaveBeenCalledWith({
-      specId: 'default:auth/login',
+      specId: 'auth/login',
     })
   })
 
@@ -75,7 +75,7 @@ describe('spec implementation', () => {
     ])
 
     expect(kernel.specs.updatePersistedImplementation.execute).toHaveBeenCalledWith({
-      specId: 'default:auth/login',
+      specId: 'auth/login',
       action: 'add',
       file: 'src/auth.ts',
       symbols: ['login'],

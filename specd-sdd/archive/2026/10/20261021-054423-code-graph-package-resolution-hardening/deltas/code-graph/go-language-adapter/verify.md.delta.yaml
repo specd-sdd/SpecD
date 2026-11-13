@@ -1,0 +1,32 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Package identity, exports, and imports'
+  content: |
+    #### Scenario: go.mod above the code root
+
+    - **GIVEN** `go.mod` at the module directory and a workspace code root `<module>/internal`
+    - **AND** an import path `example.com/mod/internal/util`
+    - **WHEN** `entrySurface` runs
+    - **THEN** the package directory is computed relative to the module directory and expressed relative to the code root
+    - **AND** the indexed `.go` files in `util` are returned
+
+    #### Scenario: Package directory outside the code root yields no entries
+
+    - **GIVEN** a code root `<module>/internal` and an import path `example.com/mod/cmd/tool`
+    - **WHEN** `entrySurface` runs
+    - **THEN** no entry is returned
+
+    #### Scenario: Quoted module path is unquoted
+
+    - **GIVEN** a `go.mod` line `module "example.com/mod"`
+    - **WHEN** `identity` runs
+    - **THEN** the identity is `example.com/mod` without quotes
+
+    #### Scenario: Module directory is located once in prepare
+
+    - **GIVEN** several workspaces
+    - **WHEN** `prepare` runs
+    - **THEN** the `go.mod` of each workspace is located once
+    - **AND** `entrySurface` performs no filesystem read

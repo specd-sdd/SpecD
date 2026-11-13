@@ -1,7 +1,35 @@
 import { SpecdCodeGraphError } from './specd-code-graph-error.js'
+import { type GraphIndexWorkerDiagnostics } from '../value-objects/graph-index-worker-types.js'
+
+/**
+ * Base error class for all failures produced by the isolated graph-index runner.
+ * Holds optional post-mortem supervisor diagnostics.
+ */
+export abstract class GraphIndexWorkerError extends SpecdCodeGraphError {
+  private attachedDiagnostics?: GraphIndexWorkerDiagnostics
+
+  /**
+   * Diagnostics attached by the supervisor; absent before the child started.
+   */
+  get diagnostics(): GraphIndexWorkerDiagnostics | undefined {
+    return this.attachedDiagnostics
+  }
+
+  /**
+   * Attaches diagnostics once; later calls are ignored.
+   * @param diagnostics - Post-mortem supervisor diagnostics.
+   * @returns this instance for fluent chaining.
+   */
+  withDiagnostics(diagnostics: GraphIndexWorkerDiagnostics): this {
+    if (this.attachedDiagnostics === undefined) {
+      this.attachedDiagnostics = diagnostics
+    }
+    return this
+  }
+}
 
 /** Failure to create or initialize the isolated graph-index child process. */
-export class GraphIndexWorkerStartError extends SpecdCodeGraphError {
+export class GraphIndexWorkerStartError extends GraphIndexWorkerError {
   /** Returns the stable machine-readable code. */
   override get code(): string {
     return 'GRAPH_INDEX_WORKER_START'
@@ -23,7 +51,7 @@ export class GraphIndexWorkerStartError extends SpecdCodeGraphError {
 }
 
 /** The injected task module does not meet the required graph-index task contract. */
-export class GraphIndexTaskContractError extends SpecdCodeGraphError {
+export class GraphIndexTaskContractError extends GraphIndexWorkerError {
   /** Returns the stable machine-readable code. */
   override get code(): string {
     return 'GRAPH_INDEX_TASK_CONTRACT'
@@ -38,7 +66,7 @@ export class GraphIndexTaskContractError extends SpecdCodeGraphError {
 }
 
 /** The injected task rejected or threw while executing. */
-export class GraphIndexTaskExecutionError extends SpecdCodeGraphError {
+export class GraphIndexTaskExecutionError extends GraphIndexWorkerError {
   /** Returns the stable machine-readable code. */
   override get code(): string {
     return 'GRAPH_INDEX_TASK_EXECUTION'
@@ -60,7 +88,7 @@ export class GraphIndexTaskExecutionError extends SpecdCodeGraphError {
 }
 
 /** A child IPC message was malformed, unsupported, late, or duplicated. */
-export class GraphIndexWorkerProtocolError extends SpecdCodeGraphError {
+export class GraphIndexWorkerProtocolError extends GraphIndexWorkerError {
   /** Returns the stable machine-readable code. */
   override get code(): string {
     return 'GRAPH_INDEX_WORKER_PROTOCOL'
@@ -75,7 +103,7 @@ export class GraphIndexWorkerProtocolError extends SpecdCodeGraphError {
 }
 
 /** The child exited unexpectedly or without a valid terminal result. */
-export class GraphIndexWorkerExitError extends SpecdCodeGraphError {
+export class GraphIndexWorkerExitError extends GraphIndexWorkerError {
   /** Returns the stable machine-readable code. */
   override get code(): string {
     return 'GRAPH_INDEX_WORKER_EXIT'
@@ -104,7 +132,7 @@ export class GraphIndexWorkerExitError extends SpecdCodeGraphError {
 }
 
 /** The host forwarded SIGINT or SIGTERM to its active graph-index child. */
-export class GraphIndexWorkerSignalError extends SpecdCodeGraphError {
+export class GraphIndexWorkerSignalError extends GraphIndexWorkerError {
   /** Returns the stable machine-readable code. */
   override get code(): string {
     return 'GRAPH_INDEX_WORKER_SIGNAL'
@@ -137,7 +165,7 @@ export class GraphIndexWorkerSignalError extends SpecdCodeGraphError {
 }
 
 /** The optional host progress callback threw while receiving a worker progress value. */
-export class GraphIndexProgressHandlerError extends SpecdCodeGraphError {
+export class GraphIndexProgressHandlerError extends GraphIndexWorkerError {
   /** Returns the stable machine-readable code. */
   override get code(): string {
     return 'GRAPH_INDEX_PROGRESS_HANDLER'

@@ -16,6 +16,11 @@ import {
 import { type SpecNode } from '../../domain/value-objects/spec-node.js'
 import { type SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { type SourceRange, type SymbolNode } from '../../domain/value-objects/symbol-node.js'
+import { type FileCategory } from '../../domain/value-objects/file-node.js'
+import {
+  type OmittedCounts,
+  resolveAdmittedCategories,
+} from '../../domain/value-objects/impact-result.js'
 import {
   type LogicalSymbol,
   type PublicBinding,
@@ -69,6 +74,9 @@ export interface SearchCodeGraphInput {
   readonly workspace?: string | undefined
   readonly excludePaths?: readonly string[] | undefined
   readonly excludeWorkspaces?: readonly string[] | undefined
+  readonly fileCategories?: readonly FileCategory[] | undefined
+  readonly includeTests?: boolean | undefined
+  readonly includeIgnored?: boolean | undefined
 }
 
 /** Spec search row retained in the unified projection. */
@@ -95,6 +103,7 @@ export interface SearchCodeGraphResult {
   readonly files: readonly SourceFileSearchResult[]
   readonly specs: readonly UnifiedSpecSearchResult[]
   readonly documents: readonly UnifiedDocumentSearchResult[]
+  readonly omittedCounts: OmittedCounts
 }
 
 const SYMBOL_TIER_WEIGHT: Readonly<Record<SymbolSearchMatchTier, number>> = {
@@ -130,8 +139,24 @@ export class SearchCodeGraph {
   async execute(input: SearchCodeGraphInput): Promise<SearchCodeGraphResult> {
     const plan = expandSearchQuery(input.query)
     if (plan.normalizedQuery.length === 0) {
-      return { symbols: [], files: [], specs: [], documents: [] }
+      return {
+        symbols: [],
+        files: [],
+        specs: [],
+        documents: [],
+        omittedCounts: { tests: 0, ignored: 0 },
+      }
     }
+    const admittedFileCategories = new Set(
+      resolveAdmittedCategories({
+        categories: input.fileCategories,
+        includeTests: input.includeTests,
+        includeIgnored: input.includeIgnored,
+      }),
+    )
+    const omittedTestFiles = new Set<string>()
+    const omittedIgnoredFiles = new Set<string>()
+
     const selected = new Set(input.categories)
     const options: SearchOptions = {
       query: input.query,
@@ -150,14 +175,58 @@ export class SearchCodeGraph {
       selected.has('specs') ? this.store.searchSpecs(options) : Promise.resolve([]),
       selected.has('documents') ? this.store.searchDocuments(options) : Promise.resolve([]),
     ])
-    const symbols = symbolCandidates.slice(0, input.limit)
-    const files = selected.has('files') ? await this.searchFiles(input, plan, symbols) : []
+
+    // Filter symbols by admitted categories and track omissions
+    const admittedSymbols: ReferenceAwareSymbolResult[] = []
+    if (symbolCandidates.length > 0) {
+      const symbolFilePaths = new Set<string>()
+      for (const cand of symbolCandidates) {
+        for (const d of cand.declarations) {
+          symbolFilePaths.add(d.declaration.location.filePath)
+        }
+        for (const h of cand.hits) {
+          symbolFilePaths.add(h.symbol.filePath)
+        }
+      }
+      const files = await this.store.getFilesByPaths([...symbolFilePaths])
+      const fileCategoryMap = new Map(files.map((f) => [f.path, f.category]))
+
+      for (const cand of symbolCandidates) {
+        const primaryPath =
+          cand.declarations[0]?.declaration.location.filePath ?? cand.hits[0]?.symbol.filePath
+        const cat = primaryPath ? (fileCategoryMap.get(primaryPath) ?? 'source') : 'source'
+        if (!admittedFileCategories.has(cat)) {
+          if (primaryPath) {
+            if (cat === 'test') omittedTestFiles.add(primaryPath)
+            else if (cat === 'ignored') omittedIgnoredFiles.add(primaryPath)
+          }
+          continue
+        }
+        admittedSymbols.push(cand)
+      }
+    }
+
+    const symbols = admittedSymbols.slice(0, input.limit)
+    const files = selected.has('files')
+      ? await this.searchFiles(
+          input,
+          plan,
+          symbols,
+          admittedFileCategories,
+          omittedTestFiles,
+          omittedIgnoredFiles,
+        )
+      : []
 
     return {
       symbols,
-      files,
+      files: files.slice(0, input.limit),
       specs: specs.slice(0, input.limit),
       documents: documents.slice(0, input.limit),
+      omittedCounts: {
+        tests: omittedTestFiles.size,
+        ignored: omittedIgnoredFiles.size,
+      },
     }
   }
 
@@ -285,12 +354,18 @@ export class SearchCodeGraph {
    * @param input - Unified request and active filters.
    * @param plan - Shared normalized and expanded query plan.
    * @param symbols - Semantic symbol groups eligible to suppress declaration duplicates.
+   * @param admittedFileCategories - Optional set of admitted file categories.
+   * @param omittedTestFiles - Optional set to collect omitted test file paths.
+   * @param omittedIgnoredFiles - Optional set to collect omitted ignored file paths.
    * @returns Ordered file groups capped after suppression.
    */
   private async searchFiles(
     input: SearchCodeGraphInput,
     plan: ReturnType<typeof expandSearchQuery>,
     symbols: readonly ReferenceAwareSymbolResult[],
+    admittedFileCategories?: Set<FileCategory>,
+    omittedTestFiles?: Set<string>,
+    omittedIgnoredFiles?: Set<string>,
   ): Promise<SourceFileSearchResult[]> {
     const result: SourceFileSearchResult[] = []
     const pageSize = Math.max(64, input.limit * 4)
@@ -315,6 +390,12 @@ export class SearchCodeGraph {
       for (const candidate of page.candidates) {
         if (consumedFiles.has(candidate.file.path)) continue
         consumedFiles.add(candidate.file.path)
+        const fileCategory = candidate.file.category ?? 'source'
+        if (admittedFileCategories !== undefined && !admittedFileCategories.has(fileCategory)) {
+          if (fileCategory === 'test') omittedTestFiles?.add(candidate.file.path)
+          else if (fileCategory === 'ignored') omittedIgnoredFiles?.add(candidate.file.path)
+          continue
+        }
         const visibleMatches = findSourceMatches(
           candidate.file.content ?? '',
           plan,

@@ -1,0 +1,39 @@
+- op: modified
+  description: 'Update declaration extraction scenarios for PHP properties, class constants, and enum cases as Property'
+  selector:
+    type: section
+    matches: 'Requirement: Declaration extraction and ranges'
+  content: |
+    #### Scenario: Class-like and member declarations retain parser ranges
+
+    - **GIVEN** functions, classes, interfaces, traits, enums, methods, properties, and top-level constants
+    - **WHEN** symbols are extracted
+    - **THEN** supported declarations have their expected broad kinds
+    - **AND** exact name selections are contained by complete parser construct ranges
+
+    #### Scenario: Properties, class constants, and enum cases extract as Property kind
+
+    - **GIVEN** a PHP class declaring properties and class constants, and a PHP enum declaring enum cases
+    - **WHEN** symbols are extracted
+    - **THEN** each property, class constant, and enum case is assigned `SymbolKind.Property`
+    - **AND** its `parentId` is set to the enclosing class or enum symbol ID
+
+- op: modified
+  description: 'Add container owner and parentId scenario for PHP properties and class constants'
+  selector:
+    type: section
+    matches: 'Requirement: PHP logical identity and declaring owners'
+  content: |
+    #### Scenario: Namespace and class owners prevent member collapse
+
+    - **GIVEN** two namespaced classes each declare `save`, including static and instance forms
+    - **WHEN** logical declarations are built
+    - **THEN** each member uses its class logical owner rather than a syntax parent ID
+    - **AND** member form preserves distinct case-preserving identities
+    - **AND** the adapter does not claim language-complete case-insensitive lookup
+
+    #### Scenario: Properties and class constants have container logical owner and parentId
+
+    - **GIVEN** a PHP class declaring properties and class constants
+    - **WHEN** logical member declarations are built
+    - **THEN** each property and class constant has the enclosing class as its logical owner and `parentId`

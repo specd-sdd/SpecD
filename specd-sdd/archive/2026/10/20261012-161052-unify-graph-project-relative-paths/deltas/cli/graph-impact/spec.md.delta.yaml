@@ -1,0 +1,120 @@
+- op: modified
+  description: 'Require projectRelativePath and remove displayPath / displayTargets from impact structured output'
+  selector:
+    type: section
+    matches: 'Requirement: Output format'
+  content: |
+    The command SHALL delegate impact analysis and path projection to `sdk:run-graph-impact`.
+
+    All file paths rendered in the impact analysis output (both text and JSON) SHALL be formatted relative to the project root for consistency across multi-workspace projects.
+
+    **File impact** in `text` mode:
+
+    ```text
+    Impact analysis for src/auth.ts (depth=5)
+      Risk level:       HIGH
+      Direct deps:      6
+      Indirect deps:    3
+      Transitive deps:  1
+      Affected files:   8
+
+    Changed symbols:
+      validate:10
+      AuthService:20
+
+    Affected files:
+      packages/core/src/login.ts: handleLogin:12 (d=1), validateSession:45 (d=1)
+      packages/core/src/session.ts: createSession:8 (d=2)
+
+    Per-symbol breakdown:
+      src/auth.ts:function:validate:10:0  risk=HIGH direct=4
+      src/auth.ts:class:AuthService:20:0  risk=MEDIUM direct=2
+    ```
+
+    For multiple files, text output SHALL show one aggregated summary plus a `Changed symbols:` block grouped by input file, an `Affected files:` block, and a `Per-file breakdown:` or equivalent structure that lets a human see which input files contributed to the overall result.
+
+    When affected symbols are available, each file line shows the symbols grouped after a colon with depth indicators: `path: name:line (d=N), name:line (d=N)`. All paths are rendered relative to the project root. Files reached only via IMPORTS (file-level) are listed without symbols. The depth value `d=N` indicates the distance from the analysis target (1 = direct, 2 = indirect, 3+ = transitive).
+
+    When `--direction` is omitted or set to `dependents` / `upstream`, human-facing documentation and help text SHOULD explain these counts as dependent counts. When `--direction dependencies` / `downstream` is used, documentation SHOULD explain that the same fields represent dependencies reached from the target.
+
+    When `--depth` is not the default (3), the header line includes `(depth=N)` to show the configured depth.
+
+    **Symbol impact** in `text` mode:
+
+    ```text
+    Impact analysis for function createKernel (packages/core/src/composition/kernel.ts:147) (depth=5)
+      Risk level:       CRITICAL
+      Direct deps:      1
+      Indirect deps:    1
+      Transitive deps:  38
+      Affected files:   40
+
+    Affected files:
+      packages/cli/src/kernel.ts: wireKernel:5 (d=1)
+      ...
+    ```
+
+    **Spec impact** in `text` mode:
+
+    ```text
+    Impact analysis for spec core:change (depth=3)
+      Risk level:       HIGH
+      Direct deps:      2
+      Indirect deps:    1
+      Transitive deps:  0
+      Affected files:   4
+    ```
+
+    Spec impact output MUST surface files reached through `COVERS_FILE` and symbols reached through `COVERS_SYMBOL` in the same result structure used by other impact targets.
+
+    When multiple symbols match, each analysis is listed sequentially.
+
+    **Omission notices:**
+    When `omittedCounts` indicates that results were filtered out (`tests > 0` or `ignored > 0`), text mode output SHALL display an omission notice:
+    `ℹ Excluded from results: <count> test files, <count> ignored files. Use --include-tests, --include-ignored, or --all to view them.`
+    When only one category has omissions, the notice MAY mention only that category (e.g. `ℹ Excluded from results: 14 test files. Use --include-tests or --all to view them.`).
+
+    In `json` or `toon` mode, the full result object is output as-is, including `omittedCounts: { tests: number, ignored: number }`. The `AffectedSymbol` entries in JSON include the `depth` field. Target file and symbol entries SHALL expose `canonicalPath` and `projectRelativePath`. Multi-file impact results SHALL expose `targets` (canonical) and `projectRelativeTargets`. The JSON/TOON output SHALL NOT expose `displayPath` or `displayTargets`. All affected file and symbol paths SHALL be formatted relative to the project root (`projectRelativePath`).
+
+    The JSON output MUST include aggregate impact fields to support automated risk assessment:
+
+    - `riskLevel`
+    - `directDepsCount`
+    - `indirectDepsCount`
+    - `transitiveDepsCount`
+    - `affectedFilesCount`
+    - `omittedCounts`
+- op: modified
+  description: 'Update Pure display-path projection requirement to project-relative paths'
+  selector:
+    type: section
+    matches: 'Requirement: Pure display-path projection'
+  content: |
+    The CLI SHALL render file paths in impact output by projecting canonical graph
+    paths to project-relative paths using project and workspace
+    configuration alone. Path projection SHALL NOT perform graph reads, SHALL NOT
+    resolve files or documents through the provider, and SHALL NOT require
+    availability validation.
+
+    For single-file impact, all affected-file project-relative paths SHALL derive from the
+    resolved project configuration. For multi-file impact, the project-relative path for each
+    input file SHALL derive from that file's own resolved workspace configuration,
+    and every affected file SHALL be rendered exactly once per input file that
+    contributed it.
+
+    Formatting a result MUST NOT fan out one provider or store read per affected
+    symbol or file. A multi-file impact result containing many affected symbols MUST
+    format successfully without `StoreOverloadError`.
+- op: modified
+  description: 'Add sdk:run-graph-impact to Spec Dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - `cli:entrypoint` — command and output conventions
+    - `cli:graph-cli-context` — graph bootstrap and provider lifecycle
+    - `core:config` — project graph configuration
+    - `code-graph:traversal` — canonical and public-binding impact
+    - `code-graph:workspace-integration` — selector identity
+    - `code-graph:resolve-symbol-reference` — target resolution and ambiguity
+    - `sdk:run-graph-impact` — SDK impact analysis orchestration and path projection

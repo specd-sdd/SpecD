@@ -151,6 +151,48 @@
 - **WHEN** `execute({ specId, set: { optimizedContext: 'value' } })` is called
 - **THEN** `writePersistedState` is called with `expectedRevision: null`
 
+#### Scenario: Missing specId is an input-shape error
+
+- **WHEN** `execute` is called with no `specId`
+- **THEN** `InvalidInputError` is thrown and no port is touched
+
+#### Scenario: Empty specId is a spec ID error, not an input-shape error
+
+- **WHEN** `execute` is called with `specId: ''`
+- **THEN** `InvalidSpecIdError` is thrown and `InvalidInputError` is not
+
+#### Scenario: Strict input matrix
+
+- **WHEN** the input has an unknown root key, an unknown `set` key, a non-string set value, an empty `set`, an empty `clear`, both `set` and `clear`, neither, a non-array `clear`, or is not an object
+- **THEN** `InvalidInputError` is thrown and no port is touched
+
+#### Scenario: Set captures a fresh baseline per changed field
+
+- **GIVEN** persisted state with an existing `optimizedContext` baseline
+- **WHEN** `set` changes only `optimizedDescription`
+- **THEN** `optimizedDescription` gets a fresh baseline and `optimizedContext` keeps its previous one
+
+#### Scenario: Created state records the effective project schema
+
+- **GIVEN** the spec has no persisted state
+- **WHEN** `set` is applied
+- **THEN** the base comes from `resolveInitialPersistedDependsOn`, the recorded schema is the effective project schema, `created` is `true`, and `expectedRevision` is `null`
+
+#### Scenario: Conflict, unknown spec, and readOnly
+
+- **WHEN** `writePersistedState` rejects with `ArtifactConflictError`, the spec does not exist, or its workspace is `readOnly`
+- **THEN** respectively the conflict is rethrown without retry, `SpecNotFoundError`, or `ReadOnlyWorkspaceError` is thrown
+
+#### Scenario: Result flags and omitted block
+
+- **WHEN** a mutation is applied to existing state, and when the last field is cleared
+- **THEN** `created` is `false` for existing state and the result omits `optimizations` after the last clear
+
+#### Scenario: Real repository round trip
+
+- **WHEN** a partial clear and then a final clear run against the filesystem repository
+- **THEN** the first keeps the other field and the second removes the whole `optimizations` block from the lock
+
 ### Requirement: Conflict handling
 
 #### Scenario: Revision mismatch at write time propagates ArtifactConflictError
@@ -204,3 +246,32 @@
 - **WHEN** a set operation must create missing persisted state
 - **THEN** initial dependencies are derived through `resolveInitialPersistedDependsOn()`
 - **AND** `UpdatePersistedSpecOptimizationsDeps` does not require a separate `initializePersistedSpecState` collaborator
+
+### Requirement: Spec ID validation
+
+#### Scenario: Empty spec ID rejected before any repository access
+
+- **WHEN** `execute` is called with `specId: ''`
+- **THEN** `InvalidSpecIdError` is thrown
+- **AND** no repository is read or written
+
+#### Scenario: Malformed spec ID rejected
+
+- **WHEN** `execute` is called with `specId: 'Bad Id'`
+- **THEN** `InvalidSpecIdError` is thrown quoting `Bad Id`
+
+#### Scenario: Unknown workspace rejected
+
+- **WHEN** `execute` is called with `specId: 'nope:auth/login'`
+- **THEN** `WorkspaceNotFoundError` is thrown
+
+#### Scenario: Bare spec ID resolved to the default workspace
+
+- **WHEN** `execute` is called with `specId: '_global/architecture'`
+- **THEN** it behaves as for `default:_global/architecture`
+- **AND** any `specId` in the result is `default:_global/architecture`
+
+#### Scenario: Qualified spec ID accepted unchanged
+
+- **WHEN** `execute` is called with `specId: 'core:storage'`
+- **THEN** it proceeds with workspace `core` and path `storage`

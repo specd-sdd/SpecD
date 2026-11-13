@@ -1,0 +1,38 @@
+- op: modified
+  description: 'Mark purpose as Removed; redirect writers to project optimized-context'
+  selector:
+    type: section
+    matches: '^Purpose$'
+  content: |
+    **Removed.** The `specd project update-metadata` command accepted a JSON/YAML payload with `optimizedContext` from `--file` or implicit stdin and delegated to `UpdateProjectMetadata`. Project optimized context is now mutated only through `project optimized-context set`/`clear` (see `cli:project-optimized-context`). There is no `update-metadata` command or alias on the `project` parent.
+
+- op: removed
+  description: 'Remove obsolete input-payload requirement'
+  selector:
+    type: section
+    matches: 'Requirement: Input payload'
+
+- op: removed
+  description: 'Remove obsolete delegation requirement'
+  selector:
+    type: section
+    matches: 'Requirement: Delegation'
+
+- op: added
+  description: 'Require that project update-metadata is not registered'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: project update-metadata is removed
+
+    The CLI MUST NOT register an `update-metadata` command, or any alias of it, on the `project` parent command. Agents that need to persist LLM-optimized project context MUST use `specd project optimized-context set` instead.
+
+- op: modified
+  description: 'Clear dependencies; removed command has none'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    _none_

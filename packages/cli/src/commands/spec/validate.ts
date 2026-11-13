@@ -2,7 +2,6 @@ import { type Command } from 'commander'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
-import { parseSpecId } from '../../helpers/spec-path.js'
 
 /**
  * Registers the `spec validate` subcommand on the given parent command.
@@ -52,8 +51,7 @@ JSON/TOON output schema:
           let inputWorkspace: string | undefined
 
           if (specPath !== undefined) {
-            const parsed = parseSpecId(specPath, config)
-            inputSpecPath = `${parsed.workspace}:${parsed.capabilityPath}`
+            inputSpecPath = specPath
           } else if (opts.workspace !== undefined) {
             const wsNames = config.workspaces.map((w) => w.name)
             if (!wsNames.includes(opts.workspace)) {
@@ -69,9 +67,11 @@ JSON/TOON output schema:
           })
 
           const fmt = parseFormat(opts.format)
+          const resolvedSpecId =
+            inputSpecPath !== undefined ? (result.entries[0]?.spec ?? inputSpecPath) : undefined
 
           if (inputSpecPath !== undefined && result.totalSpecs === 0) {
-            cliError(`spec not found '${inputSpecPath}'`, opts.format)
+            cliError(`spec not found '${resolvedSpecId}'`, opts.format)
           }
 
           if (fmt === 'text') {

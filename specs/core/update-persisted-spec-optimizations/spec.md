@@ -10,13 +10,17 @@ Optimized fields are durable authoring decisions, so setting or clearing them mu
 
 `UpdatePersistedSpecOptimizations.execute` SHALL accept an `UpdatePersistedSpecOptimizationsInput` containing:
 
-- `specId` (required, non-empty string) — the spec whose persisted optimizations are being mutated;
+- `specId` (required, string) — the spec whose persisted optimizations are being mutated; its content is validated and normalized per "Spec ID validation", so an empty, blank, or malformed value fails with `InvalidSpecIdError`;
 - `set` (optional, strict object) — a non-empty partial map of `optimizedDescription` and/or `optimizedContext` string values to persist;
 - `clear` (optional, non-empty readonly array) — field names limited to `optimizedDescription` and `optimizedContext`.
 
-Before workspace resolution, schema resolution, artifact reads, or persisted-state I/O, the use case MUST validate the complete runtime input with a strict Zod schema. The schema MUST reject unknown root keys, unknown `set` keys, non-string set values, invalid clear field names, empty `set`, empty `clear`, missing operations, and simultaneous `set` and `clear`.
+Before workspace resolution, schema resolution, artifact reads, or persisted-state I/O, the use case MUST validate the complete runtime input shape with a strict Zod schema. The schema MUST reject unknown root keys, a missing or non-string `specId`, unknown `set` keys, non-string set values, invalid clear field names, empty `set`, empty `clear`, missing operations, and simultaneous `set` and `clear`. The schema does not judge the content of a string `specId`: an empty string passes the shape check and is rejected next by `parseSpecId` with `InvalidSpecIdError`.
 
-Runtime validation failures MUST throw `InvalidInputError` with actionable issue text. This Core validation is authoritative for every caller, including JavaScript or otherwise untyped SDK consumers; adapter-level validation MAY fail earlier but MUST NOT be the only enforcement.
+Runtime shape-validation failures MUST throw `InvalidInputError` with actionable issue text; spec ID content failures always throw `InvalidSpecIdError` and never `InvalidInputError`. This Core validation is authoritative for every caller, including JavaScript or otherwise untyped SDK consumers; adapter-level validation MAY fail earlier but MUST NOT be the only enforcement.
+
+### Requirement: Spec ID validation
+
+Before workspace resolution, schema resolution, artifact reads, or persisted-state I/O, the use case MUST validate and normalize `specId` with `parseSpecId` and the configured workspaces (see `core:spec-id-format`). A bare path is resolved to the `default` workspace, so the input accepts a bare or fully-qualified valid ID, and every `specId` in the result is the fully-qualified form. An invalid ID fails with `InvalidSpecIdError` and an unknown workspace with `WorkspaceNotFoundError`, quoting the full original value, and nothing is written. Delivery adapters pass the raw string and perform no validation of their own.
 
 ### Requirement: Mutual exclusivity and minimum operation
 

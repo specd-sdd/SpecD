@@ -26,6 +26,11 @@ export { createApproveSpec, type ApproveSpecDeps } from './approve-spec.js'
 export { createApproveSignoff, type ApproveSignoffDeps } from './approve-signoff.js'
 export { createArchiveChange, type ArchiveChangeDeps } from './archive-change.js'
 export { createValidateArtifacts, type ValidateArtifactsDeps } from './validate-artifacts.js'
+export {
+  createValidateChangeBatch,
+  type ValidateChangeBatchDeps,
+  resolveValidateChangeBatchDeps,
+} from './validate-change-batch.js'
 export { createCompileContext, type CompileContextDeps } from './compile-context.js'
 export { createValidateSpecs, type ValidateSpecsDeps } from './validate-specs.js'
 export { createGetSpecsHealth, type GetSpecsHealthDeps } from './get-specs-health.js'
@@ -33,6 +38,7 @@ export { createGetSpecContext, type GetSpecContextDeps } from './get-spec-contex
 export { createDetectOverlap, type DetectOverlapDeps } from './detect-overlap.js'
 export { createPreviewSpec, type PreviewSpecDeps } from './preview-spec.js'
 export { createResolveSchema, type ResolveSchemaDeps } from './resolve-schema.js'
+export { createGetChangeSpecDeps, type GetChangeSpecDepsDeps } from './get-change-spec-deps.js'
 export { createUpdateSpecDeps, type UpdateSpecDepsDeps } from './update-spec-deps.js'
 export { createInvalidateChange, type InvalidateChangeDeps } from './invalidate-change.js'
 export {

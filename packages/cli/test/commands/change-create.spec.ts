@@ -30,6 +30,10 @@ import {
   ChangeAlreadyExistsError,
   createKernel,
   DEFAULT_INVALIDATION_POLICY,
+  InvalidInputError,
+  InvalidSpecIdError,
+  ReadOnlyWorkspaceError,
+  WorkspaceNotFoundError,
   type Kernel,
   type SpecdConfig,
 } from '@specd/sdk'
@@ -49,7 +53,31 @@ function setup(configOverrides: Record<string, unknown> = {}) {
 
 afterEach(() => vi.restoreAllMocks())
 
+describe('Invalid invalidation policy', () => {
+  it('rejects an unknown --artifact-policy value with exit 1', async () => {
+    const { kernel, stderr } = setup()
+
+    const program = makeProgram()
+    registerChangeCreate(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'create', 'feat', '--artifact-policy', 'sugical'])
+      .catch(() => {})
+
+    expect(kernel.changes.create.execute).not.toHaveBeenCalled()
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toContain('sugical')
+  })
+})
+
 describe('Command signature', () => {
+  it('documents changePath in its structured output', () => {
+    const program = makeProgram()
+    registerChangeCreate(program.command('change'))
+    const stdout = captureStdout()
+    program.commands[0]!.commands.find((c) => c.name() === 'create')!.outputHelp()
+    expect(stdout()).toContain('JSON/TOON output schema:')
+    expect(stdout()).toContain('changePath: string')
+  })
   it('Missing name argument', async () => {
     setup()
 
@@ -82,7 +110,7 @@ describe('Command signature', () => {
 })
 
 describe('Workspace resolution', () => {
-  it('Workspace prefix omitted defaults to default', async () => {
+  it('forwards a bare spec ID raw to the use case', async () => {
     const { kernel } = setup()
     kernel.changes.create.execute.mockResolvedValue({
       change: makeMockChange({ name: 'my-change', state: 'drafting' }),
@@ -102,31 +130,12 @@ describe('Workspace resolution', () => {
     ])
 
     expect(kernel.changes.create.execute).toHaveBeenCalledWith(
-      expect.objectContaining({ specIds: ['default:auth/login'] }),
+      expect.objectContaining({ specIds: ['auth/login'] }),
     )
   })
 
-  it('Explicit workspace prefix used', async () => {
-    const { kernel, stdout } = setup({
-      workspaces: [
-        {
-          name: 'default',
-          specsPath: '/project/specs',
-          schemasPath: null,
-          codeRoot: '/project',
-          ownership: 'owned' as const,
-          isExternal: false,
-        },
-        {
-          name: 'billing-ws',
-          specsPath: '/project/billing/specs',
-          schemasPath: null,
-          codeRoot: '/project/billing',
-          ownership: 'owned' as const,
-          isExternal: false,
-        },
-      ],
-    })
+  it('forwards an explicit workspace-qualified ID raw', async () => {
+    const { kernel, stdout } = setup()
     kernel.changes.create.execute.mockResolvedValue({
       change: makeMockChange({ name: 'my-change', state: 'drafting' }),
       changePath: '/tmp/test-changes/my-change',
@@ -150,8 +159,9 @@ describe('Workspace resolution', () => {
     expect(stdout()).toContain('created change my-change')
   })
 
-  it('Unknown workspace prefix', async () => {
-    const { stderr } = setup()
+  it('maps WorkspaceNotFoundError for an unknown workspace', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.create.execute.mockRejectedValue(new WorkspaceNotFoundError('nonexistent-ws'))
 
     const program = makeProgram()
     registerChangeCreate(program.command('change'))
@@ -167,8 +177,40 @@ describe('Workspace resolution', () => {
       ])
       .catch(() => {})
 
+    expect(kernel.changes.create.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ specIds: ['nonexistent-ws:some/path'] }),
+    )
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
+  })
+
+  it('forwards a comma-containing ID as one value', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.create.execute.mockRejectedValue(
+      new InvalidSpecIdError('auth/a,b', "segment 'a,b' is invalid"),
+    )
+
+    const program = makeProgram()
+    registerChangeCreate(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'create', 'my-change', '--spec', 'auth/a,b'])
+      .catch(() => {})
+
+    expect(kernel.changes.create.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ specIds: ['auth/a,b'] }),
+    )
+    expect(stderr()).toMatch(/error:/)
+  })
+
+  it('does not import helpers/spec-path and the helper file is gone', async () => {
+    const source = await fs.readFile(
+      new URL('../../src/commands/change/create.ts', import.meta.url),
+      'utf-8',
+    )
+    expect(source).not.toContain('helpers/spec-path')
+    await expect(
+      fs.access(new URL('../../src/helpers/spec-path.ts', import.meta.url)),
+    ).rejects.toMatchObject({ code: 'ENOENT' })
   })
 })
 
@@ -323,27 +365,13 @@ describe('Overlap warning delegation', () => {
 })
 
 describe('ReadOnly workspace rejection', () => {
-  it('rejects --spec targeting readOnly workspace', async () => {
-    const { kernel, stderr } = setup({
-      workspaces: [
-        {
-          name: 'default',
-          specsPath: '/project/specs',
-          schemasPath: null,
-          codeRoot: '/project',
-          ownership: 'owned' as const,
-          isExternal: false,
-        },
-        {
-          name: 'platform',
-          specsPath: '/external/platform/specs',
-          schemasPath: null,
-          codeRoot: '/external/platform',
-          ownership: 'readOnly' as const,
-          isExternal: true,
-        },
-      ],
-    })
+  it('maps ReadOnlyWorkspaceError from the use case', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.create.execute.mockRejectedValue(
+      new ReadOnlyWorkspaceError(
+        'Cannot add --spec "platform:auth/tokens" to change — workspace "platform" is readOnly.',
+      ),
+    )
 
     const program = makeProgram()
     registerChangeCreate(program.command('change'))
@@ -359,9 +387,90 @@ describe('ReadOnly workspace rejection', () => {
       ])
       .catch(() => {})
 
+    expect(kernel.changes.create.execute).toHaveBeenCalled()
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain('workspace "platform" is readOnly')
-    expect(kernel.changes.create.execute).not.toHaveBeenCalled()
+  })
+})
+
+describe('create gaps (audit hardening)', () => {
+  it('maps an invalid change name rejected by core', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.create.execute.mockRejectedValue(
+      new InvalidSpecIdError('Bad Id', 'contains a space'),
+    )
+
+    const program = makeProgram()
+    registerChangeCreate(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'create', 'my-change', '--spec', 'Bad Id'])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toContain("'Bad Id'")
+  })
+
+  it('prints every readOnly offender line for mixed owned/readOnly specs', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.create.execute.mockRejectedValue(
+      new ReadOnlyWorkspaceError(
+        'Cannot add spec "platform:auth/tokens" to change — workspace "platform" is readOnly.\n\nReadOnly workspaces are protected.',
+      ),
+    )
+
+    const program = makeProgram()
+    registerChangeCreate(program.command('change'))
+    await program
+      .parseAsync([
+        'node',
+        'specd',
+        'change',
+        'create',
+        'my-change',
+        '--spec',
+        'default:auth/login',
+        '--spec',
+        'platform:auth/tokens',
+      ])
+      .catch(() => {})
+
+    const err = stderr()
+    expect(err).toContain('platform:auth/tokens')
+    expect(err).not.toContain('Cannot add spec "default:auth/login"')
+  })
+
+  it('prints one line per readOnly offender for multiple readOnly specs', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.create.execute.mockRejectedValue(
+      new ReadOnlyWorkspaceError(
+        [
+          'Cannot add spec "platform:auth/tokens" to change — workspace "platform" is readOnly.',
+          'Cannot add spec "vendor:lib/core" to change — workspace "vendor" is readOnly.',
+          '',
+          'ReadOnly workspaces are protected.',
+        ].join('\n'),
+      ),
+    )
+
+    const program = makeProgram()
+    registerChangeCreate(program.command('change'))
+    await program
+      .parseAsync([
+        'node',
+        'specd',
+        'change',
+        'create',
+        'my-change',
+        '--spec',
+        'platform:auth/tokens',
+        '--spec',
+        'vendor:lib/core',
+      ])
+      .catch(() => {})
+
+    const err = stderr()
+    expect(err).toContain('platform:auth/tokens')
+    expect(err).toContain('vendor:lib/core')
   })
 })
 
@@ -622,5 +731,33 @@ describe('structured invalidation policy flags', () => {
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain("invalid --artifact-policy 'wide'")
     expect(kernel.changes.create.execute).not.toHaveBeenCalled()
+  })
+
+  it('outputs TOON format with --format toon', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.create.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-toon-change', state: 'drafting' }),
+      changePath: '/tmp/test-changes/my-toon-change',
+    })
+
+    const program = makeProgram()
+    registerChangeCreate(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'create',
+      'my-toon-change',
+      '--spec',
+      'auth/login',
+      '--format',
+      'toon',
+    ])
+
+    const out = stdout()
+    expect(out).toContain('result: ok')
+    expect(out).toContain('name: my-toon-change')
+    expect(out).toContain('state: drafting')
+    expect(out).toContain('changePath:')
   })
 })

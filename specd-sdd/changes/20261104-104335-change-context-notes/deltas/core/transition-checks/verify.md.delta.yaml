@@ -1,0 +1,29 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Automatic explanatory notes
+
+    #### Scenario: Repeated observation and second overlap differ
+
+    - **GIVEN** a change is already designing with open review, then a different archive successfully overlaps it
+    - **WHEN** reconciliation observes twice and later applies the new overlap consequence
+    - **THEN** observation creates no notes or recovery; the new consequence requests context even though needsArtifactReview returns false
+    - **AND** current exact duplicate note matching may reuse the stored note
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Recovery note cleanup policies
+
+    #### Scenario: Repair detours preserve useful archive context
+
+    - **GIVEN** an archive failure note uses D/I/archive-success and verification may be disabled
+    - **WHEN** retry enters archiving, fails, returns archivable, then goes back through designing and advances ready
+    - **THEN** retry/rollback preserves the existing note until forward design completion
+    - **AND** new failure notes are added after recovery and duplicate conditions remove once

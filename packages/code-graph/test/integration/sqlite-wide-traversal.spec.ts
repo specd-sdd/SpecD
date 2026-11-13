@@ -34,7 +34,7 @@ describe('SQLite wide traversal', () => {
       const inputFiles = Array.from({ length: 6 }, (_, fileIndex) =>
         createFileNode({
           path: `code-graph:src/input-${String(fileIndex)}.ts`,
-          configRelativePath: `src/input-${String(fileIndex)}.ts`,
+          projectRelativePath: `src/input-${String(fileIndex)}.ts`,
           language: 'typescript',
           contentHash: `sha256:input-${String(fileIndex)}`,
           workspace: 'code-graph',
@@ -42,14 +42,14 @@ describe('SQLite wide traversal', () => {
       )
       const callerFile = createFileNode({
         path: 'code-graph:src/callers.ts',
-        configRelativePath: 'src/callers.ts',
+        projectRelativePath: 'src/callers.ts',
         language: 'typescript',
         contentHash: 'sha256:callers',
         workspace: 'code-graph',
       })
       const dependencyFile = createFileNode({
         path: 'code-graph:src/dependencies.ts',
-        configRelativePath: 'src/dependencies.ts',
+        projectRelativePath: 'src/dependencies.ts',
         language: 'typescript',
         contentHash: 'sha256:dependencies',
         workspace: 'code-graph',
@@ -170,14 +170,14 @@ describe('SQLite wide traversal', () => {
 
         const baseFile = createFileNode({
           path: 'code-graph:src/base.ts',
-          configRelativePath: 'src/base.ts',
+          projectRelativePath: 'src/base.ts',
           language: 'typescript',
           contentHash: 'sha256:base',
           workspace: 'code-graph',
         })
         const hierarchyFile = createFileNode({
           path: 'code-graph:src/hierarchy.ts',
-          configRelativePath: 'src/hierarchy.ts',
+          projectRelativePath: 'src/hierarchy.ts',
           language: 'typescript',
           contentHash: 'sha256:hierarchy',
           workspace: 'code-graph',
@@ -262,14 +262,14 @@ describe('SQLite wide traversal', () => {
 
         const targetFile = createFileNode({
           path: 'code-graph:src/target.ts',
-          configRelativePath: 'src/target.ts',
+          projectRelativePath: 'src/target.ts',
           language: 'typescript',
           contentHash: 'sha256:target',
           workspace: 'code-graph',
         })
         const callerFile = createFileNode({
           path: 'code-graph:src/callers.ts',
-          configRelativePath: 'src/callers.ts',
+          projectRelativePath: 'src/callers.ts',
           language: 'typescript',
           contentHash: 'sha256:callers',
           workspace: 'code-graph',
@@ -328,21 +328,21 @@ describe('SQLite wide traversal', () => {
 
       const targetFile = createFileNode({
         path: 'core:src/target.ts',
-        configRelativePath: 'src/target.ts',
+        projectRelativePath: 'src/target.ts',
         language: 'typescript',
         contentHash: 'sha256:wide-filtered-target',
         workspace: 'core',
       })
       const admittedFile = createFileNode({
         path: 'allowed:src/callers.ts',
-        configRelativePath: 'src/callers.ts',
+        projectRelativePath: 'src/callers.ts',
         language: 'typescript',
         contentHash: 'sha256:wide-filtered-allowed',
         workspace: 'allowed',
       })
       const excludedFile = createFileNode({
         path: 'excluded:src/callers.ts',
-        configRelativePath: 'src/callers.ts',
+        projectRelativePath: 'src/callers.ts',
         language: 'typescript',
         contentHash: 'sha256:wide-filtered-excluded',
         workspace: 'excluded',

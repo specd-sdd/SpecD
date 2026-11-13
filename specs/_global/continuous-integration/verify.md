@@ -20,6 +20,20 @@
 - **WHEN** GitHub aggregates the workflow
 - **THEN** the check is failing
 
+### Requirement: The matrix enforces the cross-platform contract
+
+#### Scenario: Failure only on one operating system
+
+- **GIVEN** a test passes on macOS and Ubuntu and fails on Windows
+- **WHEN** the pull request is prepared for merge
+- **THEN** the code is fixed under `_global/cross-platform`
+- **AND** the runner is not excluded, the test is not skipped, and no workflow step masks the failure
+
+#### Scenario: Merge blocked by a red runner
+
+- **WHEN** any of the three runners fails
+- **THEN** the pull request does not merge
+
 ### Requirement: When the workflow runs
 
 #### Scenario: A pull request starts the workflow
@@ -52,6 +66,6 @@
 #### Scenario: pnpm test includes guide, sdk, skills, and plugins
 
 - **WHEN** `pnpm test` runs
-- **THEN** Vitest runs for `@specd/guide`, `@specd/sdk`, `@specd/skills`, `@specd/plugin-manager`, and each `@specd/plugin-agent-*` package
+- **THEN** Vitest runs for `@specd/guide`, `@specd/sdk`, `@specd/skills`, `@specd/schema-std`, `@specd/plugin-manager`, and each `@specd/plugin-agent-*` package
 - **AND** it also runs for `@specd/core`, `@specd/cli`, and `@specd/code-graph`
 - **AND** it does not run `@specd/mcp` or `@specd/public-web`

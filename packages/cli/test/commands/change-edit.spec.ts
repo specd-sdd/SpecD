@@ -15,8 +15,15 @@ vi.mock('../../src/helpers/cli-context.js', () => ({
   buildCliKernelOptions: vi.fn(() => ({})),
 }))
 
+import { readFile } from 'node:fs/promises'
 import { resolveCliContext } from '../../src/helpers/cli-context.js'
-import { ChangeNotFoundError } from '@specd/sdk'
+import {
+  ChangeNotFoundError,
+  InvalidInputError,
+  InvalidSpecIdError,
+  ReadOnlyWorkspaceError,
+  WorkspaceNotFoundError,
+} from '@specd/sdk'
 import { registerChangeEdit } from '../../src/commands/change/edit.js'
 
 function setup() {
@@ -38,6 +45,20 @@ function setup() {
 afterEach(() => vi.restoreAllMocks())
 
 describe('change edit', () => {
+  it('rejects an unknown --artifact-policy value with exit 1', async () => {
+    const { kernel, stderr } = setup()
+
+    const program = makeProgram()
+    registerChangeEdit(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'edit', 'feat', '--artifact-policy', 'sugical'])
+      .catch(() => {})
+
+    expect(kernel.changes.edit.execute).not.toHaveBeenCalled()
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toContain('sugical')
+  })
+
   it('exits 1 when no options provided', async () => {
     const { stderr } = setup()
 
@@ -300,8 +321,9 @@ describe('change edit', () => {
     expect(parsed.state).toBe('designing')
   })
 
-  it('exits 1 when --add-spec uses unknown workspace prefix', async () => {
-    const { stderr } = setup()
+  it('forwards --add-spec raw and maps WorkspaceNotFoundError', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.edit.execute.mockRejectedValue(new WorkspaceNotFoundError('unknown-ws'))
 
     const program = makeProgram()
     registerChangeEdit(program.command('change'))
@@ -309,45 +331,38 @@ describe('change edit', () => {
       .parseAsync(['node', 'specd', 'change', 'edit', 'feat', '--add-spec', 'unknown-ws:some/path'])
       .catch(() => {})
 
+    expect(kernel.changes.edit.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ addSpecIds: ['unknown-ws:some/path'] }),
+    )
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
   })
 
-  it('exits 1 when --add-spec targets readOnly workspace', async () => {
-    const config = makeMockConfig({
-      workspaces: [
-        {
-          name: 'default',
-          specsPath: '/project/specs',
-          specsAdapter: { adapter: 'fs', config: { path: '/project/specs' } },
-          schemasPath: null,
-          schemasAdapter: null,
-          codeRoot: '/project',
-          ownership: 'owned' as const,
-          isExternal: false,
-        },
-        {
-          name: 'platform',
-          specsPath: '/external/platform/specs',
-          specsAdapter: { adapter: 'fs', config: { path: '/external/platform/specs' } },
-          schemasPath: null,
-          schemasAdapter: null,
-          codeRoot: '/external/platform',
-          ownership: 'readOnly' as const,
-          isExternal: true,
-        },
-      ],
-    })
-    const kernel = makeMockKernel()
-    vi.mocked(resolveCliContext).mockResolvedValue(
-      makeMockHost({
-        config: config,
-        configFilePath: null,
-        kernel: kernel,
-      }),
+  it('forwards a comma-containing ID as one value', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.edit.execute.mockRejectedValue(
+      new InvalidSpecIdError('auth/a,b', "segment 'a,b' is invalid"),
     )
-    const stderr = captureStderr()
-    mockProcessExit()
+
+    const program = makeProgram()
+    registerChangeEdit(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'edit', 'feat', '--add-spec', 'auth/a,b'])
+      .catch(() => {})
+
+    expect(kernel.changes.edit.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ addSpecIds: ['auth/a,b'] }),
+    )
+    expect(stderr()).toMatch(/error:/)
+  })
+
+  it('maps ReadOnlyWorkspaceError from the use case', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.edit.execute.mockRejectedValue(
+      new ReadOnlyWorkspaceError(
+        'Cannot add --spec "platform:auth/tokens" to change — workspace "platform" is readOnly.',
+      ),
+    )
 
     const program = makeProgram()
     registerChangeEdit(program.command('change'))
@@ -355,9 +370,118 @@ describe('change edit', () => {
       .parseAsync(['node', 'specd', 'change', 'edit', 'feat', '--add-spec', 'platform:auth/tokens'])
       .catch(() => {})
 
+    expect(kernel.changes.edit.execute).toHaveBeenCalled()
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain('workspace "platform" is readOnly')
-    expect(kernel.changes.edit.execute).not.toHaveBeenCalled()
+  })
+
+  it('does not import helpers/spec-path', async () => {
+    const source = await readFile(
+      new URL('../../src/commands/change/edit.ts', import.meta.url),
+      'utf-8',
+    )
+    expect(source).not.toContain('helpers/spec-path')
+  })
+})
+
+describe('change edit gaps (audit hardening)', () => {
+  it('exits 1 with the quoted value for "Bad Id"', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.edit.execute.mockRejectedValue(
+      new InvalidSpecIdError('Bad Id', 'contains a space'),
+    )
+
+    const program = makeProgram()
+    registerChangeEdit(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'edit', 'feat', '--add-spec', 'Bad Id'])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toContain("'Bad Id'")
+  })
+
+  it('quotes the whole value for auth/a,b', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.edit.execute.mockRejectedValue(
+      new InvalidSpecIdError('auth/a,b', "segment 'a,b' is invalid"),
+    )
+
+    const program = makeProgram()
+    registerChangeEdit(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'edit', 'feat', '--add-spec', 'auth/a,b'])
+      .catch(() => {})
+
+    expect(stderr()).toContain("'auth/a,b'")
+  })
+
+  it('forwards --remove-spec raw', async () => {
+    const { kernel } = setup()
+    kernel.changes.edit.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'feat', specIds: [] }),
+      invalidated: false,
+    })
+
+    const program = makeProgram()
+    registerChangeEdit(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'edit', 'feat', '--remove-spec', 'auth/login'])
+      .catch(() => {})
+
+    expect(kernel.changes.edit.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ removeSpecIds: ['auth/login'] }),
+    )
+  })
+
+  it('reports the usage error before resolving the config', async () => {
+    const { stderr } = setup()
+    vi.mocked(resolveCliContext).mockReset()
+    vi.mocked(resolveCliContext).mockRejectedValue(new Error('config could not be resolved'))
+
+    const program = makeProgram()
+    registerChangeEdit(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'edit', 'feat']).catch(() => {})
+
+    expect(resolveCliContext).not.toHaveBeenCalled()
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toContain('at least one of --add-spec')
+    expect(stderr()).not.toContain('config could not be resolved')
+  })
+
+  it('does not read SpecdConfig or workspace ownership in the command source', async () => {
+    const source = await readFile(
+      new URL('../../src/commands/change/edit.ts', import.meta.url),
+      'utf-8',
+    )
+    expect(source).not.toContain('SpecdConfig')
+    expect(source).not.toContain('ownership')
+  })
+
+  it('outputs TOON format with --format toon', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.edit.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'feat', specIds: ['default:auth/login'] }),
+      invalidated: false,
+    })
+
+    const program = makeProgram()
+    registerChangeEdit(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'edit',
+      'feat',
+      '--add-spec',
+      'auth/login',
+      '--format',
+      'toon',
+    ])
+
+    const out = stdout()
+    expect(out).toContain('name: feat')
+    expect(out).toContain('default:auth/login')
   })
 
   it('names the structured policy flags when no edit option is provided', async () => {

@@ -20,4 +20,11 @@ describe('ReadOnlyWorkspaceError', () => {
     const err = new ReadOnlyWorkspaceError('any')
     expect(err.code).toBe('READ_ONLY_WORKSPACE')
   })
+
+  it('forSpec builds the spec/workspace message and keeps the code', () => {
+    const err = ReadOnlyWorkspaceError.forSpec('core:x', 'core')
+    expect(err).toBeInstanceOf(ReadOnlyWorkspaceError)
+    expect(err.message).toBe('Cannot modify spec "core:x" — workspace "core" is readOnly.')
+    expect(err.code).toBe('READ_ONLY_WORKSPACE')
+  })
 })

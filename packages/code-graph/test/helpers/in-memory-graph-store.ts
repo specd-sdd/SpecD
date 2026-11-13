@@ -13,7 +13,8 @@ import {
   type StorageGenerationSnapshot,
 } from '../../src/domain/ports/graph-store.js'
 import { type DocumentNode } from '../../src/domain/value-objects/document-node.js'
-import { type FileNode } from '../../src/domain/value-objects/file-node.js'
+import { type FileNode, type FileCategory } from '../../src/domain/value-objects/file-node.js'
+import { resolveAdmittedCategories } from '../../src/domain/value-objects/impact-result.js'
 import { type SymbolNode } from '../../src/domain/value-objects/symbol-node.js'
 import { type SpecNode } from '../../src/domain/value-objects/spec-node.js'
 import { type Relation } from '../../src/domain/value-objects/relation.js'
@@ -109,6 +110,7 @@ export class InMemoryGraphStore extends GraphStore {
   private relations: Relation[] = []
   private logicalSymbols = new Map<string, LogicalSymbol>()
   private declarationsByLogicalSymbol = new Map<string, LogicalDeclaration[]>()
+  private declarationsByPhysicalSymbol = new Map<string, LogicalDeclaration>()
   private publicBindings = new Map<string, PublicBinding>()
   private localBindings = new Map<string, LocalBinding>()
   private resolutionStepsBySource = new Map<string, ResolutionStep[]>()
@@ -229,7 +231,16 @@ export class InMemoryGraphStore extends GraphStore {
 
   async addRelations(relations: Relation[]): Promise<void> {
     this.ensureOpen()
-    this.relations.push(...relations)
+    this.relations.push(...relations.filter((relation) => !this.isPhysicalCoverageTarget(relation)))
+  }
+
+  /**
+   * Mirrors persistent stores: symbol coverage targets logical symbols only.
+   * @param relation - Candidate relation.
+   * @returns True when the relation covers a physical declaration symbol.
+   */
+  private isPhysicalCoverageTarget(relation: Relation): boolean {
+    return relation.type === RelationType.CoversSymbol && this.symbols.has(relation.target)
   }
 
   async bulkLoad(data: {
@@ -251,7 +262,9 @@ export class InMemoryGraphStore extends GraphStore {
     for (const d of data.documents ?? []) this.documents.set(d.path, d)
     for (const s of data.symbols) this.symbols.set(s.id, s)
     for (const sp of data.specs) this.specs.set(sp.specId, sp)
-    this.relations.push(...data.relations)
+    this.relations.push(
+      ...data.relations.filter((relation) => !this.isPhysicalCoverageTarget(relation)),
+    )
     this._lastIndexedAt = new Date().toISOString()
     if (data.vcsRef !== undefined) {
       this._lastIndexedRef = data.vcsRef
@@ -336,10 +349,12 @@ export class InMemoryGraphStore extends GraphStore {
 
     const logicalSymbols = new Map(facts.logicalSymbols.map((symbol) => [symbol.id, symbol]))
     const declarationsByLogicalSymbol = new Map<string, LogicalDeclaration[]>()
+    const declarationsByPhysicalSymbol = new Map<string, LogicalDeclaration>()
     for (const declaration of facts.declarations) {
       const existing = declarationsByLogicalSymbol.get(declaration.logicalSymbolId) ?? []
       existing.push(declaration)
       declarationsByLogicalSymbol.set(declaration.logicalSymbolId, existing)
+      declarationsByPhysicalSymbol.set(declaration.declaration.symbolId, declaration)
     }
     const resolutionStepsBySource = new Map<string, ResolutionStep[]>()
     for (const step of facts.steps) {
@@ -350,12 +365,21 @@ export class InMemoryGraphStore extends GraphStore {
 
     this.logicalSymbols = logicalSymbols
     this.declarationsByLogicalSymbol = declarationsByLogicalSymbol
+    this.declarationsByPhysicalSymbol = declarationsByPhysicalSymbol
     this.publicBindings = new Map(facts.publicBindings.map((binding) => [binding.id, binding]))
     this.localBindings = new Map(facts.localBindings.map((binding) => [binding.id, binding]))
     this.resolutionStepsBySource = resolutionStepsBySource
     this.coverageByFilePath = new Map(
       facts.coverage.map((coverage) => [coverage.filePath, coverage]),
     )
+  }
+
+  /**
+   * Returns every stored relation in deterministic order, for semantic-state comparisons in tests.
+   * @returns Stored relations.
+   */
+  allRelationsForTest(): Relation[] {
+    return [...this.relations].sort(compareRelations)
   }
 
   async getAllReferenceFacts(): Promise<ReferenceFactsWrite> {
@@ -404,10 +428,32 @@ export class InMemoryGraphStore extends GraphStore {
   async findDeclarations(logicalSymbolIds: readonly string[]): Promise<LogicalDeclaration[]> {
     this.ensureOpen()
     const results: LogicalDeclaration[] = []
-    for (const logicalSymbolId of new Set(logicalSymbolIds)) {
-      results.push(...(this.declarationsByLogicalSymbol.get(logicalSymbolId) ?? []))
+    const seen = new Set<string>()
+    for (const logicalSymbolId of logicalSymbolIds) {
+      if (seen.has(logicalSymbolId)) continue
+      seen.add(logicalSymbolId)
+      const declarations = (this.declarationsByLogicalSymbol.get(logicalSymbolId) ?? []).slice()
+      declarations.sort(compareDeclarationsWithinTarget)
+      results.push(...declarations)
     }
-    return results.sort(compareLogicalDeclarations)
+    return results
+  }
+
+  async findLogicalDeclarationsByDeclarationIds(
+    declarationSymbolIds: readonly string[],
+  ): Promise<LogicalDeclaration[]> {
+    this.ensureOpen()
+    const results: LogicalDeclaration[] = []
+    const seen = new Set<string>()
+    for (const declarationSymbolId of declarationSymbolIds) {
+      if (seen.has(declarationSymbolId)) continue
+      seen.add(declarationSymbolId)
+      const declaration = this.declarationsByPhysicalSymbol.get(declarationSymbolId)
+      if (declaration !== undefined) {
+        results.push(declaration)
+      }
+    }
+    return results
   }
 
   async findPublicBindings(lookups: readonly PublicBindingLookup[]): Promise<PublicBinding[]> {
@@ -504,22 +550,22 @@ export class InMemoryGraphStore extends GraphStore {
     return this.documents.get(path)
   }
 
-  async findFilesByConfigRelativePath(configRelativePath: string): Promise<FileNode[]> {
+  async findFilesByProjectRelativePath(projectRelativePath: string): Promise<FileNode[]> {
     this.ensureOpen()
     const results: FileNode[] = []
     for (const file of this.files.values()) {
-      if (file.configRelativePath === configRelativePath) {
+      if (file.projectRelativePath === projectRelativePath) {
         results.push(file)
       }
     }
     return results
   }
 
-  async findDocumentsByConfigRelativePath(configRelativePath: string): Promise<DocumentNode[]> {
+  async findDocumentsByProjectRelativePath(projectRelativePath: string): Promise<DocumentNode[]> {
     this.ensureOpen()
     const results: DocumentNode[] = []
     for (const document of this.documents.values()) {
-      if (document.configRelativePath === configRelativePath) {
+      if (document.projectRelativePath === projectRelativePath) {
         results.push(document)
       }
     }
@@ -560,6 +606,8 @@ export class InMemoryGraphStore extends GraphStore {
     const relationTypes = new Set(input.relationTypes)
     const admittedRelations = new Map<string, Relation>()
     const neighboringIds = new Set<string>()
+    const omittedTestFiles = new Set<string>()
+    const omittedIgnoredFiles = new Set<string>()
 
     for (const relation of this.relations) {
       if (!relationTypes.has(relation.type)) continue
@@ -578,13 +626,42 @@ export class InMemoryGraphStore extends GraphStore {
         neighbors.push(relation.target)
       }
 
+      // Downstream spec -> symbol coverage targets logical symbols; expose their declarations.
+      const expandsLogicalCoverage =
+        input.resource === 'symbol' &&
+        input.direction === 'downstream' &&
+        relation.type === RelationType.CoversSymbol
+
       for (const neighbor of neighbors) {
-        if (!this.matchesImpactResource(input, neighbor)) continue
-        admittedRelations.set(
-          `${relation.source}\u0000${relation.type}\u0000${relation.target}`,
-          relation,
-        )
-        neighboringIds.add(neighbor)
+        if (expandsLogicalCoverage) {
+          for (const declaration of this.declarationsByLogicalSymbol.get(neighbor) ?? []) {
+            const declarationId = declaration.declaration.symbolId
+            const declarationEvaluation = this.evaluateImpactResource(input, declarationId)
+            if (declarationEvaluation.status === 'admitted') {
+              const expanded = { ...relation, target: declarationId }
+              admittedRelations.set(
+                `${expanded.source}\u0000${expanded.type}\u0000${expanded.target}`,
+                expanded,
+              )
+              neighboringIds.add(declarationId)
+            }
+          }
+          continue
+        }
+        const evaluation = this.evaluateImpactResource(input, neighbor)
+        if (evaluation.status === 'admitted') {
+          admittedRelations.set(
+            `${relation.source}\u0000${relation.type}\u0000${relation.target}`,
+            relation,
+          )
+          neighboringIds.add(neighbor)
+        } else if (evaluation.status === 'omitted-by-category') {
+          if (evaluation.category === 'test') {
+            omittedTestFiles.add(evaluation.filePath)
+          } else if (evaluation.category === 'ignored') {
+            omittedIgnoredFiles.add(evaluation.filePath)
+          }
+        }
       }
     }
 
@@ -592,7 +669,7 @@ export class InMemoryGraphStore extends GraphStore {
     const materializes = (type: 'files' | 'symbols' | 'specs'): boolean =>
       types === undefined || types.length === 0 || types.includes(type)
 
-    return {
+    const result: ImpactFrontierResult = {
       relations: [...admittedRelations.values()].sort(compareRelations),
       symbols: materializes('symbols')
         ? [...neighboringIds]
@@ -613,6 +690,88 @@ export class InMemoryGraphStore extends GraphStore {
             .sort((left, right) => left.specId.localeCompare(right.specId))
         : [],
     }
+
+    if (omittedTestFiles.size > 0 || omittedIgnoredFiles.size > 0) {
+      return {
+        ...result,
+        omittedCounts: {
+          tests: omittedTestFiles.size,
+          ignored: omittedIgnoredFiles.size,
+        },
+        omittedFiles: {
+          tests: [...omittedTestFiles].sort(),
+          ignored: [...omittedIgnoredFiles].sort(),
+        },
+      }
+    }
+
+    return result
+  }
+
+  /**
+   * Evaluates whether one neighboring identifier satisfies the filter predicates.
+   * Distinguishes category omissions from workspace/kind rejections.
+   */
+  private evaluateImpactResource(
+    input: ImpactFrontierQuery,
+    id: string,
+  ):
+    | { status: 'admitted' }
+    | { status: 'rejected' }
+    | { status: 'omitted-by-category'; filePath: string; category: FileCategory } {
+    const filter = input.filter
+    const admittedCategories = resolveAdmittedCategories(filter)
+    let workspace: string | undefined
+    let filePath: string | undefined
+    let category: FileCategory | undefined
+
+    if (input.resource === 'symbol') {
+      const symbol = this.symbols.get(id)
+      if (symbol === undefined) return { status: 'rejected' }
+      if (
+        filter?.kinds !== undefined &&
+        filter.kinds.length > 0 &&
+        !filter.kinds.includes(symbol.kind)
+      ) {
+        return { status: 'rejected' }
+      }
+      const file = this.files.get(symbol.filePath)
+      workspace = file?.workspace
+      filePath = symbol.filePath
+      category = file?.category ?? 'source'
+    } else if (input.resource === 'file') {
+      const file = this.files.get(id)
+      if (file === undefined) return { status: 'rejected' }
+      workspace = file.workspace
+      filePath = file.path
+      category = file.category ?? 'source'
+    } else {
+      const spec = this.specs.get(id)
+      if (spec === undefined) return { status: 'rejected' }
+      workspace = spec.workspace
+    }
+
+    const excluded = new Set(filter?.excludeWorkspaces ?? [])
+    if (workspace !== undefined && excluded.has(workspace)) return { status: 'rejected' }
+
+    const included = filter?.workspaces
+    if (
+      included !== undefined &&
+      included.length > 0 &&
+      (workspace === undefined || !included.includes(workspace))
+    ) {
+      return { status: 'rejected' }
+    }
+
+    if (
+      category !== undefined &&
+      filePath !== undefined &&
+      !admittedCategories.includes(category)
+    ) {
+      return { status: 'omitted-by-category', filePath, category }
+    }
+
+    return { status: 'admitted' }
   }
 
   /**
@@ -623,39 +782,7 @@ export class InMemoryGraphStore extends GraphStore {
    * @returns Whether the resource admits its relation into the frontier result.
    */
   private matchesImpactResource(input: ImpactFrontierQuery, id: string): boolean {
-    const filter = input.filter
-    let workspace: string | undefined
-
-    if (input.resource === 'symbol') {
-      const symbol = this.symbols.get(id)
-      if (symbol === undefined) return false
-      if (
-        filter?.kinds !== undefined &&
-        filter.kinds.length > 0 &&
-        !filter.kinds.includes(symbol.kind)
-      ) {
-        return false
-      }
-      workspace = this.files.get(symbol.filePath)?.workspace
-    } else if (input.resource === 'file') {
-      const file = this.files.get(id)
-      if (file === undefined) return false
-      workspace = file.workspace
-    } else {
-      const spec = this.specs.get(id)
-      if (spec === undefined) return false
-      workspace = spec.workspace
-    }
-
-    const excluded = new Set(filter?.excludeWorkspaces ?? [])
-    if (workspace !== undefined && excluded.has(workspace)) return false
-
-    const included = filter?.workspaces
-    return (
-      included === undefined ||
-      included.length === 0 ||
-      (workspace !== undefined && included.includes(workspace))
-    )
+    return this.evaluateImpactResource(input, id).status === 'admitted'
   }
 
   async getIncomingSymbolRelations(
@@ -837,13 +964,18 @@ export class InMemoryGraphStore extends GraphStore {
 
   async getCoveringSpecsForSymbol(symbolId: string): Promise<Relation[]> {
     this.ensureOpen()
+    if (this.logicalSymbols.size > 0 && !this.logicalSymbols.has(symbolId)) return []
     return this.getRelationsByTarget(RelationType.CoversSymbol, symbolId)
   }
 
   async getCoveringSpecsForSymbols(symbolIds: readonly string[]): Promise<Relation[]> {
     this.ensureOpen()
     if (symbolIds.length === 0) return []
-    const targets = new Set(symbolIds)
+    const targets =
+      this.logicalSymbols.size > 0
+        ? new Set(symbolIds.filter((id) => this.logicalSymbols.has(id)))
+        : new Set(symbolIds)
+    if (targets.size === 0) return []
     return this.relations
       .filter(
         (relation) => relation.type === RelationType.CoversSymbol && targets.has(relation.target),
@@ -907,6 +1039,15 @@ export class InMemoryGraphStore extends GraphStore {
           (s) => s.comment !== undefined && s.comment.includes(query.comment!),
         )
       }
+    }
+
+    if (query.categories !== undefined && query.categories.length > 0) {
+      const cats = new Set(query.categories)
+      results = results.filter((s) => {
+        const file = this.files.get(s.filePath)
+        const cat = file?.category ?? 'source'
+        return cats.has(cat)
+      })
     }
 
     return results
@@ -1052,7 +1193,7 @@ export class InMemoryGraphStore extends GraphStore {
     }> = []
     for (const document of this.documents.values()) {
       const text =
-        `${document.path} ${document.configRelativePath} ${document.content}`.toLowerCase()
+        `${document.path} ${document.projectRelativePath} ${document.content}`.toLowerCase()
       const contentScore = countContentTokenHits(text, query.expandedTokens)
       if (contentScore === 0) continue
       if (options.workspace && document.workspace !== options.workspace) continue
@@ -1065,7 +1206,7 @@ export class InMemoryGraphStore extends GraphStore {
         rawTokens: query.rawTokens,
         expandedTokens: query.expandedTokens,
         canonicalIdentity: document.path,
-        alternateIdentity: document.configRelativePath,
+        alternateIdentity: document.projectRelativePath,
         contentScore,
       })
       const score = composeRankingScore(ranking)
@@ -1135,11 +1276,20 @@ export class InMemoryGraphStore extends GraphStore {
     return results
   }
 
-  async getFileImporterCounts(): Promise<Map<string, number>> {
+  async getFileImporterCounts(options?: {
+    categories?: readonly FileCategory[]
+  }): Promise<Map<string, number>> {
     this.ensureOpen()
+    const admitted =
+      options?.categories && options.categories.length > 0 ? new Set(options.categories) : undefined
     const counts = new Map<string, number>()
     for (const rel of this.relations) {
       if (rel.type === RelationType.Imports) {
+        if (admitted) {
+          const sourceFile = this.files.get(rel.source)
+          const category = sourceFile?.category ?? 'source'
+          if (!admitted.has(category)) continue
+        }
         counts.set(rel.target, (counts.get(rel.target) ?? 0) + 1)
       }
     }
@@ -1155,6 +1305,7 @@ export class InMemoryGraphStore extends GraphStore {
     this.relations = []
     this.logicalSymbols.clear()
     this.declarationsByLogicalSymbol.clear()
+    this.declarationsByPhysicalSymbol.clear()
     this.publicBindings.clear()
     this.localBindings.clear()
     this.resolutionStepsBySource.clear()
@@ -1177,6 +1328,7 @@ export class InMemoryGraphStore extends GraphStore {
     this.relations = []
     this.logicalSymbols.clear()
     this.declarationsByLogicalSymbol.clear()
+    this.declarationsByPhysicalSymbol.clear()
     this.publicBindings.clear()
     this.localBindings.clear()
     this.resolutionStepsBySource.clear()
@@ -1377,6 +1529,26 @@ function compareLogicalDeclarations(left: LogicalDeclaration, right: LogicalDecl
     ],
     [
       right.logicalSymbolId,
+      right.declaration.location.filePath,
+      String(right.declaration.location.line),
+      String(right.declaration.location.column),
+      right.declaration.symbolId,
+    ],
+  )
+}
+
+function compareDeclarationsWithinTarget(
+  left: LogicalDeclaration,
+  right: LogicalDeclaration,
+): number {
+  return compareStrings(
+    [
+      left.declaration.location.filePath,
+      String(left.declaration.location.line),
+      String(left.declaration.location.column),
+      left.declaration.symbolId,
+    ],
+    [
       right.declaration.location.filePath,
       String(right.declaration.location.line),
       String(right.declaration.location.column),

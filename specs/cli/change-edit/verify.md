@@ -16,6 +16,33 @@ Scenarios:
 - **WHEN** no scope, description, or policy edit flag is supplied
 - **THEN** the command fails before calling core
 
+#### Scenario: Values are forwarded unchanged
+
+- **WHEN** `specd change edit my-change --add-spec auth/register` is run
+- **THEN** the command forwards `auth/register` to `EditChange` and the use case stores `default:auth/register`
+
+#### Scenario: A value with a comma is one ID
+
+- **WHEN** `specd change edit my-change --add-spec "auth/a,b"` is run
+- **THEN** the command exits with code 1 with the `InvalidSpecIdError` message quoting `auth/a,b`
+- **AND** stderr contains the full value `auth/a,b`
+
+#### Scenario: Usage error precedes configuration resolution
+
+- **GIVEN** no `specd.yaml` can be found
+- **WHEN** `specd change edit my-change` is run with none of the edit flags
+- **THEN** the command exits with code 1 and prints the usage error, not a configuration error
+
+#### Scenario: Remove values are forwarded unchanged
+
+- **WHEN** `specd change edit my-change --remove-spec auth/login` is run
+- **THEN** the command forwards `auth/login` to `EditChange` as `removeSpecIds` without trimming, splitting, or qualifying it
+
+#### Scenario: Command resolves no workspace itself
+
+- **WHEN** the command source is inspected
+- **THEN** it does not read `SpecdConfig` workspaces or ownership to validate `--add-spec`
+
 ### Requirement: Workspace derivation
 
 #### Scenario: Workspace added when new spec requires it
@@ -63,16 +90,6 @@ Scenarios:
 - **AND** workspace `platform` is `readOnly`
 - **THEN** the command exits with code 1
 - **AND** neither spec is added (atomic rejection)
-
-### Requirement: Invariant enforcement
-
-#### Scenario: Removing last spec rejected
-
-- **GIVEN** a change with a single specId `default:auth/login`
-- **WHEN** `specd change edit my-change --remove-spec default:auth/login` is run
-- **THEN** the command exits with code 1
-- **AND** stderr contains an `error:` message
-- **AND** no changes are made to the change
 
 ### Requirement: Approval invalidation
 
@@ -153,3 +170,20 @@ Scenarios:
 - **WHEN** `specd change edit my-change --add-spec platform:auth/tokens` is run
 - **THEN** the command exits with code 1
 - **AND** stderr contains an error about readOnly ownership
+
+#### Scenario: Invalid spec ID
+
+- **WHEN** `specd change edit my-change --add-spec "Bad Id"` is run
+- **THEN** the command exits with code 1 with the `InvalidSpecIdError` message
+- **AND** stderr quotes `Bad Id`
+
+#### Scenario: Unknown workspace
+
+- **WHEN** `specd change edit my-change --add-spec nope:auth/login` is run
+- **THEN** the command exits with code 1 with the `WorkspaceNotFoundError` message
+
+#### Scenario: Invalid invalidation policy
+
+- **WHEN** `specd change edit my-change --invalidation-policy sugical` is run
+- **THEN** the command exits with code 1 with the `InvalidInputError` message from `EditChange`
+- **AND** no changes are made to the change

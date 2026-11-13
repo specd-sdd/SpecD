@@ -1,4 +1,4 @@
-import { type FileNode } from '../value-objects/file-node.js'
+import { type FileCategory, type FileNode } from '../value-objects/file-node.js'
 import { type DocumentNode } from '../value-objects/document-node.js'
 import { type SymbolNode } from '../value-objects/symbol-node.js'
 import { type SpecNode } from '../value-objects/spec-node.js'
@@ -7,7 +7,7 @@ import { type RelationType } from '../value-objects/relation-type.js'
 import { type SymbolQuery } from '../value-objects/symbol-query.js'
 import { type GraphStatistics } from '../value-objects/graph-statistics.js'
 import { type SearchOptions } from '../value-objects/search-options.js'
-import { type ImpactResultFilter } from '../value-objects/impact-result.js'
+import { type ImpactResultFilter, type OmittedCounts } from '../value-objects/impact-result.js'
 import {
   type DeclarationOccurrence,
   type LocalBinding,
@@ -163,6 +163,13 @@ export interface ImpactFrontierResult {
   readonly files: readonly FileNode[]
   /** Hydrated neighboring spec nodes selected by the query. */
   readonly specs: readonly SpecNode[]
+  /** Counts of files omitted by category filtering during this frontier step. */
+  readonly omittedCounts?: OmittedCounts
+  /** Omitted file paths partitioned by category. */
+  readonly omittedFiles?: {
+    readonly tests: readonly string[]
+    readonly ignored: readonly string[]
+  }
 }
 
 /**
@@ -416,6 +423,20 @@ export abstract class GraphStore {
   }
 
   /**
+   * Batch-retrieves logical declaration mappings by physical declaration symbol IDs.
+   * Duplicate IDs are ignored, unknown IDs are omitted, and results follow the first requested ID order.
+   * Empty input returns [] without backend work.
+   * @param declarationSymbolIds - Physical declaration symbol identifiers to map.
+   * @returns Matching logical declarations in deterministic order.
+   */
+  findLogicalDeclarationsByDeclarationIds(
+    declarationSymbolIds: readonly string[],
+  ): Promise<LogicalDeclaration[]> {
+    void declarationSymbolIds
+    return Promise.reject(new Error('Reference facts are not supported by this graph store'))
+  }
+
+  /**
    * Batch-looks up public bindings by surface, exported spelling, and space.
    * @param lookups - Public route keys to resolve in one backend operation.
    * @returns Matching public bindings in deterministic order.
@@ -483,18 +504,18 @@ export abstract class GraphStore {
   abstract getDocument(path: string): Promise<DocumentNode | undefined>
 
   /**
-   * Retrieves all file nodes whose configRelativePath exactly matches the given path.
-   * @param configRelativePath - The normalized config-relative path to search.
+   * Retrieves all file nodes whose projectRelativePath exactly matches the given path.
+   * @param projectRelativePath - The normalized project-relative path to search.
    * @returns An array of matching file nodes.
    */
-  abstract findFilesByConfigRelativePath(configRelativePath: string): Promise<FileNode[]>
+  abstract findFilesByProjectRelativePath(projectRelativePath: string): Promise<FileNode[]>
 
   /**
-   * Retrieves all document nodes whose configRelativePath exactly matches the given path.
-   * @param configRelativePath - The normalized config-relative path to search.
+   * Retrieves all document nodes whose projectRelativePath exactly matches the given path.
+   * @param projectRelativePath - The normalized project-relative path to search.
    * @returns An array of matching document nodes.
    */
-  abstract findDocumentsByConfigRelativePath(configRelativePath: string): Promise<DocumentNode[]>
+  abstract findDocumentsByProjectRelativePath(projectRelativePath: string): Promise<DocumentNode[]>
 
   /**
    * Retrieves a symbol node by its id.
@@ -732,19 +753,21 @@ export abstract class GraphStore {
   abstract getCoveredSymbols(specId: string): Promise<Relation[]>
 
   /**
-   * Returns all symbol-coverage relations targeting the given symbol.
-   * @param symbolId - The symbol id to find covering specs for.
+   * Returns all symbol-coverage relations targeting the given logical symbol.
+   * Physical declaration IDs are not valid targets.
+   * @param logicalSymbolId - The logical symbol identifier to find covering specs for.
    * @returns An array of COVERS_SYMBOL relations.
    */
-  abstract getCoveringSpecsForSymbol(symbolId: string): Promise<Relation[]>
+  abstract getCoveringSpecsForSymbol(logicalSymbolId: string): Promise<Relation[]>
 
   /**
-   * Returns symbol-coverage relations targeting any requested symbol in one batch.
+   * Returns symbol-coverage relations targeting any requested logical symbol in one batch.
    * Empty input must return without backend work.
-   * @param symbolIds - Symbol identifiers.
+   * Physical declaration IDs are not valid targets.
+   * @param logicalSymbolIds - Logical symbol identifiers.
    * @returns Deterministically ordered COVERS_SYMBOL relations.
    */
-  abstract getCoveringSpecsForSymbols(symbolIds: readonly string[]): Promise<Relation[]>
+  abstract getCoveringSpecsForSymbols(logicalSymbolIds: readonly string[]): Promise<Relation[]>
 
   /**
    * Returns all symbols exported by the given file.
@@ -860,9 +883,12 @@ export abstract class GraphStore {
   /**
    * Returns the number of files that import each file in the graph.
    * Used for batch hotspot computation.
+   * @param options - Optional category filtering options.
    * @returns A map from file path to importer count.
    */
-  abstract getFileImporterCounts(): Promise<Map<string, number>>
+  abstract getFileImporterCounts(options?: {
+    categories?: readonly FileCategory[]
+  }): Promise<Map<string, number>>
 
   /**
    * Removes every logical-generation artifact, including incremental and semantic

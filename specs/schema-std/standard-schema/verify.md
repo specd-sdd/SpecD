@@ -54,8 +54,23 @@
 - **GIVEN** the `verify` artifact entry in `schema.yaml`
 - **WHEN** evaluating its definition and rules
 - **THEN** `validations` requires Gherkin-style `#### Scenario:` subheadings under matching requirement headings
+- **AND** each scenario validation requires at least one WHEN list item and at least one THEN list item
+- **AND** GIVEN list items are not required when the precondition is obvious
+- **AND** authoring `instruction` states that “never bullets” applies only to scenario titles while GWT bodies MUST use list items
 - **AND** `deltaValidations` enforces scenario presence in added/modified requirement deltas
 - **AND** a post-rule verifies requirement-to-scenario parity
+
+#### Scenario: Scenario without WHEN or THEN list items fails structural validation
+
+- **GIVEN** a `verify.md` scenario section whose body is prose or headings without WHEN/THEN list items
+- **WHEN** validating the verify artifact against the standard schema
+- **THEN** structural validation fails because the scenario lacks the required WHEN and/or THEN list items
+
+#### Scenario: Scenario with WHEN and THEN list items and no GIVEN passes
+
+- **GIVEN** a `verify.md` scenario whose body contains WHEN and THEN list items and omits GIVEN
+- **WHEN** validating the verify artifact against the standard schema
+- **THEN** structural validation succeeds for that scenario’s GWT list-item rules
 
 ### Requirement: Design Artifact Contract and Instructions
 

@@ -1,6 +1,7 @@
 ---
 title: Core
-sidebar_position: 4
+description: Package reference for `@specd/core` — domain model, ports, use cases, and plugin extension points.
+sidebar_position: 1
 ---
 
 # Core

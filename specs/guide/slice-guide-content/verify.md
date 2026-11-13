@@ -7,7 +7,7 @@
 #### Scenario: Section extraction returns heading and all body lines up to next peer heading
 
 - **GIVEN** a section starting with `## Configuration Syntax` on line 20 and next `##` on line 50
-- **WHEN** `GetGuideSectionQuery.execute({ topic: "configuration", sectionHeading: "Configuration Syntax" })` is called
+- **WHEN** `GetGuideSectionQuery.execute({ topic: "configuration", section: "Configuration Syntax" })` is called
 - **THEN** the returned content is extracted dynamically from the guide content
 - **AND** starts with `## Configuration Syntax`
 - **AND** contains lines 20 through 49
@@ -38,7 +38,7 @@
 - **WHEN** requesting non-existent section `"NonExistent"`
 - **THEN** it rejects with `GuideSectionNotFoundError`
 - **AND** `error.code` is `'UNKNOWN_GUIDE_SECTION'`
-- **AND** `error.availableHeadings` lists `["Syntax", "Overrides"]`
+- **AND** the error exposes the document's section headings
 
 #### Scenario: Section selection by 1-indexed numeric index
 
@@ -54,6 +54,13 @@
 - **WHEN** `GetGuideSectionQuery.execute({ topic: "workflow", section: "2" })` is called
 - **THEN** the numeric string is parsed as integer 2
 - **AND** returns the 2nd section in the outline
+
+#### Scenario: Numeric detection requires a digits-only trimmed value
+
+- **GIVEN** a document with a section heading containing digits, such as `## Phase 2 Rollout`
+- **WHEN** the selector `"Phase 2 Rollout"` is supplied
+- **THEN** it MUST be treated as a heading name, not as a numeric index
+- **AND** the numeric path MUST be taken only when the trimmed value consists solely of digits
 
 #### Scenario: Disambiguating duplicate section headings via section index
 
@@ -71,12 +78,53 @@
 - **AND** `error.matchingIndices` contains `[3, 7]`
 - **AND** `error.message` prompts the user to select `--section 3` or `--section 7`
 
+#### Scenario: Ambiguity is never resolved silently
+
+- **GIVEN** a document with duplicate headings
+- **WHEN** the query is called with that heading name
+- **THEN** it MUST NOT return the first matching section as if it were unambiguous
+
 #### Scenario: Section index out of bounds throws GuideSectionNotFoundError
 
 - **GIVEN** a guide with 6 sections in its outline
 - **WHEN** requesting `section: 0` or `section: 15`
 - **THEN** the query rejects with `GuideSectionNotFoundError`
 - **AND** `error.code` is `'UNKNOWN_GUIDE_SECTION'`
+
+#### Scenario: The section selector is the only accepted selector field
+
+- **GIVEN** the query's declared input interface
+- **WHEN** the input is inspected
+- **THEN** a heading selector MUST be supplied through the declared section selector field
+- **AND** a field named `sectionHeading` MUST NOT be part of the input interface
+- **AND** invoking the query with a `sectionHeading` field MUST NOT be a supported invocation
+
+#### Scenario: Collection-qualified topics resolve for section extraction
+
+- **GIVEN** two collections each containing a topic named `ports`, each with different content
+- **WHEN** `GetGuideSectionQuery.execute({ topic: "core:ports", section: 1 })` is called against the core collection's port
+- **THEN** the section MUST be extracted from the `core` collection's document
+- **AND** the other collection's document MUST NOT be consulted
+
+#### Scenario: Nested collection-qualified topic resolves for section extraction
+
+- **GIVEN** a collection containing `examples/implementing-a-port`
+- **WHEN** `GetGuideSectionQuery.execute({ topic: "core:examples/implementing-a-port", section: 1 })` is called
+- **THEN** the nested document's section MUST be extracted
+
+#### Scenario: Available headings shape is documented and consistent
+
+- **GIVEN** a query that rejects because no section matched
+- **WHEN** the error's available-headings value is inspected
+- **THEN** it MUST be either the list of available heading strings or the list of available section descriptors
+- **AND** the shape MUST be consistent across rejections from the same invocation
+- **AND** the shape MUST NOT vary unpredictably between error cases
+
+#### Scenario: Query resolves only within the served collection
+
+- **GIVEN** a query whose port serves the `core` collection
+- **WHEN** a topic belonging to another collection is requested
+- **THEN** the query MUST reject as not found
 
 ### Requirement: SliceGuideLinesQuery Implementation
 

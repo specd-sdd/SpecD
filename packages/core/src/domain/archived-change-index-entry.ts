@@ -1,3 +1,4 @@
+import { parseSpecId } from './services/parse-spec-id.js'
 import { type ActorIdentity } from './entities/change.js'
 
 /**
@@ -24,18 +25,17 @@ export type ArchivedChangeIndexEntry = ArchiveListEntry
 /**
  * Derives workspace prefixes from spec IDs.
  *
- * Used by archive path templating (`ArchivePathEntry`), not by list rows.
+ * Used by archive path templating (`ArchivePathEntry`), not by list rows. Each ID is parsed with
+ * {@link parseSpecId}, so a bare ID yields the `default` workspace.
  *
- * @param specIds - Spec IDs in `workspace:path` form
+ * @param specIds - Spec IDs, bare or in `workspace:path` form
  * @returns Unique workspace prefixes in encounter order
+ * @throws {InvalidSpecIdError} If an ID is empty, blank, or malformed
  */
 export function workspacesFromSpecIds(specIds: readonly string[]): readonly string[] {
   const set = new Set<string>()
   for (const id of specIds) {
-    const colonIdx = id.indexOf(':')
-    if (colonIdx >= 0) {
-      set.add(id.substring(0, colonIdx))
-    }
+    set.add(parseSpecId(id).workspace)
   }
   return [...set]
 }

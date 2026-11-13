@@ -107,4 +107,31 @@ describe('isolated graph-index worker protocol', () => {
       stack: null,
     })
   })
+
+  it('validates activity message envelope shapes', () => {
+    const validActivity = {
+      protocol: GRAPH_INDEX_PROTOCOL,
+      type: 'activity',
+      item: 'src/main.ts',
+    }
+    expect(isChildMessage(validActivity)).toBe(true)
+
+    // Rejected with extra fields
+    expect(isChildMessage({ ...validActivity, extra: 'field' })).toBe(false)
+
+    // Rejected with empty item
+    expect(isChildMessage({ ...validActivity, item: '' })).toBe(false)
+
+    // Rejected with non-string item
+    expect(isChildMessage({ ...validActivity, item: 123 })).toBe(false)
+
+    // Accepted up to 4096 characters
+    expect(isChildMessage({ ...validActivity, item: 'a'.repeat(4096) })).toBe(true)
+
+    // Rejected with over-long item (>4096)
+    expect(isChildMessage({ ...validActivity, item: 'a'.repeat(4097) })).toBe(false)
+
+    // v1 protocol identifier rejected
+    expect(isChildMessage({ ...validActivity, protocol: 'specd.graph-index.v1' })).toBe(false)
+  })
 })

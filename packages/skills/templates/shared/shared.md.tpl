@@ -258,14 +258,14 @@ these commands instead of inventing a second cookbook:
 specd changes implementation list <name>
 specd changes implementation review <name>
 specd changes implementation add <name> --spec <specId> --file <path> [--symbol "<SymbolName>"]
-specd changes implementation resolve <name> --file <path1>,<path2>
-specd changes implementation ignore <name> --file <path1>,<path2>
+specd changes implementation resolve <name> --file <path1> --file <path2>
+specd changes implementation ignore <name> --file <path1> --file <path2>
 ```
 
 - **`resolve`** — the file belongs to this change and has been reviewed.
 - **`ignore`** — the file is not this change’s implementation surface (incidental
-  dirty files such as unrelated `spec-lock.json`). Files with confirmed links
-  **cannot** be ignored; `add` a link first if they actually implement a spec.
+  dirty files such as unrelated `spec-lock.json`). Ignoring a file preserves any
+  confirmed links on it.
 - **`add`** — confirmed spec↔file (prefer `--symbol` on a **top-level** export:
   function, class, type, method). Link only what **realizes that spec**. Skip
   locals, variables, and anything incidental. No catch-all dumps. Out-of-scope

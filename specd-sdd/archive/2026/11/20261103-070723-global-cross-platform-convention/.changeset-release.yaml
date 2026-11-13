@@ -1,0 +1,4 @@
+releases:
+  default:_global/cross-platform: minor
+  default:_global/testing: patch
+  default:_global/continuous-integration: patch

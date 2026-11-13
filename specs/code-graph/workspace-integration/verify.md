@@ -10,12 +10,12 @@
 - **THEN** `FileNode.path` is `core:src/index.ts`
 - **AND** `FileNode.workspace` is `core`
 
-#### Scenario: Config-relative path stored alongside canonical identity
+#### Scenario: Project-relative path stored alongside canonical identity
 
 - **GIVEN** the active `specd.yaml` lives at `/project/specd.yaml`
 - **WHEN** a file `src/index.ts` is discovered in workspace `core` with codeRoot `/project/packages/core`
 - **THEN** `FileNode.path` is `core:src/index.ts`
-- **AND** `FileNode.configRelativePath` is `packages/core/src/index.ts`
+- **AND** `FileNode.projectRelativePath` is `packages/core/src/index.ts`
 
 #### Scenario: Duplicate filenames across workspaces remain distinct
 
@@ -90,29 +90,62 @@
 - **WHEN** IndexOptions contains a single workspace
 - **THEN** the indexer SHALL behave identically to multi-workspace with one entry
 
-### Requirement: Config-relative file lookup
+#### Scenario: discoverFiles receives the project-relative base
 
-#### Scenario: Unprefixed selector resolves through configRelativePath
+- **GIVEN** workspace `backend` with `codeRoot` `/project/app` and project root `/project`
+- **WHEN** the indexer discovers the files of `backend`
+- **THEN** `discoverFiles` is called with the `codeRoot` and `pathBase` `app`
+- **AND** it still returns paths relative to `codeRoot`
+
+### Requirement: Project-relative file lookup
+
+#### Scenario: Unprefixed selector resolves through projectRelativePath
 
 - **GIVEN** the active `specd.yaml` lives at `/project/specd.yaml`
-- **AND** file `core:src/index.ts` is indexed with `configRelativePath` `packages/core/src/index.ts`
+- **AND** file `core:src/index.ts` is indexed with `projectRelativePath` `packages/core/src/index.ts`
 - **WHEN** a CLI command resolves the selector `packages/core/src/index.ts`
 - **THEN** it can map that selector back to canonical file `core:src/index.ts`
 
-#### Scenario: Absolute selector normalizes to configRelativePath before lookup
+#### Scenario: Absolute selector normalizes to projectRelativePath before lookup
 
 - **GIVEN** the active `specd.yaml` lives at `/project/specd.yaml`
-- **AND** file `core:src/index.ts` is indexed with `configRelativePath` `packages/core/src/index.ts`
+- **AND** file `core:src/index.ts` is indexed with `projectRelativePath` `packages/core/src/index.ts`
 - **WHEN** a CLI command resolves `/project/packages/core/src/index.ts`
 - **THEN** it normalizes the absolute path to `packages/core/src/index.ts`
 - **AND** resolves the canonical file `core:src/index.ts`
 
-#### Scenario: Config-relative lookup supports parent segments
+#### Scenario: Project-relative lookup supports parent segments
 
 - **GIVEN** the active `specd.yaml` lives at `/project/apps/web/specd.yaml`
-- **AND** file `core:src/index.ts` is indexed with `configRelativePath` `../../packages/core/src/index.ts`
+- **AND** file `core:src/index.ts` is indexed with `projectRelativePath` `../../packages/core/src/index.ts`
 - **WHEN** a CLI command resolves `../../packages/core/src/index.ts`
 - **THEN** it resolves the canonical file `core:src/index.ts`
+
+### Requirement: Workspace ownership is decided by discovery rules
+
+#### Scenario: Workspace filters match the project-relative path
+
+- **GIVEN** workspace `core` with `codeRoot` `packages/core` and `excludePaths: ['packages/core/dist/']`
+- **WHEN** `packages/core/dist/a.js` is discovered
+- **THEN** it is excluded
+
+#### Scenario: Nested code roots are not ranked
+
+- **GIVEN** workspaces `backend` (`app`) and `backoffice` (`app/webroot`) and a file passing discovery in both
+- **WHEN** owners are determined
+- **THEN** both are owners and neither is primary
+
+#### Scenario: Shared code root partitioned by excludes
+
+- **GIVEN** two workspaces with the same `codeRoot`, each excluding the files of the other
+- **WHEN** owners are determined for a file of the first
+- **THEN** only the first workspace is an owner
+
+#### Scenario: Overlapping owners do not fail indexing
+
+- **GIVEN** a path that passes discovery in two workspaces
+- **WHEN** the indexer runs
+- **THEN** it is persisted under both identities and reported as an overlap warning
 
 ### Requirement: Spec resolution via SpecRepository
 
@@ -138,6 +171,76 @@
 - **AND** the monorepo map resolves `@specd/core` to the `core` workspace prefix
 - **THEN** the import SHALL resolve to the symbol in `core/src/...`
 
+#### Scenario: Type import across workspaces produces USES_TYPE
+
+- **GIVEN** `sdk` declares a parameter of type `SymbolNode` imported from `@specd/code-graph`
+- **AND** the entry surface of `@specd/code-graph` publishes `SymbolNode` through its `src/public.ts` barrel chain
+- **WHEN** the project is indexed
+- **THEN** the local binding of `SymbolNode` in the `sdk` file has the logical id of `SymbolNode` declared in `code-graph`
+- **AND** the `sdk` file has an `IMPORTS` relation to the entry file that published the name
+- **AND** a `USES_TYPE` relation links the `sdk` symbol to `SymbolNode`
+- **AND** `graph impact --symbol SymbolNode --direction dependents` lists the `sdk` file
+
+#### Scenario: Subpath export selects its own entry
+
+- **GIVEN** `@specd/code-graph/internal` is exported to `dist/index.js` and `.` to `dist/public.js`
+- **WHEN** a file imports a name from `@specd/code-graph/internal`
+- **THEN** the name is resolved against the indexed source of `dist/index.js`, not of `dist/public.js`
+
+#### Scenario: dist path maps to the indexed source
+
+- **GIVEN** the manifest points `exports["."]` at `./dist/public.js`
+- **AND** `code-graph:src/public.ts` is indexed
+- **WHEN** an import from the package is resolved
+- **THEN** the entry file is `code-graph:src/public.ts`
+
+#### Scenario: Unknown package produces no edge
+
+- **GIVEN** an import from a package that no workspace declares
+- **WHEN** the project is indexed
+- **THEN** no relation, binding target, or step exists for that import
+- **AND** the import is counted as an external package import and is not reported as a failure
+
+#### Scenario: Name not published by the entry surface produces no edge
+
+- **GIVEN** the target workspace declares a symbol with the imported name in an internal file that no entry file publishes
+- **WHEN** the import is resolved
+- **THEN** no relation, binding target, or step exists
+- **AND** a non-persisted diagnostic has reason `not-exported`
+
+#### Scenario: Same-name symbol in a test file is never chosen
+
+- **GIVEN** the target workspace declares the imported name in a test helper file
+- **AND** the entry surface does not publish that name
+- **WHEN** the import is resolved
+- **THEN** the test helper is not selected and no relation targets it
+
+#### Scenario: Exact qualified name declared only in a test file is not used
+
+- **GIVEN** a qualified name that only a file classified as a test declares
+- **WHEN** an import of that qualified name is resolved
+- **THEN** the import stays unresolved and no relation targets the test file
+
+#### Scenario: Incremental run with unchanged target workspace still resolves
+
+- **GIVEN** a previous run resolved the import and the target workspace is unchanged
+- **WHEN** only the importing file changes and the run is incremental
+- **THEN** the import resolves to the same target using hydrated public bindings
+- **AND** the result equals a clean rebuild
+
+#### Scenario: Changing the target's entry invalidates dependents
+
+- **GIVEN** the target workspace stops publishing a name from its entry surface
+- **WHEN** an incremental run follows
+- **THEN** every file that imported that name from the package is re-resolved
+- **AND** the stale edge is removed
+
+#### Scenario: Adapter without the facet leaves its package imports unresolved
+
+- **GIVEN** a language whose adapter does not provide `packageResolution`
+- **WHEN** the project is indexed
+- **THEN** its package-specifier imports stay unresolved and the run completes without error
+
 ### Requirement: WorkspaceIndexTarget
 
 #### Scenario: Single-workspace indexing isolation
@@ -150,9 +253,9 @@
 
 - **GIVEN** `SpecdWorkspaceConfig.graph.excludePaths` is `[".specd/*", "!.specd/metadata/"]`
 - **AND** `SpecdWorkspaceConfig.graph.respectGitignore` is `false`
-- **WHEN** `buildWorkspaceTargets()` constructs the `WorkspaceIndexTarget`
-- **THEN** `WorkspaceIndexTarget.excludePaths` is `[".specd/*", "!.specd/metadata/"]`
-- **AND** `WorkspaceIndexTarget.respectGitignore` is `false`
+- **WHEN** `buildProjectGraphConfig()` builds the graph configuration
+- **THEN** the workspace entry of `ProjectGraphConfig.workspaces` has `excludePaths` `[".specd/*", "!.specd/metadata/"]`
+- **AND** `respectGitignore` `false`
 
 ### Requirement: Per-workspace IndexResult breakdown
 
@@ -185,6 +288,18 @@
 - **THEN** `.log` files are not excluded by gitignore rules
 - **AND** no `.gitignore` file is read during the walk
 
+#### Scenario: A negation cannot re-include below an excluded directory
+
+- **GIVEN** a `.gitignore` at the VCS root ignoring `build/` and a nearer `.gitignore` containing `!build/keep.txt`
+- **WHEN** `build/keep.txt` is evaluated
+- **THEN** it stays excluded because its parent directory is excluded
+
+#### Scenario: Intermediate .gitignore files apply
+
+- **GIVEN** a `.gitignore` in `/project/packages` ignoring `*.gen.ts`, `codeRoot` `/project/packages/core` and VCS root `/project`
+- **WHEN** the files of the workspace are discovered
+- **THEN** `/project/packages/core/a.gen.ts` is excluded by that `.gitignore`
+
 ### Backward compatibility
 
 #### Scenario: Force re-index on path format change
@@ -192,9 +307,9 @@
 - **WHEN** an existing graph store has file identity metadata incompatible with the current format
 - **THEN** a full rebuild is required before lookups are considered trustworthy
 
-#### Scenario: Force re-index after adding configRelativePath metadata
+#### Scenario: Force re-index after adding projectRelativePath metadata
 
-- **WHEN** an existing graph store was built before `configRelativePath` was persisted
+- **WHEN** an existing graph store was built before `projectRelativePath` was persisted
 - **THEN** the next rebuild path must recreate the graph before unprefixed selector lookup can rely on that metadata
 
 ### Requirement: Canonical module and package resolution identity
@@ -212,3 +327,21 @@
 - **WHEN** each is resolved as an exact graph selector
 - **THEN** they produce the same canonical file identity
 - **AND** a wildcard input remains a pattern rather than selecting one file
+
+#### Scenario: Unique name inside the target workspace is not enough
+
+- **GIVEN** the imported name exists exactly once in the target workspace, in a file the entry surface does not publish
+- **WHEN** the import is resolved
+- **THEN** it stays unresolved
+
+#### Scenario: Changing exports changes the fingerprint
+
+- **GIVEN** an indexed package whose `package.json` `exports` changes
+- **WHEN** the next run computes the derivation fingerprint
+- **THEN** the fingerprint differs and a rebuild is required
+
+#### Scenario: Changing go.mod, pyproject.toml, or composer.json changes the fingerprint
+
+- **GIVEN** a workspace whose `go.mod` module path, `pyproject.toml` project name, or `composer.json` PSR-4 map changes
+- **WHEN** the next run computes the derivation fingerprint
+- **THEN** the fingerprint differs and a rebuild is required

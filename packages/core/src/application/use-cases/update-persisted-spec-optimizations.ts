@@ -13,7 +13,6 @@ import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { SpecNotFoundError } from '../errors/spec-not-found-error.js'
-import { WorkspaceNotFoundError } from '../errors/workspace-not-found-error.js'
 import { type ExtractorTransformRegistry } from '../../domain/services/extract-metadata.js'
 import { resolveInitialPersistedDependsOn } from './resolve-initial-persisted-depends-on.js'
 import { type GetActiveSchema } from './get-active-schema.js'
@@ -38,7 +37,7 @@ const optimizationSetSchema = z
 
 const updatePersistedSpecOptimizationsInputSchema = z
   .object({
-    specId: z.string().min(1),
+    specId: z.string(),
     set: optimizationSetSchema.optional(),
     clear: z.array(optimizationFieldNameSchema).nonempty().optional(),
   })
@@ -153,7 +152,8 @@ export class UpdatePersistedSpecOptimizations {
    *
    * @param input - Update parameters
    * @returns The resulting optimization projection and whether state was created
-   * @throws {InvalidInputError} If `set` and `clear` conflict or no operation is provided
+   * @throws {InvalidInputError} If the input shape is invalid (including a missing `specId`), `set` and `clear` conflict, or no operation is provided
+   * @throws {InvalidSpecIdError} If the `specId` content is empty, blank, or malformed
    * @throws {WorkspaceNotFoundError} If the workspace does not exist
    * @throws {ReadOnlyWorkspaceError} If the workspace is read-only
    * @throws {SpecNotFoundError} If the spec does not exist
@@ -163,27 +163,30 @@ export class UpdatePersistedSpecOptimizations {
   ): Promise<UpdatePersistedSpecOptimizationsResult> {
     const validatedInput = parseUpdatePersistedSpecOptimizationsInput(input)
 
-    const { workspace, capPath } = parseSpecId(validatedInput.specId)
-    const repo = this.specRepositories.get(workspace)
-    if (repo === undefined) {
-      throw new WorkspaceNotFoundError(workspace)
+    const { workspace, capPath, specId } = parseSpecId(validatedInput.specId, {
+      workspaces: this.specRepositories.keys(),
+    })
+    const normalizedInput: ParsedUpdatePersistedSpecOptimizationsInput = {
+      ...validatedInput,
+      specId,
     }
+    const repo = this.specRepositories.get(workspace)!
     if (repo.ownership() === 'readOnly') {
-      throw new ReadOnlyWorkspaceError(workspace)
+      throw ReadOnlyWorkspaceError.forSpec(specId, workspace)
     }
 
     const spec = await repo.get(SpecPath.parse(capPath))
     if (spec === null) {
-      throw new SpecNotFoundError(validatedInput.specId)
+      throw new SpecNotFoundError(specId)
     }
 
     let current = await repo.readPersistedState(spec)
-    if (current === null && validatedInput.set === undefined) {
-      return { specId: validatedInput.specId, created: false }
+    if (current === null && normalizedInput.set === undefined) {
+      return { specId, created: false }
     }
 
     const schemaResult = await this.getActiveSchema.execute()
-    if (schemaResult.raw) throw new Error('schema resolution failed')
+    if (schemaResult.raw) throw new InvalidInputError('schema resolution failed')
     const schemaIdentity = {
       name: schemaResult.schema.name(),
       version: schemaResult.schema.version(),
@@ -193,7 +196,7 @@ export class UpdatePersistedSpecOptimizations {
     let created = false
     if (current === null) {
       const dependsOn = await resolveInitialPersistedDependsOn(
-        { specId: validatedInput.specId, schema: schemaIdentity },
+        { specId, schema: schemaIdentity },
         {
           specRepo: repo,
           schemaProvider: { get: () => Promise.resolve(schemaResult.schema) },
@@ -219,9 +222,9 @@ export class UpdatePersistedSpecOptimizations {
       ...(current.optimizations ?? {}),
     }
 
-    if (validatedInput.set !== undefined) {
+    if (normalizedInput.set !== undefined) {
       const schemaForField = created ? schemaIdentity : current.schema
-      for (const [field, value] of Object.entries(validatedInput.set) as Array<
+      for (const [field, value] of Object.entries(normalizedInput.set) as Array<
         [PersistedOptimizationFieldName, string]
       >) {
         nextOptimizations[field] = {
@@ -232,8 +235,8 @@ export class UpdatePersistedSpecOptimizations {
       }
     }
 
-    if (validatedInput.clear !== undefined) {
-      for (const field of validatedInput.clear) {
+    if (normalizedInput.clear !== undefined) {
+      for (const field of normalizedInput.clear) {
         delete nextOptimizations[field]
       }
     }
@@ -253,7 +256,7 @@ export class UpdatePersistedSpecOptimizations {
           }
         : { kind: 'existing', state: current },
       { optimizations: patchOptimizations },
-      { specId: validatedInput.specId },
+      { specId },
     )
 
     await repo.writePersistedState(spec, state, {
@@ -273,7 +276,7 @@ export class UpdatePersistedSpecOptimizations {
     }
 
     return {
-      specId: validatedInput.specId,
+      specId,
       created,
       ...(projection !== undefined ? { optimizations: projection } : {}),
     }

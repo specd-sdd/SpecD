@@ -6,18 +6,8 @@
   "dependsOn": ["core:config", "core:spec-id-format"],
   "implementation": [
     {
-      "file": "core:src/domain/services/windows-device-name.ts",
-      "symbols": ["isWindowsDeviceName"]
-    },
-    {
-      "file": "core:test/domain/services/windows-device-name.spec.ts"
-    },
-    {
-      "file": "core:src/infrastructure/fs/config-loader.ts",
-      "symbols": ["FsConfigLoader"]
-    },
-    {
-      "file": "core:test/infrastructure/fs/config-loader.spec.ts"
+      "file": "core:src/application/ports/config-schema.ts",
+      "symbols": ["WorkspaceRawZodSchema"]
     }
   ],
   "optimizations": {

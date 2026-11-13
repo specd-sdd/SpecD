@@ -30,6 +30,27 @@ Scenarios:
 - **THEN** the CLI delegates exactly `{ artifacts: surgical, workflow: preserve }`
 - **AND** it does not expose the deprecated scalar for new writes
 
+#### Scenario: Values are forwarded unchanged
+
+- **WHEN** `specd change create my-change --spec auth/login` is run
+- **THEN** the command forwards `auth/login` and the manifest stores `default:auth/login`
+
+#### Scenario: A value with a comma is one ID
+
+- **WHEN** `specd change create my-change --spec "auth/a,b"` is run
+- **THEN** the command exits with code 1 with the `InvalidSpecIdError` message quoting `auth/a,b`, and no change is created
+
+#### Scenario: Invalid ID rejected
+
+- **WHEN** `specd change create my-change --spec "Bad Id"` is run
+- **THEN** the command exits with code 1 with the `InvalidSpecIdError` message quoting `Bad Id`, and no change is created
+
+#### Scenario: Invalid change name rejected by the core
+
+- **WHEN** `specd change create "Bad Name"` is run
+- **THEN** the command exits with code 1 with the core's invalid-name error on stderr
+- **AND** the command source declares no name-format rule
+
 ### Requirement: Workspace resolution
 
 #### Scenario: Workspace prefix omitted defaults to default
@@ -48,6 +69,11 @@ Scenarios:
 
 - **WHEN** `specd change create my-change --spec nonexistent-ws:some/path` is run
 - **THEN** the command exits with code 1 and prints an `error:` message to stderr
+
+#### Scenario: Workspace derived by the use case
+
+- **WHEN** the command source is inspected
+- **THEN** it does not parse `--spec` values or derive workspaces; `CreateChange` does
 
 ### Requirement: ReadOnly workspace rejection
 
@@ -78,6 +104,23 @@ Scenarios:
 - **GIVEN** workspace `default` is `owned`
 - **WHEN** `specd change create my-change --spec default:auth/login` is run
 - **THEN** the change is created successfully
+
+#### Scenario: Command checks no ownership itself
+
+- **WHEN** the command source is inspected
+- **THEN** it does not read workspace ownership; it maps `ReadOnlyWorkspaceError` from `CreateChange` to exit code 1
+
+#### Scenario: Mixed owned and readOnly specs
+
+- **GIVEN** workspace `platform` is `readOnly`
+- **WHEN** `specd change create my-change --spec default:auth/login --spec platform:auth/tokens` is run
+- **THEN** the command exits with code 1 with one `Cannot add spec "platform:auth/tokens" ...` line on stderr
+- **AND** no change is created
+
+#### Scenario: Several readOnly specs each produce a line
+
+- **WHEN** two `--spec` values target `readOnly` workspaces
+- **THEN** stderr has one line per offending spec and no remediation
 
 ### Requirement: Schema name and version
 
@@ -145,11 +188,8 @@ Scenarios:
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message mentioning the duplicate name
 
-### Requirement: JSON output on success
+#### Scenario: Invalid invalidation policy
 
-#### Scenario: JSON output on success
-
-- **WHEN** `specd change create add-login --spec auth/login --format json` succeeds
-- **THEN** stdout is valid JSON with `result` equal to `"ok"` and `state` equal to `"drafting"`
-- **AND** `name` is `"add-login"`
-- **AND** the process exits with code 0
+- **WHEN** `specd change create my-change --invalidation-policy sugical` is run
+- **THEN** the command exits with code 1 with the `InvalidInputError` message from `CreateChange`
+- **AND** no change is created

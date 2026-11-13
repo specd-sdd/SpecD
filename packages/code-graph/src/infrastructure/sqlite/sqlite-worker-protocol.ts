@@ -1,5 +1,5 @@
 import { type DocumentNode } from '../../domain/value-objects/document-node.js'
-import { type FileNode } from '../../domain/value-objects/file-node.js'
+import { type FileCategory, type FileNode } from '../../domain/value-objects/file-node.js'
 import { type Relation } from '../../domain/value-objects/relation.js'
 import { type RelationType } from '../../domain/value-objects/relation-type.js'
 import { type SpecNode } from '../../domain/value-objects/spec-node.js'
@@ -105,13 +105,13 @@ export interface SQLiteWorkerOperationMap {
   }
   /** Retrieves a file node. */
   getFile: { payload: { filePath: string }; result: FileNode | undefined }
-  /** Finds files by config relative path. */
-  findFilesByConfigRelativePath: { payload: { configRelativePath: string }; result: FileNode[] }
+  /** Finds files by project relative path. */
+  findFilesByProjectRelativePath: { payload: { projectRelativePath: string }; result: FileNode[] }
   /** Retrieves a document node. */
   getDocument: { payload: { documentId: string }; result: DocumentNode | undefined }
-  /** Finds documents by config relative path. */
-  findDocumentsByConfigRelativePath: {
-    payload: { configRelativePath: string }
+  /** Finds documents by project relative path. */
+  findDocumentsByProjectRelativePath: {
+    payload: { projectRelativePath: string }
     result: DocumentNode[]
   }
   /** Retrieves a symbol node. */
@@ -150,10 +150,13 @@ export interface SQLiteWorkerOperationMap {
   getCoveringSpecsForFiles: { payload: { filePaths: readonly string[] }; result: Relation[] }
   /** Retrieves symbols covered by spec. */
   getCoveredSymbols: { payload: { specId: string }; result: Relation[] }
-  /** Retrieves specs covering symbol. */
-  getCoveringSpecsForSymbol: { payload: { symbolId: string }; result: Relation[] }
-  /** Retrieves specs covering any symbol in list. */
-  getCoveringSpecsForSymbols: { payload: { symbolIds: readonly string[] }; result: Relation[] }
+  /** Retrieves specs covering logical symbol. */
+  getCoveringSpecsForSymbol: { payload: { logicalSymbolId: string }; result: Relation[] }
+  /** Retrieves specs covering any logical symbol in list. */
+  getCoveringSpecsForSymbols: {
+    payload: { logicalSymbolIds: readonly string[] }
+    result: Relation[]
+  }
   /** Retrieves callers of symbol. */
   getCallers: { payload: { symbolId: string }; result: Relation[] }
   /** Retrieves callees of symbol. */
@@ -184,7 +187,10 @@ export interface SQLiteWorkerOperationMap {
     result: Array<{ symbol: SymbolNode; callerFilePath: string }>
   }
   /** Retrieves importer counts per file. */
-  getFileImporterCounts: { payload: Record<string, never>; result: Map<string, number> }
+  getFileImporterCounts: {
+    payload: { categories?: readonly FileCategory[] }
+    result: Map<string, number>
+  }
   /** Retrieves all file nodes. */
   getAllFiles: { payload: Record<string, never>; result: FileNode[] }
   /** Retrieves all document nodes. */
@@ -198,6 +204,11 @@ export interface SQLiteWorkerOperationMap {
   /** Finds declarations for logical symbols. */
   findDeclarations: {
     payload: { logicalSymbolIds: readonly string[] }
+    result: LogicalDeclaration[]
+  }
+  /** Finds logical declarations by physical declaration symbol IDs. */
+  findLogicalDeclarationsByDeclarationIds: {
+    payload: { declarationSymbolIds: readonly string[] }
     result: LogicalDeclaration[]
   }
   /** Finds public bindings by exported names. */

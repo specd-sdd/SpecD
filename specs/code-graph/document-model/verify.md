@@ -7,7 +7,7 @@
 #### Scenario: DocumentNode has required graph properties
 
 - **WHEN** a `DocumentNode` is created
-- **THEN** it includes `path`, `configRelativePath`, `contentHash`, `content`, and `workspace`
+- **THEN** it includes `path`, `projectRelativePath`, `contentHash`, `content`, and `workspace`
 
 ### Requirement: Reserved root namespace
 

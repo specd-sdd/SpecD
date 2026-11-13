@@ -6,32 +6,65 @@
 
 #### Scenario: Outline returns document metadata and section array without full content
 
-- **GIVEN** guide topic `"workflow"` with 300 lines and 10 sections
-- **WHEN** `GetGuideOutlineQuery.execute({ topic: "workflow" })` is called
-- **THEN** it returns a `GuideOutline` object
-- **AND** `outline.lines` equals 300
-- **AND** `outline.file` equals `"workflow.md"`
-- **AND** `outline.sections` has length 10
-- **AND** no full body content is included, minimizing token transfer
+- **GIVEN** a catalog guide whose sections include optional body content
+- **WHEN** its outline is requested
+- **THEN** the result MUST include `topic`, `file`, `lines`, `bytes` and `sections`
+- **AND** no returned section MUST contain a `content` property
+- **AND** the optional catalog body content MUST remain available only through on-demand section retrieval
 
 #### Scenario: Heading levels and line spans are correctly structured
 
-- **GIVEN** a document where `# Title` is on line 1 and `## Section` is on line 15
-- **WHEN** inspecting the returned outline
-- **THEN** section 0 has `heading: "Title"`, `level: 1`, `startLine: 1`
-- **AND** section 1 has `heading: "Section"`, `level: 2`, `startLine: 15`
-- **AND** `endLine` of section 0 equals 14
+- **GIVEN** a document with nested headings
+- **WHEN** its outline is requested
+- **THEN** each section MUST report `index`, `heading`, `level`, `startLine`, `endLine` and `lines`
 
 #### Scenario: Document with no headings returns empty outline array
 
-- **GIVEN** a valid guide topic composed purely of paragraph prose without any `#` headings
-- **WHEN** `GetGuideOutlineQuery.execute()` is called
-- **THEN** `outline.sections` is an empty array `[]`
-- **AND** `outline.lines` correctly reports total document lines
+- **GIVEN** a document with no headings
+- **WHEN** its outline is requested
+- **THEN** `sections` MUST be an empty array, not `null` and not an error
 
 #### Scenario: Unknown topic query rejects with GuideTopicNotFoundError
 
-- **GIVEN** an unknown topic `"unknown-outline"`
-- **WHEN** `GetGuideOutlineQuery.execute({ topic: "unknown-outline" })` is invoked
-- **THEN** it rejects with `GuideTopicNotFoundError`
-- **AND** `error.code` is `'UNKNOWN_GUIDE_TOPIC'`
+- **GIVEN** a query for a topic absent from the served collection
+- **WHEN** its outline is requested
+- **THEN** it MUST reject with `GuideTopicNotFoundError`
+
+#### Scenario: Outline file is a real source path, not a synthesized filename
+
+- **GIVEN** a document at `docs/core/ports.md` in the `core` collection
+- **WHEN** its outline is requested
+- **THEN** `file` MUST be `ports.md`
+- **AND** it MUST NOT be `core:ports.md`
+
+#### Scenario: Nested document file keeps its subdirectory path
+
+- **GIVEN** a document at `docs/core/examples/implementing-a-port.md`
+- **WHEN** its outline is requested
+- **THEN** `file` MUST be `examples/implementing-a-port.md`
+
+#### Scenario: Outline reports the document's collection
+
+- **GIVEN** a document in the `core` collection
+- **WHEN** its outline is requested
+- **THEN** the result MUST include `collection` equal to `core`
+
+#### Scenario: Sections expose character offsets
+
+- **GIVEN** a document with multiple sections
+- **WHEN** its outline is requested
+- **THEN** each section MUST expose `startOffset` and `endOffset`
+- **AND** slicing the body with those offsets MUST yield the section text exactly
+
+#### Scenario: Unknown topic propagates the resolution error rather than raising its own
+
+- **GIVEN** a topic absent from the served collection
+- **WHEN** the outline is requested
+- **THEN** the raised error MUST be the `GuideTopicNotFoundError` produced during topic resolution
+- **AND** the query MUST NOT define or raise a separate outline-specific not-found error
+
+#### Scenario: Outline resolves only within the served collection
+
+- **GIVEN** an engine serving the `core` collection
+- **WHEN** a topic belonging to the user guide collection is requested
+- **THEN** the query MUST reject with `GuideTopicNotFoundError`

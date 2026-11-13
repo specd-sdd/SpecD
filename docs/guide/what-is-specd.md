@@ -70,10 +70,10 @@ When the index is stale, search and impact are not trustworthy. `specd graph ind
 
 ### Search
 
-`specd graph search` looks through symbols, source files, specs, and documents. With no category flag it searches all four. This finds a function by name and hides test files:
+`specd graph search` looks through symbols, source files, specs, and documents. With no category flag it searches all four. This finds a function by name and excludes test files by default:
 
 ```bash
-specd graph search "resolveCliContext" --symbols --kind function --exclude-path "*:test/*" --format toon
+specd graph search "resolveCliContext" --symbols --kind function --format toon
 ```
 
 The same command with `--documents` or `--specs` searches guides and requirements instead of code. `--snippet` adds a short preview. The full flag list is in [Code Graph & Intelligence](./code-graph.md).
@@ -90,10 +90,10 @@ The same command accepts a file, a spec id (`workspace:capability-path`), or one
 
 ### Hotspots
 
-Hotspots rank symbols by how coupled they are: callers in the same workspace, callers in other workspaces, and files that import them. Use them to see where a change deserves extra care, or where tests and refactors will pay off.
+Hotspots rank symbols by how coupled they are: callers in the same workspace, callers in other workspaces, and files that import them (excluding test and ignored files by default). Use them to see where a change deserves extra care, or where tests and refactors will pay off.
 
 ```bash
-specd graph hotspots --min-risk HIGH --exclude-path "*:test/*" --format toon
+specd graph hotspots --min-risk HIGH --format toon
 ```
 
 ### Specs and code stay linked

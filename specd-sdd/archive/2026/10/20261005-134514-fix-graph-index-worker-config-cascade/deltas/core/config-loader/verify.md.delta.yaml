@@ -1,0 +1,2 @@
+- op: no-op
+  description: Existing scenarios already verify startDir discovery, local cascade attachment, exact forced loading, and failure when discovery finds no config.

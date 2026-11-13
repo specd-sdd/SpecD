@@ -1,0 +1,19 @@
+- op: added
+  position:
+    parent: { type: section, matches: '^Requirements$' }
+  content: |
+    ### Requirement: Success-cleaned note snapshot commit
+
+    #### Scenario: A failed staged move restores the original note snapshot
+
+    - **GIVEN** disk retains an archive-success note and the candidate aggregate has success-cleaned notes/audit
+    - **WHEN** the staged archive move fails before commit
+    - **THEN** active storage retains the original note collection and history
+    - **AND** no successful cleanup is visible or reconstructed from events
+
+    #### Scenario: Successful archived detail matches the committed note snapshot
+
+    - **GIVEN** a candidate contains automatic note removals and actor IDs
+    - **WHEN** archive persistence succeeds and metadata later reports a warning
+    - **THEN** archive manifest and returned detail contain the same cleaned notes and removal audit
+    - **AND** unrelated manifest fields and historical actors are preserved without a post-commit archive mutation

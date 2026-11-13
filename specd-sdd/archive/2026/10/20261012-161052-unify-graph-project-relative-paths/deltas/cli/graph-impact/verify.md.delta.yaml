@@ -1,0 +1,61 @@
+- op: modified
+  description: 'Update Output format scenarios to verify projectRelativePath and absence of displayPath / displayTargets in impact'
+  selector:
+    type: section
+    matches: 'Requirement: Output format'
+  content: |
+    #### Scenario: Text output shows risk level and counts
+
+    - **GIVEN** `core:src/auth.ts` has risk level HIGH with 6 direct, 3 indirect, and 1 transitive dependents
+    - **WHEN** `specd graph impact --file core:src/auth.ts` is run
+    - **THEN** stdout contains `Risk level:       HIGH`
+    - **AND** stdout contains `Direct deps:      6`
+
+    #### Scenario: Text output shows changed symbols for file impact
+
+    - **WHEN** `specd graph impact --file core:src/auth.ts` is run
+    - **THEN** text output includes a `Changed symbols:` block before the affected files list
+
+    #### Scenario: Multi-file text output shows grouped changed symbols
+
+    - **WHEN** `specd graph impact --file core:src/auth.ts cli:src/user.ts` is run
+    - **THEN** text output includes one aggregated summary
+    - **AND** a `Changed symbols:` block grouped by input file
+    - **AND** a per-file breakdown section
+
+    #### Scenario: JSON output includes symbols for file impact
+
+    - **WHEN** `specd graph impact --file core:src/auth.ts --format json` is run
+    - **THEN** stdout is valid JSON containing `symbols`, `affectedSymbols`, `affectedFiles`, `canonicalPath`, and `projectRelativePath`
+    - **AND** stdout JSON does not contain `displayPath`
+
+    #### Scenario: JSON output for symbol impact
+
+    - **WHEN** `specd graph impact --symbol createKernel --format json` is run
+    - **THEN** stdout is valid JSON containing `symbol`, `impact`, and `projectRelativePath`
+    - **AND** stdout JSON does not contain `displayPath`
+
+    #### Scenario: JSON output includes aggregate impact fields
+
+    - **WHEN** `specd graph impact --file <path> --format json` is run
+    - **THEN** stdout is valid JSON
+    - **AND** it contains `riskLevel`, `directDepsCount`, `indirectDepsCount`, `transitiveDepsCount`, and `affectedFilesCount`
+
+    #### Scenario: Impact paths are rendered relative to project root
+
+    - **WHEN** `specd graph impact` is run
+    - **THEN** all file paths in the output (e.g., `packages/core/src/index.ts`) are relative to the project root as `projectRelativePath`
+    - **AND** they do not include workspace-prefixed identities unless explicitly requested
+    - **AND** structured output does not include `displayPath` or `displayTargets`
+
+    #### Scenario: Omission notice displayed in text mode when tests are excluded
+
+    - **GIVEN** an impact query where 5 test files were omitted from results
+    - **WHEN** `specd graph impact --file src/foo.ts` is run in text mode
+    - **THEN** stdout includes `Excluded from results: 5 test files`
+
+    #### Scenario: Omitted counts included in JSON output
+
+    - **GIVEN** an impact query where test files were omitted
+    - **WHEN** `specd graph impact --file src/foo.ts --format json` is run
+    - **THEN** the output object includes `omittedCounts` with the count of omitted test and ignored files

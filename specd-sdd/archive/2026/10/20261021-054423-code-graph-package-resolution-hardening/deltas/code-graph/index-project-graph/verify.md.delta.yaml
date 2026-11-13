@@ -1,0 +1,18 @@
+- op: modified
+  description: Verify configuredWorkspaces forwarding for cross-workspace package resolution
+  selector:
+    type: section
+    matches: 'Requirement: Accepts open provider and prepared inputs'
+  content: |
+    #### Scenario: Prepared inputs are forwarded unchanged
+
+    - **GIVEN** an already-open provider and prepared project inputs including `configuredWorkspaces`
+    - **WHEN** the use case executes
+    - **THEN** it invokes provider indexing with those inputs including `configuredWorkspaces`
+
+    #### Scenario: Prepared provider lifecycle remains untouched
+
+    - **GIVEN** an already-open provider and complete prepared inputs
+    - **WHEN** the use case executes
+    - **THEN** it forwards VCS and progress fields unchanged
+    - **AND** it does not open, close, clear directly, recreate, lock, or spawn

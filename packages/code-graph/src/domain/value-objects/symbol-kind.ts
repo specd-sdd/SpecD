@@ -6,6 +6,7 @@ export const SymbolKind = {
   Type: 'type',
   Interface: 'interface',
   Enum: 'enum',
+  Property: 'property',
 } as const
 
 /**

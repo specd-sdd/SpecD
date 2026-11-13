@@ -10,11 +10,23 @@ The Python language adapter translates Python source and stub syntax into shared
 
 `PythonLanguageAdapter` SHALL handle `.py` and `.pyi` files as `python`. It SHALL parse supplied content once through the registered Tree-sitter/ast-grep grammar and return one complete `FileAnalysisDraft` containing symbols, imports, binding and call facts, reference facts, and compact serializable parser state for Pass 2.
 
-The adapter MUST NOT import or execute analyzed modules. Parser-runtime objects MAY exist only in run-scoped keepalive state and MUST NOT be persisted in file analysis.
+The adapter MUST NOT import or execute analyzed modules, and MUST NOT persist parser objects in file analysis. The adapter SHALL register the parse result in the parser-resource scope of the `IndexSession` (`session.parserResources`), as defined by Requirement: Parser-owned resource registration of `code-graph:language-adapter`. The registration SHALL happen inside `analyzeFile`, immediately after the content is parsed and before any traversal of the parse result, so that the resource is released at the end of the file's epoch even when the analysis throws. The adapter MUST NOT keep parser objects in adapter-private session state, in adapter-instance fields, or in the returned draft.
+
+### Requirement: Python parser-authoritative structural extraction
+
+The adapter SHALL derive imports and literal dynamic imports, class definitions and bases, annotations, return types, assignments and aliases, type aliases, decorators, calls, and construction from Python parser nodes whenever the grammar represents them. Indentation and lexical containment SHALL come from parser ranges and ancestry rather than line scanning or indentation reconstructed from raw source.
+
+Token extraction MAY operate inside a parser-proven annotation or type-expression node when required by the supported reference policy. Parsing `pyproject.toml` or another declared resolution manifest MAY remain textual because it is auxiliary metadata, but that exception MUST NOT authorize regex reconstruction of Python source structure.
+
+Static and literal dynamic imports SHALL emit dependency relations only when module-resolution evidence identifies a target. The adapter MUST NOT persist a relation to the first syntactic candidate when none resolves.
+
+An imported base-class target SHALL emit its physical hierarchy relation together with exactly one matching shared hierarchy reference fact carrying the parser-derived range of the base-class expression, import-resolution provenance, and resolved target.
 
 ### Requirement: Declaration extraction and ranges
 
-The adapter SHALL extract module function definitions, class and nested-class definitions, methods declared in class bodies including decorated definitions, and module-level assignment targets. Nested function declarations inside function bodies and class assignment members remain unsupported. It SHALL preserve comments immediately attached to declarations and SHALL map constructs to the shared broad `SymbolKind` without losing supported language-specific identity dimensions.
+The adapter SHALL extract module function definitions, class and nested-class definitions, methods declared in class bodies including decorated definitions, module-level assignment targets, and class-level assignment targets.
+
+Class-level assignments, dataclass field definitions, and Protocol field annotations SHALL be extracted as `SymbolKind.Property`. Their declaring owner and `parentId` SHALL be set to the enclosing class symbol. Nested function declarations inside function bodies remain unsupported. It SHALL preserve comments immediately attached to declarations and SHALL map constructs to the shared broad `SymbolKind` without losing supported language-specific identity dimensions.
 
 Each extracted symbol SHALL use the complete parser construct range and exact declared-name `selectionRange` under the shared half-open convention. A symbol whose authoritative range or declared selection cannot be obtained SHALL be omitted rather than approximated.
 
@@ -28,19 +40,38 @@ Owner identities SHALL be created and mapped before member logical IDs and MUST 
 
 The adapter SHALL extract `import`, `from ... import ...`, aliases, relative imports, and literal `importlib.import_module()` and `__import__()` dependencies. Variable or computed dynamic import arguments SHALL be dropped. For `import package.module`, the locally accessible binding and original qualified module SHALL both be retained.
 
-Relative resolution SHALL honor leading-dot parent traversal and deterministic module/package candidates including module files, package `__init__.py`, stub files, and common `src/` layouts when known indexed paths prove them. Package identities SHALL be read from the nearest bounded `pyproject.toml` and compared with underscore/hyphen normalization. Namespace-package selection or other ambiguous layouts SHALL remain unresolved unless indexed context selects one route.
+Relative resolution SHALL honor leading-dot parent traversal and deterministic module/package candidates including module files, package `__init__.py`, stub files, and common `src/` layouts when known indexed paths prove them, through the `relativeImportResolution` facet. Relative import path resolution SHALL portable-normalize the importing file path and the specifier (treat `\` as a separator) before segment walks, consistent with `code-graph:graph-path-identity`. Namespace-package selection or other ambiguous layouts SHALL remain unresolved unless indexed context selects one route.
+
+The adapter SHALL provide the `packageResolution` facet. `identity(codeRoot, repoRoot?, report?)` SHALL read the project name from the nearest `pyproject.toml` found by the package-root search defined in "Package resolution facet" of `code-graph:language-adapter`; the search is bounded by the repository root of the code root, and a `pyproject.toml` without `[project].name` is skipped while reporting a diagnostic via `report` as the walk continues within that bound. `matchSpecifier` SHALL compare the first dotted segment of an absolute import with known package identities after normalizing both sides: letters are lowercased and every run of `-`, `_`, or `.` becomes a single `-`. When exactly one known identity matches, it is returned. When several distinct known identities normalize to the same name (for example `acme-auth` and `acme_auth`), `matchSpecifier` returns `undefined` (which `resolvePackageExport` treats as `package-unknown` and counts in `externalPackageImports`) so the import stays unresolved; the adapter MUST NOT choose by registration order. `prepare` MAY be a no-op: the project name comes from the `identity` result and the code root from the workspace, so nothing more is read. When a module has both a source file and a stub (`mod.py` and `mod.pyi`, or `__init__.py` and `__init__.pyi`), only the source file is an entry. `entrySurface` SHALL perform no filesystem read and use only the package map and the indexed file set:
+
+- `import pkg.sub.mod` and `from pkg.sub.mod import X` request the module file `pkg/sub/mod.py`, the stub `pkg/sub/mod.pyi`, or the package `pkg/sub/mod/__init__.py` (and `.pyi`), searched under the package's code root and its `src/` directory.
+- `import pkg` and `from pkg import X` request the package `pkg/__init__.py` (and `.pyi`) under the same roots.
+
+A non-relative absolute import SHALL resolve through the shared package import helpers. A name imported with `from pkg import X` resolves to the module-level declaration `X` published by the entry file's module surface, or to the declaration that a re-export route published by the entry file reaches (see "Public surface and stub behavior"). When `X` is not published by the entry file, or when `pkg` has no `__init__.py` or `__init__.pyi` at all, but `pkg/X.py`, `pkg/X.pyi`, or `pkg/X/__init__.py` is an indexed file under the same roots, the import is a submodule import: it adds a file dependency on that file and creates no binding. When more than one of those files is indexed, under the same root or under different roots, the import stays unresolved. Names that the entry file imports without a re-export route stay local aliases and are not public routes, so such an import stays unresolved. The adapter MUST NOT search symbols by name in the target workspace.
+
+Resolved package imports SHALL return an `import:package` step when the import has a retained file-scope local binding; a resolved import without one contributes no step, and unresolved ones SHALL return a diagnostic with the reason reported by the helper.
 
 ### Requirement: Resolution manifests
 
 `resolutionManifests()` SHALL return exactly `['pyproject.toml']`.
 
-The adapter MUST NOT declare `setup.cfg`, `setup.py`, or any other basename. Package identity MUST come from `[project].name` in the nearest bounded `pyproject.toml`, and MUST NOT come from a `name` key in another table of that file.
+The adapter MUST NOT declare `setup.cfg`, `setup.py`, or any other basename. The package identity MUST come from `[project].name` in the nearest bounded `pyproject.toml`, and MUST NOT come from a `name` key in another table of that file.
 
 ### Requirement: Scoped bindings, calls, annotations, and construction
 
-The adapter SHALL emit deterministic facts for lexical scopes, imported aliases, parameter and return annotations, annotated assignments, type-alias right-hand sides, `self` and `cls` receiver bindings, explicit class construction calls, and locally proven aliases. It SHALL build `IMPORTS`, `CALLS`, `CONSTRUCTS`, and `USES_TYPE` only where these facts identify one indexed target.
+The adapter SHALL emit deterministic facts for lexical scopes, imported aliases, parameter and return annotations, annotated assignments, type-alias right-hand sides, `self` and `cls` receiver bindings, explicit class construction calls, and locally proven aliases.
 
-The caller SHALL be the innermost enclosing function or method. Module-level calls, monkey-patched attributes, descriptor results, reflection, computed imports, and aliases requiring runtime data flow SHALL not produce guessed relations.
+The adapter SHALL extract decorator invocations and references on functions and classes to emit `CALLS` or `USES_TYPE` relations when resolvable. It SHALL extract type annotations on class and dataclass fields to emit `USES_TYPE` relations. It SHALL build `CALLS`, `CONSTRUCTS`, and `USES_TYPE` only where these facts identify one indexed target. Resolved imports SHALL be exposed through `resolveImports()` so the indexer derives file-level `IMPORTS`.
+
+The caller SHALL be the innermost enclosing function or method (or class for class-level decorators). Module-level calls, monkey-patched attributes, descriptor results, reflection, computed imports, and aliases requiring runtime data flow SHALL not produce guessed relations.
+
+### Requirement: Python caller containment and declaration classification
+
+The adapter SHALL select the caller of an ordinary call as the innermost supported function or method whose complete parser range contains the call. For a class-level decorator invocation, the class MAY be the caller only where the existing decorator contract explicitly permits it. Line order without range containment MUST NOT establish caller identity.
+
+Parameters, imported aliases, assignment targets inside routines, and receiver names such as `self` and `cls` SHALL be lexical bindings rather than logical targets unless a separate supported declaration rule proves otherwise. Their presence before a call MUST NOT displace the enclosing executable caller.
+
+Module functions, classes, nested classes, and class members SHALL follow the Python ownership rules already defined by this spec. If nested functions become supported, their logical identity MUST include deterministic lexical ownership so equal names in different enclosing functions do not collapse. Python has no implicit overload grouping in ordinary source; same-name competing declarations MUST remain distinct unless a supported Python construct explicitly defines one semantic declaration group.
 
 ### Requirement: Python hierarchy and provenance evidence
 
@@ -52,15 +83,31 @@ For multiple inheritance, the adapter SHALL preserve declared base order and onl
 
 ### Requirement: Public surface and stub behavior
 
-Module declarations SHALL be addressable through their module surface. Explicit aliases and imports SHALL remain local bindings unless Python syntax and supported static module metadata prove a public route. `.pyi` declarations SHALL participate as declarations without executing or merging runtime modules speculatively.
+Module declarations SHALL be addressable through their module surface. Explicit aliases and imports SHALL remain local bindings unless they are a re-export route as defined below. `.pyi` declarations SHALL participate as declarations without executing or merging runtime modules speculatively.
 
-Static `__all__`, star-import expansion, namespace package aggregation, and runtime module mutation SHALL remain unsupported until directly implemented. The adapter MUST NOT infer public exports merely because a declaration name lacks a leading underscore.
+The adapter SHALL provide the `reExportLinking` facet. A **re-export route** is a `from <module> import <name> [as <alias>]` statement written directly in the module body of a package entry file (`__init__.py` or `__init__.pyi`), not nested in a function, class, or conditional block, where `<module>` is either a relative module (one or more leading dots followed by a non-empty module path) or an absolute module that resolves to an indexed file inside the same package. `from . import name` has an empty module path and is not a route. A relative module SHALL be resolved through the `relativeImportResolution` facet and an absolute module through the `packageResolution` facet, with the same candidate rules as an ordinary import. An absolute module is **inside the same package** when the resolved file lies under the top-level package directory that contains the entry file, so a sub-package entry may re-export a sibling module through `from acme_auth.models import User`; a file under a different top-level package is not a route. A route publishes the bound name (the alias when present, otherwise `<name>`) on the entry file's module surface, with the logical target that the reached module surface publishes for `<name>` as target. A route whose reached module does not publish `<name>`, whose module resolves to no indexed file or to more than one, or that is part of a cycle, MUST NOT produce a binding. Routes reached through another entry file's routes SHALL be followed, and the binding MUST still carry the final logical target. A wildcard import (`from .x import *`) is not a route.
+
+Static `__all__` SHALL be supported as the public-list metadata of an entry file. `__all__` is **static** when every assignment to it in the module body is `=` or `+=` of a list or tuple literal (parenthesized or not) whose elements are all plain string literals (not bytes), or of a `+` concatenation of such literals; an annotated assignment such as `__all__: list[str] = [...]` counts as `=`. When an entry file has a static `__all__`, only the re-export routes whose bound name is listed in it SHALL be published; module declarations are not filtered. Any other reference to `__all__` in the file, whether a mutation or a read (computed value, comprehension, `.extend()`, `.append()`, a non-literal element, or a membership test), makes it non-static: the public list cannot be proven. When an entry file has a non-static `__all__`, no re-export route of that file SHALL be published. A name listed in `__all__` that has no route or declaration behind it creates no binding.
+
+Star-import expansion, namespace package aggregation, and runtime module mutation SHALL remain unsupported. The adapter MUST NOT publish an import or alias as a public export merely because its name lacks a leading underscore; module-level declarations keep their existing public-binding rule. The adapter MUST NOT search symbols by name to complete a route.
 
 ### Requirement: Capability truthfulness and failure behavior
 
 The adapter SHALL advertise `hierarchy: true` only while it emits the hierarchy and provenance facts defined here. Build-context support SHALL remain false while environment markers, interpreter/platform selection, and complete package-layout policy are not consumed. Parse failure and unsupported semantics SHALL be represented as shared coverage outcomes rather than name-only guesses.
 
 All emitted facts, relations, and provenance paths SHALL be deterministic for identical content and indexing context.
+
+### Requirement: Bounded Python member and lexical-scope analysis
+
+The adapter SHALL inspect each class body's direct definitions once and SHALL reuse their parser-backed declaration and decorator evidence when classifying extracted members. Resolving one member MUST NOT recursively recollect every function below the class.
+
+Direct-member indexing SHALL recognize decorated definitions while excluding nested functions and members of nested classes from the outer owner's member set. Association SHALL use owner containment, declared name, kind, and source position rather than name-only matching.
+
+`__init__` and `__new__` SHALL remain constructors. `staticmethod` and `classmethod` decorator evidence SHALL retain static dispatch in the shared model. `property` and `.setter` decorator evidence SHALL retain getter and setter member semantics. Multiline decorators and comments between decorators and definitions SHALL remain parser-authoritative.
+
+For bare-call shadowing, the adapter SHALL derive the bound-name summary of an enclosing function scope at most once and reuse it for references in that scope. The summary SHALL include parameters, assignment and augmented-assignment targets, loop targets, `as` aliases, and named-expression targets, and MUST exclude bindings introduced only inside nested function or class scopes.
+
+Nested-owner exclusion and lexical lookup MUST use reusable owner or scope indexes rather than scanning all class symbols or the complete scope body once per member or reference.
 
 ## Constraints
 
@@ -73,3 +120,4 @@ All emitted facts, relations, and provenance paths SHALL be deterministic for id
 - `code-graph:language-adapter` — common adapter port, phases, and capability contract
 - `code-graph:symbol-model` — logical symbols, owners, bindings, ranges, and hierarchy evidence
 - `code-graph:workspace-integration` — workspace and package-layout boundaries
+- [`code-graph:graph-path-identity`](../graph-path-identity/spec.md) — portable normalize for relative import path walks

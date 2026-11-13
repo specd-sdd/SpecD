@@ -9,7 +9,8 @@
     "core:schema-merge",
     "core:vcs-adapter-port",
     "core:vcs-adapter",
-    "default:_global/architecture"
+    "default:_global/architecture",
+    "core:spec-id-format"
   ],
   "implementation": [
     {

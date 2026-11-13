@@ -1,0 +1,77 @@
+- op: added
+  description: 'Apply semantic containment and explicit identity classification to Go declarations.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Scoped bindings, selectors, construction, and types$'
+  content: |
+    ### Requirement: Go caller containment and declaration classification
+
+    The adapter SHALL select a call's caller as the innermost supported function, receiver method, or explicitly modeled function literal whose complete parser range contains the call. A package declaration, type, field, local variable, constant, parameter, or preceding declaration MUST NOT become the caller based only on source order.
+
+    Parameters, result names, receivers, import aliases, short-variable declarations, and routine-local variables SHALL be lexical bindings. Package functions and language-defined type or package declarations MAY be logical targets under the existing package surface policy. Function literals SHALL remain physical or lexical callable evidence unless the adapter defines a deterministic semantic identity that cannot collide across lexical scopes.
+
+    Receiver methods SHALL continue to use the canonical receiver-type owner. Same-name methods on distinct receiver types and same-name declarations in competing lexical scopes MUST remain distinct. Go declarations MUST NOT be grouped as overloads because Go does not define overload sets by simple name.
+
+- op: added
+  description: 'Require Go structural facts to come from Tree-sitter nodes rather than whole-source regex scans.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Supported files and deterministic analysis$'
+  content: |
+    ### Requirement: Go parser-authoritative structural extraction
+
+    The adapter SHALL derive type and interface declarations, interface methods, import specs, fields, aliases, type references, selector calls, function calls, construction-like composite literals, receivers, and embedding or hierarchy evidence from Go parser nodes whenever the grammar represents them. Brace counting or whole-source regular expressions MUST NOT determine a declaration body, scope, call, or composite literal.
+
+    Token extraction MAY operate inside a parser-proven type-expression node when required by the supported reference policy. Parsing `go.mod` MAY remain textual because it is an auxiliary resolution manifest, but that exception MUST NOT authorize regex reconstruction of Go source structure.
+
+    Import specs SHALL emit dependency relations only when package-resolution evidence identifies a workspace or supported external target. An unresolved raw import specifier MAY remain diagnostic evidence, but MUST NOT itself be persisted as a resolved relation target.
+
+- op: added
+  description: 'Move file-level IMPORTS derivation to the indexer.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Scoped bindings, selectors, construction, and types$'
+    before:
+      type: paragraph
+      contains: 'It SHALL build .?IMPORTS.?, .?CALLS.?, .?CONSTRUCTS.?, and .?USES_TYPE'
+  content: |
+    The adapter SHALL emit deterministic facts for import aliases, function scopes, typed parameters and results, receiver bindings, selector expressions, named composite literals, constructor-like calls, and type references. It SHALL build `CALLS`, `CONSTRUCTS`, and `USES_TYPE` only when package aliases, receiver types, local declarations, or indexed imports prove the target. Resolved imports SHALL be exposed through `resolveImports()` so the indexer derives file-level `IMPORTS`.
+
+- op: removed
+  description: 'Remove the superseded builder sentence.'
+  selector:
+    type: paragraph
+    contains: 'It SHALL build .?IMPORTS.?, .?CALLS.?, .?CONSTRUCTS.?, and .?USES_TYPE'
+    parent:
+      type: section
+      matches: '^Requirement: Scoped bindings, selectors, construction, and types$'
+
+- op: added
+  description: 'Align Go buildRelations with indexer-owned IMPORTS.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Scoped bindings, selectors, construction, and types$'
+    before:
+      type: paragraph
+      contains: 'concrete .?IMPORTS.? relations for resolved imported packages'
+  content: |
+    In `buildRelations()`, the adapter SHALL build concrete `CALLS` relations connecting callers to target functions and receiver methods. Resolved imported packages SHALL be returned from `resolveImports()` so the indexer derives the file-level `IMPORTS` relations.
+
+- op: removed
+  description: 'Remove the superseded buildRelations IMPORTS sentence.'
+  selector:
+    type: paragraph
+    contains: 'concrete .?IMPORTS.? relations for resolved imported packages'
+    parent:
+      type: section
+      matches: '^Requirement: Scoped bindings, selectors, construction, and types$'

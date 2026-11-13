@@ -87,6 +87,9 @@ export async function projectSpecCoverage(
       }
 
       for (const symbolName of link.symbols) {
+        const physicalMatches = input
+          .symbolsByFile(link.file)
+          .filter((symbol) => symbol.name === symbolName)
         if (input.resolveSymbol !== undefined) {
           const workspace = splitWorkspaceIdentity(link.file)?.workspace ?? ''
           const resolved = await input.resolveSymbol({
@@ -103,19 +106,26 @@ export async function projectSpecCoverage(
             })
             relations.set(`${relation.source}:${relation.type}:${relation.target}`, relation)
           } else {
+            const hasOnlyPhysicalEvidence =
+              physicalMatches.length > 0 &&
+              physicalMatches.every(
+                (symbol) => !input.logicalIdByDeclarationSymbolId.has(symbol.id),
+              )
             addDiagnostic(
               spec.specId,
               link.file,
               symbolName,
-              resolved.status === 'ambiguous' ? 'SYMBOL_AMBIGUOUS' : 'SYMBOL_NOT_FOUND',
+              resolved.status === 'ambiguous'
+                ? 'SYMBOL_AMBIGUOUS'
+                : hasOnlyPhysicalEvidence
+                  ? 'COVERAGE_NOT_APPLICABLE'
+                  : 'SYMBOL_NOT_FOUND',
             )
           }
           continue
         }
         const logicalIds = new Set(
-          input
-            .symbolsByFile(link.file)
-            .filter((symbol) => symbol.name === symbolName)
+          physicalMatches
             .map((symbol) => input.logicalIdByDeclarationSymbolId.get(symbol.id))
             .filter((logicalId): logicalId is string => logicalId !== undefined),
         )
@@ -131,7 +141,11 @@ export async function projectSpecCoverage(
             spec.specId,
             link.file,
             symbolName,
-            logicalIds.size === 0 ? 'SYMBOL_NOT_FOUND' : 'SYMBOL_AMBIGUOUS',
+            logicalIds.size === 0 && physicalMatches.length > 0
+              ? 'COVERAGE_NOT_APPLICABLE'
+              : logicalIds.size === 0
+                ? 'SYMBOL_NOT_FOUND'
+                : 'SYMBOL_AMBIGUOUS',
           )
         }
       }

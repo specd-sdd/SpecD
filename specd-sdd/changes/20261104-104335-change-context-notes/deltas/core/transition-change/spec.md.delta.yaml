@@ -1,0 +1,46 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Input contract$'
+  content: |
+    The Use Case MUST accept `TransitionChangeInput` containing:
+
+    - `name`: Change identifier (`string`).
+    - `to`: Target lifecycle state enum or `'next'`.
+    - `skipChecks`: Optional array of check IDs to bypass (`readonly string[]`).
+    - `skipHookPhases`: Optional array of hook phases to skip (`readonly HookPhase[]`).
+    - `onProgress`: Optional progress callback for streaming telemetry.
+
+    The Use Case MUST NOT accept ad-hoc check bypass booleans (`allowOutOfScope`, `allowOverlap`). Check bypasses SHALL be supplied uniformly through `skipChecks`.
+
+    Input additionally accepts reason?: string and note?: { autoRemove?: NoteAutoRemoval }. note requires a non-blank reason and reuses that text; no policy means no automatic removal. Validate the complete input at runtime (types, unknown fields, variants and cross-field constraints) before actor resolution, refresh, reconciliation, hooks or any effects. Invalid input SHALL produce typed errors and zero effects.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Atomic optional reason and current note
+
+    Record reason in the transitioned event independently of optional note creation. Only after a successful effective transition within the final serialized mutation, clean existing notes and add/reuse the requested note. Failed predicate/hook/no-op/persistence paths SHALL not create requested notes or clean existing notes. Preserve any previously committed independent recovery and its note when the requested hop fails. Do not call AddChangeNote as a separately persisted follow-up operation. Reject reason/note on a neutral self-entry.
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`core:change`](../change/spec.md)
+    - [`core:run-step-hooks`](../run-step-hooks/spec.md)
+    - [`core:hook-execution-model`](../hook-execution-model/spec.md)
+    - [`core:workflow-model`](../workflow-model/spec.md)
+    - [`default:_global/architecture`](../../_global/architecture/spec.md)
+    - [`core:lifecycle-engine`](../lifecycle-engine/spec.md)
+    - [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md)
+    - [`core:composition-resolver`](../composition-resolver/spec.md)
+    - [`core:count-tasks`](../count-tasks/spec.md) — supplies shared task-completion counts.
+    - [`core:transition-checks`](../transition-checks/spec.md) — predicate evaluation then matching effects.
+    - [`core:check-registry`](../check-registry/spec.md) — registers step-skip checks for bypassed states.
+    - [`core:workflow-topology`](../workflow-topology/spec.md) — authoritative domain service for legal transitions and bypassed steps.
+    - [`core:resolve-change-schema`](../resolve-change-schema/spec.md) — sovereign schema lookup, identity integrity, and version advisory.
+    - `core:note-auto-removal-policy` — note policy or application capability used by this contract.

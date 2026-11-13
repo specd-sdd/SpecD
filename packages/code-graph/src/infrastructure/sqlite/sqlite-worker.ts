@@ -9,7 +9,7 @@ import {
   type SQLiteWorkerRequest,
   type SQLiteWorkerResponse,
 } from './sqlite-worker-protocol.js'
-import { type FileNode } from '../../domain/value-objects/file-node.js'
+import { type FileCategory, type FileNode } from '../../domain/value-objects/file-node.js'
 import { type DocumentNode } from '../../domain/value-objects/document-node.js'
 import { type SymbolNode } from '../../domain/value-objects/symbol-node.js'
 import { type SpecNode } from '../../domain/value-objects/spec-node.js'
@@ -194,9 +194,9 @@ export async function handleMessage(
         result = database.getFile(p.filePath)
         break
       }
-      case 'findFilesByConfigRelativePath': {
-        const p = payload as { configRelativePath: string }
-        result = database.findFilesByConfigRelativePath(p.configRelativePath)
+      case 'findFilesByProjectRelativePath': {
+        const p = payload as { projectRelativePath: string }
+        result = database.findFilesByProjectRelativePath(p.projectRelativePath)
         break
       }
       case 'getDocument': {
@@ -204,9 +204,9 @@ export async function handleMessage(
         result = database.getDocument(p.documentId)
         break
       }
-      case 'findDocumentsByConfigRelativePath': {
-        const p = payload as { configRelativePath: string }
-        result = database.findDocumentsByConfigRelativePath(p.configRelativePath)
+      case 'findDocumentsByProjectRelativePath': {
+        const p = payload as { projectRelativePath: string }
+        result = database.findDocumentsByProjectRelativePath(p.projectRelativePath)
         break
       }
       case 'getSymbol': {
@@ -291,13 +291,13 @@ export async function handleMessage(
         break
       }
       case 'getCoveringSpecsForSymbol': {
-        const p = payload as { symbolId: string }
-        result = database.getCoveringSpecsForSymbol(p.symbolId)
+        const p = payload as { logicalSymbolId: string }
+        result = database.getCoveringSpecsForSymbol(p.logicalSymbolId)
         break
       }
       case 'getCoveringSpecsForSymbols': {
-        const p = payload as { symbolIds: readonly string[] }
-        result = database.getCoveringSpecsForSymbols(p.symbolIds)
+        const p = payload as { logicalSymbolIds: readonly string[] }
+        result = database.getCoveringSpecsForSymbols(p.logicalSymbolIds)
         break
       }
       case 'getCallers': {
@@ -365,7 +365,8 @@ export async function handleMessage(
         break
       }
       case 'getFileImporterCounts': {
-        result = database.getFileImporterCounts()
+        const p = payload as { categories?: readonly FileCategory[] }
+        result = database.getFileImporterCounts(p)
         break
       }
       case 'getAllFiles': {
@@ -392,6 +393,11 @@ export async function handleMessage(
       case 'findDeclarations': {
         const p = payload as { logicalSymbolIds: readonly string[] }
         result = database.findDeclarations(p.logicalSymbolIds)
+        break
+      }
+      case 'findLogicalDeclarationsByDeclarationIds': {
+        const p = payload as { declarationSymbolIds: readonly string[] }
+        result = database.findLogicalDeclarationsByDeclarationIds(p.declarationSymbolIds)
         break
       }
       case 'findPublicBindingsByExportedNames': {

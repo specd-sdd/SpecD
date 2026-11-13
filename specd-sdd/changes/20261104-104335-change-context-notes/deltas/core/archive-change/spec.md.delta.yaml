@@ -1,0 +1,44 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Overlap guard$'
+  content: |
+    After the archivable guard passes and before pre-archive hooks execute, `ArchiveChange` MUST evaluate `spec.overlap` while the subject change remains `archivable`. Overlap is archive-only and MUST NOT become an enter-`ready` predicate.
+
+    The check MUST list active changes, exclude the change being archived by name, call `detectSpecOverlap` with the remaining changes and subject, and retain only report entries involving the subject. When overlap exists and `spec.overlap` is not bypassed (not in the effective `skipChecks`), it MUST throw `SpecOverlapError` naming each overlapping spec and peer change before any publication. Without overlap, archive proceeds regardless of the bypass.
+
+    When overlap exists and `spec.overlap` is bypassed (`skipChecks` contains `spec.overlap`), each affected peer MUST receive a `spec-overlap-conflict` reconciliation intent through the single application reconciler. The peer's configured artifact and workflow policies and any mandatory gate recovery determine its persisted review state and lifecycle target; overlap alone MUST NOT unconditionally move every peer to `designing`. Peer invalidation and the resulting audit evidence MUST be committed atomically per peer. `ArchiveChange` MUST NOT call broad `Change.invalidate` directly. Peer invalidation SHALL run only after publication and archive success. Pass structured causative change name/spec IDs to reconciliation; create the peer's explanatory note atomically with its applied consequences. On individual peer failure, report the peer/error, continue remaining peers and normal post-archive work, preserve successful updates and never roll back the completed archive. Failed/restored attempts SHALL not invalidate peers for an unpublished result. No retry queue or blocking repair workflow is required.
+
+    A schema MAY disable `spec.overlap` or make it non-skippable through `archiveChecks`. When it is disabled the check is not evaluated, no overlap scan runs, and no peer is invalidated. When it is non-skippable, bypassing it MUST fail with `CheckNotSkippableError`.
+
+    `SpecOverlapError` names each overlapping spec and the peer changes, and exposes `skippable` (whether the resolved `spec.overlap` binding can be bypassed). Its message MUST NOT contain delivery-specific flags: hosts compose their own bypass hint from `skippable`.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Archive note failure and success boundaries
+
+    New failed attempts SHALL request SYSTEM_ACTOR explanatory notes with repair-completion/archive-success alternatives; exact current duplicate text/author/policy may reuse a note. Record failure notes after any successful rollback to archivable so recovery cleanup does not consume the new note; incomplete restore retains context in archiving. At successful archive commit, persist operation-success cleanup and note-removed audits in the archived manifest. On failure restore the original active notes/audit together with the existing batch protocol; do not consume success policies on attempted entry/preflight, or run separately persisted cleanup after moving. Metadata/post-hook warnings after success do not restore removed notes.
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Result shape$'
+  content: |
+    `ArchiveChange.execute` must return a result object. The result must include:
+
+    - `archivedChange` — the `ArchivedChange` record that was persisted
+    - `archiveDirPath` — absolute path to the archive directory where the change was stored
+    - `postHookFailures` — array of hook commands that failed post-archive, empty on full success
+    - `staleMetadataSpecPaths` — array of spec paths where `metadata.json` generation failed during this archive (e.g. extraction produced no required fields); empty when all metadata was generated successfully
+    - `invalidatedChanges` — array of objects describing changes that were invalidated due to spec overlap, each containing:
+      - `name` — the invalidated change's name
+      - `specIds` — readonly array of overlapping spec IDs that triggered the invalidation
+        Empty when no changes were invalidated (either no overlap existed or `spec.overlap` was not bypassed and the archive was blocked).
+
+    `ArchiveChange` throws on pre-archive hook failure or `assertArchivable` failure. Post-archive failures are returned, not thrown.
+
+    The result SHALL additionally report peerInvalidationFailures as peer name, overlapping spec IDs and actionable error message. Such failures are post-success diagnostics, not thrown rollback errors. invalidatedChanges SHALL list only successfully updated peers; continue after each failure.

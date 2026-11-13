@@ -12,13 +12,18 @@ function sym(name: string, filePath: string, line: number, kind: SymbolKind = Sy
   return createSymbolNode({ name, kind, filePath, line, column: 0 })
 }
 
-function file(path: string, workspace = 'ws-a') {
+function file(
+  path: string,
+  workspace = 'ws-a',
+  category: 'source' | 'test' | 'ignored' = 'source',
+) {
   return createFileNode({
     path,
-    configRelativePath: '',
+    projectRelativePath: '',
     language: 'typescript',
     contentHash: 'sha256:x',
     workspace,
+    category,
   })
 }
 
@@ -210,19 +215,20 @@ describe('computeHotspots', () => {
     expect(result.entries[0]?.score).toBe(2)
   })
 
-  it('uses class, method, and function as the default hotspot kinds', async () => {
+  it('uses class, method, function, and interface as the default hotspot kinds, excluding properties and variables', async () => {
     const fn = sym('fn', 'ws-a:targets.ts', 1, SymbolKind.Function)
     const cls = sym('Cls', 'ws-a:targets.ts', 5, SymbolKind.Class)
     const method = sym('method', 'ws-a:targets.ts', 9, SymbolKind.Method)
     const variable = sym('state', 'ws-a:targets.ts', 13, SymbolKind.Variable)
     const contract = sym('Contract', 'ws-a:targets.ts', 17, SymbolKind.Interface)
+    const prop = sym('prop', 'ws-a:targets.ts', 21, SymbolKind.Property)
     const callers = [
       sym('callerA', 'ws-a:callers.ts', 1),
       sym('callerB', 'ws-a:callers.ts', 2),
       sym('callerC', 'ws-a:callers.ts', 3),
     ]
 
-    await store.upsertFile(file('ws-a:targets.ts'), [fn, cls, method, variable, contract], [])
+    await store.upsertFile(file('ws-a:targets.ts'), [fn, cls, method, variable, contract, prop], [])
     await store.upsertFile(
       file('ws-a:callers.ts'),
       callers,
@@ -232,15 +238,17 @@ describe('computeHotspots', () => {
         createRelation({ source: caller.id, target: method.id, type: RelationType.Calls }),
         createRelation({ source: caller.id, target: variable.id, type: RelationType.Calls }),
         createRelation({ source: caller.id, target: contract.id, type: RelationType.Calls }),
+        createRelation({ source: caller.id, target: prop.id, type: RelationType.Calls }),
       ]),
     )
 
     const result = await computeHotspots(store)
 
-    expect(DEFAULT_HOTSPOT_KINDS).toEqual(['class', 'method', 'function'])
+    expect(DEFAULT_HOTSPOT_KINDS).toEqual(['class', 'method', 'function', 'interface'])
     expect(result.entries.map((entry) => entry.symbol.kind).sort()).toEqual([
       SymbolKind.Class,
       SymbolKind.Function,
+      SymbolKind.Interface,
       SymbolKind.Method,
     ])
   })
@@ -489,5 +497,89 @@ describe('computeHotspots', () => {
 
     const included = await computeHotspots(store, { workspace: 'C', minScore: 0, minRisk: 'LOW' })
     expect(included.entries).toHaveLength(0)
+  })
+
+  it('callers in test files do not count toward hotspot scores by default', async () => {
+    const symA = sym('symA', 'ws-a:src/a.ts', 1)
+    const symB = sym('symB', 'ws-a:src/b.ts', 1)
+    const testCaller = sym('testCaller', 'ws-a:test/a.spec.ts', 1)
+    const prodCaller = sym('prodCaller', 'ws-a:src/c.ts', 1)
+
+    await store.upsertFile(file('ws-a:src/a.ts', 'ws-a', 'source'), [symA], [])
+    await store.upsertFile(file('ws-a:src/b.ts', 'ws-a', 'source'), [symB], [])
+    await store.upsertFile(
+      file('ws-a:test/a.spec.ts', 'ws-a', 'test'),
+      [testCaller],
+      [createRelation({ source: testCaller.id, target: symA.id, type: RelationType.Calls })],
+    )
+    await store.upsertFile(
+      file('ws-a:src/c.ts', 'ws-a', 'source'),
+      [prodCaller],
+      [createRelation({ source: prodCaller.id, target: symB.id, type: RelationType.Calls })],
+    )
+
+    const result = await computeHotspots(store, { minRisk: 'LOW', minScore: 1 })
+    const entryA = result.entries.find((e) => e.symbol.id === symA.id)
+    const entryB = result.entries.find((e) => e.symbol.id === symB.id)
+
+    expect(entryA).toBeUndefined()
+    expect(entryB).toBeDefined()
+    expect(entryB?.directCallers).toBe(1)
+  })
+
+  it('counts test callers when includeTests is true', async () => {
+    const symA = sym('symA', 'ws-a:src/a.ts', 1)
+    const testCaller = sym('testCaller', 'ws-a:test/a.spec.ts', 1)
+
+    await store.upsertFile(file('ws-a:src/a.ts', 'ws-a', 'source'), [symA], [])
+    await store.upsertFile(
+      file('ws-a:test/a.spec.ts', 'ws-a', 'test'),
+      [testCaller],
+      [createRelation({ source: testCaller.id, target: symA.id, type: RelationType.Calls })],
+    )
+
+    const result = await computeHotspots(store, { includeTests: true, minRisk: 'LOW', minScore: 1 })
+    const entryA = result.entries.find((e) => e.symbol.id === symA.id)
+
+    expect(entryA).toBeDefined()
+    expect(entryA?.directCallers).toBe(1)
+  })
+
+  it('excludes candidate symbols defined in test files by default', async () => {
+    const testHelper = sym('testHelper', 'ws-a:test/helper.ts', 1)
+    const testCaller = sym('testCaller', 'ws-a:test/caller.spec.ts', 1)
+
+    await store.upsertFile(file('ws-a:test/helper.ts', 'ws-a', 'test'), [testHelper], [])
+    await store.upsertFile(
+      file('ws-a:test/caller.spec.ts', 'ws-a', 'test'),
+      [testCaller],
+      [createRelation({ source: testCaller.id, target: testHelper.id, type: RelationType.Calls })],
+    )
+
+    const defaultResult = await computeHotspots(store, { minRisk: 'LOW', minScore: 1 })
+    expect(defaultResult.entries.find((e) => e.symbol.id === testHelper.id)).toBeUndefined()
+
+    const withTestsResult = await computeHotspots(store, {
+      includeTests: true,
+      minRisk: 'LOW',
+      minScore: 1,
+    })
+    expect(withTestsResult.entries.find((e) => e.symbol.id === testHelper.id)).toBeDefined()
+  })
+
+  it('tracks omitted test and ignored files in HotspotResult', async () => {
+    await store.upsertFile(file('ws-a:src/a.ts', 'ws-a', 'source'), [], [])
+    await store.upsertFile(file('ws-a:test/a.spec.ts', 'ws-a', 'test'), [], [])
+    await store.upsertFile(file('ws-a:test/b.spec.ts', 'ws-a', 'test'), [], [])
+    await store.upsertFile(file('ws-a:generated/c.ts', 'ws-a', 'ignored'), [], [])
+
+    const defaultResult = await computeHotspots(store)
+    expect(defaultResult.omittedCounts).toEqual({ tests: 2, ignored: 1 })
+
+    const withTestsResult = await computeHotspots(store, { includeTests: true })
+    expect(withTestsResult.omittedCounts).toEqual({ tests: 0, ignored: 1 })
+
+    const withAll = await computeHotspots(store, { includeTests: true, includeIgnored: true })
+    expect(withAll.omittedCounts).toEqual({ tests: 0, ignored: 0 })
   })
 })

@@ -1,0 +1,137 @@
+- op: added
+  description: 'Render logical symbol impact without collapsing it to one declaration.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Symbol impact analysis$'
+  content: |
+    ### Requirement: Logical and declaration symbol-impact presentation
+
+    The CLI SHALL delegate symbol selector resolution and impact orchestration to `sdk:run-graph-impact` and SHALL preserve its resolved target kind. For a logical selector, the command MUST request one canonical logical-target analysis covering every contributing declaration; it MUST NOT call impact separately for one arbitrary declaration or for each overload occurrence.
+
+    For an exact physical selector, the command SHALL identify the result as declaration impact. For an ambiguous selector, it SHALL display deterministic semantic candidates and MUST NOT traverse any candidate. This requirement supersedes legacy behaviour that inferred the operation solely from one `symbolId`.
+
+    Text output for logical impact SHALL identify the canonical logical target and summarize its declaration locations. It SHALL distinguish unique affected logical targets from declaration-only evidence and SHALL show covering specs derived from logical coverage. JSON and TOON SHALL expose the SDK result without removing its target discriminant, declarations, physical evidence, semantic affected targets, coverage evidence, explicitly named count units, or `projectRelativePath` on every nested location supplied by the SDK. The CLI MUST NOT reconstruct or omit nested path projections under `resolvedTarget` or its declaration and evidence collections.
+
+    The CLI MUST NOT compute declaration grouping, logical deduplication, coverage projection, or risk. It MAY format those provider-owned results for human output while projecting paths through the SDK contract.
+
+- op: added
+  description: 'Replace per-symbol analyzeImpact behaviour with typed delegated resolution.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Symbol impact analysis$'
+    before:
+      type: list-item
+      matches: 'If one symbol matches, calls'
+  content: |
+    5. If the selector resolves to one typed target (logical target, exact declaration, or public binding), delegates to `sdk:run-graph-impact` and outputs the result as specified by "Logical and declaration symbol-impact presentation".
+    6. If a bare or file-qualified selector matches several distinct semantic targets, reports every candidate as ambiguous and MUST NOT traverse any of them. Several declarations that belong to one logical target are one target, not several matches.
+
+- op: removed
+  description: 'Remove the stale single-symbol analyzeImpact step.'
+  selector:
+    type: list-item
+    matches: 'If one symbol matches, calls'
+    parent:
+      type: section
+      matches: '^Requirement: Symbol impact analysis$'
+
+- op: removed
+  description: 'Remove the stale analyze-each-match step.'
+  selector:
+    type: list-item
+    matches: 'analyzes each one and outputs all results'
+    parent:
+      type: section
+      matches: '^Requirement: Symbol impact analysis$'
+
+- op: modified
+  description: 'Round 3: exact ambiguity lists candidates and is never traversed.'
+  selector:
+    type: section
+    matches: '^Requirement: Output format$'
+  content: |
+    The command SHALL delegate impact analysis and path projection to `sdk:run-graph-impact`.
+
+    All file paths rendered in the impact analysis output (both text and JSON) SHALL be formatted relative to the project root for consistency across multi-workspace projects.
+
+    **File impact** in `text` mode:
+
+    ```text
+    Impact analysis for src/auth.ts (depth=5)
+      Risk level:       HIGH
+      Direct deps:      6
+      Indirect deps:    3
+      Transitive deps:  1
+      Affected files:   8
+
+    Changed symbols:
+      validate:10
+      AuthService:20
+
+    Affected files:
+      packages/core/src/login.ts: handleLogin:12 (d=1), validateSession:45 (d=1)
+      packages/core/src/session.ts: createSession:8 (d=2)
+
+    Per-symbol breakdown:
+      src/auth.ts:function:validate:10:0  risk=HIGH direct=4
+      src/auth.ts:class:AuthService:20:0  risk=MEDIUM direct=2
+    ```
+
+    For multiple files, text output SHALL show one aggregated summary plus a `Changed symbols:` block grouped by input file, an `Affected files:` block, and a `Per-file breakdown:` or equivalent structure that lets a human see which input files contributed to the overall result.
+
+    When affected symbols are available, each file line shows the symbols grouped after a colon with depth indicators: `path: name:line (d=N), name:line (d=N)`. All paths are rendered relative to the project root. Files reached only via IMPORTS (file-level) are listed without symbols. The depth value `d=N` indicates the distance from the analysis target (1 = direct, 2 = indirect, 3+ = transitive).
+
+    When `--direction` is omitted or set to `dependents` / `upstream`, human-facing documentation and help text SHOULD explain these counts as dependent counts. When `--direction dependencies` / `downstream` is used, documentation SHOULD explain that the same fields represent dependencies reached from the target.
+
+    When `--depth` is not the default (3), the header line includes `(depth=N)` to show the configured depth.
+
+    **Symbol impact** in `text` mode:
+
+    ```text
+    Impact analysis for function createKernel (packages/core/src/composition/kernel.ts:147) (depth=5)
+      Risk level:       CRITICAL
+      Direct deps:      1
+      Indirect deps:    1
+      Transitive deps:  38
+      Affected files:   40
+
+    Affected files:
+      packages/cli/src/kernel.ts: wireKernel:5 (d=1)
+      ...
+    ```
+
+    **Spec impact** in `text` mode:
+
+    ```text
+    Impact analysis for spec core:change (depth=3)
+      Risk level:       HIGH
+      Direct deps:      2
+      Indirect deps:    1
+      Transitive deps:  0
+      Affected files:   4
+    ```
+
+    Spec impact output MUST surface files reached through `COVERS_FILE` and symbols reached through `COVERS_SYMBOL` in the same result structure used by other impact targets.
+
+    When several logical targets exactly match the requested symbol, the command lists each candidate with its project-relative declaration locations and performs no impact traversal. Overloads of one logical symbol are one target and are analyzed.
+
+    **Omission notices:**
+    When `omittedCounts` indicates that results were filtered out (`tests > 0` or `ignored > 0`), text mode output SHALL display an omission notice:
+    `ℹ Excluded from results: <count> test files, <count> ignored files. Use --include-tests, --include-ignored, or --all to view them.`
+    When only one category has omissions, the notice MAY mention only that category (e.g. `ℹ Excluded from results: 14 test files. Use --include-tests or --all to view them.`).
+
+    In `json` or `toon` mode, the full result object is output as-is, including `omittedCounts: { tests: number, ignored: number }`. The `AffectedSymbol` entries in JSON include the `depth` field. Target file and symbol entries SHALL expose `canonicalPath` and `projectRelativePath`. Multi-file impact results SHALL expose `targets` (canonical) and `projectRelativeTargets`. The JSON/TOON output SHALL NOT expose `displayPath` or `displayTargets`. All affected file and symbol paths SHALL be formatted relative to the project root (`projectRelativePath`).
+
+    The JSON output MUST include aggregate impact fields to support automated risk assessment:
+
+    - `riskLevel`
+    - `directDepsCount`
+    - `indirectDepsCount`
+    - `transitiveDepsCount`
+    - `affectedFilesCount`
+    - `omittedCounts`

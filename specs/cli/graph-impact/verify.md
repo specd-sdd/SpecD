@@ -68,12 +68,6 @@
 - **THEN** the command resolves the symbol through the provider's shared symbol resolver
 - **AND** analyzes impact for that exact symbol
 
-#### Scenario: Multiple symbol matches
-
-- **GIVEN** `validate` exists in 3 different files
-- **WHEN** `specd graph impact --symbol validate` is run
-- **THEN** stdout shows `3 symbols match "validate":` followed by separate impact reports for each
-
 #### Scenario: Symbol not found
 
 - **GIVEN** `nonExistentSymbol` does not exist in the graph
@@ -124,6 +118,30 @@
 - **WHEN** any `--symbol` impact command runs
 - **THEN** storage is reached only through the provider
 - **AND** the CLI does not read `package.json` or SQLite itself
+
+### Requirement: Logical and declaration symbol-impact presentation
+
+#### Scenario: Logical impact summarizes every declaration
+
+- **GIVEN** a logical selector resolves to a canonical target with several declaration locations
+- **WHEN** graph impact is rendered as text
+- **THEN** the target is analyzed once and identified as logical impact
+- **AND** every contributing declaration location is summarized
+
+#### Scenario: Exact and ambiguous selectors are presented truthfully
+
+- **GIVEN** an exact physical selector or an ambiguous semantic selector
+- **WHEN** graph impact runs
+- **THEN** exact impact is identified as declaration impact
+- **AND** ambiguity lists deterministic candidates without traversing any of them
+
+#### Scenario: Structured formats preserve the SDK contract
+
+- **GIVEN** the SDK returns discriminated target, declarations, physical evidence, logical affected targets, coverage, explicit count units, and project-relative paths on nested locations
+- **WHEN** JSON or TOON output is requested
+- **THEN** those fields are preserved without CLI recomputation
+- **AND** nested resolvedTarget declarations and evidence retain their projectRelativePath values
+- **AND** risk, grouping, and coverage remain provider-owned results
 
 ### Requirement: Spec impact analysis
 
@@ -177,15 +195,17 @@
 - **AND** a `Changed symbols:` block grouped by input file
 - **AND** a per-file breakdown section
 
-#### Scenario: JSON output includes changedSymbols for file impact
+#### Scenario: JSON output includes symbols for file impact
 
 - **WHEN** `specd graph impact --file core:src/auth.ts --format json` is run
-- **THEN** stdout is valid JSON containing `changedSymbols`, `affectedSymbols`, and `affectedFiles`
+- **THEN** stdout is valid JSON containing `symbols`, `affectedSymbols`, `affectedFiles`, `canonicalPath`, and `projectRelativePath`
+- **AND** stdout JSON does not contain `displayPath`
 
 #### Scenario: JSON output for symbol impact
 
 - **WHEN** `specd graph impact --symbol createKernel --format json` is run
-- **THEN** stdout is valid JSON containing `symbol` and `impact` objects
+- **THEN** stdout is valid JSON containing `symbol`, `impact`, and `projectRelativePath`
+- **AND** stdout JSON does not contain `displayPath`
 
 #### Scenario: JSON output includes aggregate impact fields
 
@@ -196,8 +216,21 @@
 #### Scenario: Impact paths are rendered relative to project root
 
 - **WHEN** `specd graph impact` is run
-- **THEN** all file paths in the output (e.g., `packages/core/src/index.ts`) are relative to the project root
+- **THEN** all file paths in the output (e.g., `packages/core/src/index.ts`) are relative to the project root as `projectRelativePath`
 - **AND** they do not include workspace-prefixed identities unless explicitly requested
+- **AND** structured output does not include `displayPath` or `displayTargets`
+
+#### Scenario: Omission notice displayed in text mode when tests are excluded
+
+- **GIVEN** an impact query where 5 test files were omitted from results
+- **WHEN** `specd graph impact --file src/foo.ts` is run in text mode
+- **THEN** stdout includes `Excluded from results: 5 test files`
+
+#### Scenario: Omitted counts included in JSON output
+
+- **GIVEN** an impact query where test files were omitted
+- **WHEN** `specd graph impact --file src/foo.ts --format json` is run
+- **THEN** the output object includes `omittedCounts` with the count of omitted test and ignored files
 
 ### Requirement: Pure display-path projection
 
@@ -297,6 +330,19 @@
 - **WHEN** impact receives that name
 - **THEN** it returns a bounded deterministic ambiguity list and performs no traversal
 - **AND** prefix or textual candidates are never accepted as targets
+
+#### Scenario: Category inclusion flags widen analysis scope
+
+- **GIVEN** a symbol imported by both production and test files
+- **WHEN** `specd graph impact --symbol myFunc --include-tests` is run
+- **THEN** test files and their callers are included in the results
+
+#### Scenario: Category filter accepts comma-separated categories
+
+- **GIVEN** a symbol imported by production, test, and ignored files
+- **WHEN** `specd graph impact --symbol myFunc --category source,test` is run
+- **THEN** production and test files and their callers are included in the results
+- **AND** ignored callers remain excluded
 
 ### Requirement: Provider-owned impact result filters
 

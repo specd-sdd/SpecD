@@ -1,6 +1,6 @@
 ---
 title: CLI Guide & Command Interface
-description: Comprehensive guide to the SpecD command-line interface, covering all 12 command families and practical workflows.
+description: Comprehensive guide to the SpecD command-line interface, covering all 13 command families and practical workflows.
 sidebar_position: 6
 ---
 
@@ -58,6 +58,7 @@ flowchart LR
     subgraph Requirements & Specs
         S[specs]
         G[guide]
+        GS[guide-sdk]
     end
     subgraph Architecture & Engine
         SC[schema]
@@ -195,7 +196,7 @@ Direct inspection, searching, and validation of specifications in workspaces.
 - **`specd specs resolve-path <specId>`**: Prints the exact filesystem path on disk.
 - **`specd specs validate [specId]`**: Validates Markdown AST and schema conformance.
 - **`specd specs init <specId>`**: Scaffolds a new spec directory with `spec.md` and `verify.md`.
-- **`specd specs deps <specId>`**: Adds, removes, or lists dependencies between specifications.
+- **`specd specs deps <list|add|remove|set|clear> <specId>`**: Lists or updates persisted dependencies between specifications.
 - **`specd specs implementation <specId>`**: Maps source files and symbols to specification capabilities.
 - **`specd specs optimizations`**: Diagnostics for spec authoring and token usage optimization.
 
@@ -207,7 +208,9 @@ Direct inspection, searching, and validation of specifications in workspaces.
 
 Access and search documentation topics directly within your terminal without opening a browser.
 
-- **`specd guide`**: Catalogs all available guides with titles and descriptions.
+- **`specd guide`**: Catalogs all available guides with titles and descriptions. Each collection is delimited and the page position is reported when the result spans several pages.
+- **`specd guide --meta`**: Prints a catalog index — every topic's page, size, and a copy-pasteable command to read its metadata — instead of the plain listing.
+- **`specd guide --page <n> --page-size <n>`**: Bounds and paginates the listing.
 - **`specd guide <topic>`**: Displays the full guide content.
   ```bash
   specd guide workflow
@@ -227,6 +230,37 @@ Access and search documentation topics directly within your terminal without ope
 
 ---
 
+### 7b. `specd guide-sdk` — SDK & Extension Documentation
+
+The sibling of `specd guide`, serving the hand-written package references (`sdk`, `core`, `code-graph`, `skills`, `schemas`) plus generated public API topics. Topics are addressed with an explicit `collection:` prefix.
+
+- **`specd guide-sdk`**: Lists hand-written documents only, so the catalog stays comparable to `specd guide`. The listing reports how many generated API topics are withheld and the exact command that reveals them, so the API is never invisible.
+- **`specd guide-sdk --scope <docs|api|all>`**: Selects topic kinds. `docs` (the default) lists hand-written documents only, `api` lists generated API topics across every collection, and `all` lists both. An unrecognized scope fails with `INVALID_GUIDE_SCOPE` and points at `--collection`.
+- **`specd guide-sdk --collection <collection>`**: Restricts the listing to one collection (`sdk`, `core`, `code-graph`, `skills`, `schemas`). It is an independent dimension, so it combines with any scope; an unrecognized collection fails with `INVALID_GUIDE_COLLECTION`.
+  ```bash
+  specd guide-sdk --collection core
+  specd guide-sdk --scope api --page-size 20
+  specd guide-sdk --scope api --collection code-graph
+  ```
+- **`specd guide-sdk <collection>:<topic> --meta`**: Reports the metadata for one topic. Generated API topics additionally report `packageName` and `importStatement`, a copy-pasteable import from the published package; their internal declaration paths are withheld from published output.
+  ```bash
+  specd guide-sdk code-graph:classes/GetGraphHealth --meta
+  ```
+- **`specd guide-sdk --page <n> --page-size <n>`**: Bounds and paginates large listings.
+- **`specd guide-sdk <collection>:<topic>`**: Retrieves a document or a generated API symbol.
+  ```bash
+  specd guide-sdk core:ports
+  specd guide-sdk sdk:classes/ArtifactDag
+  ```
+- **`specd guide-sdk --meta`**: Prints a bounded catalog index of every topic, with its page, size, and a read command.
+- **`specd guide-sdk <collection>:<topic> --meta`**: Inspects metadata and outline without the body.
+- **`specd guide-sdk <collection>:<topic> --section <name|index>`**: Slices a section by index, heading, or slug.
+- **`specd guide-sdk search <query> --collection <name>`**: BM25 search scoped to one collection.
+
+👉 _See [Guide SDK Reference](../cli/guide-sdk.md) for full options and examples._
+
+---
+
 ### 8. `specd graph` — Codebase Intelligence
 
 The Code Graph is a core SpecD pillar: AST symbols, call and import edges, spec links, and markdown documents. Use it before reading files at random. The full walkthrough, risk model, and playbooks are in [Code Graph & Intelligence](./code-graph.md).
@@ -237,22 +271,22 @@ The Code Graph is a core SpecD pillar: AST symbols, call and import edges, spec 
   specd graph index --force --exclude-path "**/dist/**"
   ```
 - **`specd graph stats`**: File, document, symbol, and spec counts, relation totals, and freshness (`Content fresh`, `Known stale`, coverage completeness).
-- **`specd graph search "<query>"`**: With no category flag, searches symbols, source files, specs, and documents. Narrow with `--symbols`, `--files`, `--specs`, or `--documents`. Useful flags: `--kind`, `--snippet`, `--spec-content` (json/toon only), `--workspace`, `--exclude-workspace`, `--file`, `--exclude-path`, `--limit`.
+- **`specd graph search "<query>"`**: With no category flag, searches symbols, source files, specs, and documents. Narrow with `--symbols`, `--files`, `--specs`, or `--documents`. Useful flags: `--kind`, `--snippet`, `--spec-content` (json/toon only), `--workspace`, `--exclude-workspace`, `--file`, `--exclude-path`, `--limit`, `--category <categories>`, `--include-tests`, `--include-ignored`, `--all`.
   ```bash
   specd graph search "archive pattern" --specs --spec-content --format toon
   specd graph search "cascade resolution" --documents --snippet --format text
-  specd graph search "createChange" --symbols --kind function --exclude-path "*:test/*"
+  specd graph search "createChange" --symbols --kind function --format text
   ```
-- **`specd graph impact`**: Blast radius. Pass exactly one of `--symbol`, `--file` (repeatable, aggregated), `--spec <workspace:capability-path>`, or `--export <name> --from <surface>`. `--direction` is `dependents` (default; alias `upstream`), `dependencies` (alias `downstream`), or `both`. `--depth` defaults to `3`.
+- **`specd graph impact`**: Blast radius. Pass exactly one of `--symbol`, `--file` (repeatable, aggregated), `--spec <workspace:capability-path>`, or `--export <name> --from <surface>`. `--direction` is `dependents` (default; alias `upstream`), `dependencies` (alias `downstream`), or `both`. `--depth` defaults to `3`. Category flags: `--category <categories>`, `--include-tests`, `--include-ignored`, `--all`.
   ```bash
   specd graph impact --symbol "resolveCliContext" --direction dependents --format toon
   specd graph impact --file "packages/core/src/domain/entities/change.ts" --file "packages/core/src/application/use-cases/edit-change.ts" --direction dependents
   specd graph impact --spec "core:core/transition-change" --direction both --depth 2
   specd graph impact --export "SpecdConfig" --from "core:src/public.ts" --direction dependents
   ```
-- **`specd graph hotspots`**: Ranks coupled symbols. Defaults: kinds `class,method,function`, `--min-risk MEDIUM`, `--min-score 1`, `--limit 20`. `--kind` replaces the default kinds. `--include-importer-only` adds symbols scored only from imports.
+- **`specd graph hotspots`**: Ranks coupled symbols. Defaults: kinds `class,method,function`, `--min-risk MEDIUM`, `--min-score 1`, `--limit 20`, source files only. `--kind` replaces the default kinds. `--include-importer-only` adds symbols scored only from imports. Category flags: `--category <categories>`, `--include-tests`, `--include-ignored`, `--all`.
   ```bash
-  specd graph hotspots --min-risk HIGH --exclude-path "*:test/*" --format toon
+  specd graph hotspots --min-risk HIGH --format toon
   ```
 
 👉 _See [Code Graph & Intelligence](./code-graph.md) for playbooks, and [Graph Reference](../cli/graph.md) for the command contract._
@@ -346,6 +380,7 @@ When generating prompts or piping commands to AI agents, use `--format toon` to 
 specd project status --format toon
 specd changes context 20260924-user-profile implementing --format toon
 specd guide search "approval gates" --format toon
+specd guide-sdk search "dependency tracking" --collection code-graph --format toon
 ```
 
 ### Recipe 3: Investigate, then measure blast radius

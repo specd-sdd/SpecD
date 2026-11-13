@@ -4,7 +4,6 @@ import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
-import { WorkspaceNotFoundError } from '../errors/workspace-not-found-error.js'
 import { SpecNotFoundError } from '../errors/spec-not-found-error.js'
 import { type SpecMetadata } from '../../domain/services/parse-metadata.js'
 import { DependsOnOverwriteError } from '../../domain/errors/depends-on-overwrite-error.js'
@@ -95,22 +94,24 @@ export class GenerateSpecMetadata {
    *
    * @param input - Target spec identifier
    * @returns Generated metadata and source-state provenance
+   * @throws {InvalidSpecIdError} If `specId` is empty, blank, or malformed
+   * @throws {WorkspaceNotFoundError} If the spec ID names an unknown workspace
+   * @throws {SpecNotFoundError} If the spec does not exist
+   * @throws {SchemaNotFoundError} If the active schema cannot be resolved
+   * @throws {DependsOnOverwriteError} If declared `dependsOn` cannot be overwritten
    */
   async execute(input: GenerateSpecMetadataInput): Promise<GenerateSpecMetadataResult> {
-    const { workspace, capPath } = parseSpecId(input.specId)
     const workspaces = await this._listWorkspaces.execute()
     const workspaceMap = new Map(workspaces.map((ws) => [ws.name, ws]))
+    const { workspace, capPath, specId } = parseSpecId(input.specId, { workspaces })
 
-    const ws = workspaceMap.get(workspace)
-    if (ws === undefined) {
-      throw new WorkspaceNotFoundError(workspace)
-    }
+    const ws = workspaceMap.get(workspace)!
 
     const specRepo = ws.specRepo
     const specPath = SpecPath.parse(capPath)
     const spec = await specRepo.get(specPath)
     if (spec === null) {
-      throw new SpecNotFoundError(input.specId)
+      throw new SpecNotFoundError(specId)
     }
 
     const persistedState = await specRepo.readPersistedState(spec)
@@ -188,7 +189,7 @@ export class GenerateSpecMetadata {
       null
 
     const dependsOn = resolveCanonicalDependsOn(
-      input.specId,
+      specId,
       extracted.metadata.dependsOn,
       persistedState?.dependsOn ?? null,
       input.allowDependsOnOverwrite === true,
@@ -197,7 +198,7 @@ export class GenerateSpecMetadata {
     const implementation =
       persistedState !== null && persistedState.implementation.length > 0
         ? projectImplementationMetadata(
-            input.specId,
+            specId,
             persistedState.implementation.map((entry) => ({
               file: entry.file,
               ...(entry.symbols !== undefined ? { symbols: entry.symbols } : {}),

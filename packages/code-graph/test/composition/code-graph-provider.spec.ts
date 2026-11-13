@@ -20,7 +20,9 @@ import { type ImpactResultFilter } from '../../src/domain/value-objects/impact-r
 import {
   createLogicalSymbol,
   createPublicBinding,
+  DeclarationOccurrenceForm,
   SymbolSpace,
+  type ResolvedSymbolTarget,
 } from '../../src/domain/value-objects/symbol-reference.js'
 import { SymbolKind } from '../../src/domain/value-objects/symbol-kind.js'
 import { PhpLanguageAdapter } from '../../src/infrastructure/tree-sitter/php-language-adapter.js'
@@ -113,6 +115,99 @@ describe('CodeGraphProvider', () => {
     })
 
     expect(provider).toBeDefined()
+    await provider.close()
+  })
+
+  it('delegates resolved impact with the complete logical declaration set', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-resolved-impact-'))
+    const store = new InMemoryGraphStore(tempDir)
+    const provider = createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+      graphStoreFactories: { custom: { create: () => store } },
+      graphStoreId: 'custom',
+    })
+    await provider.open()
+
+    const first = createSymbolNode({
+      name: 'run',
+      kind: SymbolKind.Function,
+      filePath: 'ws:first.ts',
+      line: 1,
+      column: 0,
+    })
+    const second = createSymbolNode({
+      name: 'run',
+      kind: SymbolKind.Function,
+      filePath: 'ws:second.ts',
+      line: 1,
+      column: 0,
+    })
+    await store.upsertFile(
+      createFileNode({
+        path: 'ws:first.ts',
+        language: 'typescript',
+        contentHash: 'a',
+        workspace: 'ws',
+      }),
+      [first],
+      [],
+    )
+    await store.upsertFile(
+      createFileNode({
+        path: 'ws:second.ts',
+        language: 'typescript',
+        contentHash: 'b',
+        workspace: 'ws',
+      }),
+      [second],
+      [],
+    )
+
+    const logical = createLogicalSymbol({
+      workspace: 'ws',
+      surface: 'ws:public.ts',
+      name: 'run',
+      space: SymbolSpace.Value,
+    })
+    const declarations = [first, second].map((symbol) => ({
+      logicalId: logical.id,
+      symbolId: symbol.id,
+      location: {
+        filePath: symbol.filePath,
+        line: symbol.line,
+        column: symbol.column,
+        endLine: symbol.endLine,
+        endColumn: symbol.endColumn,
+      },
+      kind: symbol.kind,
+      form: DeclarationOccurrenceForm.Definition,
+    }))
+    await store.replaceReferenceFacts({
+      logicalSymbols: [logical],
+      declarations: declarations.map((declaration) => ({
+        logicalSymbolId: logical.id,
+        declaration,
+      })),
+      publicBindings: [],
+      localBindings: [],
+      steps: [],
+      coverage: [],
+    })
+    const target: ResolvedSymbolTarget = {
+      kind: 'logical-target',
+      logicalSymbol: logical,
+      declarations,
+      path: [],
+    }
+
+    const result = await provider.analyzeResolvedSymbolImpact(target, 'upstream')
+
+    expect(result.resolvedTarget).toBe(target)
+    expect(result.resolvedTarget.kind).toBe('logical-target')
+    if (result.resolvedTarget.kind === 'logical-target') {
+      expect(result.resolvedTarget.declarations).toHaveLength(2)
+    }
     await provider.close()
   })
 
@@ -250,6 +345,33 @@ describe('CodeGraphProvider', () => {
     await provider.close()
   })
 
+  it('explainPath explains a path with the provider injected', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-explain-'))
+    writeFileSync(join(tempDir, 'a.ts'), 'export const a = 1\n')
+    const config = createBootstrapGraphConfig({ projectRoot: tempDir, vcsRoot: tempDir })
+    const provider = createCodeGraphProvider(config)
+    await provider.open()
+
+    const result = await provider.explainPath('a.ts')
+
+    expect(result.projectRelativePath).toBe('a.ts')
+    expect(result.verdict).toBe('indexable')
+    // inGraph is read through the same provider: nothing is indexed yet
+    expect(result.candidates[0]?.inGraph).toBe(false)
+    await provider.close()
+  })
+
+  it('explainPath without a SpecdConfig throws GRAPH_WHY_REQUIRES_CONFIG', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-explain-nocfg-'))
+    const provider = createCodeGraphProvider({ storagePath: tempDir, projectRoot: tempDir })
+    await provider.open()
+
+    await expect(provider.explainPath('a.ts')).rejects.toMatchObject({
+      code: 'GRAPH_WHY_REQUIRES_CONFIG',
+    })
+    await provider.close()
+  })
+
   it('keeps reader availability locked while an index lease is held', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-reader-lock-'))
     const provider = createCodeGraphProvider({ storagePath: tempDir, projectRoot: tempDir })
@@ -269,8 +391,9 @@ describe('CodeGraphProvider', () => {
     const previousToken = process.env['SPECD_GRAPH_INDEX_LOCK_TOKEN']
     const release = acquireGraphIndexLockByStoragePath(tempDir)
     const lockPath = join(tempDir, 'graph', 'index.lock')
-    const lock = JSON.parse(readFileSync(lockPath, 'utf8')) as { version: 1; token: string }
-    writeFileSync(lockPath, JSON.stringify({ ...lock, pid: process.ppid }))
+    const lock = JSON.parse(readFileSync(lockPath, 'utf8')) as { token: string }
+    // The handoff parent owns the lock: its pid is alive and no start time is recorded for it.
+    writeFileSync(lockPath, JSON.stringify({ version: 1, pid: process.ppid, token: lock.token }))
     process.env['SPECD_GRAPH_INDEX_LOCK_ROOT'] = tempDir
     process.env['SPECD_GRAPH_INDEX_LOCK_TOKEN'] = lock.token
     const store = new InMemoryGraphStore(tempDir)
@@ -422,7 +545,7 @@ describe('CodeGraphProvider', () => {
     await store.upsertFile(
       createFileNode({
         path: 'root:src/messages.ts',
-        configRelativePath: 'packages/root/src/messages.ts',
+        projectRelativePath: 'packages/root/src/messages.ts',
         language: 'typescript',
         contentHash: 'hash',
         workspace: 'root',
@@ -435,7 +558,7 @@ describe('CodeGraphProvider', () => {
     expect(resolved).toHaveLength(1)
     expect(resolved[0]).toMatchObject({
       canonicalPath: 'root:src/messages.ts',
-      configRelativePath: 'packages/root/src/messages.ts',
+      projectRelativePath: 'packages/root/src/messages.ts',
       workspace: 'root',
     })
     await provider.close()
@@ -552,7 +675,7 @@ describe('CodeGraphProvider', () => {
     await store.upsertFile(
       createFileNode({
         path: 'root:src/messages.ts',
-        configRelativePath: 'src/messages.ts',
+        projectRelativePath: 'src/messages.ts',
         language: 'typescript',
         contentHash: 'hash',
         workspace: 'root',
@@ -589,7 +712,7 @@ describe('CodeGraphProvider', () => {
     await store.upsertFile(
       createFileNode({
         path: 'root:src/messages.ts',
-        configRelativePath: 'packages/root/src/messages.ts',
+        projectRelativePath: 'packages/root/src/messages.ts',
         language: 'typescript',
         contentHash: 'hash',
         workspace: 'root',
@@ -738,7 +861,7 @@ describe('CodeGraphProvider', () => {
     await store.upsertFile(
       createFileNode({
         path: target.filePath,
-        configRelativePath: 'src/target.ts',
+        projectRelativePath: 'src/target.ts',
         language: 'typescript',
         contentHash: 'target',
         workspace: 'fixture',
@@ -749,7 +872,7 @@ describe('CodeGraphProvider', () => {
     await store.upsertFile(
       createFileNode({
         path: consumer.filePath,
-        configRelativePath: 'src/consumer.ts',
+        projectRelativePath: 'src/consumer.ts',
         language: 'typescript',
         contentHash: 'consumer',
         workspace: 'fixture',
@@ -808,6 +931,7 @@ describe('CodeGraphProvider', () => {
       kinds: [SymbolKind.Function],
       workspaces: ['fixture'],
       excludeWorkspaces: ['excluded'],
+      categories: ['source'],
     }
     const frontier = vi.spyOn(store, 'queryImpactFrontier')
     const generation = vi.spyOn(store, 'getStorageGeneration')
@@ -920,7 +1044,7 @@ describe('CodeGraphProvider', () => {
     )
     const custom = new PhpLanguageAdapter()
     const analyze = vi.spyOn(custom, 'analyzeFile')
-    const parse = vi.spyOn(custom, 'parseSymbolReference')
+    const parse = vi.spyOn(custom.symbolReferenceSyntax, 'parse')
     const provider = await createCodeGraphProvider({
       storagePath: tempDir,
       projectRoot: tempDir,
@@ -968,7 +1092,10 @@ describe('CodeGraphProvider', () => {
         language: 'php',
       })
       expect(parse).toHaveBeenCalledWith('ArchiveChange::execute()')
-      expect(parse.mock.instances.every((instance) => instance === custom)).toBe(true)
+      // The spy wraps the custom adapter's own facet, so every call went through that adapter.
+      expect(
+        parse.mock.instances.every((instance) => instance === custom.symbolReferenceSyntax),
+      ).toBe(true)
     } finally {
       await provider.close()
     }

@@ -1,0 +1,21 @@
+- op: modified
+  description: 'Extract properties, class constants, and enum cases as SymbolKind.Property'
+  selector:
+    type: section
+    matches: 'Requirement: Declaration extraction and ranges'
+  content: |
+    The adapter SHALL extract functions, classes, interfaces, traits, enums, class/interface/trait methods and properties, top-level constant declarations, class constants, and enum cases.
+
+    Properties, class constants, and enum cases SHALL be extracted as `SymbolKind.Property`. It SHALL retain the declared namespace separately from the simple symbol name and SHALL map declarations to shared broad kinds without collapsing supported language-specific symbol spaces or member forms.
+
+    Each symbol SHALL use the complete parser construct range and exact declared-name `selectionRange` under the shared half-open convention. Attached preceding comments SHALL be retained verbatim. A declaration lacking an authoritative construct or selection range SHALL be omitted rather than approximated.
+
+- op: modified
+  description: 'Set declaring owner and parentId for properties, class constants, and enum cases'
+  selector:
+    type: section
+    matches: 'Requirement: PHP logical identity and declaring owners'
+  content: |
+    Top-level declarations SHALL use their namespace-qualified module surface. Supported methods, properties, class constants, and enum cases SHALL use the logical identity of the syntactically declaring class, interface, trait, or enum as owner, and their `parentId` SHALL be set to that enclosing container's symbol ID. Owner identities SHALL be derived from parser construct containment and mapped before member logical IDs are created; raw parser IDs and optional `SymbolNode.parentId` MUST NOT be used as canonical owners. Any extracted method whose owner cannot be proven SHALL be omitted from logical member facts rather than represented as ownerless.
+
+    Same-name methods declared by different owners MUST remain distinct, including compact same-line declarations. Static and instance methods, constructors, properties, and contract signatures SHALL retain distinct member-form or symbol-space evidence whenever the current syntax projection represents it. Logical identities SHALL remain case-preserving; language-complete case-insensitive lookup and magic property semantics remain unsupported rather than globally lowercased or guessed.

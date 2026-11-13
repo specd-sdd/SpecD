@@ -1,0 +1,23 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "sdk:host-context",
+    "sdk:with-open-graph-provider",
+    "core:config",
+    "code-graph:composition",
+    "code-graph:document-model"
+  ],
+  "implementation": [
+    {
+      "file": "sdk:src/orchestration/project-relative-path.ts",
+      "symbols": ["toProjectRelativePath", "splitWorkspaceIdentity"]
+    },
+    {
+      "file": "sdk:src/orchestration/run-graph-search.ts",
+      "symbols": ["runGraphSearch"]
+    }
+  ]
+}

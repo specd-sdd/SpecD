@@ -1,0 +1,34 @@
+- op: added
+  description: 'Verify direct Python member indexing and cached lexical summaries'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Bounded Python member and lexical-scope analysis
+
+    #### Scenario: Large class indexes direct definitions once
+
+    - **GIVEN** one Python class contains hundreds of decorated and undecorated methods with large bodies
+    - **AND** deterministic instrumentation records class-body scans used for member classification
+    - **WHEN** the adapter analyzes the class
+    - **THEN** direct class-body definitions are indexed once
+    - **AND** resolving each method does not recursively recollect all functions below the class
+    - **AND** method-body size does not multiply member-classification scans
+
+    #### Scenario: Decorators and nested owners remain isolated
+
+    - **GIVEN** an outer class contains `__init__`, `__new__`, multiline `staticmethod` and `classmethod` decorators, a property getter and setter, a nested function, and a nested class with repeated method names
+    - **WHEN** member semantics are built
+    - **THEN** constructors, dispatch, and accessors retain their established semantics
+    - **AND** nested functions and nested-class methods are not members of the outer class
+    - **AND** comments between decorators and definitions do not change classification
+
+    #### Scenario: Calls in one scope share one bound-name summary
+
+    - **GIVEN** a function contains many bare calls plus parameters, assignments, augmented assignments, loop targets, aliases, and named expressions
+    - **AND** nested functions and classes bind some of the same names
+    - **WHEN** bare-call shadowing is evaluated
+    - **THEN** the enclosing function's bound names are summarized once and reused for all its calls
+    - **AND** names bound only in nested scopes do not shadow calls in the outer function
+    - **AND** every call retains the same resolved or unresolved result as before optimization

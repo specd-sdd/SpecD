@@ -1,3 +1,9 @@
+---
+title: Core Config
+description: Project-level config shape used by core use cases and adapters.
+sidebar_position: 9
+---
+
 # Core Config
 
 This document summarizes the project-level config shape used by core use cases and adapters.

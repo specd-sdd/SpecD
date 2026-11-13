@@ -3,12 +3,16 @@ import { type SpecNode } from './spec-node.js'
 import { type DocumentNode } from './document-node.js'
 import { type Relation } from './relation.js'
 import { type FileAnalysis, type FileAnalysisDraft } from './file-analysis.js'
+import { type FileCategory } from './file-node.js'
+import { type ParserResourceScope } from './parser-resource-scope.js'
 import {
   type DeclarationOccurrence,
   type LocalBinding,
+  type LogicalDeclarationDiagnostic,
   type LogicalSymbol,
   type PublicBinding,
   type ResolutionStep,
+  type SymbolSpace,
 } from './symbol-reference.js'
 
 /** The evidence state recorded for every source target considered by an index run. */
@@ -42,10 +46,12 @@ export interface IndexCoverage {
  */
 export interface RegisterFileInput {
   readonly filePath: string
-  readonly configRelativePath: string
+  readonly projectRelativePath: string
   readonly language: string
   readonly contentHash: string
   readonly workspace: string
+  /** File category; defaults to `'source'` when omitted. */
+  readonly category?: FileCategory
 }
 
 /**
@@ -61,6 +67,11 @@ export interface RegisterAnalysisInput {
  * file-level analysis results, and relations during an indexing run.
  */
 export interface IndexSession {
+  /**
+   * Scope holding parser-owned resources for the file currently being analysed.
+   */
+  readonly parserResources: ParserResourceScope
+
   /**
    * Registers a file and returns its numeric ID.
    */
@@ -97,9 +108,22 @@ export interface IndexSession {
   findSymbolsByName(name: string, filePrefix?: string): readonly SymbolNode[]
 
   /**
-   * Finds a symbol's ID by its qualified name.
+   * Finds one registered symbol by its exact id, in any workspace.
+   * @param symbolId - Symbol id.
+   * @returns The symbol, or `undefined` when it is not registered.
    */
-  findSymbolByQualifiedName(qualifiedName: string): string | undefined
+  findSymbolById(symbolId: string): SymbolNode | undefined
+
+  /**
+   * Finds a symbol's ID by its qualified name.
+   * @param qualifiedName - Full qualified symbol name.
+   * @param options - Options; when `includeTests` is true, test-file symbols are also considered.
+   * @param options.includeTests - When true, test-file symbols are also considered.
+   */
+  findSymbolByQualifiedName(
+    qualifiedName: string,
+    options?: { readonly includeTests?: boolean },
+  ): string | undefined
 
   /**
    * Finds all specifications linked to a symbol.
@@ -143,8 +167,10 @@ export interface IndexSession {
 
   /**
    * Retrieves the qualified name mapping.
+   * @param options - Options; when `includeTests` is true, returns production and test symbols (production wins on duplicates).
+   * @param options.includeTests - When true, returns production and test symbols (production wins on duplicates).
    */
-  getQualifiedNames(): ReadonlyMap<string, string>
+  getQualifiedNames(options?: { readonly includeTests?: boolean }): ReadonlyMap<string, string>
 
   /** Returns declaration occurrences grouped by their logical identity. */
   getDeclarationsByLogicalId(): ReadonlyMap<string, readonly DeclarationOccurrence[]>
@@ -152,11 +178,45 @@ export interface IndexSession {
   /** Returns logical symbols recorded for this session. */
   getLogicalSymbols(): readonly LogicalSymbol[]
 
+  /**
+   * Returns logical-collision diagnostics gathered while registering analyses.
+   * @returns Deterministically ordered diagnostics.
+   */
+  getLogicalDiagnostics(): readonly LogicalDeclarationDiagnostic[]
+
   /** Returns public bindings recorded for this session. */
   getPublicBindings(): readonly PublicBinding[]
 
   /** Returns lexical bindings recorded for this session. */
   getLocalBindings(): readonly LocalBinding[]
+
+  /**
+   * Returns the public bindings stored under one surface for an exported name and symbol space.
+   * @param surface - Public surface id.
+   * @param exportedName - Exported spelling.
+   * @param space - Symbol space of the export.
+   * @returns Matching bindings in deterministic identity order, empty when none.
+   */
+  findPublicBindings(
+    surface: string,
+    exportedName: string,
+    space: SymbolSpace,
+  ): readonly PublicBinding[]
+
+  /**
+   * Returns the category of a registered file.
+   * @param filePath - Workspace-prefixed file path.
+   * @returns The file category (`'source'` when none was recorded), or `undefined` when the file is not registered.
+   */
+  getFileCategory(filePath: string): FileCategory | undefined
+
+  /**
+   * Returns the primary declaration symbol id of a logical symbol: the lowest symbol id
+   * among definition occurrences, falling back to the lowest symbol id of any occurrence.
+   * @param logicalId - Logical symbol id.
+   * @returns The symbol id, or `undefined` when the logical symbol has no declaration.
+   */
+  getPrimaryDeclarationSymbolId(logicalId: string): string | undefined
 
   /** Returns resolution steps recorded for this session. */
   getResolutionSteps(): readonly ResolutionStep[]

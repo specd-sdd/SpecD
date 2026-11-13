@@ -9,7 +9,6 @@ import { type Command } from 'commander'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
 import { resolveCliContext } from '../../helpers/cli-context.js'
-import { parseSpecId } from '../../helpers/spec-path.js'
 
 /** Validation file states emitted by `change validate`. */
 type ValidationFileStatus = 'validated' | 'missing' | 'skipped'
@@ -41,6 +40,7 @@ interface ValidateResult {
   readonly failures: ValidateFailure[]
   readonly notes: ValidateNote[]
   readonly files: ValidationFileEntry[]
+  readonly specId?: string
 }
 
 /** Artifact scope supported by schema-defined artifact types. */
@@ -81,6 +81,7 @@ function toValidateResult(value: unknown): ValidateResult {
   if (!isRecord(value)) {
     return { passed: false, failures: [], notes: [], files: [] }
   }
+  const specId = typeof value['specId'] === 'string' ? value['specId'] : undefined
 
   const failures: ValidateFailure[] = Array.isArray(value['failures'])
     ? value['failures']
@@ -134,7 +135,13 @@ function toValidateResult(value: unknown): ValidateResult {
     : []
 
   const passed = typeof value['passed'] === 'boolean' ? value['passed'] : failures.length === 0
-  return { passed, failures, notes, files }
+  return {
+    passed,
+    failures,
+    notes,
+    files,
+    ...(specId !== undefined ? { specId } : {}),
+  }
 }
 
 /**
@@ -374,7 +381,7 @@ JSON/TOON output schema:
  * Validates a single spec (existing behaviour).
  *
  * @param kernel - The wired kernel instance
- * @param config - The loaded specd configuration
+ * @param _config - Unused (kept for call-site compatibility)
  * @param name - The change name
  * @param specPath - The spec ID to validate
  * @param opts - Command options
@@ -384,18 +391,13 @@ JSON/TOON output schema:
  */
 async function executeSingle(
   kernel: import('@specd/sdk').Kernel,
-  config: import('@specd/sdk').SpecdConfig,
+  _config: import('@specd/sdk').SpecdConfig,
   name: string,
   specPath: string,
   opts: { format: string; artifact?: string },
   requestedArtifactScope?: ArtifactScope,
 ): Promise<void> {
-  const parsed = parseSpecId(specPath, config)
-  const fullSpecPath = `${parsed.workspace}:${parsed.capabilityPath}`
   const isChangeScopedArtifact = opts.artifact !== undefined && requestedArtifactScope === 'change'
-  const displayTarget = isChangeScopedArtifact
-    ? `${name} [artifact:${opts.artifact}]`
-    : `${name}/${fullSpecPath}`
 
   const { warnings: schemaWarnings } = await resolveValidateSchema(kernel, name, opts.format)
   const advisoryBlock = formatSchemaAdvisories(schemaWarnings)
@@ -403,10 +405,15 @@ async function executeSingle(
   const result = toValidateResult(
     await kernel.changes.validate.execute({
       name,
-      ...(isChangeScopedArtifact ? {} : { specPath: fullSpecPath }),
+      ...(isChangeScopedArtifact ? {} : { specPath }),
       ...(opts.artifact !== undefined ? { artifactId: opts.artifact } : {}),
     }),
   )
+
+  const fullSpecPath = result.specId ?? specPath
+  const displayTarget = isChangeScopedArtifact
+    ? `${name} [artifact:${opts.artifact}]`
+    : `${name}/${fullSpecPath}`
 
   const fmt = parseFormat(opts.format)
   const passed = result.failures.length === 0
@@ -505,84 +512,29 @@ async function executeBatch(
   if (change === undefined) {
     cliError(`change '${name}' is drafted; restore it before validating`, opts.format)
   }
-  const specIds = change.specIds
 
-  if (specIds.length === 0) {
+  const batchResult = await kernel.changes.validateBatch.execute({
+    name,
+    ...(opts.artifact !== undefined ? { artifactId: opts.artifact } : {}),
+  })
+
+  if (batchResult.total === 0) {
     const fmt = parseFormat(opts.format)
     if (fmt === 'text') {
       output(`${name}: no specIds declared`, 'text')
     } else {
-      output({ passed: true, total: 0, results: [] }, fmt)
+      output(batchResult, fmt)
     }
     return
   }
 
-  const { schema, warnings: schemaWarnings } = await resolveValidateSchema(
-    kernel,
-    name,
-    opts.format,
-  )
-  const dag = schema.artifactDag()
-
-  const results: Array<{
-    spec: string | null
-    artifact: string
-    passed: boolean
-    failures: ValidateFailure[]
-    warnings: ValidateNote[]
-    files: readonly ValidationFileEntry[]
-  }> = []
-
-  for (const artifactId of dag.topologicalOrder()) {
-    if (opts.artifact !== undefined && artifactId !== opts.artifact) continue
-
-    const artifactType = schema.artifact(artifactId)
-    if (artifactType === null) continue
-
-    if (artifactType.scope === 'change') {
-      const result = toValidateResult(
-        await kernel.changes.validate.execute({
-          name,
-          artifactId,
-        }),
-      )
-      results.push({
-        spec: null,
-        artifact: artifactId,
-        passed: result.failures.length === 0,
-        failures: result.failures,
-        warnings: result.notes,
-        files: result.files,
-      })
-      continue
-    }
-
-    for (const specId of specIds) {
-      const result = toValidateResult(
-        await kernel.changes.validate.execute({
-          name,
-          specPath: specId,
-          artifactId,
-        }),
-      )
-      results.push({
-        spec: specId,
-        artifact: artifactId,
-        passed: result.failures.length === 0,
-        failures: result.failures,
-        warnings: result.notes,
-        files: result.files,
-      })
-    }
-  }
-
-  const allPassed = results.every((r) => r.passed)
   const fmt = parseFormat(opts.format)
+  const schemaWarnings = batchResult.warnings ?? []
 
   if (fmt === 'text') {
     const isChangeScopedArtifact =
       opts.artifact !== undefined && requestedArtifactScope === 'change'
-    for (const r of results) {
+    for (const r of batchResult.results) {
       const target =
         r.spec === null
           ? `${name} [artifact:${r.artifact}]`
@@ -618,23 +570,21 @@ async function executeBatch(
         output(`validation failed ${target}:\n${allLines.join('\n')}`, 'text')
       }
     }
-    const passedSteps = results.filter((r) => r.passed).length
-    output(`validated ${passedSteps}/${results.length} steps`, 'text')
+    const passedSteps = batchResult.results.filter((r) => r.passed).length
+    output(`validated ${passedSteps}/${batchResult.total} steps`, 'text')
     const advisoryBlock = formatSchemaAdvisories(schemaWarnings)
     if (advisoryBlock !== null) output(advisoryBlock, 'text')
   } else {
     output(
       {
-        passed: allPassed,
-        total: results.length,
-        results,
+        ...batchResult,
         ...(schemaWarnings.length > 0 ? { schemaWarnings } : {}),
       },
       fmt,
     )
   }
 
-  if (!allPassed) {
+  if (!batchResult.passed) {
     process.exitCode = 1
   }
 }

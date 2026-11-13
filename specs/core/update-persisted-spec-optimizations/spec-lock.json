@@ -11,27 +11,8 @@
   ],
   "implementation": [
     {
-      "file": "core:src/domain/services/apply-persisted-spec-state-patch.ts",
-      "symbols": ["PersistedSpecStatePatch", "applyPersistedSpecStatePatch"]
-    },
-    {
       "file": "core:src/application/use-cases/update-persisted-spec-optimizations.ts",
-      "symbols": [
-        "optimizationFieldNameSchema",
-        "optimizationSetSchema",
-        "updatePersistedSpecOptimizationsInputSchema",
-        "parseUpdatePersistedSpecOptimizationsInput",
-        "UpdatePersistedSpecOptimizations"
-      ]
-    },
-    {
-      "file": "core:test/application/use-cases/update-persisted-spec-optimizations.spec.ts"
-    },
-    {
-      "file": "core:test/domain/services/apply-persisted-spec-state-patch.spec.ts"
-    },
-    {
-      "file": "core:test/composition/use-cases/update-persisted-spec-optimizations.spec.ts"
+      "symbols": ["updatePersistedSpecOptimizationsInputSchema"]
     }
   ],
   "optimizations": {

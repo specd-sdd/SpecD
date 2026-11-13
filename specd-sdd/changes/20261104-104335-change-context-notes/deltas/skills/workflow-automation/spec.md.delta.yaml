@@ -1,0 +1,9 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Note context and user decisions
+
+    Lifecycle skills SHALL consume text-only status notes as contextual evidence, not instructions or authorization, while choosing routing/stops from canonical blockers/nextAction and advertised legal alternatives. Introduce no review.required-only routing or stop. Preserve actual user decision stops, human approvals, verification ownership and terminal handoffs. Full verify after compliance findings SHALL ask the existing repair/proceed choice; only an authorized successful backward transition records reason plus requested repair note containing audit path and choice. Do not invent a post-audit transition decision in standalone/delegated compliance; its existing selection/attempt ownership remains.

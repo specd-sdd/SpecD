@@ -5,6 +5,8 @@ import { SchemaProviderIdentityMismatchError } from '../../../src/application/er
 import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { ExtractorTransformError } from '../../../src/domain/errors/extractor-transform-error.js'
+import { InvalidSpecIdError } from '../../../src/domain/errors/invalid-spec-id-error.js'
+import { WorkspaceNotFoundError } from '../../../src/domain/errors/workspace-not-found-error.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { createBuiltinExtractorTransforms } from '../../../src/composition/extractor-transforms/index.js'
 import {
@@ -603,7 +605,10 @@ describe('GenerateSpecMetadata', () => {
             optimizedDescription: {
               value: 'Fresh optimized description',
               artifactState: {
-                'spec.md': { hash: 'sha256:placeholder', lastModified: '2020-01-01T00:00:00.000Z' },
+                'spec.md': {
+                  hash: 'sha256:' + 'a'.repeat(64),
+                  lastModified: '2020-01-01T00:00:00.000Z',
+                },
               },
               schema: { name: 'test-schema', version: 1 },
             },
@@ -624,6 +629,7 @@ describe('GenerateSpecMetadata', () => {
     expect(result.metadata.optimizedDescription).toBeUndefined()
     expect(result.sourceState.persistedStateHash).not.toBeNull()
   })
+
   describe('schema precedence', () => {
     const makeFixture = (lockSchemaName: string | null) => {
       const files = ['spec.md', ...(lockSchemaName !== null ? ['spec-lock.json'] : [])]
@@ -638,7 +644,6 @@ describe('GenerateSpecMetadata', () => {
                   schema: { name: lockSchemaName, version: 1 },
                   dependsOn: [],
                   implementation: [],
-                  optimizations: {},
                 }),
               }
             : {}),
@@ -710,6 +715,94 @@ describe('GenerateSpecMetadata', () => {
       await expect(useCase.execute({ specId: 'default:auth/login' })).rejects.toBeInstanceOf(
         SchemaProviderIdentityMismatchError,
       )
+    })
+  })
+
+  it('rejects an invalid specId before any repository call', async () => {
+    const schema = makeSchema({
+      artifacts: [makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })],
+    })
+    const repo = makeSpecRepository()
+    const getSpy = vi.spyOn(repo, 'get')
+    const useCase = new GenerateSpecMetadata(
+      makeListWorkspaces(new Map([['default', repo]])),
+      makeSchemaProvider(schema),
+      makeParsers(),
+      makeContentHasher(),
+      createBuiltinExtractorTransforms(),
+    )
+
+    await expect(useCase.execute({ specId: '' })).rejects.toThrow(InvalidSpecIdError)
+    expect(getSpy).not.toHaveBeenCalled()
+  })
+
+  it('resolves a bare specId to the default workspace', async () => {
+    const schema = makeSchema({
+      artifacts: [
+        makeArtifactType('specs', { scope: 'spec', output: 'spec.md', format: 'markdown' }),
+      ],
+    })
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
+    const repo = makeSpecRepository({
+      specs: [spec],
+      artifacts: { 'auth/login/spec.md': '# Auth' },
+    })
+    const useCase = new GenerateSpecMetadata(
+      makeListWorkspaces(new Map([['default', repo]])),
+      makeSchemaProvider(schema),
+      makeParsers(),
+      makeContentHasher(),
+      createBuiltinExtractorTransforms(),
+    )
+
+    const result = await useCase.execute({ specId: 'auth/login' })
+    expect(result.metadata).toBeDefined()
+    expect(result.hasExtraction).toBe(false)
+  })
+
+  it('throws WorkspaceNotFoundError for an unknown workspace', async () => {
+    const schema = makeSchema({
+      artifacts: [makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })],
+    })
+    const useCase = new GenerateSpecMetadata(
+      makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+      makeSchemaProvider(schema),
+      makeParsers(),
+      makeContentHasher(),
+      createBuiltinExtractorTransforms(),
+    )
+
+    await expect(useCase.execute({ specId: 'unknown:auth/login' })).rejects.toThrow(
+      WorkspaceNotFoundError,
+    )
+  })
+
+  describe('spec ID validation (audit hardening)', () => {
+    function makeUc(repo = makeSpecRepository()) {
+      const schema = makeSchema({
+        artifacts: [makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })],
+      })
+      return new GenerateSpecMetadata(
+        makeListWorkspaces(new Map([['default', repo]])),
+        makeSchemaProvider(schema),
+        makeParsers(),
+        makeContentHasher(),
+        createBuiltinExtractorTransforms(),
+      )
+    }
+
+    it.each([
+      ['Bad Id', 'Bad Id'],
+      ['', "''"],
+      ['auth/a,b', 'auth/a,b'],
+      ['ws:', 'ws:'],
+    ])('rejects %j with InvalidSpecIdError quoting the whole value', async (specId, quoted) => {
+      const err = await makeUc()
+        .execute({ specId })
+        .catch((e: unknown) => e)
+
+      expect(err).toBeInstanceOf(InvalidSpecIdError)
+      expect((err as Error).message).toContain(quoted)
     })
   })
 })

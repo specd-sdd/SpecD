@@ -1,0 +1,99 @@
+- op: added
+  description: 'Implement logical/declaration mapping as set-based worker operations.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Worker-backed exact batch node lookups$'
+  content: |
+    ### Requirement: Worker-backed logical declaration mapping
+
+    SQLite SHALL implement the abstract logical-to-declaration and declaration-to-logical batch lookups as set-based worker operations. Each logical batch MUST cross the worker boundary as one typed RPC and MUST NOT issue one RPC per logical symbol or declaration.
+
+    The database SHALL query `logical_symbols`, `logical_declarations`, and physical symbol rows using bounded parameter chunks inside the worker. Merged results MUST preserve first-request ordering, deterministic declaration ordering, deduplication, unknown-value omission, and empty-input no-RPC semantics.
+
+    Worker protocol payloads and database row DTOs MUST distinguish `logicalSymbolIds` from `declarationSymbolIds`. The implementation MUST NOT parse canonical IDs or infer an identity domain from string shape.
+
+- op: added
+  description: 'Keep logical coverage endpoints strict across SQLite queries and worker serialization.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: SQLite logical coverage integrity$'
+  content: |
+    ### Requirement: SQLite batched logical coverage reads
+
+    Reverse `COVERS_SYMBOL` reads SHALL join and filter against committed logical-symbol targets and SHALL accept only logical-symbol IDs. A physical symbol row with an equal-looking identifier MUST NOT satisfy, shadow, or widen the logical endpoint.
+
+    The host store, worker protocol, dispatcher, and database SHALL carry one serializable batch request for all requested logical IDs. SQL parameter chunking MAY divide the database query, but the logical operation MUST remain one worker RPC and its merged output MUST preserve deterministic abstract-store ordering.
+
+- op: modified
+  description: 'Align the persisted schema contract with occurrence-form storage implemented by this change.'
+  selector:
+    type: section
+    matches: '^Requirement: Reference schema upgrade$'
+  content: |
+    SQLite SHALL persist the logical-symbol, declaration, member-semantics, symbol-space, binding, provenance, coverage, construct-range, selection-range, and declaration-occurrence-form fields required by `GraphStore`. Structured lookup columns SHALL be indexed. Serialized canonical ids MUST NOT be parsed or substring-ranked to implement semantic lookup. Canonical ids remain unique external identities; backend-local integer row keys MAY be used for physical joins when provider-visible ids do not change.
+
+    The reference schema version MUST be **15**. `SQLITE_SCHEMA_VERSION` MUST be 15 in the same revision as the DDL that persists declaration `occurrence_form`. `CREATE TABLE IF NOT EXISTS` does not alter an existing database, so a persisted version 14 database MUST reject ordinary reads with `GraphSchemaIncompatibleError` and recovery reason `SCHEMA_INCOMPATIBLE`; `graph index` SHALL recreate derived storage as version 15, rotate `storage.epoch`, and rebuild search indexes before readiness. Versions older than 14 and versions newer than 15 MUST also be rejected. The implementation MUST NOT mix rows from different schema versions or use an in-place `ALTER TABLE` migration.
+
+    In schema version 15:
+
+    - `files` SHALL persist `project_relative_path` and omit `config_relative_path`.
+    - `documents` SHALL persist `project_relative_path` and omit `config_relative_path`.
+    - `symbols` SHALL persist `project_relative_path`.
+    - `logical_declarations` SHALL persist the declaration `occurrence_form` used to distinguish signature, implementation, and other physical occurrence roles without changing logical identity. A physical-only declaration has no `logical_declarations` row and therefore persists no occurrence form; it remains navigable by physical symbol ID and range.
+
+    `logical_symbols` SHALL keep `member_kind`, `member_dispatch`, `member_accessor`, `native_kind`, and `qualified_name`. `qualified_name` stores the generic dotted owner path and MUST have an equality index. `idx_logical_symbols_member_lookup` SHALL use the member-semantics columns. `id`, `workspace`, `surface`, `name`, `space`, and `owner_id` stay. Stored `id` text MUST use the versioned canonical encoding.
+
+    `public_bindings`, `resolution_steps`, `symbols.parent_id`, `symbols.search_text`, the non-form columns of `logical_declarations`, `index_coverage`, `relations`, and `symbol_fts` (`id`, `search_text`, `comment`) MUST keep their current columns. New re-export bindings and resolution steps are new rows. `symbol_fts.search_text` MAY still contain a qualified spelling for discovery. It MUST NOT be the exact-match key. `symbols.search_text` remains the expanded bare name.
+
+    `local_bindings` SHALL keep its current columns and additionally persist the binding's source range as `start_line`, `start_column`, `end_line`, and `end_column`. A local binding's identity MUST include its scope and source range, so shadowed bindings that share a name within one scope remain distinct rows. These columns belong to schema version 15, which this change introduces; no separate version is created for them.
+
+    SQLite SHALL maintain the substring-capable source-content index and bounded short-query fallback required by the abstract store. Reverse coverage and traversal batch reads SHALL use set-based predicates and deterministic ordering.
+
+    Indexed-input observations, freshness latches, VCS evidence, and compact unchanged-file facts SHALL remain persisted. One indexing run SHALL use one transaction, set-based endpoint validation, bounded writes, one commit, and one semantic and content index rebuild. Inserts, selects, and the worker row shape MUST use the version 15 columns in the same revision.
+
+- op: modified
+  description: 'Round 3: recreation removes the SQLite database files, not the whole graph directory, so the live lock and storage epoch survive.'
+  selector:
+    type: section
+    matches: '^Requirement: Destructive recreation$'
+  content: |
+    `SQLiteGraphStore.recreate()` SHALL implement physical recovery only after the
+    SQLite worker and database are closed. It MUST reject while open, remove the SQLite database file and its `-wal` and `-shm` companion files, rotate the storage
+    generation, and return with no worker or database handle reopened. It MUST NOT remove `index.lock`, and `storage.epoch` MUST be rotated rather than deleted.
+
+    SQLite open validation SHALL translate only known corruption and non-migratable
+    schema conditions to the abstract typed recoverable storage-open error after closing
+    any partial database resources. A non-migratable schema condition includes both a persisted schema version other than the expected one and a persisted table shape that lacks a column required by the expected version. Permission, configuration, native-runtime, and
+    unrelated I/O errors MUST propagate without recreation authority.
+
+    A healthy forced reindex SHALL use the existing opened-store logical clear path and
+    MUST NOT implement force by closing, deleting, reopening, or re-closing SQLite.
+
+- op: modified
+  description: 'Round 3: define the exact open order and add a table-shape check so an old version-15 database is recreated instead of failing on the first missing column.'
+  selector:
+    type: section
+    matches: '^Requirement: Schema versioning$'
+  content: |
+    `SQLiteGraphStore` SHALL track a backend-specific schema version for its persisted
+    SQLite schema.
+
+    When the adapter opens a database it SHALL, in this order:
+
+    1. read the persisted schema version, if any, and reject a mismatch before any DDL runs;
+    2. execute the current SQLite schema definition;
+    3. verify the table shape: for every table that the current definition creates, every column that the current version requires MUST exist (as reported by `PRAGMA table_info`); a missing column MUST be rejected with `GraphSchemaIncompatibleError` and recovery reason `SCHEMA_INCOMPATIBLE` after closing partial resources;
+    4. record the current schema version in persisted metadata; and
+    5. prepare any required FTS structures.
+
+    If the persisted SQLite schema version or table shape is incompatible with the expected one, the
+    implementation SHALL require a destructive rebuild rather than attempting incremental
+    migration, and ordinary reads and `graph index` (including `--force`) MUST reach the recreate-and-retry recovery path rather than a raw SQLite error.

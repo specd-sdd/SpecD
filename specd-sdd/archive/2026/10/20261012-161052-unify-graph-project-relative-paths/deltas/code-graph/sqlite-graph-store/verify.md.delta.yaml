@@ -1,0 +1,98 @@
+- op: modified
+  description: 'Update Persisted node storage verification scenarios to include project_relative_path'
+  selector:
+    type: section
+    matches: 'Requirement: Persisted node storage'
+  content: |
+    #### Scenario: Logical node kinds survive backend-specific layout choices
+
+    - **WHEN** files, symbols, specs, and metadata are persisted by `SQLiteGraphStore`
+    - **THEN** the abstract graph-store queries can retrieve the expected logical node kinds
+    - **AND** callers do not need to know whether SQLite uses one table per kind or another internal layout
+
+    #### Scenario: File node persistence includes source content for symbol snippets
+
+    - **WHEN** a source file is persisted by `SQLiteGraphStore`
+    - **THEN** the persisted file record includes source content sufficient to derive symbol snippets from file-backed context
+    - **AND** symbol preview extraction does not require a separate persisted snippet field per symbol
+
+    #### Scenario: File and document tables store project_relative_path
+
+    - **WHEN** files and documents are persisted by `SQLiteGraphStore`
+    - **THEN** their table records persist `project_relative_path` and do not contain `config_relative_path`
+
+    #### Scenario: Symbols table stores denormalized project_relative_path
+
+    - **WHEN** symbols are persisted by `SQLiteGraphStore`
+    - **THEN** the `symbols` table record stores `project_relative_path` matching the owning file's project-relative path
+    - **AND** symbol retrieval does not require a join against the `files` table
+
+- op: modified
+  description: 'Update Reference schema upgrade verification scenarios for version 14'
+  selector:
+    type: section
+    matches: 'Requirement: Reference schema upgrade'
+  content: |
+    #### Scenario: SQLite old schema rebuilds safely
+
+    - **GIVEN** schema version 12 or 13 and the reference schema expects 14
+    - **WHEN** normal read and then graph index are attempted
+    - **THEN** read rejects with `GraphSchemaIncompatibleError` without empty recreation
+    - **AND** index rotates generation, rebuilds fields and FTS, and opens version 14
+
+    #### Scenario: Version 14 table columns persist project_relative_path
+
+    - **WHEN** a version 14 database is created
+    - **THEN** `files` has column `project_relative_path` and no `config_relative_path`
+    - **AND** `documents` has column `project_relative_path` and no `config_relative_path`
+    - **AND** `symbols` has column `project_relative_path`
+    - **AND** `logical_symbols` has `member_kind`, `member_dispatch`, `member_accessor`, `native_kind`, and `qualified_name`
+    - **AND** `qualified_name` has an equality index
+
+    #### Scenario: Version 14 opens without rebuild
+
+    - **GIVEN** `meta.schemaVersion` is already 14
+    - **WHEN** the store opens for a read
+    - **THEN** it does not throw `GraphSchemaIncompatibleError`
+    - **AND** it does not recreate the database
+
+    #### Scenario: Any other version is incompatible
+
+    - **GIVEN** `meta.schemaVersion` is 13 or 15
+    - **WHEN** the store opens
+    - **THEN** the error is `GraphSchemaIncompatibleError`
+    - **AND** no `ALTER TABLE` is executed
+
+    #### Scenario: Qualified spelling is an equality column
+
+    - **GIVEN** `EditChange` owns `execute`
+    - **WHEN** the member is indexed
+    - **THEN** `logical_symbols.qualified_name` is `EditChange.execute`
+    - **AND** `symbols.search_text` is the expanded bare name
+    - **AND** `symbol_fts` has no extra column
+
+    #### Scenario: Worker row uses the new columns
+
+    - **WHEN** a logical symbol is inserted and selected through the worker
+    - **THEN** the row carries `member_kind`, `member_dispatch`, `member_accessor`, `native_kind`, and `qualified_name`
+    - **AND** the statement does not reference `member_form`
+
+    #### Scenario: SQLite source search preserves occurrence and range semantics
+
+    - **GIVEN** source content, construct ranges, and selection ranges were bulk indexed
+    - **WHEN** full, raw, expanded, and short source queries are executed with filters
+    - **THEN** SQLite returns bounded substring candidates equivalent to the abstract Store contract
+    - **AND** ranges round-trip without converting half-open coordinates
+
+    #### Scenario: SQLite semantic queries use structured indexes
+
+    - **GIVEN** logical symbols and bindings with canonical ids containing overlapping serialized components
+    - **WHEN** exact-name, owner/member, surface/export, case-precedence, and ambiguity queries run
+    - **THEN** SQLite resolves them through indexed structured columns without parsing or substring-ranking canonical ids
+    - **AND** provider-visible canonical ids remain unchanged
+
+    #### Scenario: SQLite batches reverse coverage and rebuilds FTS once
+
+    - **WHEN** a bulk generation containing coverage and source content commits
+    - **THEN** reverse file/symbol coverage is queryable in batches
+    - **AND** semantic and source-content FTS structures are rebuilt once after commit

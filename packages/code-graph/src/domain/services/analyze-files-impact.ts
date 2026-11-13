@@ -159,6 +159,10 @@ export async function analyzeFilesImpact(
     // remains governed by the result-type filter above.
     symbols: perFileResults,
     coveringSpecs,
+    omittedCounts: {
+      tests: perFileResults.reduce((acc, r) => acc + r.omittedCounts.tests, 0),
+      ignored: perFileResults.reduce((acc, r) => acc + r.omittedCounts.ignored, 0),
+    },
   }
 }
 

@@ -206,14 +206,30 @@ export abstract class SpecRepository extends Repository {
 
   /**
    * Reads the exact persisted semantic state, or `null` when no lock exists.
+   *
+   * With `{ lenientDependsOn: true }` only invalid `dependsOn` entries are tolerated (they are
+   * returned as stored so repair operations can remove or replace them); every other field of
+   * the lock stays strictly validated. A read never rewrites the file.
+   *
+   * @param spec - Spec whose lock to read
+   * @param options - Optional read flags
+   * @param options.lenientDependsOn - When `true`, tolerate invalid `dependsOn`
+   *   entries while still validating every other field strictly
    */
-  abstract readPersistedState(spec: Spec): Promise<PersistedSpecStateSnapshot | null>
+  abstract readPersistedState(
+    spec: Spec,
+    options?: { readonly lenientDependsOn?: boolean },
+  ): Promise<PersistedSpecStateSnapshot | null>
 
   /**
    * Conditionally replaces the complete persisted state.
    *
    * `expectedRevision: null` means the caller observed persisted state as absent
    * and intends to create it — the write MUST fail if state already exists.
+   *
+   * The existing lock is read leniently for `dependsOn` because the write only needs its
+   * revision hash; invalid stored `dependsOn` entries therefore never block a write that
+   * replaces the state.
    */
   abstract writePersistedState(
     spec: Spec,

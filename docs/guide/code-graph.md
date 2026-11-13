@@ -22,7 +22,7 @@ In modern monorepos and growing codebases, code modifications frequently introdu
 
 The SpecD Code Graph eliminates these issues by maintaining a live relational graph connecting:
 
-- **Symbols:** Classes, functions, methods, interfaces, types, variables, and their public export routes.
+- **Symbols:** Classes, functions, methods, interfaces, types, variables, properties, and their public export routes.
 - **Dependencies:** Bi-directional import and call relations across files and workspaces.
 - **Specifications:** Canonical requirements linked directly to the code symbols and files that realize them.
 - **Documentation:** Markdown guides, architectural decision records (ADRs), and package references indexed for instant discovery.
@@ -72,6 +72,41 @@ The indexer walks every workspace declared in `specd.yaml`, extracts AST symbols
   specd graph index --exclude-path "**/dist/**" --exclude-path "**/fixtures/**"
   ```
 
+#### File Size Limits and Memory Safety
+
+AST parsing with native tree-sitter bindings incurs significant memory overhead — typically ~3 KB of memory per source byte. A single 10 MB generated file or minified asset can easily consume tens of megabytes of native memory during AST construction, risking process out-of-memory crashes.
+
+To keep worker indexing memory bounded and predictable:
+
+- **Default Limit:** SpecD enforces a default per-file size limit of **256 KiB** (`262,144` bytes). Files strictly larger than this limit are skipped during graph indexing and recorded with coverage status `unsupported` and reason `file-too-large`.
+- **Reporting Skipped Files:** In CLI text output, any size-skipped files are reported in a summary section with their workspace-relative paths and sizes, along with an actionable configuration hint:
+
+  ```text
+  Size-skipped files (limit 256.0 KiB):
+    - packages/core/src/generated/schema.ts (412.5 KiB)
+    - 2 file(s) skipped; largest: 412.5 KiB
+
+  Hint: To index a file anyway, add its pattern to graph.largeFilePaths in specd.yaml:
+    graph:
+      largeFilePaths:
+        - "packages/core/src/generated/schema.ts"
+  Or raise maxFileBytes (e.g. maxFileBytes: 524288 for 512 KiB; 0 disables the limit).
+  ```
+
+  Structured formats (`--format json` and `--format toon`) report `filesSkippedForSize`, `largestSkippedForSize`, and `sizeExemptAnalysed`.
+
+- **Indexing a Large File Anyway:** To exempt a specific oversized file from the size gate without disabling limits globally, add its path to `graph.largeFilePaths` in `specd.yaml` (always relative to the project root, at project level and inside a workspace block). An exemption only bypasses the file size threshold; the file must still satisfy gitignore, `excludePaths`, `allowedPaths`, and binary file checks. To disable file size gating entirely, set `maxFileBytes: 0`.
+
+### Understanding Why a File Is (Not) Indexed (`specd graph why`)
+
+Every path and pattern in the `graph` section of `specd.yaml` is interpreted relative to the project root, never to a workspace `codeRoot`. When a file is missing from the graph, or shows an unexpected category, run:
+
+```bash
+specd graph why app/vendors/other/x.php
+```
+
+The command prints the verdict, the workspaces that own the path, and for each one the rule that decided every step (gitignore, global exclusions, workspace exclusions, `allowedPaths`, size limit, category, language adapter), including where the rule was declared. If a file is kept by more than one workspace (for example nested workspaces without partitioning excludes), `specd graph index` prints a workspace overlap warning and `graph why` reports `MULTIPLE_OWNERS`; the file is still indexed once per owning workspace.
+
 ### Inspecting Graph Statistics & Freshness (`specd graph stats`)
 
 To inspect graph health, node counts, supported languages, and staleness:
@@ -108,19 +143,115 @@ Health reasons:
 
 ---
 
-## 3. Multi-Modal Codebase Search (`specd graph search`)
+## 3. Semantic File Categories & Boundary Pruning
+
+Codebases contain diverse types of files: production source code, unit and integration tests, fixtures, mocks, and third-party vendor code. Treating test files and fixtures identically to production source creates significant noise:
+
+- Blast-radius impact analysis traverses through test assertions, treating test suites as downstream callers or intermediate bridges connecting unrelated modules.
+- Architectural hotspot ranking inflates coupling scores with test helpers and fixtures.
+- Symbol search buries production implementations under mock classes and test utilities.
+
+To solve this, SpecD provides a **three-tier semantic category model**:
+
+| Category      | Description                                                          | Default Behavior                                                                             |
+| :------------ | :------------------------------------------------------------------- | :------------------------------------------------------------------------------------------- |
+| **`source`**  | Core production source code.                                         | Admitted by default in all queries, impact traversals, and hotspot rankings.                 |
+| **`test`**    | Test suites, specs, fixtures, integration tests, and test utilities. | Excluded by default from blast-radius impact analysis, hotspot rankings, and search results. |
+| **`ignored`** | Vendored dependencies, generated mock data, and test fixtures.       | Excluded by default from blast-radius impact analysis, hotspot rankings, and search results. |
+
+### Configuration & Glob Patterns
+
+File categorization is configured via `specd.yaml` at both the project root level and per-workspace level:
+
+```yaml
+graph:
+  testPaths:
+    - '**/*.test.*'
+    - '**/*.spec.*'
+    - '**/tests/**'
+    - '**/__tests__/**'
+  ignorePaths:
+    - '**/vendor/**'
+    - '**/fixtures/**'
+    - '**/mocks/**'
+```
+
+Per-workspace overrides take precedence when defined:
+
+```yaml
+workspaces:
+  core:
+    path: packages/core
+    graph:
+      testPaths:
+        - 'test/**'
+      ignorePaths:
+        - 'fixtures/**'
+```
+
+#### Built-in Default Patterns
+
+When `testPaths` or `ignorePaths` are omitted from configuration, SpecD applies the following built-in glob pattern defaults:
+
+- **Default Test Patterns:** `**/*.test.*`, `**/*.spec.*`, `**/tests/**`, `**/__tests__/**`
+- **Default Ignore Patterns:** `**/vendor/**`, `**/fixtures/**`, `**/mocks/**`
+
+#### Classification Precedence
+
+During graph indexing, file paths are matched relative to the workspace root using fast glob matching:
+
+1. If the path matches `ignorePaths` (or default ignore patterns), the file is categorized as **`ignored`**.
+2. If the path matches `testPaths` (or default test patterns), the file is categorized as **`test`**.
+3. Otherwise, the file is categorized as **`source`**.
+
+### Traversal Boundary Pruning in Impact Analysis
+
+When executing `specd graph impact`, BFS traversal enforces strict semantic isolation:
+
+- By default, traversal admits only files and symbols in the `source` category.
+- When an edge would traverse into a `test` or `ignored` file, BFS traversal **prunes the path before crossing the boundary**.
+- Pruning at the boundary prevents test files from acting as "bridges" that connect unrelated production components, ensuring blast radius reflects actual runtime dependencies.
+
+### Command Flags & Omission Notices
+
+All graph query commands support flags to include non-source categories when needed:
+
+- **`--include-tests`**: Includes `test` category files alongside `source`.
+- **`--include-ignored`**: Includes `ignored` category files alongside `source`.
+- **`--all`**: Admits all categories (`source`, `test`, and `ignored`).
+- **`--category <categories>`**: Restricts results strictly to the designated category or comma-separated list (e.g. `source,test`).
+
+#### Omission Notices in Human & Structured Output
+
+When test or ignored files are omitted by default filters:
+
+- **Text output:** Prints an omission notice at the bottom:
+  ```text
+  ℹ Excluded from results: 12 test files. Use --include-tests, --include-ignored, or --all to view them.
+  ```
+- **JSON / TOON output:** Includes an `omittedCounts` object reporting omitted counts per category:
+  ```json
+  "omittedCounts": {
+    "tests": 12,
+    "ignored": 0
+  }
+  ```
+
+---
+
+## 4. Multi-Modal Codebase Search (`specd graph search`)
 
 `specd graph search "<query>"` searches four categories. With no category flag it searches all of them. Pass one or more of `--symbols`, `--files`, `--specs`, and `--documents` to narrow the search. `--limit` defaults to `10` results per category. `--snippet` adds preview text in `text`, `json`, and `toon`. `--spec-content` includes full spec bodies and requires `--format json` or `--format toon`.
 
 ### 1. Symbol Search (`--symbols`)
 
-Searches for definitions of classes, functions, methods, interfaces, types, and variables:
+Searches for definitions of classes, functions, methods, interfaces, types, variables, and properties:
 
 ```bash
 # Search for symbol by name
 specd graph search "ArchiveRepository" --symbols --format toon
 
-# Filter by symbol kind (function, class, method, variable, type, interface, enum)
+# Filter by symbol kind (function, class, method, variable, type, interface, enum, property)
 specd graph search "validate" --symbols --kind function,method --format text
 
 # Filter by workspace
@@ -128,6 +259,26 @@ specd graph search "ConfigLoader" --symbols --workspace core --format toon
 ```
 
 Symbol search follows **public bindings and re-exports**. A declaration in an internal module that is re-exported from a barrel (for example `packages/core/src/public.ts`) is one logical symbol. Text output lists the declaration and any matched public export as `matched export: <surface>::<exportedName>`.
+
+#### Cross-Language Property Normalization
+
+Container properties and state members are normalized to `SymbolKind.Property` across all supported languages:
+
+- **TypeScript**: Interface property signatures, class property definitions/field declarations, and enum members.
+- **Go**: Struct field declarations in `struct_type`.
+- **Python**: Class-level attribute assignments, dataclass fields, and Protocol annotations.
+- **PHP**: Class/trait property declarations, class constants (`const`), and enum cases (`enum_case`).
+
+#### Kind-Tiered Ranking Tie-Breaker
+
+When multiple symbol candidates share identical textual relevance and identity match strength, SQLite search applies a deterministic kind-prominence tie-breaker:
+
+- **Tier 4**: `class`, `interface`
+- **Tier 3**: `function`, `method`
+- **Tier 2**: `type`, `enum`
+- **Tier 1**: `variable`, `property`
+
+This ensures that foundational types and callable routines are not displaced by high-volume fine-grained fields and properties during broad keyword queries.
 
 ### 2. Source File Content Search (`--files`)
 
@@ -175,7 +326,7 @@ specd graph search "storage" --symbols --exclude-workspace public-web --exclude-
 
 ---
 
-## 4. Blast Radius & Impact Analysis (`specd graph impact`)
+## 5. Blast Radius & Impact Analysis (`specd graph impact`)
 
 Before modifying a file or refactoring a symbol, developers and AI agents must assess the **blast radius**—the transitive set of files, symbols, specifications, and processes that could break as a result of the change.
 
@@ -252,8 +403,9 @@ specd graph impact --file "packages/cli/src/commands/project/update.ts" --direct
 ### Traversal Depth & Filtering
 
 - **Depth (`--depth <n>`):** Controls how many levels of transitive dependencies to traverse (default: `3`).
-- **Category Filter (`--type files,symbols,specs`):** Restricts impact results to specific entity types.
+- **Result Type Filter (`--type files,symbols,specs`):** Restricts impact results to specific entity types.
 - **Kind Filter (`--kind <kinds>`):** Restricts impacted symbols to specific kinds (e.g. `--kind function,method`).
+- **File Category Filter (`--category <categories>`, `--include-tests`, `--include-ignored`, `--all`):** Restricts or widens traversal admission across file categories. Default admits only `source` files and prunes traversal before crossing into test or ignored files.
 
 ---
 
@@ -272,9 +424,9 @@ Direct dependents are depth 1. Total dependents include later depths. Record `HI
 
 ---
 
-## 5. Architectural Hotspots (`specd graph hotspots`)
+## 6. Architectural Hotspots (`specd graph hotspots`)
 
-Hotspot analysis ranks symbols by structural coupling. The default view keeps kinds `class`, `method`, and `function`, score of at least 1, risk of at least `MEDIUM`, and the top 20 results. Symbols with no direct callers are omitted unless you pass `--include-importer-only`.
+Hotspot analysis ranks symbols by structural coupling. The default view keeps kinds `class`, `method`, `function`, and `interface` (architectural contracts and high-coupling boundaries), score of at least 1, risk of at least `MEDIUM`, and the top 20 results. Symbols with no direct callers are omitted unless you pass `--include-importer-only`.
 
 ```bash
 specd graph hotspots --min-risk HIGH --exclude-path "*:test/*" --format text
@@ -298,13 +450,17 @@ Hierarchy weight is `(extenders × 3) + (implementors × 4) + (overriders × 2)`
 - `--min-risk <level>`: `LOW`, `MEDIUM`, `HIGH`, or `CRITICAL`. Default: `MEDIUM`.
 - `--min-score <n>`: Minimum score. Default: `1`.
 - `--limit <n>`: Maximum results. Default: `20`.
-- `--kind <kinds>`: Replaces the default kind set. It does not merge with it. Example: `--kind interface,type`.
+- `--kind <kinds>`: Replaces the default kind set (`class,method,function,interface`). It does not merge with it. Example: `--kind interface,type`.
 - `--include-importer-only`: Include symbols whose score comes only from file importers.
+- `--include-tests`: Include test category files in caller metrics and candidate rankings.
+- `--include-ignored`: Include ignored category files in caller metrics and candidate rankings.
+- `--all`: Include all categories (`source`, `test`, `ignored`).
+- `--category <categories>`: Restrict candidates and caller metrics strictly to designated category or comma-separated list (e.g. `source,test`).
 - `--workspace <name>`, `--exclude-workspace <name>`, `--file <path>`, `--exclude-path <pattern>`: Scope the ranking. Repeat `--exclude-path` and `--exclude-workspace`.
 
 ---
 
-## 6. Implementation Coverage & Diagnostics
+## 7. Implementation Coverage & Diagnostics
 
 Indexing checks persisted spec-to-code links (`COVERS_FILE`, `COVERS_SYMBOL`) and prints `coverage diagnostics` on `specd graph index` when a link cannot be resolved:
 
@@ -323,7 +479,7 @@ Reasons:
 
 ---
 
-## 7. The Graph-First Protocol for Agents & Developers
+## 8. The Graph-First Protocol for Agents & Developers
 
 All AI coding assistants and developers in a SpecD repository follow the **Graph-First Protocol**:
 
@@ -366,7 +522,7 @@ All AI coding assistants and developers in a SpecD repository follow the **Graph
 
 ---
 
-## 8. Practical Playbooks
+## 9. Practical Playbooks
 
 ### Playbook 1: Safe Refactoring of a Shared Function
 
@@ -406,3 +562,20 @@ All AI coding assistants and developers in a SpecD repository follow the **Graph
    ```bash
    specd graph hotspots --workspace core --min-risk HIGH --exclude-path "*:test/*" --exclude-path "*.spec.ts" --format toon
    ```
+
+---
+
+## 10. Output Paths & Selectors: Canonical Identities vs. Project-Relative Paths
+
+When interacting with the SpecD Code Graph via the CLI or AI agent tools, file locations appear in two distinct forms:
+
+- **Canonical selectors (`<workspace>:<relPath>`):** Stable, language-agnostic identifiers used for precise graph queries (e.g. `--file core:src/kernel.ts`).
+- **Project-relative paths (`projectRelativePath`):** Standard filesystem paths relative to the repository root containing `specd.yaml` (e.g. `packages/core/src/kernel.ts`). Consistently emitted across all CLI outputs (`text`, `json`, `toon`) for direct consumption by developers and AI agents.
+
+### Path Representations in Query Results
+
+In structured outputs (`--format json` or `--format toon`), file locations are reported via `projectRelativePath`:
+
+- **`graph search`:** Every matching symbol, source file, spec, and document entry reports `projectRelativePath`.
+- **`graph hotspots`:** Ranked hotspots report `projectRelativePath` identifying the exact file containing the hotspot symbol.
+- **`graph impact`:** The analysis root reports `projectRelativePath` (or `projectRelativeTargets` for multi-file impact), and all impacted files and symbols provide `projectRelativePath`.

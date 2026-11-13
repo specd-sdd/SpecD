@@ -1,0 +1,223 @@
+- op: added
+  description: Scenarios for activity messages and version mismatch
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Validated IPC lifecycle'
+  content: |
+    #### Scenario: Activity messages are accepted before the terminal result
+
+    - **GIVEN** a child that sends activity messages, progress messages, and then one result
+    - **WHEN** the supervisor receives them
+    - **THEN** the run resolves with the result
+    - **AND** the activity messages are not treated as progress values
+
+    #### Scenario: A protocol version mismatch is a protocol failure
+
+    - **GIVEN** a child message that carries a protocol identifier different from the supervisor's
+    - **WHEN** the supervisor validates it
+    - **THEN** the run fails with a protocol failure and no result is accepted
+
+    #### Scenario: An activity message with extra fields is rejected
+
+    - **GIVEN** an activity message with an unknown field
+    - **WHEN** the supervisor validates it
+    - **THEN** it is classified as a malformed message
+
+- op: added
+  description: Scenarios for cause classification and diagnostics
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Typed failure classification'
+  content: |
+    #### Scenario: A segmentation fault is a native crash
+
+    - **GIVEN** a child that terminates by `SIGSEGV`
+    - **WHEN** the supervisor classifies the failure
+    - **THEN** the `cause` is `native-crash` and the signal is exposed as structured data
+
+    #### Scenario: A forwarded signal is a cancellation
+
+    - **GIVEN** a parent `SIGINT` that the supervisor forwarded to the child
+    - **WHEN** the child terminates
+    - **THEN** the `cause` is `cancelled`
+
+    #### Scenario: A fatal out-of-memory report is a resource limit
+
+    - **GIVEN** a child that exits after printing a fatal out-of-memory report to standard error
+    - **WHEN** the supervisor classifies the failure
+    - **THEN** the `cause` is `resource-limit`
+
+    #### Scenario: Insufficient evidence falls back to a generic cause
+
+    - **GIVEN** a child that exits with code 1 and no recognisable output
+    - **WHEN** the supervisor classifies the failure
+    - **THEN** the `cause` is `exited`
+
+    #### Scenario: Diagnostics identify the last activity and the output tails
+
+    - **GIVEN** a child that announced `src/a.ts` four seconds ago and then crashed after writing to standard error
+    - **WHEN** the failure is built
+    - **THEN** the diagnostics contain the item `src/a.ts`, an elapsed time of about four seconds, and the standard error tail
+
+- op: added
+  description: Child output capture
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Typed failure classification'
+  content: |
+    ### Requirement: Child output capture
+
+    #### Scenario: Output is captured and not forwarded
+
+    - **GIVEN** a child that writes to standard output and standard error
+    - **WHEN** the run ends
+    - **THEN** the host's own standard streams received none of it
+    - **AND** the captured tails are available only through failure diagnostics
+
+    #### Scenario: Only a bounded tail is kept
+
+    - **GIVEN** a child that writes 1 MiB to standard error
+    - **WHEN** the failure is built
+    - **THEN** the tail holds the most recent output and no more than 16 KiB
+
+    #### Scenario: Invalid UTF-8 is replaced
+
+    - **GIVEN** a child that writes bytes that are not valid UTF-8
+    - **WHEN** the tail is decoded
+    - **THEN** the invalid sequences are replaced and decoding does not throw
+
+    #### Scenario: Buffers are released at the end of the run
+
+    - **GIVEN** a completed run
+    - **WHEN** the supervisor cleanup has finished
+    - **THEN** no capture listener or buffer remains attached to the child
+
+- op: added
+  description: Activity and silence watchdog
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Child output capture'
+  content: |
+    ### Requirement: Activity and silence watchdog
+
+    #### Scenario: Activity announcements are rate limited
+
+    - **GIVEN** a task that announces five hundred ordinary items within one second
+    - **WHEN** the child forwards them
+    - **THEN** at most four activity messages reach the supervisor
+
+    #### Scenario: Mandatory announcements are never withheld
+
+    - **GIVEN** a task that announces many ordinary items and then one mandatory item within the same second
+    - **WHEN** the child forwards them
+    - **THEN** the mandatory item reaches the supervisor and becomes the last announced item
+
+    #### Scenario: Silence produces a warning naming the last item
+
+    - **GIVEN** a child that announced `src/big.ts` and then sent no message for ten seconds (controlled clock)
+    - **WHEN** the silence threshold elapses
+    - **THEN** the supervisor delivers a `worker-silent` event with the item `src/big.ts` and the silent duration
+
+    #### Scenario: The warning repeats at most once per threshold
+
+    - **GIVEN** a child that stays silent for thirty seconds
+    - **WHEN** the clock advances
+    - **THEN** no more than one `worker-silent` event is delivered per further ten seconds
+
+    #### Scenario: Any message resets the silence
+
+    - **GIVEN** a child that sends a progress message every five seconds
+    - **WHEN** a minute passes
+    - **THEN** no `worker-silent` event is delivered
+
+    #### Scenario: The watchdog never terminates the child
+
+    - **GIVEN** a child that is silent for several minutes
+    - **WHEN** the watchdog fires repeatedly
+    - **THEN** the child keeps running and the run outcome is decided only by the child or by a signal
+
+    #### Scenario: The watchdog works while the child is blocked
+
+    - **GIVEN** a child whose task blocks synchronously for longer than the threshold
+    - **WHEN** the threshold elapses
+    - **THEN** the supervisor still delivers the `worker-silent` event
+
+- op: added
+  description: Typed worker events
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Activity and silence watchdog'
+  content: |
+    ### Requirement: Typed worker events
+
+    #### Scenario: Events are delivered in arrival order with stable kinds
+
+    - **GIVEN** an `onEvent` receiver and a run that produces activity, a silence, and a stale-lock recovery
+    - **WHEN** the run proceeds
+    - **THEN** the receiver gets `activity`, `worker-silent`, and `stale-lock-recovered` events in arrival order
+    - **AND** each has a `kind` and structured fields and no display sentence is required
+
+    #### Scenario: The stale-lock recovery is also reported as text
+
+    - **GIVEN** a stale lock that the supervisor recovers
+    - **WHEN** the run starts
+    - **THEN** `onWarning` still receives its text message
+    - **AND** `onEvent` receives the typed equivalent
+
+    #### Scenario: No receiver changes nothing
+
+    - **GIVEN** a run without `onEvent`
+    - **WHEN** it completes
+    - **THEN** it behaves exactly as a run with a receiver
+
+- op: added
+  description: Child runtime options
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Typed worker events'
+  content: |
+    ### Requirement: Child runtime options
+
+    #### Scenario: The child can request a garbage collection
+
+    - **GIVEN** a run started through the supervisor
+    - **WHEN** code in the child asks for the garbage-collection request
+    - **THEN** the request is available
+
+    #### Scenario: Host execution arguments are preserved
+
+    - **GIVEN** a host runtime started with its own execution arguments
+    - **WHEN** the supervisor forks the child
+    - **THEN** those arguments are not removed from the child's execution arguments
+
+- op: added
+  description: Scenario for the third task argument
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Trusted injected task module'
+  content: |
+    #### Scenario: The task receives an activity announcer
+
+    - **GIVEN** a trusted task module that declares the third parameter
+    - **WHEN** the worker invokes its entrypoint
+    - **THEN** it receives the input, the progress emitter and an announcer function
+    - **AND** a task that declares only two parameters still runs

@@ -19,11 +19,21 @@
   "implementation": [
     {
       "file": "core:src/application/use-cases/validate-specs.ts",
-      "symbols": ["_validateMetadataConsistency", "ValidateSpecs"]
+      "symbols": ["ValidateSpecs", "_validateMetadataMaterialization"]
     },
     {
-      "file": "core:src/application/use-cases/_shared/validation-source-stamps.ts",
-      "symbols": ["stampsFromListEntry", "specFromListEntry", "listEntryHasMeta"]
+      "file": "core:src/application/use-cases/_shared/validate-specs-cache-fingerprints.ts",
+      "symbols": ["VALIDATE_SPECS_ENGINE_VERSION"]
+    },
+    {
+      "file": "core:test/application/use-cases/validate-specs.spec.ts",
+      "symbols": ["metadataResult", "buildValidateSpecs"]
+    },
+    {
+      "file": "core:test/application/use-cases/_shared/validate-specs-cache-fingerprints.spec.ts"
+    },
+    {
+      "file": "core:test/infrastructure/fs/fs-validation-result-cache.spec.ts"
     }
   ],
   "optimizations": {

@@ -8,6 +8,8 @@ sidebar_position: 1
 
 The `specd guide` command family provides on-demand access to SpecD documentation directly from the terminal or from within agent tool workflows. It delivers topics, outline metadata, granular section extraction, line slicing, and BM25 search over bundled guides.
 
+This command serves the hand-written SpecD guide. The SDK and extension development guide — package references plus generated public API topics — is served by [`specd guide-sdk`](./guide-sdk.md).
+
 ## Commands
 
 ```bash
@@ -31,7 +33,9 @@ Retrieve the catalog of all available guides, or inspect the content of a specif
 
 | Option                        | Description                                                                                                                                                                                                  |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
-| `--meta`                      | Emit document metadata, byte/line statistics, and outline structure (all sections with indices and line spans) instead of full text.                                                                         |
+| `--meta`                      | Emit document metadata, byte/line statistics, and outline structure (all sections with indices and line spans) instead of full text. With no topic, emit a bounded catalog index.                            |
+| `--page <n>`                  | 1-indexed listing page to return (default: `1`).                                                                                                                                                             |
+| `--page-size <n>`             | Maximum entries per listing page (default: `50`).                                                                                                                                                            |
 | `--section <name\|index>`     | Extract only the specified section heading and its body up to the next heading of equal or shallower depth. Accepts 1-indexed section number (e.g. `3`) or heading title / slug (e.g. `"Lifecycle States"`). |
 | `--start-line <n>`            | 1-indexed start line number. Lines prior to `startLine` are omitted.                                                                                                                                         |
 | `--lines <m>`                 | Maximum number of lines to emit starting from `startLine`.                                                                                                                                                   |
@@ -41,19 +45,20 @@ Retrieve the catalog of all available guides, or inspect the content of a specif
 ### Behavior
 
 1. **Listing the Catalog (`specd guide`)**:
-   - Lists all bundled topics sorted by display order.
-   - In `text`, renders a table of topic identifier, title, and description.
-   - In `json` / `toon`, returns an array of guide summaries: `[{ topic, title, description, order }]`.
+   - Lists all bundled topics sorted by display order, bounded by `--page-size`.
+   - In `text`, renders a table of topic identifier, title, and description. Each collection is introduced by its own header carrying its topic count and page range, and the page position is reported when the result spans more than one page.
+   - In `json` / `toon`, returns the listing envelope shared with `specd guide-sdk`: `topics` (each carrying its `page` and its `scope`), `pagination` (`page`, `pageSize`, `returned`, `total`, `totalPages`), `collections` (per-collection `total`, `firstPage`, `lastPage`), and `sdkGuide`, the structured pointer to the sibling SDK guide.
 
 2. **Reading Topic Content (`specd guide <topic>`)**:
    - Prints the raw Markdown content of the requested guide.
    - Returns exit code `0` on success.
-   - If the topic is unknown, outputs error code `UNKNOWN_GUIDE_TOPIC`, lists valid available topics, and exits with code `1`.
+   - If the topic is unknown, outputs error code `UNKNOWN_GUIDE_TOPIC`, lists valid available topics, and exits with code `1`. When a topic's title equals the request, the error names its canonical identifier as a suggestion rather than resolving the request silently.
 
 3. **Inspecting Outline and Metadata (`--meta`)**:
-   - Instead of reading the full guide body, outputs the topic summary and outline:
-     - `topic`, `file`, `lines`, `bytes`.
+   - With a topic, instead of reading the full guide body, outputs the topic summary and outline:
+     - `topic`, `scope`, `file`, `lines`, `bytes`.
      - `outline`: Array of sections, each having `index` (1-indexed), `heading`, `level`, `startLine`, `endLine`, and `lines`.
+   - Without a topic, outputs a bounded catalog index instead of the plain listing: the per-collection extents, a single `read: specd guide <topic>` hint, then the per-collection extents, then one row per topic with its page, scope, line count, byte length, and title. `--page` and `--page-size` still bound it. Each row prints its topic as the fully qualified `collection:topic` identifier, so the value the hint shows is exactly what the caller pastes into `<topic>`.
    - Token-efficient for agents to map document structure before requesting sections.
 
 4. **Extracting Sections (`--section <name|index>`)**:
@@ -65,13 +70,14 @@ Retrieve the catalog of all available guides, or inspect the content of a specif
 5. **Line Range and Window Slicing (`--start-line`, `--lines`, `--line-numbers`)**:
    - Slices line windows precisely.
    - When `--line-numbers` is active, prefixes each line with its absolute document line number padded according to maximum line width.
+   - `--section`, `--start-line`, and `--lines` address a document body, so they are rejected with code `1` when no topic is supplied rather than silently ignored.
 
 ### Exit Codes
 
-| Exit Code | Condition                                                                                                                                                                               |
-| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `0`       | Successful retrieval or catalog listing.                                                                                                                                                |
-| `1`       | Error encountered: topic not found (`UNKNOWN_GUIDE_TOPIC`), section not found (`UNKNOWN_GUIDE_SECTION`), ambiguous section name (`AMBIGUOUS_GUIDE_SECTION`), or invalid flag arguments. |
+| Exit Code | Condition                                                                                                                                                                                                                                             |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0`       | Successful retrieval or catalog listing.                                                                                                                                                                                                              |
+| `1`       | Error encountered: topic not found (`UNKNOWN_GUIDE_TOPIC`), section not found (`UNKNOWN_GUIDE_SECTION`), ambiguous section name (`AMBIGUOUS_GUIDE_SECTION`), a body flag supplied without a topic (`MISSING_GUIDE_TOPIC`), or invalid flag arguments. |
 
 ### Examples
 
@@ -79,8 +85,17 @@ Retrieve the catalog of all available guides, or inspect the content of a specif
 # List all available guides
 specd guide
 
+# Locate every topic, with one hint to read any of them
+specd guide --meta --page-size 20
+
+# List one page of the catalog
+specd guide --page 2 --page-size 10
+
 # List all available guides in compact TOON format
 specd guide --format toon
+
+# The SDK and extension development guide
+specd guide-sdk --scope api --page-size 20
 
 # View the full workflow guide
 specd guide workflow

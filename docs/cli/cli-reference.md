@@ -49,14 +49,16 @@ Create a new change and place it in the active changes directory. The stored pol
 
 `<name>` is a short slug identifying the change. It must be unique among active changes and match the slug conventions of your project (lowercase, hyphens). It becomes part of the change directory name and is used in all subsequent commands that reference this change.
 
-| Option                      | Description                                                                                      |
-| --------------------------- | ------------------------------------------------------------------------------------------------ |
-| `--spec <id>`               | Associate a spec with this change. Repeatable — pass multiple `--spec` flags for multiple specs. |
-| `--description <text>`      | Short description of the change's intent.                                                        |
-| `--artifact-policy <p>`     | Stored artifact policy (`none\|surgical\|downstream\|global`). Default `downstream`.             |
-| `--workflow-policy <p>`     | Stored workflow policy (`preserve\|redesign`). Default `preserve`.                               |
-| `--format text\|json\|toon` | Output format.                                                                                   |
-| `--config <path>`           | Config file path.                                                                                |
+| Option                      | Description                                                                                  |
+| --------------------------- | -------------------------------------------------------------------------------------------- |
+| `--spec <id>`               | Spec ID (repeatable). Each value is one raw ID — never comma-split. Bare IDs mean `default`. |
+| `--description <text>`      | Short description of the change's intent.                                                    |
+| `--artifact-policy <p>`     | Stored artifact policy (`none\|surgical\|downstream\|global`). Default `downstream`.         |
+| `--workflow-policy <p>`     | Stored workflow policy (`preserve\|redesign`). Default `preserve`.                           |
+| `--format text\|json\|toon` | Output format.                                                                               |
+| `--config <path>`           | Config file path.                                                                            |
+
+`--spec` values are validated by the core as canonical spec IDs. Invalid syntax fails with `INVALID_SPEC_ID`; an unknown workspace fails with `WORKSPACE_NOT_FOUND`. Pass one ID per flag (for example `--spec auth/login --spec core:change`), not a comma-separated list.
 
 ```bash
 # Create a change for two specs
@@ -233,15 +235,17 @@ specd changes edit <name> [options]
 
 Edit the spec scope, description, or stored invalidation policy of an existing change. At least one option below is required. `--artifact-policy` and `--workflow-policy` update only the dimensions you pass and persist them on the change. Unspecified dimensions stay as stored. There is no `--invalidation-policy` flag. Output includes whether validity changed and any committed recovery. An invalid policy value exits 1 before mutation.
 
-| Option                      | Description                                                        |
-| --------------------------- | ------------------------------------------------------------------ |
-| `--add-spec <id>`           | Add a spec to the change.                                          |
-| `--remove-spec <id>`        | Remove a spec from the change.                                     |
-| `--description <text>`      | Update the change description.                                     |
-| `--artifact-policy <p>`     | Store this artifact policy (`none\|surgical\|downstream\|global`). |
-| `--workflow-policy <p>`     | Store this workflow policy (`preserve\|redesign`).                 |
-| `--format text\|json\|toon` | Output format.                                                     |
-| `--config <path>`           | Config file path.                                                  |
+| Option                      | Description                                                                   |
+| --------------------------- | ----------------------------------------------------------------------------- |
+| `--add-spec <id>`           | Add a spec ID (repeatable). Raw ID — never comma-split. Bare means `default`. |
+| `--remove-spec <id>`        | Remove a spec ID (repeatable). Raw ID — never comma-split.                    |
+| `--description <text>`      | Update the change description.                                                |
+| `--artifact-policy <p>`     | Store this artifact policy (`none\|surgical\|downstream\|global`).            |
+| `--workflow-policy <p>`     | Store this workflow policy (`preserve\|redesign`).                            |
+| `--format text\|json\|toon` | Output format.                                                                |
+| `--config <path>`           | Config file path.                                                             |
+
+`--add-spec` values are validated like `changes create --spec` (`INVALID_SPEC_ID` / `WORKSPACE_NOT_FOUND`). `--remove-spec` removes a stored ID and does not re-validate syntax, so an invalid persisted ID can still be removed.
 
 ### change validate
 
@@ -415,6 +419,8 @@ Available subcommands:
 - `resolve` — mark a tracked file as reviewed/resolved
 - `unresolve` — reopen a resolved file back to `open`
 
+`--file` takes raw project-relative path(s). Use a listed form (`--file a.ts b.ts`) or repeat the flag. Commas are **not** separators — a comma is part of the path. `add` / `remove` take a single `--file <path>`; `ignore` / `resolve` / `unresolve` take `--file <paths...>`.
+
 `list` and `review` use one delivery-neutral SDK projection. For symbol links they
 report the original stored file and symbol plus:
 
@@ -549,18 +555,22 @@ Start, complete, or withdraw verification evidence without moving the lifecycle 
 ### change deps
 
 ```
-specd changes deps <name> <specId> [options]
+specd changes deps <name> [specId] [options]
 ```
 
-Manage the `dependsOn` relationships for a spec within a change. At least one of `--add`, `--remove`, or `--set` is required.
+Add, remove, replace, or clear declared spec dependencies for a change, or list current dependencies when no modification flags are provided. Modification flags require `<specId>`.
 
-| Option                      | Description                                         |
-| --------------------------- | --------------------------------------------------- |
-| `--add <specId>`            | Add a dependency. Repeatable.                       |
-| `--remove <specId>`         | Remove a dependency. Repeatable.                    |
-| `--set <specId>`            | Replace all dependencies with this set. Repeatable. |
-| `--format text\|json\|toon` | Output format.                                      |
-| `--config <path>`           | Config file path.                                   |
+| Option                      | Description                                                                                      |
+| --------------------------- | ------------------------------------------------------------------------------------------------ |
+| `--add <id>`                | Add a dependency spec ID (repeatable). Raw ID — never comma-split. Bare IDs mean `default`.      |
+| `--remove <id>`             | Remove a dependency spec ID (repeatable). Raw ID — never comma-split.                            |
+| `--set <id>`                | Replace all dependencies (repeatable; mutually exclusive with `--add` / `--remove` / `--clear`). |
+| `--clear`                   | Clear all dependencies for the spec (mutually exclusive with `--add` / `--remove` / `--set`).    |
+| `--force`                   | Skip confirmation for `--clear`.                                                                 |
+| `--format text\|json\|toon` | Output format.                                                                                   |
+| `--config <path>`           | Config file path.                                                                                |
+
+`--clear` prompts for confirmation unless `--force` is passed. Added and set IDs are validated as canonical spec IDs (`INVALID_SPEC_ID` / `WORKSPACE_NOT_FOUND`).
 
 ### change discard
 
@@ -1009,7 +1019,7 @@ specd specs deps list <specPath>
 specd specs deps add|remove|set|clear <specPath> [options]
 ```
 
-Manage persisted `dependsOn` links in `spec-lock.json`.
+Manage persisted `dependsOn` links in `spec-lock.json`. Dependency IDs use `--dep <id>` (repeatable, raw IDs — never comma-split). `specs deps clear` prompts for confirmation unless `--force` is passed.
 
 See [spec deps](spec-deps.md).
 
@@ -1134,7 +1144,7 @@ Initialize a new SpecD project in the current directory. When run in a TTY, laun
 | Option                      | Description                                                                                                                                                                                      |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `--schema <ref>`            | Schema reference to use (e.g. `@specd/schema-std`).                                                                                                                                              |
-| `--workspace <name>`        | Workspace name. Defaults to `default`.                                                                                                                                                           |
+| `--workspace <name>`        | Workspace name. Defaults to `default`. Must be two or more of `a-z`, `0-9` and `-`, start with a letter and not be a Windows device name (e.g. `nul`); the value is never trimmed.               |
 | `--workspace-path <path>`   | Path to the specs directory for the workspace.                                                                                                                                                   |
 | `--plugin <name>`           | Install skills for this agent plugin. Repeatable. Valid values include `@specd/plugin-agent-claude`, `@specd/plugin-agent-copilot`, `@specd/plugin-agent-codex`, `@specd/plugin-agent-opencode`. |
 | `--force`                   | Overwrite existing `specd.yaml` if present.                                                                                                                                                      |
@@ -1317,6 +1327,12 @@ using a successful exit code as proof that every input became a graph node.
 Completed results also include counts and elapsed milliseconds for import resolution,
 dependency facts, adapter relations, re-exports, hierarchy/overrides, persistence,
 and search-index rebuilding in text and structured output.
+Results also report size gating metrics: `filesSkippedForSize` (count of skipped oversized files),
+`largestSkippedForSize` (array of `{ filePath, projectRelativePath, sizeBytes, limitBytes }`, largest
+first, at most 25) and `sizeExemptAnalysed` (array of `{ filePath, projectRelativePath, sizeBytes }`
+for oversized files indexed under exemption). In text output, skipped files are summarized with
+formatted byte sizes and an actionable `graph.largeFilePaths` YAML snippet (root-level files are
+anchored with a leading `/`). All `graph` patterns in `specd.yaml` are interpreted relative to the project root; when one physical file is kept by more than one workspace the run reports `workspaceOverlaps` / `workspaceOverlapCount` (and an overlap section in text output) and `specd graph why <path>` shows the owners.
 
 Code Graph owns the shared writer lock and the process-isolated worker used for every
 production index run. The CLI supplies its trusted packaged task through the SDK and
@@ -1324,16 +1340,22 @@ renders only the returned progress, result, and typed failure. During an active 
 Code Graph forwards `SIGINT` or `SIGTERM` to that run's child, waits for cleanup, and
 returns a typed failure without terminating or re-signalling the CLI host. There is no
 public in-process indexing mode.
+A silence watchdog monitors child worker activity: if 10 seconds elapse without IPC activity,
+a warning is emitted to `stderr` in text mode (`warning: no progress for 10s while processing <file>. If that file is not needed, add it to graph.excludePaths or lower graph.maxFileBytes.`),
+repeating at most every 10 seconds while silent.
+Worker failures exit with code 3 and report structured diagnostics: failure cause (`start-failed`,
+`task-contract`, `task-error`, `protocol`, `cancelled`, `native-crash`, `resource-limit`,
+`exited`), last activity item and time ago, and trailing 16 KiB tails of child stdout and stderr.
 
-| Option                      | Description                                                                                    |
-| --------------------------- | ---------------------------------------------------------------------------------------------- |
-| `--force`                   | Logically rebuild every selected graph input; typed incompatible storage may be repaired once. |
-| `--config <path>`           | Config file path. Mutually exclusive with `--path`.                                            |
-| `--path <path>`             | Repository root bootstrap path. Ignores any discovered config.                                 |
-| `--exclude-path <pattern>`  | Gitignore-syntax pattern to exclude (repeatable; merges with config).                          |
-| `--format text\|json\|toon` | Output format.                                                                                 |
+| Option                      | Description                                                                                                                                |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--force`                   | Logically rebuild every selected graph input; typed incompatible storage may be repaired once.                                             |
+| `--config <path>`           | Config file path. Mutually exclusive with `--path`.                                                                                        |
+| `--path <path>`             | Repository root bootstrap path. Ignores any discovered config.                                                                             |
+| `--exclude-path <glob...>`  | One or more gitignore-syntax patterns, relative to the project root, added to the global exclusion layer (repeatable; merges with config). |
+| `--format text\|json\|toon` | Output format.                                                                                                                             |
 
-#### Config fields: `graph.includePaths`, `graph.excludePaths`, `graph.respectGitignore`, and `workspace.graph.allowedPaths`
+#### Config fields: `graph.includePaths`, `graph.excludePaths`, `graph.respectGitignore`, `graph.maxFileBytes`, `graph.largeFilePaths`, and `workspace.graph.allowedPaths`
 
 Each workspace in `specd.yaml` may declare a `graph` block:
 
@@ -1343,15 +1365,21 @@ workspaces:
     codeRoot: ./
     graph:
       respectGitignore: true # optional; default: true
+      maxFileBytes: 262144 # optional; override limit in bytes (0 disables limit)
+      largeFilePaths: # optional; size exemptions relative to the project root
+        - 'src/generated/ast-tokens.ts'
       excludePaths: # optional; gitignore-syntax, supports ! negation
         - node_modules/
         - dist/
         - .specd/*
         - '!.specd/metadata/' # re-include .specd/metadata/ despite the wildcard above
-      allowedPaths: # optional; gitignore-syntax include surface relative to codeRoot
+      allowedPaths: # optional; gitignore-syntax include surface relative to the project root
         - src/**
         - package.json
 graph:
+  maxFileBytes: 262144 # optional; project-global limit in bytes (default: 262144 = 256 KiB)
+  largeFilePaths: # optional; project-global size exemptions relative to projectRoot
+    - 'docs/adr/0029-cross-language-symbol-semantics.md'
   includePaths: # optional; gitignore-syntax paths relative to projectRoot, indexed as root:...
     - docs/**
     - pnpm-workspace.yaml
@@ -1359,6 +1387,10 @@ graph:
     - specd-sdd/
     - specs/
 ```
+
+**`graph.maxFileBytes`** — project-global maximum file size in bytes for indexing code and documents (default `262144` = 256 KiB). Files exceeding this threshold are skipped during code graph indexing with coverage reason `file-too-large`. Setting `0` disables size gating. Workspaces may override this limit individually.
+
+**`graph.largeFilePaths`** — project-global gitignore-syntax patterns (relative to project root) exempting oversized files from the `maxFileBytes` limit. Exempt files are indexed even when oversized, but must still pass gitignore, `excludePaths`, `allowedPaths`, and binary detection. Workspaces can add workspace-relative exemptions via `workspaces.<name>.graph.largeFilePaths`.
 
 **`graph.excludePaths`** — global exclusions for file/document discovery. When set in config, they replace the built-in defaults; CLI `--exclude-path` flags are appended on top. Patterns follow gitignore syntax and support `!` negation. The built-in defaults are:
 
@@ -1376,10 +1408,11 @@ Filesystem-backed spec roots are excluded automatically from file/document disco
 
 #### `--exclude-path` merging
 
-CLI `--exclude-path` flags merge (append) on top of the effective exclusion list — either `graph.excludePaths` from config or the built-in defaults when config is absent. They never reduce the exclusion set. This flag may be repeated:
+CLI `--exclude-path` flags merge (append) on top of the effective exclusion list — either `graph.excludePaths` from config or the built-in defaults when config is absent. They never reduce the exclusion set. Patterns are relative to the project root and join the global exclusion layer, so a workspace-level `!` negation cannot re-include them. Pass one or more whole gitignore patterns per flag (`--exclude-path <glob...>`), or repeat the flag. Commas are not separators — a comma is part of the pattern.
 
 ```
 specd graph index --exclude-path "packages/generated/*" --exclude-path "tmp/"
+specd graph index --exclude-path "packages/generated/*" "tmp/"
 ```
 
 #### Shared indexing lock
@@ -1407,28 +1440,43 @@ rules as `graph index`.
 
 If a graph index is currently running, this command may return `GRAPH_BUSY` with the message: `The code graph is currently being indexed. Try again in a few seconds.`
 
-| Option                       | Description                                                                     |
-| ---------------------------- | ------------------------------------------------------------------------------- |
-| `--symbols`                  | Search only symbols.                                                            |
-| `--files`                    | Search only indexed source-file content.                                        |
-| `--specs`                    | Search only specs.                                                              |
-| `--documents`                | Search only documents.                                                          |
-| `--snippet`                  | Include snippet previews. Without it, output stays compact and location-first.  |
-| `--kind <list>`              | Filter symbol results by comma-separated kinds, for example `class,method`.     |
-| `--config <path>`            | Config file path. Mutually exclusive with `--path`.                             |
-| `--path <path>`              | Repository root bootstrap path. Ignores any discovered config.                  |
-| `--file <path>`              | Restrict selected categories to paths matching the wildcard pattern.            |
-| `--workspace <name>`         | Restrict results to the named workspace.                                        |
-| `--exclude-path <pattern>`   | Exclude symbols/specs whose file path matches the wildcard pattern. Repeatable. |
-| `--exclude-workspace <name>` | Exclude results from the named workspace. Repeatable.                           |
-| `--limit <n>`                | Maximum number of results per category (default: 10).                           |
-| `--spec-content`             | Include full spec content in `json` or `toon` output.                           |
-| `--format text\|json\|toon`  | Output format.                                                                  |
+| Option                       | Description                                                                                                                            |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `--symbols`                  | Search only symbols.                                                                                                                   |
+| `--files`                    | Search only indexed source-file content.                                                                                               |
+| `--specs`                    | Search only specs.                                                                                                                     |
+| `--documents`                | Search only documents.                                                                                                                 |
+| `--snippet`                  | Include snippet previews. Without it, output stays compact and location-first.                                                         |
+| `--kind <list>`              | Filter symbol results by comma-separated kinds, for example `class,method`.                                                            |
+| `--config <path>`            | Config file path. Mutually exclusive with `--path`.                                                                                    |
+| `--path <path>`              | Repository root bootstrap path. Ignores any discovered config.                                                                         |
+| `--file <path>`              | Restrict selected categories to paths matching the wildcard pattern.                                                                   |
+| `--workspace <name>`         | Restrict results to the named workspace.                                                                                               |
+| `--exclude-path <pattern>`   | Exclude symbols/specs whose file path matches the wildcard pattern. Repeatable.                                                        |
+| `--exclude-workspace <name>` | Exclude results from the named workspace. Repeatable.                                                                                  |
+| `--limit <n>`                | Maximum number of results per category (default: 10).                                                                                  |
+| `--include-tests`            | Include `test` category files and symbols alongside `source`.                                                                          |
+| `--include-ignored`          | Include `ignored` category files and symbols.                                                                                          |
+| `--all`                      | Include all categories (`source`, `test`, `ignored`).                                                                                  |
+| `--category <categories>`    | Restrict search results strictly to `source`, `test`, or `ignored` (accepts single value or comma-separated list, e.g. `source,test`). |
+| `--spec-content`             | Include full spec content in `json` or `toon` output.                                                                                  |
+| `--format text\|json\|toon`  | Output format.                                                                                                                         |
 
 With no category flag, the command requests symbols, files, specs, and documents in
 one provider call. Category flags narrow that request. `--files` selects source
 content; it is intentionally different from `--file`, which is a path filter and
 never enables a category.
+
+By default, `graph search` searches only files and symbols in the `source` category. Test
+files and ignored files are excluded unless requested with `--include-tests`,
+`--include-ignored`, `--all`, or `--category`. When matches in test or ignored files are excluded, text mode
+displays an omission notice:
+
+```text
+ℹ Excluded from results: <count> test files, <count> ignored files. Use --include-tests, --include-ignored, or --all to view them.
+```
+
+In `json` and `toon` mode, the output includes `omittedCounts: { tests: number, ignored: number }`.
 
 Code Graph owns expansion, candidate paging, exact-first semantic ranking, grouping,
 deduplication, declaration-name suppression, and post-suppression limit refill. The
@@ -1533,22 +1581,34 @@ List the most connected symbols in the graph ranked by coupling risk. Context re
 
 If a graph index is currently running, this command may return `GRAPH_BUSY` with the message: `The code graph is currently being indexed. Try again in a few seconds.`
 
-| Option                       | Description                                                                                                 |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `--workspace <name>`         | Restrict hotspots to the named workspace.                                                                   |
-| `--kind <list>`              | Filter hotspots by comma-separated symbol kinds, for example `class,method`. Replaces the default kind set. |
-| `--file <path>`              | Restrict hotspots to a file path.                                                                           |
-| `--exclude-path <pattern>`   | Exclude symbols whose file path matches the wildcard pattern. Repeatable.                                   |
-| `--exclude-workspace <name>` | Exclude hotspots from the named workspace. Repeatable.                                                      |
-| `--limit <n>`                | Maximum number of results. When omitted, defaults to `20`.                                                  |
-| `--min-score <n>`            | Minimum score threshold. When omitted, defaults to `1`.                                                     |
-| `--include-importer-only`    | Include symbols with no direct callers whose score comes only from file importers.                          |
-| `--min-risk <level>`         | Minimum risk level to show. When omitted, defaults to `MEDIUM`.                                             |
-| `--config <path>`            | Config file path. Mutually exclusive with `--path`.                                                         |
-| `--path <path>`              | Repository root bootstrap path. Ignores any discovered config.                                              |
-| `--format text\|json\|toon`  | Output format.                                                                                              |
+| Option                       | Description                                                                                                                                           |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | -------------- |
+| `--workspace <name>`         | Restrict hotspots to the named workspace.                                                                                                             |
+| `--kind <list>`              | Filter hotspots by comma-separated symbol kinds, for example `class,method`. Replaces the default kind set.                                           |
+| `--file <path>`              | Restrict hotspots to a file path.                                                                                                                     |
+| `--exclude-path <pattern>`   | Exclude symbols whose file path matches the wildcard pattern. Repeatable.                                                                             |
+| `--exclude-workspace <name>` | Exclude hotspots from the named workspace. Repeatable.                                                                                                |
+| `--limit <n>`                | Maximum number of results. When omitted, defaults to `20`.                                                                                            |
+| `--min-score <n>`            | Minimum score threshold. When omitted, defaults to `1`.                                                                                               |
+| `--include-importer-only`    | Include symbols with no direct callers whose score comes only from file importers.                                                                    |
+| `--include-tests`            | Include test category files in caller metrics and candidate rankings.                                                                                 |
+| `--include-ignored`          | Include ignored category files in caller metrics and candidate rankings.                                                                              |
+| `--all`                      | Include all categories (`source`, `test`, `ignored`).                                                                                                 |
+| `--category <categories>`    | Restrict candidates and caller metrics strictly to `source`, `test`, or `ignored` (accepts single value or comma-separated list, e.g. `source,test`). |
+| `--min-risk <level>`         | Minimum risk level to show. When omitted, defaults to `MEDIUM`.                                                                                       |
+| `--config <path>`            | Config file path. Mutually exclusive with `--path`.                                                                                                   |
+| `--path <path>`              | Repository root bootstrap path. Ignores any discovered config.                                                                                        |
+| `--format text               | json                                                                                                                                                  | toon` | Output format. |
 
-By default, `graph hotspots` shows only `class`, `method`, and `function` symbols, applies `min-score=1`, `min-risk=MEDIUM`, and `limit=20`, and excludes importer-only symbols that have no direct callers.
+By default, `graph hotspots` shows only `class`, `method`, and `function` symbols, applies `min-score=1`, `min-risk=MEDIUM`, and `limit=20`, excludes importer-only symbols that have no direct callers, and restricts candidates and caller metrics to `source` category files. Test files and ignored files are excluded by default.
+
+In text format, if non-source files are omitted, an omission notice is displayed at the bottom:
+
+```text
+ℹ Excluded from results: <count> test files, <count> ignored files. Use --include-tests, --include-ignored, or --all to view them.
+```
+
+In JSON and TOON format, an `omittedCounts` object (`{ tests: number, ignored: number }`) is returned with counts of omitted candidates.
 
 `--kind` accepts a single comma-separated list and validates every token against the supported symbol kinds. Invalid values fail the command before querying the graph. When you pass `--kind`, that list fully replaces the default kind set instead of merging with it.
 
@@ -1584,6 +1644,13 @@ reason, VCS visibility, derivation fingerprint, schema/generation, and index cov
 dimension separate. A current VCS ref alone does not prove current indexed content.
 Text output includes persisted coverage counts for indexed, excluded, unsupported,
 parse-failed, and partial inputs; structured output preserves the same summary.
+Health also reports `coverageCompleteness` (`complete`, `complete-with-warnings`,
+`incomplete`, or `unknown`) and `coverageWarnings`. Files skipped by the per-file size limit
+(`graph.maxFileBytes`) leave the aggregate `coverageComplete` flag `true`, because skipping them is
+an explicit outcome, but they make the completeness `complete-with-warnings`: text output then
+prints `coverage: complete with warnings (N file(s) skipped: file-too-large)` and a hint to exempt
+files with `graph.largeFilePaths`, and a missing symbol is not proof of absence for code that may
+live in those files. JSON and TOON expose both fields unchanged.
 
 VCS workspaces assess normalized graph-visible staged, unstaged, untracked, deleted,
 and renamed paths once per repository. Non-VCS workspaces compare persisted
@@ -1616,6 +1683,67 @@ Print graph stats in TOON format:
 
 ```
 specd graph stats --format toon
+```
+
+---
+
+### graph why
+
+```
+specd graph why <path> [options]
+```
+
+Explain why a path is excluded, classified or indexed. `<path>` is a project-relative path, an absolute path (converted to project-relative) or `workspace:path`. For each workspace whose code root contains the path the command reports, in indexer order, the decisive rule of `binary-extension`, `gitignore`, `global-exclude`, `workspace-exclude`, `allowed-paths`, `size-limit`, `category` and `adapter`, with the rule's origin (layer, workspace, configuration key, and for `.gitignore` the file and line). Configured graph patterns are interpreted relative to the project root. Exit status is `0` whenever an explanation is produced, including for excluded paths.
+
+JSON and TOON output carry `input`, `projectRelativePath`, `verdict` (`indexable`, `not-indexed`, `not-in-scope`), `owners`, `candidates` (each with `workspace`, `identity`, `verdict`, `category`, `kind`, `steps`, `inGraph`) and `diagnostics` (`PATH_NOT_FOUND`, `CODE_ROOT_OUTSIDE_PROJECT`, `PATH_OUTSIDE_PROJECT`, `MULTIPLE_OWNERS`).
+
+| Option                      | Description                                                    |
+| --------------------------- | -------------------------------------------------------------- |
+| `--config <path>`           | Config file path. Mutually exclusive with `--path`.            |
+| `--path <path>`             | Repository root bootstrap path. Ignores any discovered config. |
+| `--format text\|json\|toon` | Output format.                                                 |
+
+#### Examples
+
+Explain an excluded path (shows the matching pattern, its layer and configuration key):
+
+```
+specd graph why app/vendors/other/x.php
+```
+
+```text
+app/vendors/other/x.php
+verdict: not-indexed   owners: none
+
+backend:vendors/other/x.php  [excluded]  category: -  kind: -  inGraph: no
+  - binary-extension: passed
+  - gitignore: passed
+  - global-exclude: matched — /app/vendors/* (pattern) from global graph.excludePaths
+  - workspace-exclude: not-applicable
+  - allowed-paths: not-applicable
+  - size-limit: not-applicable
+  - category: not-applicable
+  - adapter: not-applicable
+```
+
+Explain a path in a specific workspace, as structured data:
+
+```
+specd graph why core:src/index.ts --format toon
+```
+
+Explain an indexable path (text output; diagnostics, when present, are printed after all candidates):
+
+```text
+$ specd graph why packages/core/src/index.ts
+packages/core/src/index.ts
+verdict: indexable   owners: core
+
+core:src/index.ts  [indexable]  category: source  kind: file  inGraph: yes
+  - global-exclude: passed
+  - size-limit: passed size=2048 limit=262144
+  - category: passed category=source
+  - adapter: passed kind=file language=typescript
 ```
 
 ---
@@ -1687,26 +1815,40 @@ traversal does not run. Bare names first require an exact case-sensitive declara
 name, fall back to case-insensitive exact lookup only when none exists, and never
 widen prefixes or partial search hits into impact targets.
 
-| Option                                                             | Description                                                                                       |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| `--spec <id>`                                                      | Spec ID to analyze.                                                                               |
-| `--symbol <name>`                                                  | Symbol selector to analyze. Supports bare names, qualified selectors, and full ids.               |
-| `--file <path...>`                                                 | One or more file paths to analyze (config-relative, workspace-prefixed, or absolute).             |
-| `--export <name>`                                                  | Exact public export name; requires `--from`.                                                      |
-| `--from <surface>`                                                 | File or public surface containing `--export`.                                                     |
-| `--direction dependents\|dependencies\|upstream\|downstream\|both` | Impact direction (default: `dependents`).                                                         |
-| `--type <types>`                                                   | Comma-separated result categories: `files`, `symbols`, and/or `specs`.                            |
-| `--kind <kinds>`                                                   | Comma-separated impacted symbol kinds; requires omitted `--type` or `--type` including `symbols`. |
-| `--workspace <name>`                                               | Include result rows from a workspace. Repeat this option for multiple workspaces.                 |
-| `--exclude-workspace <name>`                                       | Exclude result rows from a workspace. Repeat this option; exclusions take precedence.             |
-| `--depth <n>`                                                      | Maximum traversal depth (default: `3`).                                                           |
-| `--config <path>`                                                  | Config file path. Mutually exclusive with `--path`.                                               |
-| `--path <path>`                                                    | Repository root bootstrap path. Ignores any discovered config.                                    |
-| `--format text\|json\|toon`                                        | Output format.                                                                                    |
+| Option                                                             | Description                                                                                                                                 |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--spec <id>`                                                      | Spec ID to analyze.                                                                                                                         |
+| `--symbol <name>`                                                  | Symbol selector to analyze. Supports bare names, qualified selectors, and full ids.                                                         |
+| `--file <path...>`                                                 | One or more file paths to analyze (config-relative, workspace-prefixed, or absolute).                                                       |
+| `--export <name>`                                                  | Exact public export name; requires `--from`.                                                                                                |
+| `--from <surface>`                                                 | File or public surface containing `--export`.                                                                                               |
+| `--direction dependents\|dependencies\|upstream\|downstream\|both` | Impact direction (default: `dependents`).                                                                                                   |
+| `--type <types>`                                                   | Comma-separated result categories: `files`, `symbols`, and/or `specs`.                                                                      |
+| `--kind <kinds>`                                                   | Comma-separated impacted symbol kinds; requires omitted `--type` or `--type` including `symbols`.                                           |
+| `--workspace <name>`                                               | Include result rows from a workspace. Repeat this option for multiple workspaces.                                                           |
+| `--exclude-workspace <name>`                                       | Exclude result rows from a workspace. Repeat this option; exclusions take precedence.                                                       |
+| `--depth <n>`                                                      | Maximum traversal depth (default: `3`).                                                                                                     |
+| `--include-tests`                                                  | Admit `test` category files and symbols alongside `source`.                                                                                 |
+| `--include-ignored`                                                | Admit `ignored` category files and symbols.                                                                                                 |
+| `--all`                                                            | Admit all categories (`source`, `test`, `ignored`).                                                                                         |
+| `--category <categories>`                                          | Restrict traversal admission strictly to `source`, `test`, or `ignored` (accepts single value or comma-separated list, e.g. `source,test`). |
+| `--config <path>`                                                  | Config file path. Mutually exclusive with `--path`.                                                                                         |
+| `--path <path>`                                                    | Repository root bootstrap path. Ignores any discovered config.                                                                              |
+| `--format text\|json\|toon`                                        | Output format.                                                                                                                              |
 
 `dependents` is the preferred name for blast-radius analysis: it reports code that
 depends on the target. `dependencies` reports code the target depends on. The legacy
 values `upstream` and `downstream` remain accepted aliases for compatibility.
+
+By default, impact traversal admits only files and symbols in the `source` category. The BFS traversal prunes search paths before crossing into test or ignored files unless requested, preventing non-source files from acting as traversal bridges.
+
+In text format, if non-source files or symbols are omitted, an omission notice is rendered at the bottom:
+
+```text
+ℹ Excluded from results: <count> test files, <count> ignored files. Use --include-tests, --include-ignored, or --all to view them.
+```
+
+In JSON and TOON format, an `omittedCounts` object (`{ tests: number, ignored: number }`) reports the number of omitted items per category.
 
 Text output renders file paths relative to `projectRoot`.
 

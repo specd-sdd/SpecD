@@ -6,19 +6,111 @@
 
 #### Scenario: Plain 'specd guide' lists all available topics
 
-- **GIVEN** `@specd/guide` catalog containing 12 guides
-- **WHEN** running `node packages/cli/dist/index.js guide`
-- **THEN** it outputs a formatted list or table containing all 12 topics
-- **AND** displays `topic`, `title`, and `description` for each guide
-- **AND** exits with status code 0
+- **WHEN** `specd guide` is run with no arguments
+- **THEN** it displays every available user guide topic
+- **AND** each entry shows its topic, title and description
+- **AND** the topics are ordered by their order value
 
 #### Scenario: Catalog listing in JSON and TOON formats
 
-- **GIVEN** `@specd/guide` catalog
-- **WHEN** running `node packages/cli/dist/index.js guide --format json`
-- **THEN** output is parseable as a JSON array of guide summaries
-- **AND** running with `--format toon` emits a compact TOON array with zero syntax errors
-- **AND** both exit with status code 0
+- **WHEN** `specd guide --format json` is run
+- **THEN** a JSON array of guide summaries is emitted
+- **WHEN** `specd guide --format toon` is run
+- **THEN** a TOON-structured array of guide summaries is emitted
+
+#### Scenario: Listing carries a structured field identifying the sibling SDK guide
+
+- **WHEN** `specd guide` is run
+- **THEN** the output MUST contain a structured field that identifies `specd guide-sdk`
+- **AND** that field MUST be machine-parseable rather than an appended sentence
+
+#### Scenario: Discovery field is present in every supported output format
+
+- **WHEN** the listing is rendered as `text`, `json` and `toon`
+- **THEN** the discovery field MUST be present in all three renderings
+- **AND** it MUST NOT degrade into a text-only footer in any of them
+
+#### Scenario: Discovery field sits in the structured payload, not the human stream
+
+- **WHEN** `specd guide --format json` and `specd guide --format toon` are run
+- **THEN** the discovery field MUST be a member of the emitted structure
+- **AND** it MUST NOT be interleaved into human-readable text alongside the entries
+
+#### Scenario: Discovery field names the SDK guide by its exact command name
+
+- **WHEN** the listing is rendered in any supported format
+- **THEN** the SDK guide MUST be identified by the exact command string `specd guide-sdk`
+
+#### Scenario: Existing listing contract is preserved alongside the new field
+
+- **GIVEN** the user guide catalog as it stood before this change
+- **WHEN** the listing is compared with the previous output
+- **THEN** the existing `topic`, `title`, `description` and ordering contract MUST be unchanged
+- **AND** the discovery field MUST be purely additive
+
+### Requirement: Guide Listing Envelope And Pagination Reporting
+
+#### Scenario: Listing envelope matches the sibling SDK guide listing
+
+- **WHEN** `specd guide --format json` is run
+- **THEN** the output MUST be a structured object with a `topics` member holding the guide summaries
+- **AND** it MUST carry a `pagination` member with `page`, `pageSize`, `returned`, `total` and `totalPages`
+- **AND** it MUST carry a `collections` member summarising each collection's `total` and its `firstPage`/`lastPage` range
+- **AND** the envelope shape MUST be the same one `specd guide-sdk --format json` emits
+
+#### Scenario: Page position is reported only when the result spans several pages
+
+- **GIVEN** the result spans more than one page
+- **WHEN** the listing is rendered as `text`
+- **THEN** the output MUST report the position as `page N of M` with the returned and total counts
+- **GIVEN** the result fits in a single page
+- **WHEN** the listing is rendered as `text`
+- **THEN** the page position MUST be omitted rather than reported as `page 1 of 1`
+
+#### Scenario: Multi-collection listing delimits collections
+
+- **GIVEN** a listing whose page contains entries from more than one collection
+- **WHEN** it is rendered as `text`
+- **THEN** the entries of each collection MUST be visibly delimited from the entries of the next collection
+
+### Requirement: Guide Body Flags Require a Topic
+
+#### Scenario: Body flags without a topic are rejected
+
+- **WHEN** `specd guide --section 2` is run with no topic argument
+- **THEN** the command MUST exit with code 1 and MUST name `--section` as requiring a topic argument
+- **WHEN** `specd guide --lines 5` or `specd guide --start-line 2` is run with no topic argument
+- **THEN** the command MUST exit with code 1 and name the offending flag
+
+#### Scenario: Body flags without a topic never fall back to a listing
+
+- **WHEN** a body flag is supplied without a topic argument
+- **THEN** the command MUST NOT render a catalog listing
+- **AND** it MUST NOT silently discard the requested flag
+
+### Requirement: Guide Meta Without a Topic Returns a Catalog Index
+
+#### Scenario: Meta without a topic returns a catalog index
+
+- **WHEN** `specd guide --meta` is run with no topic argument
+- **THEN** the command MUST return a catalog index rather than the plain listing
+- **AND** each topic MUST be reported with the page it starts on, its line count, its byte length, its scope and its title
+- **AND** the index MUST carry the literal hint `read: specd guide <topic>` exactly once instead of a per-topic retrieval command
+- **AND** each topic MUST be printed as the fully qualified `collection:topic` identifier, so the value the hint shows is what the caller pastes into `<topic>`
+- **AND** the index MUST NOT carry a per-topic retrieval command
+
+#### Scenario: Meta with a topic still returns that topic's metadata
+
+- **WHEN** `specd guide configuration --meta` is run
+- **THEN** the command MUST return that single topic's metadata and outline rather than the index
+
+### Requirement: Guide Points At The Sibling SDK Guide In Help
+
+#### Scenario: Help points at the sibling SDK guide
+
+- **WHEN** `specd guide --help` is run
+- **THEN** the help output MUST name the exact command `specd guide-sdk`
+- **AND** it MUST state that it serves the SDK and extension development guide
 
 ### Requirement: Guide Topic Inspection Command
 
@@ -48,20 +140,40 @@
 
 #### Scenario: '--meta' flag returns document statistics and section outline
 
-- **GIVEN** guide topic `"schemas"`
-- **WHEN** running `node packages/cli/dist/index.js guide schemas --meta`
-- **THEN** the command does not print the full document text
-- **AND** prints `topic: schemas`, total line count, total bytes, and an outline table of all sections
-- **AND** each section row includes `index`, `heading`, `level`, `startLine`, `endLine`, and `lines`
-- **AND** process exits with code 0
+- **WHEN** `specd guide <topic> --meta` is executed
+- **THEN** the output contains `topic`, `file`, `lines`, `bytes` and `outline`
+- **AND** the full document body is not emitted
 
 #### Scenario: '--meta' combined with '--format toon' produces compact outline for agents
 
-- **GIVEN** guide topic `"configuration"`
-- **WHEN** running `node packages/cli/dist/index.js guide configuration --meta --format toon`
-- **THEN** output is formatted in compact TOON
-- **AND** contains the `outline` array with numeric `index`, `startLine`, and `endLine` values
-- **AND** token consumption is under 200 tokens
+- **WHEN** `specd guide <topic> --meta --format toon` is executed
+- **THEN** the outline is emitted in TOON form
+- **AND** the output remains compact enough to serve as a structural map
+
+#### Scenario: '--meta' file is the real source path, not a synthesized filename
+
+- **GIVEN** a user guide document at `docs/guide/configuration.md`
+- **WHEN** `specd guide configuration --meta` is executed
+- **THEN** `file` MUST equal `configuration.md`
+- **AND** it MUST NOT equal `configuration.md.md` nor any `<topic>`-derived duplication of the path
+
+#### Scenario: '--meta' file preserves nested subdirectories
+
+- **GIVEN** a document that lives in a subdirectory of its collection root
+- **WHEN** its metadata is requested
+- **THEN** `file` MUST include the relative subdirectory path
+- **AND** it MUST NOT be flattened to the bare filename
+
+#### Scenario: '--meta' reports the document's collection
+
+- **WHEN** a document's metadata is requested
+- **THEN** the output MUST include a `collection` field naming the collection the document belongs to
+
+#### Scenario: '--meta' outline entries carry offsets
+
+- **WHEN** metadata is requested for a document with multiple sections
+- **THEN** every outline entry MUST include `startOffset` and `endOffset`
+- **AND** slicing the body with those offsets MUST reproduce the section text exactly
 
 ### Requirement: Section and Window Slicing Flags
 

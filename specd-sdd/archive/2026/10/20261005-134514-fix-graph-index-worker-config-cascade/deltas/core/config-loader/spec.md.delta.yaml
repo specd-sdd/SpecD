@@ -1,0 +1,2 @@
+- op: no-op
+  description: Existing config-loader requirements already define startDir discovery with local cascade layers and exact configPath forced loading; the fix reuses those contracts unchanged.

@@ -1,0 +1,15 @@
+- op: added
+  description: Loading and validation of the size limit fields
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Default values for workspace fields'
+  content: |
+    ### Requirement: Graph size limit fields
+
+    The loader SHALL accept `maxFileBytes` and `largeFilePaths` in the project-level `graph` section and in each workspace `graph` block, and SHALL expose them on the resolved configuration exactly as declared, without applying a default: a field that no layer declares is absent. The structural validation of the `graph` blocks stays strict, so these two keys are the only new keys accepted and any other unknown key is still rejected.
+
+    The loader MUST reject a `maxFileBytes` that is not a non-negative integer with a `ConfigValidationError` that names the offending key and its location. The layer merge rules apply unchanged: `maxFileBytes` from a later layer wins and `largeFilePaths` entries append.

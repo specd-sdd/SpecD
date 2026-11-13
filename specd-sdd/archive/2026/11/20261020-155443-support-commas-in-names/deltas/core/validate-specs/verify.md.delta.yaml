@@ -1,0 +1,134 @@
+- op: added
+  description: Spec ID validation scenarios
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Single spec validation mode'
+  content: |
+    #### Scenario: Invalid specPath rejected
+
+    - **WHEN** `ValidateSpecs.execute` receives `specPath: 'ws:'`
+    - **THEN** it throws `InvalidSpecIdError`
+
+    #### Scenario: Bare specPath resolved to the default workspace
+
+    - **WHEN** it receives `specPath: '_global/architecture'`
+    - **THEN** it validates `default:_global/architecture`
+    - **AND** the result entry is identified by `default:_global/architecture`
+
+    #### Scenario: Comma in specPath is not split
+
+    - **WHEN** it receives `specPath: 'auth/a,b'`
+    - **THEN** it throws `InvalidSpecIdError` quoting `auth/a,b`
+
+- op: modified
+  description: Verify metadata delegation without an independent dependency baseline
+  selector:
+    type: section
+    matches: '^Requirement: Metadata materialization and validation$'
+  content: |
+    #### Scenario: Full validation delegates using the qualified spec ID
+
+    - **GIVEN** validation of `auth/login` resolves to `default:auth/login` and has no result-cache hit
+    - **WHEN** `ValidateSpecs` validates that spec
+    - **THEN** it calls `GetSpecMetadata.execute({ specId: 'default:auth/login' })` once
+    - **AND** it does not read the metadata snapshot directly to decide metadata validity
+
+    #### Scenario: Stale persisted metadata is self-healed, not a failure
+
+    - **GIVEN** a spec's metadata cache is missing, invalid or stale
+    - **AND** `GetSpecMetadata` successfully returns usable metadata
+    - **WHEN** `ValidateSpecs` validates that spec
+    - **THEN** no failure is recorded solely because of the prior cache state
+
+    #### Scenario: Lock-less extracted dependencies are accepted
+
+    - **GIVEN** a spec has no persisted lock and its schema extracts `dependsOn: ['core:storage']`
+    - **AND** `GetSpecMetadata` successfully returns that dependency projection
+    - **WHEN** `ValidateSpecs` validates that spec
+    - **THEN** it accepts the metadata without comparing the dependencies against `[]`
+    - **AND** it performs no independent dependency extraction or persisted-state comparison
+
+    #### Scenario: Successful metadata is not checked against another lock observation
+
+    - **GIVEN** `GetSpecMetadata` successfully returns metadata with `dependsOn: ['core:storage']`
+    - **AND** a second persisted-state observation would return different dependencies
+    - **WHEN** `ValidateSpecs` validates that spec
+    - **THEN** it does not obtain that observation to revalidate the returned dependencies
+    - **AND** it records no second-model dependency mismatch
+
+    #### Scenario: Successful metadata does not require schema dependency extraction
+
+    - **GIVEN** the schema omits `metadataExtraction.dependsOn`
+    - **AND** `GetSpecMetadata` successfully returns usable metadata
+    - **WHEN** `ValidateSpecs` validates that spec
+    - **THEN** it accepts the metadata without reconstructing a dependency baseline
+
+    #### Scenario: Materialization failure becomes a validation failure
+
+    - **GIVEN** `GetSpecMetadata` fails because usable metadata cannot be produced
+    - **WHEN** `ValidateSpecs` validates that spec
+    - **THEN** the spec entry includes a metadata `ValidationFailure` with the materialization failure reason
+
+    #### Scenario: Dependency conflict is reported by the metadata authority
+
+    - **GIVEN** `GetSpecMetadata` rejects an extraction and persisted-dependency conflict
+    - **WHEN** `ValidateSpecs` validates that spec
+    - **THEN** it records the materialization failure with the conflict reason
+    - **AND** it does not repeat dependency extraction or comparison after the failure
+
+    #### Scenario: metadata-cache-write-failed is a warning, not a failure
+
+    - **GIVEN** `GetSpecMetadata` returns usable metadata and a `metadata-cache-write-failed` warning
+    - **WHEN** `ValidateSpecs` validates that spec
+    - **THEN** the spec entry includes a `ValidationWarning` preserving the warning kind, spec identity and error diagnostics
+    - **AND** the warning does not become a failure or produce a duplicate log
+
+    #### Scenario: Successful metadata preserves artifact failures
+
+    - **GIVEN** artifact or cross-artifact validation has already recorded a failure
+    - **AND** `GetSpecMetadata` successfully returns usable metadata
+    - **WHEN** `ValidateSpecs` assembles the spec entry
+    - **THEN** the original failure remains and the spec does not pass
+
+- op: added
+  description: Reject result-cache rows from the superseded dependency-validation engine
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Transparent validation result cache$'
+  content: |
+    #### Scenario: Metadata delegation change invalidates the old validation engine bucket
+
+    - **GIVEN** a cached entry was produced by the engine that independently compared metadata dependencies
+    - **WHEN** validation runs with the engine implementing metadata delegation
+    - **THEN** the changed `engineVersion` prevents reuse of the old entry
+    - **AND** full validation uses `GetSpecMetadata` before storing the new outcome
+
+- op: modified
+  description: Align resolveValidateSpecsDeps verification scenarios with single GetSpecMetadata instance
+  selector:
+    type: section
+    matches: 'Requirement: Config-based factory delegates through resolveValidateSpecsDeps'
+  content: |
+    #### Scenario: createValidateSpecs config form derives ValidateSpecsDeps through resolveValidateSpecsDeps
+
+    - **WHEN** `createValidateSpecs(config, options?)` is invoked
+    - **THEN** it creates a composition resolver for that composition session
+    - **AND** it derives `ValidateSpecsDeps` through `resolveValidateSpecsDeps(resolver)`
+    - **AND** `resolveValidateSpecsDeps(resolver)` resolves:
+      - `specs: ReadonlyMap<string, SpecRepository>`
+      - `schemaProvider: SchemaProvider`
+      - `parsers: ArtifactParserRegistry`
+      - `contentHasher: ContentHasher`
+      - `extractorTransforms: ExtractorTransformRegistry`
+      - `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+      - `validationResultCaches: ReadonlyMap<string, ValidationResultCache>`
+      - `getMetadata: GetSpecMetadata`
+    - **AND** the factory delegates to canonical `createValidateSpecs(deps)`
+
+    #### Scenario: resolveValidateSpecsDeps wires a shared GetSpecMetadata instance
+
+    - **WHEN** `resolveValidateSpecsDeps(resolver)` runs
+    - **THEN** the resolved deps include `getMetadata: GetSpecMetadata`
+    - **AND** it is used to self-heal metadata before normalized-content validation

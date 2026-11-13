@@ -12,6 +12,10 @@ Commands and diagnostics that need the canonical, lock-owned dependency list for
 
 - `specId` (required, string) — the fully-qualified spec identity to read
 
+### Requirement: Spec ID validation
+
+Before resolving any repository, the use case MUST validate and normalize `specId` with `parseSpecId` and the configured workspaces (see `core:spec-id-format`). A bare path is resolved to the `default` workspace, so the input accepts a bare or fully-qualified valid ID, and every `specId` in the result is the fully-qualified form. An invalid ID fails with `InvalidSpecIdError` and an unknown workspace with `WorkspaceNotFoundError`, quoting the full original value. Delivery adapters pass the raw string and perform no validation of their own.
+
 ### Requirement: Reads persisted state through the repository port
 
 The use case MUST resolve the spec's workspace repository and call `SpecRepository.readPersistedState(spec)`. It MUST NOT read `spec-lock.json` or any adapter-owned sidecar directly, and MUST NOT read or materialize generated metadata to answer this query.
@@ -41,7 +45,7 @@ The config-based `createGetPersistedSpecDeps(config, options?)` form MUST derive
 
 `resolveGetPersistedSpecDepsDeps(resolver)` MUST resolve:
 
-- `specs: ReadonlyMap<string, SpecRepository>` — one repository instance per workspace
+- `specRepositories: ReadonlyMap<string, SpecRepository>` — one repository instance per workspace
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
 

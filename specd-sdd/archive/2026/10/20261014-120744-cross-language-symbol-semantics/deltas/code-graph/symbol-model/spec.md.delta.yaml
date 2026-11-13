@@ -1,0 +1,47 @@
+- op: added
+  description: 'Define the non-bijective identity layers used by adapters, resolution, and impact.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Logical symbol and canonical reference model$'
+  content: |
+    ### Requirement: Declaration, binding, and logical identity layers
+
+    The graph SHALL distinguish three identity layers:
+
+    - a declaration occurrence represented by a location-backed `SymbolNode`, which is physical source evidence and MAY exist without a logical target;
+    - a `LocalBinding`, which identifies a visible name inside a lexical scope and MUST preserve its scope and source range; and
+    - a `LogicalSymbol`, which identifies one language-defined semantic target and MAY own one or more declaration occurrences.
+
+    These layers MUST NOT be treated as bijective. Parameters, receivers, aliases, ordinary local variables, and other scope-bound names SHALL remain local bindings unless the language adapter proves that the declaration is an addressable semantic target. A physical declaration that has no logical target MUST remain available for navigation and dependency evidence rather than being dropped.
+
+    Logical identity MUST be independent of ordinary line and column movement. It SHALL include the canonical logical owner whenever the language defines an owner, and declarations in competing lexical scopes MUST NOT collapse merely because their simple name, broad `SymbolKind`, file, or surface matches.
+
+    Multiple declarations SHALL share one logical identity only when the language adapter supplies positive, language-defined grouping evidence, such as a proven overload set or declaration merge. An absent, empty, or unknown grouping key is evidence of no group and MUST NOT cause equal-name declarations to merge. The logical target SHALL retain the complete deterministic declaration set. Declaration-level form, including signature versus implementation, MUST NOT change the logical member identity of a proven group.
+
+- op: added
+  description: 'Require semantic projections to retain their physical evidence.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: First-class binding model$'
+  content: |
+    ### Requirement: Evidence-preserving semantic projection
+
+    Physical `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations SHALL remain the authoritative dependency evidence. A semantic projection MAY aggregate or deduplicate results by logical identity, but it MUST retain every physical declaration, relation, and source location that justifies the projected result.
+
+    Physical declarations without a logical mapping SHALL remain representable in semantic query results as declaration-only evidence. Counts and risk summaries MUST identify whether their unit is physical occurrences, unique logical targets, or both; one field MUST NOT silently mix those units.
+
+    `COVERS_SYMBOL` SHALL target a `LogicalSymbol.id`. Physical declaration traversal MUST be projected to its logical identity before reverse symbol-coverage lookup, and returned coverage evidence SHALL retain contributing declaration locations when available.
+
+- op: removed
+  description: 'Round 3: nothing produces or consumes a relation stale flag; unresolved coverage is a SYMBOL_NOT_FOUND diagnostic.'
+  selector:
+    type: section
+    matches: '^Requirement: Relation staleness$'
