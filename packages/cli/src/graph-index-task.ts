@@ -61,14 +61,14 @@ export const runGraphIndexTask: GraphIndexTask<
     input.context.mode === 'configured'
       ? await openSpecdHost({
           configPath: input.context.configFilePath,
-          options: { kernel },
+          options: { kernel, plugins: false },
         })
       : await createSdkContext(
           createBootstrapGraphConfig({
             projectRoot: input.context.projectRoot,
             vcsRoot: input.context.vcsRoot,
           }),
-          { kernel },
+          { kernel, plugins: false },
         )
 
   try {

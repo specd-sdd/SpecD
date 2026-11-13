@@ -216,16 +216,16 @@ describe('buildSchema archiveChecks — governance of plugin checks', () => {
   it('lets a schema tune a plugin check bound to archive without embedding and cascades defaultConfig', () => {
     const registry = new CheckRegistry()
     registry.register(
-      'sec',
+      '@acme/sec',
       pluginCheck('scan'),
       [{ scope: 'archive', allowBindingOverride: true, allowConfigOverride: true }],
       { allowSchemaEmbedding: false, defaultConfig: { minSeverity: 'high' } },
     )
     const schema = build(
-      archiving([{ id: '@sec.scan', skippable: true, config: { minSeverity: 'critical' } }]),
+      archiving([{ id: '@acme/sec.scan', skippable: true, config: { minSeverity: 'critical' } }]),
       registry,
     )
-    expect(schema.workflowStep('archiving')?.archiveChecks?.[0]?.id).toBe('@sec.scan')
+    expect(schema.workflowStep('archiving')?.archiveChecks?.[0]?.id).toBe('@acme/sec.scan')
     const effective = resolveEffectiveBindings({
       baseBindings: registry
         .bindings()
@@ -234,54 +234,61 @@ describe('buildSchema archiveChecks — governance of plugin checks', () => {
       operation: 'archive',
       registry,
     })
-    const resolved = effective.find((b) => b.check.id === '@sec.scan')
+    const resolved = effective.find((b) => b.check.id === '@acme/sec.scan')
     expect(resolved?.skippable).toBe(true)
     expect(resolved?.effectiveConfig).toEqual({ minSeverity: 'critical' })
   })
 
   it('rejects a plugin check without an archive binding when embedding is locked', () => {
     const registry = new CheckRegistry()
-    registry.register('sec', pluginCheck('scan'), [{ scope: 'transition', to: 'verifying' }], {
-      allowSchemaEmbedding: false,
-    })
-    expect(() => build(archiving([{ id: '@sec.scan' }]), registry)).toThrow(
+    registry.register(
+      '@acme/sec',
+      pluginCheck('scan'),
+      [{ scope: 'transition', to: 'verifying' }],
+      {
+        allowSchemaEmbedding: false,
+      },
+    )
+    expect(() => build(archiving([{ id: '@acme/sec.scan' }]), registry)).toThrow(
       CheckEmbeddingForbiddenError,
     )
   })
 
   it('embeds a registered plugin check that allows schema embedding', () => {
     const registry = new CheckRegistry()
-    registry.register('qa', pluginCheck('lint'), undefined)
-    expect(() => build(archiving([{ id: '@qa.lint', skippable: true }]), registry)).not.toThrow()
+    registry.register('@acme/qa', pluginCheck('lint'), undefined)
+    expect(() =>
+      build(archiving([{ id: '@acme/qa.lint', skippable: true }]), registry),
+    ).not.toThrow()
   })
 
   it('applies the plugin binding policy, configuration and disablement locks on archive', () => {
     const policy = new CheckRegistry()
     policy.register(
-      'sec',
+      '@acme/sec',
       pluginCheck('scan'),
       [{ scope: 'archive', skippable: false, allowBindingOverride: false }],
       { allowSchemaEmbedding: false },
     )
-    expect(() => build(archiving([{ id: '@sec.scan', skippable: true }]), policy)).toThrow(
+    expect(() => build(archiving([{ id: '@acme/sec.scan', skippable: true }]), policy)).toThrow(
       CheckBindingOverrideForbiddenError,
     )
 
     const config = new CheckRegistry()
-    config.register('sec', pluginCheck('scan'), [{ scope: 'archive' }], {
+    config.register('@acme/sec', pluginCheck('scan'), [{ scope: 'archive' }], {
       allowConfigOverride: false,
       allowSchemaEmbedding: false,
     })
-    expect(() => build(archiving([{ id: '@sec.scan', config: { a: 1 } }]), config)).toThrow(
+    expect(() => build(archiving([{ id: '@acme/sec.scan', config: { a: 1 } }]), config)).toThrow(
       CheckConfigOverrideForbiddenError,
     )
 
     const disable = new CheckRegistry()
-    disable.register('sec', pluginCheck('scan'), [{ scope: 'archive' }], {
+    disable.register('@acme/sec', pluginCheck('scan'), [{ scope: 'archive' }], {
       allowDisable: false,
       allowSchemaEmbedding: false,
     })
-    expect(() => build(archiving([{ id: '@sec.scan', disabled: true }]), disable)).toThrow(
+    expect(() => build(archiving([{ id: '@acme/sec.scan', disabled: true }]), disable)).toThrow(
       CheckDisableForbiddenError,
     )
   })

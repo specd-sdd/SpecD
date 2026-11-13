@@ -523,7 +523,7 @@ describe('resolveEffectiveBindings', () => {
   it('modifies targetStep transition checks, overriding skippable and merging config', () => {
     const registry = new CheckRegistry()
     registry.register(
-      'custom',
+      '@acme/custom',
       {
         id: 'lint',
         label: 'Lint Check',
@@ -562,7 +562,7 @@ describe('resolveEffectiveBindings', () => {
           hooks: { pre: [], post: [] },
           checks: [
             {
-              id: '@custom.lint',
+              id: '@acme/custom.lint',
               along: 'forward',
               skippable: true,
               onFailure: 'collect',
@@ -582,7 +582,7 @@ describe('resolveEffectiveBindings', () => {
       registry,
     })
 
-    const lintBinding = effective.find((b) => b.check.id === '@custom.lint')
+    const lintBinding = effective.find((b) => b.check.id === '@acme/custom.lint')
     expect(lintBinding).toBeDefined()
     expect(lintBinding?.skippable).toBe(true)
     expect(lintBinding?.onFailure).toBe('collect')
@@ -635,7 +635,7 @@ describe('resolveEffectiveBindings', () => {
   it('synthesizes new transition binding when check is declared on step but absent from base bindings', () => {
     const registry = new CheckRegistry()
     registry.register(
-      'sec',
+      '@acme/sec',
       {
         id: 'audit',
         label: 'Security Audit',
@@ -661,7 +661,7 @@ describe('resolveEffectiveBindings', () => {
           hooks: { pre: [], post: [] },
           checks: [
             {
-              id: '@sec.audit',
+              id: '@acme/sec.audit',
               onFailure: 'collect',
               skippable: true,
             },
@@ -679,7 +679,7 @@ describe('resolveEffectiveBindings', () => {
       registry,
     })
 
-    const auditBinding = effective.find((b) => b.check.id === '@sec.audit')
+    const auditBinding = effective.find((b) => b.check.id === '@acme/sec.audit')
     expect(auditBinding).toBeDefined()
     expect(auditBinding?.onFailure).toBe('collect')
     expect(auditBinding?.skippable).toBe(true)
@@ -697,7 +697,7 @@ describe('resolveEffectiveBindings', () => {
     const registry = new CheckRegistry()
     for (const id of ['transition-lock', 'skip-lock']) {
       registry.register(
-        'locked',
+        '@acme/locked',
         {
           id,
           label: id,
@@ -720,8 +720,8 @@ describe('resolveEffectiveBindings', () => {
           requires: [],
           requiresTaskCompletion: [],
           hooks: { pre: [], post: [] },
-          checks: [{ id: '@locked.transition-lock' }],
-          skipChecks: [{ id: '@locked.skip-lock' }],
+          checks: [{ id: '@acme/locked.transition-lock' }],
+          skipChecks: [{ id: '@acme/locked.skip-lock' }],
         },
       ],
     )
@@ -736,7 +736,7 @@ describe('resolveEffectiveBindings', () => {
       registry,
     })
 
-    for (const id of ['@locked.transition-lock', '@locked.skip-lock']) {
+    for (const id of ['@acme/locked.transition-lock', '@acme/locked.skip-lock']) {
       const binding = effective.find((candidate) => candidate.check.id === id)
       expect(binding).toMatchObject({
         allowBindingOverride: false,
@@ -749,7 +749,7 @@ describe('resolveEffectiveBindings', () => {
   it('overlays bypassedSteps skipChecks with cascaded config and disabled filtering', () => {
     const registry = new CheckRegistry()
     registry.register(
-      'plugin',
+      '@acme/plugin',
       {
         id: 'code-freeze',
         label: 'Code Freeze',
@@ -777,7 +777,7 @@ describe('resolveEffectiveBindings', () => {
     )
 
     registry.register(
-      'plugin',
+      '@acme/plugin',
       {
         id: 'synthesized-skip',
         label: 'Synthesized Skip Check',
@@ -804,13 +804,13 @@ describe('resolveEffectiveBindings', () => {
           hooks: { pre: [], post: [] },
           skipChecks: [
             {
-              id: '@plugin.code-freeze',
+              id: '@acme/plugin.code-freeze',
               skippable: true,
               onFailure: 'collect',
               config: { env: 'prod', extra: 123 },
             },
             {
-              id: '@plugin.synthesized-skip',
+              id: '@acme/plugin.synthesized-skip',
               config: { foo: 'bar' },
             },
             {
@@ -832,13 +832,13 @@ describe('resolveEffectiveBindings', () => {
       registry,
     })
 
-    const freezeBinding = effective.find((b) => b.check.id === '@plugin.code-freeze')
+    const freezeBinding = effective.find((b) => b.check.id === '@acme/plugin.code-freeze')
     expect(freezeBinding).toBeDefined()
     expect(freezeBinding?.skippable).toBe(true)
     expect(freezeBinding?.onFailure).toBe('collect')
     expect(freezeBinding?.effectiveConfig).toEqual({ env: 'prod', extra: 123 })
 
-    const synthBinding = effective.find((b) => b.check.id === '@plugin.synthesized-skip')
+    const synthBinding = effective.find((b) => b.check.id === '@acme/plugin.synthesized-skip')
     expect(synthBinding).toBeDefined()
     expect(synthBinding?.applicability).toEqual([
       {
@@ -938,7 +938,7 @@ describe('resolveEffectiveBindings', () => {
     it('stores the single-pass cascade on effectiveConfig and leaves binding config untouched', () => {
       const registry = new CheckRegistry()
       registry.register(
-        'cfg',
+        '@acme/cfg',
         {
           id: 'arrays',
           label: 'Arrays',
@@ -955,7 +955,7 @@ describe('resolveEffectiveBindings', () => {
             requires: [],
             requiresTaskCompletion: [],
             hooks: { pre: [], post: [] },
-            checks: [{ id: '@cfg.arrays', config: { tags: ['c'] } }],
+            checks: [{ id: '@acme/cfg.arrays', config: { tags: ['c'] } }],
           },
         ],
       )
@@ -969,7 +969,7 @@ describe('resolveEffectiveBindings', () => {
         registry,
       })
 
-      const binding = effective.find((b) => b.check.id === '@cfg.arrays')
+      const binding = effective.find((b) => b.check.id === '@acme/cfg.arrays')
       expect(binding?.effectiveConfig).toEqual({ tags: ['a', 'b', 'c'] })
       expect(binding?.config).toEqual({ tags: ['b'] })
     })
@@ -1060,11 +1060,16 @@ describe('resolveEffectiveBindings', () => {
     it('narrows a wildcard step-skip row to the declared bypassed step only', () => {
       const registry = new CheckRegistry()
       registry.register(
-        'qa',
+        '@acme/qa',
         {
           id: 'wild',
           label: 'Wild',
-          execute: async () => ({ id: '@qa.wild', label: 'x', kind: 'predicate', outcome: 'pass' }),
+          execute: async () => ({
+            id: '@acme/qa.wild',
+            label: 'x',
+            kind: 'predicate',
+            outcome: 'pass',
+          }),
         },
         [{ scope: 'step-skip', step: '*', config: { base: 1 } }],
       )
@@ -1079,7 +1084,7 @@ describe('resolveEffectiveBindings', () => {
       const schema = makeSchema(
         [],
         [
-          optional('implementing', [{ id: '@qa.wild', config: { extra: 2 } }]),
+          optional('implementing', [{ id: '@acme/qa.wild', config: { extra: 2 } }]),
           optional('verifying', []),
         ],
       )
@@ -1092,7 +1097,7 @@ describe('resolveEffectiveBindings', () => {
         along: 'forward',
         registry,
       })
-      const wild = effective.filter((b) => b.check.id === '@qa.wild')
+      const wild = effective.filter((b) => b.check.id === '@acme/qa.wild')
       const declared = wild.find((b) =>
         b.applicability.some((a) => a.scope === 'step-skip' && a.step === 'implementing'),
       )
@@ -1187,38 +1192,38 @@ describe('resolveEffectiveBindings — archive operation', () => {
 
   it('synthesizes a non-skippable binding for an embedded registered check', () => {
     const registry = new CheckRegistry()
-    registry.register('qa', { id: 'lint', label: 'Lint', execute: pass }, undefined, {
+    registry.register('@acme/qa', { id: 'lint', label: 'Lint', execute: pass }, undefined, {
       defaultConfig: { level: 'warn' },
     })
     const effective = resolveArchive(
-      archivingSchema([{ id: '@qa.lint', config: { level: 'error' } }]),
+      archivingSchema([{ id: '@acme/qa.lint', config: { level: 'error' } }]),
       registry,
     )
-    const lint = effective.find((b) => b.check.id === '@qa.lint')
+    const lint = effective.find((b) => b.check.id === '@acme/qa.lint')
     expect(lint?.skippable).toBe(false)
     expect(lint?.applicability).toEqual([{ scope: 'archive' }])
     expect(lint?.effectiveConfig).toEqual({ level: 'error' })
-    expect(effective.at(-1)?.check.id).toBe('@qa.lint')
+    expect(effective.at(-1)?.check.id).toBe('@acme/qa.lint')
   })
 
   it('honours skippable true on an embedded check and orders embeds by declaration', () => {
     const registry = new CheckRegistry()
-    registry.register('a', { id: 'lint', label: 'Lint', execute: pass }, undefined)
-    registry.register('b', { id: 'scan', label: 'Scan', execute: pass }, undefined)
+    registry.register('@acme/a', { id: 'lint', label: 'Lint', execute: pass }, undefined)
+    registry.register('@acme/b', { id: 'scan', label: 'Scan', execute: pass }, undefined)
     const effective = resolveArchive(
-      archivingSchema([{ id: '@a.lint', skippable: true }, { id: '@b.scan' }]),
+      archivingSchema([{ id: '@acme/a.lint', skippable: true }, { id: '@acme/b.scan' }]),
       registry,
     )
     const tail = effective.slice(-2)
-    expect(tail.map((b) => b.check.id)).toEqual(['@a.lint', '@b.scan'])
+    expect(tail.map((b) => b.check.id)).toEqual(['@acme/a.lint', '@acme/b.scan'])
     expect(tail[0]?.skippable).toBe(true)
   })
 
   it('ignores a disabled declaration for a check with no archive binding', () => {
     const registry = new CheckRegistry()
-    registry.register('qa', { id: 'lint', label: 'Lint', execute: pass }, undefined)
+    registry.register('@acme/qa', { id: 'lint', label: 'Lint', execute: pass }, undefined)
     const effective = resolveArchive(
-      archivingSchema([{ id: '@qa.lint', disabled: true }]),
+      archivingSchema([{ id: '@acme/qa.lint', disabled: true }]),
       registry,
     )
     expect(effective.map((b) => b.check.id)).toEqual(ARCHIVE_BINDINGS.map((b) => b.check.id))
@@ -1227,22 +1232,22 @@ describe('resolveEffectiveBindings — archive operation', () => {
   it('applies plugin default config under the declaration config exactly once', () => {
     const registry = new CheckRegistry()
     registry.register(
-      'sec',
+      '@acme/sec',
       { id: 'scan', label: 'Scan', execute: pass },
       [{ scope: 'archive', config: { paths: ['a'] } }],
       { defaultConfig: { paths: ['d'] }, allowConfigOverride: true },
     )
     const base = [
       ...ARCHIVE_BINDINGS,
-      ...registry.bindings().filter((b) => b.check.id === '@sec.scan'),
+      ...registry.bindings().filter((b) => b.check.id === '@acme/sec.scan'),
     ]
     const effective = resolveEffectiveBindings({
       baseBindings: base,
-      schema: archivingSchema([{ id: '@sec.scan', config: { paths: ['s'] } }]),
+      schema: archivingSchema([{ id: '@acme/sec.scan', config: { paths: ['s'] } }]),
       operation: 'archive',
       registry,
     })
-    expect(effective.find((b) => b.check.id === '@sec.scan')?.effectiveConfig).toEqual({
+    expect(effective.find((b) => b.check.id === '@acme/sec.scan')?.effectiveConfig).toEqual({
       paths: ['d', 'a', 's'],
     })
   })
@@ -1298,11 +1303,11 @@ describe('resolveEffectiveBindings — archive operation', () => {
   it('drops unserved declarations without error and applies base overlays when resolved without a registry', () => {
     const schema = archivingSchema([
       { id: 'spec.overlap', skippable: false },
-      { id: '@qa.lint', skippable: true },
+      { id: '@acme/qa.lint', skippable: true },
     ])
     const effective = resolveArchive(schema, undefined)
     expect(effective.find((b) => b.check.id === 'spec.overlap')?.skippable).toBe(false)
-    expect(effective.some((b) => b.check.id === '@qa.lint')).toBe(false)
+    expect(effective.some((b) => b.check.id === '@acme/qa.lint')).toBe(false)
   })
 
   it('rejects the archive operation combined with a transition or bypassed steps', () => {

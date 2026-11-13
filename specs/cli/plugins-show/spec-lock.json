@@ -3,6 +3,14 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["plugin-manager:load-plugin-use-case"],
-  "implementation": []
+  "dependsOn": ["plugin-manager:load-plugin-use-case", "cli:host-context"],
+  "implementation": [
+    {
+      "file": "cli:src/commands/plugins/show.ts",
+      "symbols": ["registerPluginsShow"]
+    },
+    {
+      "file": "cli:test/commands/plugins.spec.ts"
+    }
+  ]
 }

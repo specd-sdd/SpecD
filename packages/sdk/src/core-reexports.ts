@@ -2,6 +2,7 @@
 export { createKernel, type Kernel, type KernelOptions } from '@specd/core'
 export { createDefaultConfigLoader, type FsConfigLoaderOptions } from '@specd/core'
 export { createConfigWriter, type FsConfigWriterOptions } from '@specd/core'
+export type { AddPluginOptions, ConfigDeclaredPlugin, ConfigWriter } from '@specd/core'
 export { createVcsAdapter } from '@specd/core'
 export { createVcsActorResolver } from '@specd/core'
 export { createSchemaRegistry, type FsSchemaRegistryOptions } from '@specd/core'
@@ -183,6 +184,11 @@ export {
   type GenerateSpecMetadata,
   type GenerateSpecMetadataInput,
   type GenerateSpecMetadataResult,
+  /**
+   * Type-only by design: the use-case classes are consumed through their
+   * `create*` factories (values), so the classes themselves are exported as types
+   * to type factory results without exposing constructors.
+   */
   type MaterializeSpecMetadata,
   type MaterializeSpecMetadataInput,
   type MaterializeSpecMetadataResult,
@@ -520,6 +526,11 @@ export {
   HookFailedError,
   SchemaValidationError,
   ConfigValidationError,
+  LegacyConfigFormatError,
+  UnsupportedConfigVersionError,
+  CURRENT_CONFIG_VERSION,
+  PLUGIN_NAME_REGEX,
+  isPluginName,
   DeltaApplicationError,
   UnsupportedPatternError,
   CorruptedManifestError,
@@ -679,6 +690,7 @@ export {
   checkLabel,
   CHECK_LABELS,
   CheckRegistry,
+  InvalidCheckIdError,
   deepMergeConfig,
   type CheckId,
   type CheckKind,

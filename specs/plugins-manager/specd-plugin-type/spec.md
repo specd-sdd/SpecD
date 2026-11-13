@@ -2,37 +2,42 @@
 
 ## Purpose
 
-Defines the base plugin interface (`SpecdPlugin`) that all specd plugins must implement. This is the foundation for extensible plugin types.
+Defines the base plugin contract (`SpecdPlugin`) and the static manifest model that all specd plugins share. A plugin is a feature: one scoped package that owns identity, namespace, configuration, lifecycle and a single code entry, and that declares N contributions of arbitrary kinds in its manifest. This spec is the foundation for extensible plugins; kinds are open extension points, not a closed list.
 
 ## Requirements
-
-### Requirement: PluginType
-
-The spec MUST define a runtime const array of known plugin types and derive the `PluginType` union from it:
-
-```typescript
-export const PLUGIN_TYPES = ['agent'] as const
-export type PluginType = (typeof PLUGIN_TYPES)[number]
-```
-
-Adding a new plugin type requires only adding a string to the `PLUGIN_TYPES` array — both compile-time type and runtime validation update automatically.
 
 ### Requirement: SpecdPlugin interface
 
 All plugins MUST implement:
 
 - `name: string` — plugin package name, sourced from the manifest at runtime
-- `type: PluginType` — plugin type, hardcoded in the plugin class for type safety
 - `version: string` — semver version, sourced from the manifest at runtime
-- `configSchema: Record<string, ConfigSchemaEntry>` — configuration schema
-- `init(context: PluginContext): Promise<void>` — initialization
-- `destroy(): Promise<void>` — cleanup
+- `init(context: PluginContext): Promise<void>` — runtime initialization
+- `destroy(): Promise<void>` — runtime cleanup
 
-Plugins MUST NOT hardcode `name` or `version` — these fields MUST be read from `specd-plugin.json` by the factory and passed to the plugin constructor. The `type` field MUST remain hardcoded to ensure compile-time type safety.
+Plugins MAY implement:
+
+- `install(context: PluginInstallContext): Promise<unknown>` — install-time hook, receives the selected contribution ids; the resolved value is plugin-specific (for example agent plugins return an `AgentInstallResult`) and is ignored by the install use case unless a contribution-kind handler consumes it
+- `uninstall(context: PluginInstallContext): Promise<void>` — install-time cleanup, receives the selected contribution ids; it resolves to nothing (consistent with `AgentPlugin.uninstall`)
+- `contribution(kind: string, id: string): unknown` — returns the code object backing the manifest contribution `kind`/`id`; REQUIRED for every kind whose handler activates contributions at runtime
+
+```typescript
+interface PluginInstallContext {
+  readonly config: SpecdConfig
+  /** Contribution ids selected for this plugin (all declared ids when no allowlist). */
+  readonly contributions: readonly string[]
+  /** Plugin-specific install options forwarded by the caller, when provided. */
+  readonly options?: Readonly<Record<string, unknown>>
+}
+```
+
+When the manifest declares `contributes.agents`, `contributions` carries only the selected ids of the `agents` kind; for any other plugin it carries all selected ids. `InstallPluginOutput.contributions` reports exactly the ids passed to the hook.
+
+Plugins MUST NOT hardcode `name` or `version` — these fields MUST be read from `specd-plugin.json` by the factory and passed to the plugin. `SpecdPlugin` MUST NOT carry a `type` discriminator and MUST NOT carry `configSchema`: the configuration schema is manifest data.
 
 ### Requirement: PluginContext
 
-The system SHALL pass the fully-resolved project configuration to plugins during initialization:
+The system SHALL pass the fully-resolved project configuration to plugins during runtime initialization:
 
 ```typescript
 interface PluginContext {
@@ -40,43 +45,85 @@ interface PluginContext {
    * Fully-resolved project configuration.
    */
   readonly config: SpecdConfig
+
+  /**
+   * This plugin's own configuration, already validated against the manifest `configSchema`
+   * with defaults applied. Empty object when the plugin declares no schema.
+   */
+  readonly pluginConfig: Readonly<Record<string, unknown>>
 }
 ```
 
-The `PluginContext` MUST NOT include `projectRoot`, `typeContext`, or a separate `config` record, as these are all available through the `SpecdConfig` object.
-
-### Requirement: ConfigSchemaEntry
-
-```typescript
-interface ConfigSchemaEntry {
-  type: 'string' | 'boolean' | 'number'
-  description: string
-  default?: unknown
-  required?: boolean
-}
-```
+`PluginContext` is config only: it MUST NOT expose kernel services, a lifecycle phase, `projectRoot` or `typeContext`.
 
 ### Requirement: isSpecdPlugin type guard
 
 The spec MUST export a pure function `isSpecdPlugin(value: unknown): value is SpecdPlugin` that validates:
 
 1. `value` is a non-null object
-2. `name`, `type`, and `version` are strings
-3. `configSchema` is a non-null object
+2. `name` and `version` are strings
+3. `name` satisfies the plugin name rule (see Requirement: Plugin name)
 4. `init` and `destroy` are functions
-5. `type` is one of the values in `PLUGIN_TYPES`
+5. `install`, `uninstall` and `contribution`, when present, are functions
 
-The `type` check against `PLUGIN_TYPES` ensures unknown plugin types are rejected at the base level, before any subtype validation runs.
+### Requirement: Plugin manifest
+
+Every plugin MUST ship a `specd-plugin.json` manifest with `schemaVersion: 2` and the fields:
+
+- `name` — scoped npm package name (see Requirement: Plugin name)
+- `version` — required; `description` and `minCoreVersion` — OPTIONAL (`minCoreVersion` defaults to `*`; it is recorded in the manifest but not enforced against the running core version by this contract)
+- `contributes` — a map keyed by contribution kind; each value is a map keyed by contribution id to the kind's block
+- `configSchema` — OPTIONAL bounded JSON Schema subset (see Requirement: Plugin configuration schema)
+- `defaultConfig` — OPTIONAL object validated against `configSchema`
+
+The manifest MUST NOT contain `pluginType`. A manifest with `schemaVersion` other than `2` MUST be rejected with a typed error. The structure of each `contributes[kind]` block is defined and validated by the handler registered for that kind; the manifest layer only validates that `contributes` is a map of maps.
+
+### Requirement: Plugin name
+
+A plugin name MUST match `^@[a-z0-9][a-z0-9_-]*\/[a-z0-9][a-z0-9_-]*$`: scoped, lowercase, and without `.`. The leading `@` is mandatory and MUST NOT be added by consumers. The `.` character is reserved as the separator between plugin name and contribution id and MUST NOT appear in the scope or in the package name.
+
+### Requirement: Contribution identity and address
+
+A contribution id MUST match `^[a-z0-9][a-z0-9_-]*$` (it MUST NOT contain `.`) and MUST be unique across the whole plugin, regardless of kind. The address of a contribution is `<plugin name>.<id>` (for example `@acme/specd-compliance.audit`). `buildContributionAddress(name, id)` MUST validate both parts and throw `InvalidContributionAddressError` when either is invalid. `parseContributionAddress(address)` MUST split at the single `.`; an address with zero or more than one `.`, an invalid plugin part or an invalid id part MUST throw `InvalidContributionAddressError` (never a different error class).
+
+### Requirement: Plugin configuration schema
+
+A plugin MAY declare `configSchema` in the manifest using only the keywords `type`, `properties`, `required`, `items`, `enum`, `default` and `additionalProperties`, with root `type: "object"`. Any other keyword MUST be rejected with `UnsupportedSchemaKeywordError` naming the plugin and the keyword; a node that is not an object (including a non-object root) is rejected with the same error using the keyword `type` (or `configSchema` for the root value). The shape of every node MUST be validated: `type` MUST be one of `object`, `string`, `number`, `integer`, `boolean`, `array`; `required` MUST be an array of strings; `additionalProperties` MUST be a boolean; `properties` MUST be an object; `items` MUST be a single schema (not an array); `enum` MUST be a non-empty array whose entries are strings, numbers or booleans; every node, nested nodes included, MUST declare `type`; a node violating its shape MUST be rejected with `UnsupportedSchemaKeywordError` naming the plugin and the offending keyword (`type`, `required`, `additionalProperties`, `items` or `enum`), never silently degraded. A schema nested deeper than 32 levels below the root (the root is level 0) MUST be rejected with `UnsupportedSchemaKeywordError` (keyword `properties` or `items`) instead of exhausting the stack. A property named `__proto__` in `properties` MUST be rejected with `UnsupportedSchemaKeywordError` (keyword `properties`) instead of being dropped. A plugin without `configSchema` accepts no configuration: a `config` provided for it MUST be rejected. One configuration is shared by all contributions of the plugin. The schema is data, validated and converted for validation by plugin-manager without executing plugin code. The conversion (`resolvePluginConfig`) MUST validate the same shape rules itself, so it raises a typed error and never an untyped `TypeError` even when it is called without a prior loader check.
+
+### Requirement: Contribution kind handler
+
+Contribution kinds are open extension points. A kind handler is supplied by the subsystem that consumes the kind and registered in an open registry owned by plugin-manager:
+
+```typescript
+interface ContributionKindHandler {
+  readonly kind: string
+  /** Validates the manifest block `contributes[kind]`. */
+  readonly blockSchema: ZodType
+  /** Runtime activation; optional for install-time-only kinds. */
+  activate?(ctx: ContributionActivationContext): void | Promise<void>
+  /** Optional extra check run after the base contract check; throws `PluginValidationError` to reject. */
+  validatePlugin?(plugin: SpecdPlugin, pluginName: string): void
+}
+```
+
+Handlers are held in a registry keyed by `kind`; two handlers for the same kind (including a host-supplied handler for the built-in `agents` kind) are a host wiring error raised as `DuplicateHandlerKindError` when the loader or `registerPlugins` is set up.
+
+A manifest declaring a kind for which no handler is registered MUST fail loading with a typed error naming the plugin and the kind. A handler MUST NOT be required to implement `activate`; a kind without `activate` is install-time only and is a no-op at runtime.
+
+### Requirement: Plugin lifecycles
+
+Runtime lifecycle: `init`/`destroy` are called once per process in which a host loads plugins, for every configured plugin of any kind, with configuration only. Install lifecycle: `install`/`uninstall` receive the selected contribution ids (the ids of the `agents` kind only when the manifest declares `agents`) and MUST NOT cause `init` to be called. Contributions have no lifecycle of their own; their kind handler activates them.
 
 ## Constraints
 
 - Plugins are pure — no direct I/O in the interface.
-- The `init()` and `destroy()` methods handle lifecycle.
-- `PLUGIN_TYPES` is the single source of truth for known plugin types — both compile-time (`PluginType`) and runtime validation derive from it.
-- `name` and `version` MUST be sourced from `specd-plugin.json` at runtime, not hardcoded in plugin classes. The plugin factory (`create()`) reads the manifest and passes these values to the constructor.
-- `type` MUST remain hardcoded in the plugin class — reading it from the manifest would allow invalid types at runtime.
+- `init()` and `destroy()` handle the runtime lifecycle; `install()` and `uninstall()` handle the install lifecycle.
+- Kinds are not enumerated in this spec: the set of kinds is the set of registered handlers.
+- `name` and `version` MUST be sourced from `specd-plugin.json` at runtime, not hardcoded in plugin code. The plugin factory (`create()`) reads the manifest and passes these values to the plugin.
+- Plugin names are validated in the manifest schema, the loader, `isSpecdPlugin` and `cli plugins install`.
+- The plugin-manager domain layer MAY import `zod` (schema validation for manifests and contribution blocks) in addition to core domain types; this is an accepted exception to the "standard library and domain types only" rule of `default:_global/architecture`, because `ContributionKindHandler.blockSchema` is a `ZodType`.
 
 ## Spec Dependencies
 
-- [`core:config`](../../core/core/config/spec.md) — defines SpecdConfig type
+- [`core:config`](../../core/core/config/spec.md) — defines SpecdConfig type and the flat `plugins` list
 - [`default:_global/architecture`](../default/_global/architecture/spec.md) — architecture constraints

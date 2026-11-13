@@ -12,5 +12,12 @@ describe('@specd/cli runtime dependencies', () => {
     expect(dependencies).toContain('@specd/sdk')
     expect(dependencies).not.toContain('@specd/core')
     expect(dependencies).not.toContain('@specd/code-graph')
+    // Other specd workspace packages are plugins, schemas, the guide and the plugin manager only.
+    const others = dependencies.filter(
+      (name) => name.startsWith('@specd/') && name !== '@specd/sdk',
+    )
+    for (const name of others) {
+      expect(name).toMatch(/^@specd\/(plugin-manager|plugin-agent-[a-z]+|schema-[a-z]+|guide)$/)
+    }
   })
 })

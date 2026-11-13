@@ -8,12 +8,17 @@
     "core:kernel",
     "core:kernel-builder",
     "core:composition",
-    "code-graph:composition"
+    "code-graph:composition",
+    "plugin-manager:register-plugins-use-case",
+    "plugin-manager:plugin-errors"
   ],
   "implementation": [
     {
       "file": "sdk:src/composition/host-context.ts",
-      "symbols": ["createSdkContext", "SdkHostContext", "openSpecdHost"]
+      "symbols": ["createSdkContext", "SdkContextOptions"]
+    },
+    {
+      "file": "sdk:test/composition/host-context-e2e.spec.ts"
     }
   ],
   "optimizations": {

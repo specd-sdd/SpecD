@@ -25,6 +25,8 @@ import {
   SchemaValidationError,
   ConfigValidationError,
   ArchiveDependencyMismatchError,
+  PluginDestroyError,
+  PluginValidationError,
   type LoggerPort,
 } from '@specd/sdk'
 import { handleError, cliError } from '../src/handle-error.js'
@@ -96,6 +98,8 @@ describe('handleError — exit code 1 (domain errors)', () => {
     ['UnsupportedPatternError', new UnsupportedPatternError('output', 'nested variables')],
     ['PathTraversalError', new PathTraversalError('/etc/passwd')],
     ['DeltaApplicationError', new DeltaApplicationError('section not found')],
+    ['PluginDestroyError', new PluginDestroyError([new Error('boom')], ['@acme/x'])],
+    ['PluginValidationError', new PluginValidationError('@acme/x', ['create'])],
     ['MetadataValidationError', new MetadataValidationError('title: Required')],
     ['DependsOnOverwriteError', new DependsOnOverwriteError(['core:config'], ['core:change'])],
   ]

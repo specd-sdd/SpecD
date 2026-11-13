@@ -1,6 +1,8 @@
 import type { SpecdConfig } from '@specd/core'
+import type { UninstallResult } from '@specd/skills'
 import type {
   AgentPlugin,
+  AgentInstallContext,
   AgentInstallOptions,
   AgentInstallResult,
   PluginContext,
@@ -20,7 +22,7 @@ export type InstallOperation = (
 export type UninstallOperation = (
   config: SpecdConfig,
   options?: AgentInstallOptions,
-) => Promise<void>
+) => Promise<UninstallResult | void>
 
 /**
  * Agent Skills standard implementation of the agent-plugin contract.
@@ -46,21 +48,9 @@ export class AgentStandardAgentPlugin implements AgentPlugin {
     return this.pluginName
   }
 
-  /** Plugin type (always 'agent'). */
-  get type(): 'agent' {
-    return 'agent'
-  }
-
   /** Plugin version from manifest. */
   get version(): string {
     return this.pluginVersion
-  }
-
-  /**
-   * Plugin config schema (none in phase 1).
-   */
-  get configSchema(): Record<string, never> {
-    return {}
   }
 
   /**
@@ -84,22 +74,33 @@ export class AgentStandardAgentPlugin implements AgentPlugin {
   /**
    * Installs Agent Skills standard skills into `.agents/skills`.
    *
-   * @param config - Project configuration.
-   * @param options - Install options.
+   * @param context - Install context with config, contributions, and options.
    * @returns Install summary.
    */
-  async install(config: SpecdConfig, options?: AgentInstallOptions): Promise<AgentInstallResult> {
-    return this.runInstall(config, options)
+  async install(context: AgentInstallContext): Promise<AgentInstallResult> {
+    return this.runInstall(context.config, context.options)
   }
 
   /**
-   * Uninstalls Agent Skills standard skills from `.agents/skills`.
+   * Uninstalls specd skills and agents; see {@link AgentStandardAgentPlugin.uninstallWithResult} for the report.
    *
-   * @param config - Project configuration.
-   * @param options - Optional skill filter.
-   * @returns A promise that resolves when uninstall completes.
+   * @param context - Install context with config, contributions, and options.
+   * @returns A promise that resolves when uninstall finishes.
    */
-  async uninstall(config: SpecdConfig, options?: AgentInstallOptions): Promise<void> {
-    return this.runUninstall(config, options)
+  async uninstall(context: AgentInstallContext): Promise<void> {
+    await this.uninstallWithResult(context)
+  }
+
+  /**
+   * Uninstalls specd skills and agents and reports the skipped names.
+   *
+   * Names in `options.skills` / `options.agents` that are not specd-managed (or that
+   * contain a path separator or `..`) are never touched and are listed in `skipped`.
+   *
+   * @param context - Install context with config, contributions, and options.
+   * @returns The requested names that were skipped.
+   */
+  async uninstallWithResult(context: AgentInstallContext): Promise<UninstallResult> {
+    return (await this.runUninstall(context.config, context.options)) ?? { skipped: [] }
   }
 }

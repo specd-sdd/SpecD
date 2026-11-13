@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import { ConfigValidationError } from '../../domain/errors/config-validation-error.js'
+import { PLUGIN_NAME_REGEX } from '../../domain/plugin-name.js'
+import { deepMergeConfig, isRecord } from '../../domain/services/deep-merge-config.js'
 
 // ---------------------------------------------------------------------------
 // Zod schemas for specd.yaml validation
@@ -204,16 +206,25 @@ export const SchemaOverridesZodSchema = z
 
 export const PluginEntryZodSchema = z
   .object({
-    name: z.string(),
+    name: z.string().regex(PLUGIN_NAME_REGEX),
     config: z.record(z.unknown()).optional(),
+    contributions: z.array(z.string()).min(1).optional(),
   })
   .strict()
 
-export const PluginsZodSchema = z
-  .object({
-    agents: z.array(PluginEntryZodSchema).optional(),
-  })
-  .strict()
+export const PluginsZodSchema = z.array(PluginEntryZodSchema).superRefine((plugins, ctx) => {
+  const seen = new Set<string>()
+  for (const [index, plugin] of plugins.entries()) {
+    if (seen.has(plugin.name)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [index, 'name'],
+        message: `duplicate plugin name '${plugin.name}'`,
+      })
+    }
+    seen.add(plugin.name)
+  }
+})
 
 export const LoggingZodSchema = z
   .object({
@@ -279,6 +290,7 @@ export const SpecdYamlZodSchema = z
       .optional(),
     /** @deprecated Input compatibility alias. Effective config exposes `invalidation` only. */
     invalidationPolicy: z.enum(['none', 'surgical', 'downstream', 'global']).optional(),
+    configVersion: z.number().int().positive().optional(),
     plugins: PluginsZodSchema.optional(),
   })
   .strict()
@@ -297,7 +309,6 @@ export const SpecdYamlZodSchema = z
 // Utility functions needed by cascade code
 // ---------------------------------------------------------------------------
 
-import { deepMergeConfig, isRecord } from '../../domain/services/deep-merge-config.js'
 export { isRecord }
 
 /**
@@ -324,5 +335,40 @@ export function deepMergeRawConfig(
   base: Record<string, unknown>,
   overlay: Record<string, unknown>,
 ): Record<string, unknown> {
-  return deepMergeConfig(base, overlay, { ignoredKeys: ['extends', 'remove'] })
+  const merged = deepMergeConfig(base, overlay, { ignoredKeys: ['extends', 'remove', 'plugins'] })
+  if (base['plugins'] !== undefined || overlay['plugins'] !== undefined) {
+    merged['plugins'] = mergePluginLists(base['plugins'], overlay['plugins'])
+  }
+  return merged
+}
+
+/**
+ * Merges flat plugin lists by `name`: same name replaces in place, new names append.
+ *
+ * Non-array values pass through from the overlay when the overlay defines `plugins`.
+ * Array results are always fresh copies, so later in-place removals never mutate a
+ * previous layer's raw `plugins` array.
+ *
+ * @param base - Inherited `plugins` value
+ * @param overlay - Extending layer `plugins` value
+ * @returns The merged plugin list, or the overlay when it is not a list
+ */
+function mergePluginLists(base: unknown, overlay: unknown): unknown {
+  if (overlay === undefined)
+    return Array.isArray(base) ? Array.from(base as readonly unknown[]) : base
+  if (!Array.isArray(overlay)) return overlay
+  if (!Array.isArray(base)) return Array.from(overlay as readonly unknown[])
+  const result: unknown[] = Array.from(base as readonly unknown[])
+  for (const entry of overlay) {
+    if (!isRecord(entry) || typeof entry['name'] !== 'string') {
+      result.push(entry)
+      continue
+    }
+    const index = result.findIndex(
+      (candidate) => isRecord(candidate) && candidate['name'] === entry['name'],
+    )
+    if (index === -1) result.push(entry)
+    else result[index] = entry
+  }
+  return result
 }

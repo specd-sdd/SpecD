@@ -3378,7 +3378,7 @@ describe('TransitionChange', () => {
         uc.execute({
           name: 'my-change',
           to: 'ready',
-          skipChecks: ['@security.nonexistent'],
+          skipChecks: ['@acme/security.nonexistent'],
         }),
       ).rejects.toThrow(UnknownCheckError)
     })
@@ -3425,13 +3425,13 @@ describe('TransitionChange', () => {
         id: 'code-audit',
         label: 'Code Audit',
         execute: async () => ({
-          id: '@security.code-audit',
+          id: '@acme/security.code-audit',
           label: 'Code Audit',
           kind: 'predicate',
           outcome: 'pass',
         }),
       }
-      registry.register('security', customCheck, [
+      registry.register('@acme/security', customCheck, [
         { scope: 'transition', from: 'designing', to: 'ready', skippable: true },
       ])
 
@@ -3458,7 +3458,7 @@ describe('TransitionChange', () => {
         id: 'code-audit',
         label: 'Code Audit',
         execute: async () => ({
-          id: '@security.code-audit',
+          id: '@acme/security.code-audit',
           label: 'Code Audit',
           kind: 'predicate',
           outcome: 'fail',
@@ -3467,7 +3467,7 @@ describe('TransitionChange', () => {
           command: 'npm audit fix',
         }),
       }
-      registry.register('security', customCheck, [
+      registry.register('@acme/security', customCheck, [
         { scope: 'transition', from: 'designing', to: 'ready', skippable: true },
       ])
 
@@ -3488,7 +3488,7 @@ describe('TransitionChange', () => {
       } catch (err) {
         expect(err).toBeInstanceOf(CheckPredicateFailedError)
         const checkErr = err as CheckPredicateFailedError
-        expect(checkErr.checkId).toBe('@security.code-audit')
+        expect(checkErr.checkId).toBe('@acme/security.code-audit')
         expect(checkErr.label).toBe('Code Audit')
         expect(checkErr.code).toBe('AUDIT_VULNERABILITY_FOUND')
         expect(checkErr.message).toContain('Found high severity vulnerability')
@@ -3506,7 +3506,7 @@ describe('TransitionChange', () => {
         id: 'code-audit',
         label: 'Code Audit',
         execute: async () => ({
-          id: '@security.code-audit',
+          id: '@acme/security.code-audit',
           label: 'Code Audit',
           kind: 'predicate',
           outcome: 'fail',
@@ -3514,7 +3514,7 @@ describe('TransitionChange', () => {
           message: 'Found high severity vulnerability',
         }),
       }
-      registry.register('security', customCheck, [
+      registry.register('@acme/security', customCheck, [
         { scope: 'transition', from: 'designing', to: 'ready', skippable: true },
       ])
 
@@ -3526,7 +3526,7 @@ describe('TransitionChange', () => {
       const result = await uc.execute({
         name: 'my-change',
         to: 'ready',
-        skipChecks: ['@security.code-audit'],
+        skipChecks: ['@acme/security.code-audit'],
       })
 
       expect(result.change.state).toBe('ready')
@@ -3571,12 +3571,12 @@ describe('TransitionChange', () => {
       const repo = makeChangeRepository([change])
       const registry = new CheckRegistry()
       registry.register(
-        'security',
+        '@acme/security',
         {
           id: 'mandatory-audit',
           label: 'Mandatory Security Audit',
           execute: async () => ({
-            id: '@security.mandatory-audit',
+            id: '@acme/security.mandatory-audit',
             label: 'Audit',
             kind: 'predicate',
             outcome: 'pass',
@@ -3594,7 +3594,7 @@ describe('TransitionChange', () => {
         uc.execute({
           name: 'my-change',
           to: 'ready',
-          skipChecks: ['@security.mandatory-audit'],
+          skipChecks: ['@acme/security.mandatory-audit'],
         }),
       ).rejects.toThrow(CheckNotSkippableError)
     })
@@ -3606,7 +3606,7 @@ describe('TransitionChange', () => {
       const repo = makeChangeRepository([change])
       const registry = new CheckRegistry()
       registry.register(
-        'db',
+        '@acme/db',
         {
           id: 'health',
           label: 'Database Health',
@@ -3641,12 +3641,12 @@ describe('TransitionChange', () => {
       const repo = makeChangeRepository([change])
       const registry = new CheckRegistry()
       registry.register(
-        'check',
+        '@acme/check',
         {
           id: 'first',
           label: 'First Check',
           execute: async () => ({
-            id: '@check.first',
+            id: '@acme/check.first',
             label: 'First Check',
             kind: 'predicate',
             outcome: 'pass',
@@ -3656,12 +3656,12 @@ describe('TransitionChange', () => {
       )
 
       registry.register(
-        'check',
+        '@acme/check',
         {
           id: 'second',
           label: 'Second Check',
           execute: async () => ({
-            id: '@check.second',
+            id: '@acme/check.second',
             label: 'Second Check',
             kind: 'predicate',
             outcome: 'fail',
@@ -3689,7 +3689,7 @@ describe('TransitionChange', () => {
       } catch (err) {
         expect(err).toBeInstanceOf(CheckPredicateFailedError)
         const checkErr = err as CheckPredicateFailedError
-        expect(checkErr.checkId).toBe('@check.second')
+        expect(checkErr.checkId).toBe('@acme/check.second')
         expect(checkErr.code).toBe('SECOND_CHECK_FAILED')
       }
 
@@ -3704,12 +3704,12 @@ describe('TransitionChange', () => {
       const repo = makeChangeRepository([change])
       const registry = new CheckRegistry()
       registry.register(
-        'qa',
+        '@acme/qa',
         {
           id: 'flake',
           label: 'Flaky QA Check',
           execute: async () => ({
-            id: '@qa.flake',
+            id: '@acme/qa.flake',
             label: 'Flaky QA Check',
             kind: 'predicate',
             outcome: 'fail',
@@ -3727,7 +3727,7 @@ describe('TransitionChange', () => {
       const result = await uc.execute({
         name: 'my-change',
         to: 'ready',
-        skipChecks: ['@qa.flake', '@qa.flake', '@qa.flake'],
+        skipChecks: ['@acme/qa.flake', '@acme/qa.flake', '@acme/qa.flake'],
       })
 
       expect(result.change.state).toBe('ready')
@@ -3823,12 +3823,12 @@ describe('TransitionChange', () => {
       const build = (outcome: 'pass' | 'fail') => {
         const registry = new CheckRegistry()
         registry.register(
-          'qa',
+          '@acme/qa',
           {
             id: 'freeze',
             label: 'Checking code freeze',
             execute: async () => ({
-              id: '@qa.freeze',
+              id: '@acme/qa.freeze',
               label: 'Checking code freeze',
               kind: 'predicate' as const,
               outcome,
@@ -3853,7 +3853,7 @@ describe('TransitionChange', () => {
         .then(() => undefined)
         .catch((error: unknown) => error)
       expect(failure).toBeInstanceOf(CheckPredicateFailedError)
-      expect((failure as CheckPredicateFailedError).checkId).toBe('@qa.freeze')
+      expect((failure as CheckPredicateFailedError).checkId).toBe('@acme/qa.freeze')
       expect(repo.store.get('my-change')?.state).toBe('ready')
 
       const result = await build('pass').execute({ name: 'my-change', to: 'verifying' })
@@ -4036,14 +4036,14 @@ describe('TransitionChange', () => {
       const registry = new CheckRegistry()
       let executeCount = 0
       registry.register(
-        'custom',
+        '@acme/custom',
         {
           id: 'schema-gate',
           label: 'Schema Gate Check',
           execute: async () => {
             executeCount++
             return {
-              id: '@custom.schema-gate',
+              id: '@acme/custom.schema-gate',
               label: 'Schema Gate Check',
               kind: 'predicate',
               outcome: 'fail',
@@ -4063,7 +4063,7 @@ describe('TransitionChange', () => {
           makeWorkflowStep('ready', {
             checks: [
               {
-                id: '@custom.schema-gate',
+                id: '@acme/custom.schema-gate',
                 onFailure: 'abort',
                 skippable: true,
               },
@@ -4093,11 +4093,11 @@ describe('TransitionChange', () => {
       )
       expect(executeCount).toBe(1)
 
-      // When transitioning with skipChecks: ['@custom.schema-gate'], succeeds because skippable: true
+      // When transitioning with skipChecks: ['@acme/custom.schema-gate'], succeeds because skippable: true
       const result = await uc.execute({
         name: 'my-change',
         to: 'ready',
-        skipChecks: ['@custom.schema-gate'],
+        skipChecks: ['@acme/custom.schema-gate'],
       })
       expect(result.change.state).toBe('ready')
     })
@@ -4115,14 +4115,14 @@ describe('TransitionChange', () => {
       const registry = new CheckRegistry()
       let skipCheckCalled = false
       registry.register(
-        'qa',
+        '@acme/qa',
         {
           id: 'bypass-gate',
           label: 'Bypass Gate Check',
           execute: async () => {
             skipCheckCalled = true
             return {
-              id: '@qa.bypass-gate',
+              id: '@acme/qa.bypass-gate',
               label: 'Bypass Gate Check',
               kind: 'predicate',
               outcome: 'pass',
@@ -4152,7 +4152,7 @@ describe('TransitionChange', () => {
             optional: true,
             skipChecks: [
               {
-                id: '@qa.bypass-gate',
+                id: '@acme/qa.bypass-gate',
                 onFailure: 'abort',
               },
             ],
@@ -4235,12 +4235,12 @@ describe('TransitionChange', () => {
       const repo = makeChangeRepository([changeCustom, changeDefault])
       const registry = new CheckRegistry()
       registry.register(
-        'custom',
+        '@acme/custom',
         {
           id: 'strict-audit',
           label: 'Strict Audit',
           execute: async () => ({
-            id: '@custom.strict-audit',
+            id: '@acme/custom.strict-audit',
             label: 'Strict Audit',
             kind: 'predicate',
             outcome: 'fail',
@@ -4257,7 +4257,7 @@ describe('TransitionChange', () => {
           makeWorkflowStep('drafting'),
           makeWorkflowStep('designing'),
           makeWorkflowStep('ready', {
-            checks: [{ id: '@custom.strict-audit', onFailure: 'abort' }],
+            checks: [{ id: '@acme/custom.strict-audit', onFailure: 'abort' }],
           }),
           makeWorkflowStep('implementing'),
           makeWorkflowStep('verifying'),
@@ -4311,7 +4311,7 @@ describe('TransitionChange', () => {
         id: name,
         label: `Auditing ${name}`,
         execute: async () => ({
-          id: `@custom.${name}`,
+          id: `@acme/custom.${name}`,
           label: `Auditing ${name}`,
           kind: 'predicate' as const,
           outcome: 'fail' as const,
@@ -4341,8 +4341,8 @@ describe('TransitionChange', () => {
         ],
       })
       const registry = new CheckRegistry()
-      registry.register('custom', auditCheck('first', 'FIRST_FAILED'), [])
-      registry.register('custom', auditCheck('second', 'SECOND_FAILED'), [])
+      registry.register('@acme/custom', auditCheck('first', 'FIRST_FAILED'), [])
+      registry.register('@acme/custom', auditCheck('second', 'SECOND_FAILED'), [])
       const schema = makeSchema({
         name: 'schema-custom',
         workflow: [
@@ -4350,8 +4350,8 @@ describe('TransitionChange', () => {
           makeWorkflowStep('designing'),
           makeWorkflowStep('ready', {
             checks: [
-              { id: '@custom.first', onFailure },
-              { id: '@custom.second', onFailure },
+              { id: '@acme/custom.first', onFailure },
+              { id: '@acme/custom.second', onFailure },
             ],
           }),
           makeWorkflowStep('implementing'),
@@ -4376,10 +4376,10 @@ describe('TransitionChange', () => {
 
       expect(error).toBeInstanceOf(CheckPredicateFailedError)
       const failure = error as CheckPredicateFailedError
-      expect(failure.checkId).toBe('@custom.first')
+      expect(failure.checkId).toBe('@acme/custom.first')
       expect(failure.details?.failures).toEqual([
-        expect.objectContaining({ checkId: '@custom.first', code: 'FIRST_FAILED' }),
-        expect.objectContaining({ checkId: '@custom.second', code: 'SECOND_FAILED' }),
+        expect.objectContaining({ checkId: '@acme/custom.first', code: 'FIRST_FAILED' }),
+        expect.objectContaining({ checkId: '@acme/custom.second', code: 'SECOND_FAILED' }),
       ])
     })
 
@@ -4389,7 +4389,7 @@ describe('TransitionChange', () => {
         .catch((e: unknown) => e)
 
       expect(error).toBeInstanceOf(CheckPredicateFailedError)
-      expect((error as CheckPredicateFailedError).checkId).toBe('@custom.first')
+      expect((error as CheckPredicateFailedError).checkId).toBe('@acme/custom.first')
       expect((error as CheckPredicateFailedError).details?.failures).toBeUndefined()
     })
   })

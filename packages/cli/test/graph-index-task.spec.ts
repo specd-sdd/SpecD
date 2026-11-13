@@ -36,7 +36,7 @@ describe('runGraphIndexTask', () => {
     )
     expect(openSpecdHost).toHaveBeenCalledWith({
       configPath: '/repo/specd.yaml',
-      options: { kernel: { logger: 'cli' } },
+      options: { kernel: { logger: 'cli' }, plugins: false },
     })
     expect(createSdkContext).not.toHaveBeenCalled()
     expect(runIndexProjectGraph).toHaveBeenCalledTimes(1)
@@ -96,6 +96,10 @@ describe('runGraphIndexTask', () => {
       vcsRoot: '/repo/.git',
     })
     expect(openSpecdHost).not.toHaveBeenCalled()
+    expect(createSdkContext).toHaveBeenCalledWith(config, {
+      kernel: { logger: 'cli' },
+      plugins: false,
+    })
     expect(runIndexProjectGraph).toHaveBeenCalledWith(
       host,
       expect.objectContaining({

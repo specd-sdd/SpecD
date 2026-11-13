@@ -2,6 +2,7 @@ import type { ChangeState } from '../value-objects/change-state.js'
 import {
   DuplicateCheckBindingError,
   DuplicateCheckError,
+  InvalidCheckIdError,
   InvalidCheckKindError,
   InvalidPluginNameError,
 } from '../errors/check-registry-errors.js'
@@ -15,8 +16,10 @@ import {
 } from './transition-checks.js'
 import { InvalidInputError } from '../errors/invalid-input-error.js'
 import { ARCHIVE_BINDINGS, DOMAIN_CHECKS, TRANSITION_BINDINGS } from './check-bindings.js'
+import { PLUGIN_NAME_REGEX } from '../plugin-name.js'
 
-const PLUGIN_NAME_REGEX = /^[a-zA-Z0-9_-]+$/
+/** Grammar of a plugin check id (no `.`, so canonical ids stay unambiguous). */
+const CHECK_ID_REGEX = /^[a-z0-9][a-z0-9_-]*$/
 
 /** Governance rules recorded for a registered check. */
 export interface CheckGovernance {
@@ -156,7 +159,7 @@ export class CheckRegistry {
   /**
    * Retrieves a registered check by its canonical identifier.
    *
-   * @param canonicalId - Canonical check id (e.g. 'protocol.edge' or '@plugin.check-name')
+   * @param canonicalId - Canonical check id (e.g. 'protocol.edge' or '@scope/plugin.check-name')
    * @returns Check instance or undefined if not registered
    */
   get(canonicalId: string): Check | undefined {
@@ -214,12 +217,13 @@ export class CheckRegistry {
   /**
    * Registers a custom check from an external plugin.
    *
-   * @param pluginName - Plugin namespace matching ^[a-z][a-z0-9-]*$
+   * @param pluginName - Scoped plugin name (`@scope/name`): lowercase, no dot
    * @param check - Custom check definition
    * @param defaultBindings - Optional default bindings for this check
    * @param options - Check-level governance and configuration options
-   * @returns The assigned canonical identifier (`@${pluginName}.${check.id}`)
+   * @returns The assigned canonical identifier (`${pluginName}.${check.id}`)
    * @throws {@link InvalidPluginNameError} When pluginName is invalid
+   * @throws {@link InvalidCheckIdError} When `check.id` does not match `^[a-z0-9][a-z0-9_-]*$`
    * @throws {@link DuplicateCheckError} When check is already registered
    * @throws {@link InvalidCheckKindError} When check kind is not 'predicate'
    */
@@ -242,7 +246,11 @@ export class CheckRegistry {
       throw new InvalidPluginNameError(pluginName)
     }
 
-    const canonicalId = `@${pluginName}.${check.id}`
+    if (typeof check.id !== 'string' || !CHECK_ID_REGEX.test(check.id)) {
+      throw new InvalidCheckIdError(String(check.id))
+    }
+
+    const canonicalId = `${pluginName}.${check.id}`
 
     if (this._catalog.has(canonicalId)) {
       throw new DuplicateCheckError(canonicalId)

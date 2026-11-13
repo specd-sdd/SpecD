@@ -8,7 +8,7 @@ Delivery hosts (CLI, MCP, API, IPC) need a single package that wires `@specd/cor
 
 ### Requirement: Package identity and dependencies
 
-The `@specd/sdk` package SHALL live at `packages/sdk/` in the monorepo with workspace name `sdk` in `specd.yaml`. Runtime dependencies MUST be limited to `@specd/core` and `@specd/code-graph` workspace packages. The package MUST NOT depend on `@specd/cli`, `@specd/mcp`, or plugin packages.
+The `@specd/sdk` package SHALL live at `packages/sdk/` in the monorepo with workspace name `sdk` in `specd.yaml`. Runtime dependencies MUST be limited to the `@specd/core`, `@specd/code-graph` and `@specd/plugin-manager` workspace packages. The package MUST NOT depend on `@specd/cli`, `@specd/mcp`, or concrete plugin packages (`@specd/plugin-agent-*`); plugins are loaded dynamically by `@specd/plugin-manager` from the project configuration. The dependency edge `sdk → plugin-manager → core` MUST stay acyclic.
 
 ### Requirement: Layer structure
 
@@ -35,8 +35,12 @@ generated from the logical source barrel `src/index.ts`.
 
 `src/index.ts` SHALL export explicitly (no `export * from '@specd/core'`):
 
-- SDK composition: `openSpecdHost`, `createSdkContext`, `withOpenGraphProvider`, `SdkHostContext`, `OpenSpecdHostInput`, `OpenSpecdHostResult`, `WithOpenGraphProviderOptions`
-- SDK orchestration: `buildProjectStatusSnapshot`, `runIndexProjectGraph`, and their input/result types
+- SDK composition: `openSpecdHost`, `createSdkContext`, `withOpenGraphProvider`, `SdkHostContext`, `SdkContextOptions`, `OpenSpecdHostInput`, `OpenSpecdHostResult`, `WithOpenGraphProviderOptions`
+- Plugin contracts hosts need to supply handlers: `ContributionKindHandler` and `ContributionActivationContext` re-exported from `@specd/plugin-manager`
+- Plugin error classes re-exported from `@specd/plugin-manager` so hosts catch them without depending on plugin-manager directly: `PluginInitError`, `PluginDestroyError`, `PluginValidationError`, `PluginNotFoundError`, `DuplicateContributionError`, `UnknownContributionError`, `UnknownContributionKindError`, `InvalidPluginConfigError`, `UnsupportedSchemaKeywordError`, `DuplicateHandlerKindError` and `InvalidContributionAddressError`
+- Plugin helpers hosts and the CLI rely on, re-exported from `@specd/core`: `isPluginName`, `PLUGIN_NAME_REGEX` (the scoped plugin-name grammar of `plugin-manager:specd-plugin-type`, implemented in core) and `createConfigWriter` (the `ConfigWriter` factory used for `specd.yaml` plugin mutations), together with the types `ConfigWriter`, `AddPluginOptions` and `ConfigDeclaredPlugin` and the errors `LegacyConfigFormatError` and `UnsupportedConfigVersionError` that `ConfigWriter` and the config loader raise
+- SDK orchestration: `buildProjectStatusSnapshot`, `runIndexProjectGraph`, `buildImplementationReview`, and their input/result types (including the reviewed implementation link and symbol types)
+- SDK errors: `InvalidProviderLifecycleError`
 - SDK presentation: `changeContextToMarkdown`, `projectContextToMarkdown`, `ChangeContextToMarkdownOptions`
 - Explicit re-exports from `@specd/core` `"."` public barrel (bootstrap, `Kernel`, kernel-equivalent `createX` factories, repository factories, kernel use-case I/O types, domain entities, errors). This MUST track the revised `kernel.specs` surface — including `MaterializeSpecMetadata`, `GetSpecMetadata`, `RegenerateSpecMetadata`, `InitializePersistedSpecState`, persisted schema inspection/reassignment, and persisted dependency/implementation/optimization use cases — and their `create*` factories.
 - Explicit re-exports from `@specd/code-graph` `"."` public barrel (provider factory, host use cases, graph host-adapter symbols listed under **Public barrel exports for host adapters**)
@@ -44,7 +48,7 @@ generated from the logical source barrel `src/index.ts`.
 
 The `"."` barrel MUST NOT export infrastructure adapters, internal composition helpers, or symbols that are only available from `"./internal"` entry points of dependency packages.
 
-The `"."` barrel MUST NOT re-export `SaveSpecMetadata`, `UpdateSpecMetadata`, `InvalidateSpecMetadata`, or their `createSaveSpecMetadata` / `createUpdateSpecMetadata` / `createInvalidateSpecMetadata` factories — those use cases are removed from `@specd/core` and MUST NOT be restored at the SDK layer. `PersistSpecMetadata` MUST NOT be exported — it is an internal collaborator of `MaterializeSpecMetadata` only.
+The use-case classes of the `MaterializeSpecMetadata` family (`MaterializeSpecMetadata`, `GetSpecMetadata`, `RegenerateSpecMetadata`, `InitializePersistedSpecState`) are exported as TYPES only; consumers obtain behaviour through the `create*` factories, which are values. The `"."` barrel MUST NOT re-export `SaveSpecMetadata`, `UpdateSpecMetadata`, `InvalidateSpecMetadata`, or their `createSaveSpecMetadata` / `createUpdateSpecMetadata` / `createInvalidateSpecMetadata` factories — those use cases are removed from `@specd/core` and MUST NOT be restored at the SDK layer. `PersistSpecMetadata` MUST NOT be exported — it is an internal collaborator of `MaterializeSpecMetadata` only.
 
 ### Requirement: Public barrel exports for host adapters
 
@@ -60,9 +64,12 @@ The `"."` barrel MUST NOT re-export `SaveSpecMetadata`, `UpdateSpecMetadata`, `I
 - `codeGraphVersion` and `getCodeGraphVersion` (SDK-owned aliases where applicable)
 - `GraphSpecNotFoundError` (alias for graph `SpecNotFoundError`)
 - `SymbolKind`, `SearchOptions`, `HotspotOptions`, and `RiskLevel`
-- `normalizeFileSelectorPath` and `createBootstrapGraphConfig`
+- `createBootstrapGraphConfig`
 - fingerprint helpers: `isGraphStale`, `detectFingerprintMismatch`,
-  `parseFingerprintMap`, and `buildProjectGraphConfig`
+  `parseFingerprintMap`, `serializeFingerprintMap`, `buildProjectGraphConfig`,
+  `computeWorkspaceFingerprint`, and `computeRootFingerprint`, plus type `GraphFingerprintInput`
+- provider factory and host use cases: `createCodeGraphProvider`, `createIndexProjectGraph`, type `CodeGraphProvider`, and the search, impact, symbol-resolution, index-coverage, and health result types the provider and those use cases return or accept (for example `SearchCodeGraphInput`, `SearchCodeGraphResult`, `ResolveSymbolReferenceInput`, `SymbolResolutionResult`, `IndexCoverage`, `ExactPublicBindingResult`)
+- `DEFAULT_HOTSPOT_KINDS` and `CODE_GRAPH_VERSION`
 
 SDK MUST NOT export `acquireGraphIndexLock`, `assertGraphIndexUnlocked`, lock-path
 helpers, release callbacks, raw lock tokens, or raw worker IPC envelopes. Delivery
@@ -74,7 +81,7 @@ Delivery hosts MUST import the curated symbols from `@specd/sdk`, not from
 
 ### Requirement: Import policy for integrators
 
-Delivery hosts (`@specd/cli`, `@specd/mcp`, and future API/IPC hosts) that use both `@specd/core` and `@specd/code-graph` MUST depend on `@specd/sdk` only — not on `@specd/core` and `@specd/code-graph` as parallel direct runtime dependencies.
+Delivery hosts (`@specd/cli`, `@specd/mcp`, and future API/IPC hosts) that use both `@specd/core` and `@specd/code-graph` MUST depend on `@specd/sdk` only for those two — not on `@specd/core` and `@specd/code-graph` as parallel direct runtime dependencies. A delivery host MAY additionally depend directly on `@specd/plugin-manager` (plugin install, uninstall, update, list and load use cases), on `@specd/schema-std`, `@specd/guide` and the concrete `@specd/plugin-agent-*` packages it offers for installation, because those are not re-exported by the SDK.
 
 Packages that need only `@specd/core` (for example `plugin-*`, `skills`) MAY import `@specd/core` directly.
 
@@ -100,3 +107,5 @@ CLI and other hosts using implementation review MUST import this orchestration t
 - `sdk:build-implementation-review` — shared review orchestration
 - `code-graph:isolated-index-worker` — isolated graph-index execution re-exported
   to delivery hosts
+- `plugin-manager:register-plugins-use-case` — plugin registration used by `createSdkContext`
+- `plugin-manager:plugin-errors` — error classes re-exported to hosts

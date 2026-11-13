@@ -20,12 +20,17 @@ The registry interface MUST expose methods to:
 - Check whether a canonical check identifier is registered (`has(canonicalId: string): boolean`).
 - List all registered check definitions (`list(): readonly Check[]`).
 - Query all active default check bindings (`bindings(): readonly CheckBinding[]`).
+- Query the default bindings of one check (`getBindings(canonicalId: string): readonly CheckBinding[]`).
+- Query the governance record of one check (`getGovernance(canonicalId: string): CheckGovernance | undefined`).
+- Derive a registry whose built-in checks carry executable instances (`withExecutableBuiltins(instances: Readonly<Partial<Record<string, Check>>>): CheckRegistry`), used by composition so schema-embedded built-ins evaluate their real implementation. The derived registry keeps the same ids, bindings and governance.
+
+This list is the complete public surface; none of these methods registers or mutates built-in checks.
 
 ### Requirement: Immutability of built-in checks
 
 All built-in system checks (`protocol.edge`, `workflow.requires`, `workflow.taskCompletion`, `workflow.tasksEmpty`, `deps.consistent`, `workspace.readOnly`, `impl.filesResolved`, `impl.linksInScope`, `approval.spec`, `approval.signoff`, `schema.nameMatch`, `archive.archivable`, `spec.overlap`, `verification.current`, `hook.pre`, `hook.post`) MUST be injected into the `CheckRegistry` upon constructor initialization.
 The public `CheckRegistry` interface MUST NOT expose any method to register, replace, mutate, or unregister built-in checks.
-External plugin checks are always registered under the `@<plugin>.<id>` namespace, so an external registration can never produce an unprefixed identifier and can never collide with or shadow a built-in check ID, even when `<plugin>` or `<id>` resemble built-in segments (for example `@protocol.edge` is distinct from `protocol.edge`). The registry SHALL throw `InvalidPluginNameError` only when the plugin name violates the documented plugin-name grammar `^[a-zA-Z0-9_-]+$` (for example empty, whitespace, symbols, dots, or path traversal).
+External plugin checks are always registered under the scoped `<plugin>.<id>` namespace, where `<plugin>` is a scoped plugin name starting with `@` (for example `@acme/specd-compliance.audit`). Because built-in identifiers never start with `@`, an external registration can never produce an unprefixed identifier and can never collide with or shadow a built-in check ID (for example `@protocol/x.edge` is distinct from `protocol.edge`). The registry SHALL throw `InvalidPluginNameError` only when the plugin name violates the plugin-name grammar `^@[a-z0-9][a-z0-9_-]*\/[a-z0-9][a-z0-9_-]*$` defined by `plugin-manager:specd-plugin-type` (for example empty, unscoped, containing a dot, uppercase, whitespace or path traversal).
 
 ### Requirement: Canonical namespacing and plugin registration
 
@@ -36,13 +41,14 @@ register(
   pluginName: string,
   check: CustomCheckDefinition,
   defaultBindings?: readonly CheckBindingSpec[],
-  options?: PluginCheckRegistration,
+  options?: PluginCheckRegistrationOptions,
 ): string
 ```
 
-The `pluginName` argument MUST be a non-empty string conforming strictly to `^[a-zA-Z0-9_-]+$`. If `pluginName` contains invalid characters (such as `@` or `.`) or is empty, the registry MUST throw an `InvalidPluginNameError`.
-The registry MUST automatically construct the canonical check identifier as `@${pluginName}.${check.id}`.
+The `pluginName` argument MUST be a scoped plugin name conforming strictly to `^@[a-z0-9][a-z0-9_-]*\/[a-z0-9][a-z0-9_-]*$`. If `pluginName` is empty, unscoped, contains `.`, uppercase letters or other invalid characters, the registry MUST throw an `InvalidPluginNameError` whose message states the scoped grammar (`@scope/name`, lowercase letters, digits, `_` and `-`) rather than any older grammar.
+A plugin check's `id` MUST match `^[a-z0-9][a-z0-9_-]*$` (it MUST NOT contain `.`), otherwise the registry MUST throw `InvalidCheckIdError`. The registry MUST construct the canonical check identifier as `${pluginName}.${check.id}`; the leading `@` is part of `pluginName` and MUST NOT be added again, so the identifier contains exactly one leading `@`.
 If a check with the resulting canonical identifier is already registered, the registry MUST throw a `DuplicateCheckError`.
+`PluginCheckRegistrationOptions` carries the plugin-level governance defaults (`allowSchemaEmbedding`, `allowBindingOverride`, `allowConfigOverride`, `allowDisable`). It is distinct from the composition-level `PluginCheckRegistration` entry type used by kernel composition to hand plugin checks to the registry.
 
 ### Requirement: Adaptation of CustomCheckDefinition to internal Check
 
@@ -66,13 +72,13 @@ The registry MUST reject registration attempts containing duplicate bindings for
 The registry MUST support a governance model that separates **where** a schema may place a check from **what** a schema may change on bindings defined by code. A binding is **code-defined** when it comes from the built-in binding tables or from a plugin's `defaultBindings`. A binding is **schema-owned** when a schema declaration creates it at a coordinate that no code-defined binding serves.
 
 1. **Placement Lock (`allowSchemaEmbedding`, check level)**:
-   - `PluginCheckRegistration.allowSchemaEmbedding` and the built-in check governance declare whether a schema MAY place the check at a coordinate that no code-defined binding of that check serves. When `false`, such a declaration MUST throw `CheckEmbeddingForbiddenError`.
+   - `PluginCheckRegistrationOptions.allowSchemaEmbedding` and the built-in check governance declare whether a schema MAY place the check at a coordinate that no code-defined binding of that check serves. When `false`, such a declaration MUST throw `CheckEmbeddingForbiddenError`.
    - For plugin checks, if `defaultBindings` are provided and `allowSchemaEmbedding` is not specified, it SHALL default to `false`. If `defaultBindings` are omitted, the check is an unbound catalog capability and `allowSchemaEmbedding` SHALL default to `true`.
    - Declaring a check (built-in or plugin) at a coordinate already served by one of its code-defined bindings is NOT embedding. It MUST be accepted regardless of `allowSchemaEmbedding`, and it is governed only by that coordinate's policy, configuration, and disablement locks.
    - `allowSchemaEmbedding` SHALL NOT lock `onFailure`, `skippable`, configuration, or disablement at any coordinate.
 2. **Code-Defined Policy Lock (`allowBindingOverride`)**:
    - `CheckBindingSpec.allowBindingOverride`: if `false` on a code-defined binding coordinate, `schema.yaml` CANNOT alter the `onFailure` policy or the `skippable` permission for that exact coordinate (`CheckBindingOverrideForbiddenError`).
-   - `PluginCheckRegistration.allowBindingOverride` is the default inherited by the plugin's default bindings that omit the field. If `defaultBindings` are provided and it is not specified, it SHALL default to `false`.
+   - `PluginCheckRegistrationOptions.allowBindingOverride` is the default inherited by the plugin's default bindings that omit the field. If `defaultBindings` are provided and it is not specified, it SHALL default to `false`.
    - `allowBindingOverride` SHALL NOT restrict placement; placement is governed only by `allowSchemaEmbedding`.
    - `allowBindingOverride` SHALL NOT apply to schema-owned bindings.
 3. **Configuration Override Locks (`allowConfigOverride`)**:
@@ -80,7 +86,7 @@ The registry MUST support a governance model that separates **where** a schema m
    - If set to `false` on a code-defined binding, schemas CANNOT override configuration for that specific coordinate.
    - A code-defined binding that omits `allowConfigOverride` SHALL inherit the check-level value; it SHALL NOT default to a more permissive value than its check.
 4. **Disablement Governance Locks (`allowDisable`)**:
-   - `PluginCheckRegistration.allowDisable`: If set to `false`, the check CANNOT be disabled in `schema.yaml` via `disabled: true`, at any coordinate. Core protocol invariants MUST have `allowDisable: false`.
+   - `PluginCheckRegistrationOptions.allowDisable`: If set to `false`, the check CANNOT be disabled in `schema.yaml` via `disabled: true`, at any coordinate. Core protocol invariants MUST have `allowDisable: false`.
    - `CheckBindingSpec.allowDisable`: If set to `false` on a code-defined binding coordinate, `schema.yaml` CANNOT disable the check for that specific coordinate.
    - **Immutability of `allowDisable` (No Relaxation)**: An existing binding or check definition with `allowDisable: false` CANNOT be relaxed or overridden by `schema.yaml`. Any attempt in `schema.yaml` to declare `disabled: true` on a check or coordinate where `allowDisable: false` is active MUST throw a `CheckDisableForbiddenError`.
 5. **Monotonic Governance Rule (Principle of Monotonic Governance Locks)**:
@@ -96,7 +102,7 @@ The registry MUST support a governance model that separates **where** a schema m
      - **Archive exception**: on bindings with `scope: 'archive'` only, `workspace.readOnly`, `impl.filesResolved`, and `deps.consistent` MUST declare `allowBindingOverride: false`, `allowConfigOverride: false`, `allowDisable: false`, and `skippable: false`. `workspace.readOnly` is a security boundary and the other two are required for a valid archive, so no schema declaration and no `--skip-checks` may relax them there. Their check-level governance and their `transition` and `step-skip` bindings remain Category C. On archive, the only built-in checks a schema can configure, disable, or make skippable are `spec.overlap` and `impl.linksInScope`.
    - Every built-in binding spec MUST declare `allowBindingOverride` and `allowDisable` explicitly with its category's values (applying the archive exception above).
 7. **Registration fidelity through composition**:
-   - Kernel composition SHALL forward every governance field of a `PluginCheckRegistration` (`allowSchemaEmbedding`, `allowBindingOverride`, `allowConfigOverride`, `allowDisable`, `defaultConfig`) to the `CheckRegistry` unchanged.
+   - Kernel composition SHALL forward every governance field of a `PluginCheckRegistrationOptions` (`allowSchemaEmbedding`, `allowBindingOverride`, `allowConfigOverride`, `allowDisable`, `defaultConfig`) to the `CheckRegistry` unchanged.
    - Kernel composition SHALL forward every declared default binding of a plugin check, in all scopes (`transition`, `archive`, and `step-skip`), into the bindings the use cases evaluate. A plugin `step-skip` default binding SHALL be evaluated when its step is bypassed exactly like a built-in step-skip binding.
 8. **Executable check instances**:
    - The `CheckRegistry` that composition hands to use cases MUST catalog the executable application check instances (the `create*` factories that read real facts through ports) for every built-in check.

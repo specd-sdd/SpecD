@@ -590,10 +590,10 @@ schemaOverrides:
 
 # 16. Installed Agent Plugins
 # Coding assistant plugins registered in this project.
+configVersion: 2
 plugins:
-  agents:
-    - name: '@specd/plugin-agent-claude'
-    - name: '@specd/plugin-agent-copilot'
-      config:
-        model: 'gpt-4o'
+  - name: '@specd/plugin-agent-claude'
+  - name: '@specd/plugin-agent-copilot'
+    config:
+      model: 'gpt-4o'
 ```

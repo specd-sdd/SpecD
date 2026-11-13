@@ -8,9 +8,15 @@ The Agent Skills open standard (agentskills.io) is adopted by a growing number o
 
 ### Requirement: Factory export
 
-The package MUST export `create(options: PluginLoaderOptions): AgentPlugin` as a named export.
+The package MUST export `create(options: PluginLoaderOptions): AgentPlugin | Promise<AgentPlugin>` as a named export. `create` MUST read `name` and `version` from the package `specd-plugin.json` and MUST throw `PluginValidationError` (fields `specd-plugin.json: name` or `specd-plugin.json: version`) when the manifest it resolves lacks a non-empty string for either; the resulting plugin has no `type`.
 
-The factory function MUST read `specd-plugin.json` at the infrastructure boundary to obtain `name` and `version`. It MUST search for the manifest in its own directory first, then the parent directory as fallback. The `type` field MUST remain hardcoded as `'agent'`.
+The factory function MUST read `specd-plugin.json` at the infrastructure boundary to obtain `name` and `version`. It MUST search for the manifest in its own directory first, then the parent directory as fallback. The loader awaits the result, so `create` MAY be `async`. The returned plugin MUST NOT carry a `type` discriminator.
+
+### Requirement: Manifest and install context
+
+The manifest `specd-plugin.json` MUST declare `schemaVersion: 2`, MUST NOT declare `pluginType`, and MUST declare one contribution of kind `agents` with the local id `standard` (`contributes: { "agents": { "standard": {} } }`), addressable as `@specd/plugin-agent-standard.standard`.
+
+`install` and `uninstall` receive an `AgentInstallContext` (`config`, `options`, `contributions`) as defined by `plugin-manager:agent-plugin-type`. Wherever this spec refers to `config` and `options` of `install` and `uninstall`, they are `context.config` and `context.options`. The plugin declares no `configSchema`, so it accepts no plugin `config`.
 
 ### Requirement: Domain layer
 
@@ -20,7 +26,7 @@ The domain layer MUST define:
 - an Agent Skills standard frontmatter type reflecting the fields defined by the agentskills.io specification
 - a per-skill frontmatter map keyed by skill name
 
-The plugin class constructor MUST accept `name` and `version` as parameters. The `type` getter MUST return `'agent'` (hardcoded).
+The plugin class constructor MUST accept `name` and `version` as parameters.
 
 ### Requirement: Frontmatter type contract
 
@@ -73,10 +79,10 @@ The resolved shared location MUST NOT contain a `SKILL.md` file.
 
 `StandardAgentPlugin.install()` MUST inject the base agent instruction prompt into the shared `AGENTS.md` file under the project root.
 
-- `install()` MUST inject the base prompt using `injectSpecdBlock(agentsMdPath, prompt)`.
-- `install()` MUST call `removeSpecdBlock(agentsMdPath, "standard")` to purge any legacy plugin marker blocks left by previous versions.
-- `uninstall()` MUST call `removeSpecdBlock(agentsMdPath, "standard")` (no-op if not present), then `removeSpecdBlock(agentsMdPath)` to remove the base block.
-- No plugin marker block (`<!-- <specd-plugin:standard> -->`) is injected during install.
+- `install()` MUST call `injectSpecdBlock(agentsMdPath, prompt, 'standard')`. The base `<!-- <specd agents="…"> -->` block in `AGENTS.md` is shared and reference-counted by plugin id, so several agent plugins can target the same file.
+- `uninstall()` MUST call `removeSpecdBlock(agentsMdPath, 'standard')`, which drops the `standard` reference, purges any legacy `<!-- <specd-plugin:standard> -->` block, and removes the shared base block only when no other agent plugin still references it.
+- No separate plugin marker block (`<!-- <specd-plugin:standard> -->`) is injected during install.
+- Only a full `uninstall()` calls `removeSpecdBlock`; a filtered `uninstall()` keeps the block.
 
 ### Requirement: allowed-tools configuration
 
@@ -85,6 +91,8 @@ The per-skill frontmatter map MUST declare `allowed-tools` for each skill with a
 - Read, Write, Edit, Grep, Glob for file operations
 - `Bash(node *)`, `Bash(specd *)`, `Bash(pnpm *)` for command execution
 - Agent for sub-agent spawning where applicable
+
+Tool patterns MUST use the space style `Bash(<command> *)` for every skill; the colon style (`Bash(git:*)`) MUST NOT be used. Skills that need other commands list them in the same style (for example `Bash(git *)`, `Bash(gh *)` for `specd-compliance`); `specd-compliance` MUST additionally include `Bash(node *)` and `Bash(pnpm *)`.
 
 ### Requirement: Project init wizard integration
 
@@ -96,13 +104,23 @@ The `@specd/specd` meta package MUST declare `@specd/plugin-agent-standard` as a
 
 ### Requirement: Uninstall behavior
 
-`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.agents/skills/` relative to `config.projectRoot`.
+`uninstall(context: AgentInstallContext)` MUST remove installed skill directories from `.agents/skills/` relative to `context.config.projectRoot`, honouring `context.options`. Because this plugin has no native agents directory, its agent files live in the resolved `sharedFolder` location as `<agent-name>.agent.md`.
 
-When `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory at the resolved `sharedFolder` location MUST remain in place because other installed skills may still reference it.
+**Filtered uninstall.** An empty `skills` or `agents` array counts as not provided. Selected names MUST be validated against the specd-managed skill and agent names: a name that is not managed (including any name with a path separator or `..`) is skipped, reported in the result of `uninstallWithResult()` (the plugin method that returns the report; `uninstall()` itself resolves to nothing, as the `AgentPlugin` contract requires), and never touches the filesystem. A full uninstall removes the managed agent files from both the runtime agents directory (when the runtime has one) and the shared folder, whatever `capabilities` it receives. When `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. When `options.agents` is provided, uninstall MUST remove only `<sharedFolder>/<agent-name>.agent.md` for the selected agents. A filtered uninstall MUST NOT remove any other shared file, MUST NOT touch the owners marker (`.owners.json`), MUST NOT call `removeSharedOwner`, and MUST keep the `standard` reference in the prompt block of `AGENTS.md`.
 
-When `options.skills` is omitted, uninstall MUST remove all specd-managed skill directories and the resolved sharedFolder location.
+**Full uninstall.** When neither `options.skills` nor `options.agents` is provided, uninstall MUST:
 
-Uninstall MUST NOT remove unrelated directories or files under `.agents/skills/` that are not part of the specd-managed skill set.
+1. remove all specd-managed skill directories under `.agents/skills/`, including legacy flat `<skill>.md` files left by previous versions;
+2. call `removeSpecdBlock` for `AGENTS.md`, which drops only this plugin's `standard` reference (the block itself disappears only when no other agent plugin references it);
+3. follow the uninstall protocol of `skills:shared-folder-owners` for the resolved `sharedFolder` location: call `removeSharedOwner(sharedDir, 'standard')`; when `hadMarker` is `false` every shared file MUST be left untouched; when other owners remain every shared file MUST be left untouched; when no owner remains, delete `shared.md`, every managed `<agent>.agent.md` file and the marker, and then call `removeSharedFolderIfEmpty` so that the folder survives when foreign files remain. Errors other than `ENOTEMPTY` and `ENOENT` MUST propagate.
+
+Uninstall MUST NOT remove unrelated directories or files under `.agents/skills/` or the shared folder that are not part of the specd-managed set.
+
+### Requirement: Shared folder ownership and agent placement
+
+Before writing the first file into the resolved `sharedFolder` location (shared bundle files and agent files, which this plugin always places there), `install()` MUST call `addSharedOwner(sharedDir, 'standard')` from `@specd/skills`, for filtered and unfiltered installs alike, so that `skills:shared-folder-owners` can tell when the last owner leaves.
+
+Because the plugin declares only the `frontmatter` capability, the agent fallback is unconditional: agent files are always written next to `shared.md` as `<agent-name>.agent.md`.
 
 ### Requirement: Fast-track skill installation
 
@@ -120,7 +138,6 @@ The Agent Skills standard fast-track frontmatter description MUST state that the
 - The plugin MUST implement the `AgentPlugin` contract defined by `@specd/plugin-manager`.
 - The plugin MUST remain an adapter package with no domain logic outside plugin orchestration concerns.
 - `name` and `version` MUST be read from `specd-plugin.json` by the factory and passed to the plugin constructor — never hardcoded in the class.
-- `type` MUST remain hardcoded as `'agent'` for type safety.
 - The frontmatter key for pre-approved tools MUST be `allowed-tools` (with hyphen) per the agentskills.io specification, not `allowed_tools` (underscore).
 
 ## Spec Dependencies
@@ -132,3 +149,4 @@ The Agent Skills standard fast-track frontmatter description MUST state that the
 - [`skills:resolve-bundle`](../skills/resolve-bundle/spec.md) — canonical install-time bundle resolution
 - [`skills:agents`](../skills/agents/spec.md) — defines specialized optimizer agents
 - [`skills:agent-instruction-template`](../skills/agent-instruction-template/spec.md) — shared base prompt rendering and block management
+- [`skills:shared-folder-owners`](../skills/shared-folder-owners/spec.md) — owners marker for the shared folder

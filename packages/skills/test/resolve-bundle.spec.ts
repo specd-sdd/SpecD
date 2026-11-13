@@ -45,7 +45,7 @@ function makeMockConfig(projectRoot: string = '/tmp/project'): SpecdConfig {
     },
     approvals: { spec: false, signoff: false },
     invalidation: DEFAULT_INVALIDATION_POLICY,
-    plugins: { agents: [] },
+    plugins: [],
   }
 }
 

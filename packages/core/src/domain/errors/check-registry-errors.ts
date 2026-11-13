@@ -1,7 +1,8 @@
 import { SpecdError } from './specd-error.js'
 
 /**
- * Thrown when a plugin name does not match `^[a-zA-Z0-9_-]+$` or is empty.
+ * Thrown when a plugin name does not match the scoped grammar
+ * `^@[a-z0-9][a-z0-9_-]*\/[a-z0-9][a-z0-9_-]*$` (or is empty).
  */
 export class InvalidPluginNameError extends SpecdError {
   /**
@@ -20,9 +21,35 @@ export class InvalidPluginNameError extends SpecdError {
    */
   constructor(public readonly pluginName: string) {
     super(
-      `Invalid plugin name '${pluginName}'. Plugin names must be non-empty and contain only alphanumeric characters, underscores, and hyphens (^[a-zA-Z0-9_-]+$).`,
+      `Invalid plugin name '${pluginName}'. Plugin names must be scoped as '@scope/name', using only lowercase letters, digits, underscores and hyphens, and starting each part with a letter or digit (^@[a-z0-9][a-z0-9_-]*/[a-z0-9][a-z0-9_-]*$).`,
     )
     this.name = 'InvalidPluginNameError'
+  }
+}
+
+/**
+ * Thrown when a plugin check id does not match `^[a-z0-9][a-z0-9_-]*$` (for example it contains a dot).
+ */
+export class InvalidCheckIdError extends SpecdError {
+  /**
+   * Diagnostic error code.
+   *
+   * @returns Stable machine-readable error code
+   */
+  override get code(): string {
+    return 'INVALID_CHECK_ID'
+  }
+
+  /**
+   * Creates an InvalidCheckIdError.
+   *
+   * @param checkId - Invalid check id that failed validation
+   */
+  constructor(public readonly checkId: string) {
+    super(
+      `Invalid check id '${checkId}'. Check ids must use only lowercase letters, digits, underscores and hyphens, starting with a letter or digit (^[a-z0-9][a-z0-9_-]*$); they cannot contain '.'.`,
+    )
+    this.name = 'InvalidCheckIdError'
   }
 }
 
@@ -109,7 +136,7 @@ export class InvalidCheckKindError extends SpecdError {
 }
 
 /**
- * Thrown when a check with check-level allowBindingOverride: false is embedded in a workflow step outside its declared bindings.
+ * Thrown when a check with check-level allowSchemaEmbedding: false is embedded in a workflow step outside its declared bindings.
  */
 export class CheckEmbeddingForbiddenError extends SpecdError {
   /**
@@ -132,7 +159,7 @@ export class CheckEmbeddingForbiddenError extends SpecdError {
     public readonly stepName: string,
   ) {
     super(
-      `Check '${checkId}' has allowBindingOverride: false and cannot be embedded in workflow step '${stepName}'.`,
+      `Check '${checkId}' has allowSchemaEmbedding: false and cannot be embedded in workflow step '${stepName}'.`,
     )
     this.name = 'CheckEmbeddingForbiddenError'
   }

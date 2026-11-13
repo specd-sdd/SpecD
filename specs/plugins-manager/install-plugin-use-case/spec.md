@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Use case that orchestrates plugin installation. Loads the plugin, calls its install method, and returns a generic result.
+Use case that orchestrates plugin installation for any plugin, whatever kinds it contributes. Loads the plugin, resolves the selected contributions, calls its optional install hook, and returns a generic result.
 
 ## Requirements
 
@@ -10,8 +10,9 @@ Use case that orchestrates plugin installation. Loads the plugin, calls its inst
 
 ```typescript
 interface InstallPluginInput {
-  readonly pluginName: string // npm package name
+  readonly pluginName: string // scoped npm package name
   readonly config: SpecdConfig
+  readonly contributions?: readonly string[] // allowlist of contribution ids; omitted = all declared
   readonly options?: Record<string, unknown> // plugin-specific options
 }
 ```
@@ -22,6 +23,8 @@ interface InstallPluginInput {
 interface InstallPluginOutput {
   readonly success: boolean
   readonly message: string // human-readable result
+  readonly contributions: readonly string[] // contribution ids actually passed to the install hook
+  readonly defaultConfig?: Readonly<Record<string, unknown>> // manifest defaultConfig, for the caller to persist
   readonly data?: unknown // plugin-specific result
 }
 ```
@@ -30,35 +33,40 @@ interface InstallPluginOutput {
 
 The use case MUST:
 
-1. Load the plugin via `PluginLoader`
-2. Verify the loaded plugin is an `AgentPlugin` using the `isAgentPlugin` type guard
-3. If the plugin is not an `AgentPlugin`, throw `PluginValidationError`
-4. Call the plugin's `install()` method with the provided `SpecdConfig` and options
-5. Return a generic result (no config mutation — that is the CLI's responsibility)
+1. Load the plugin and its validated manifest via `PluginLoader`
+2. Resolve the selected contribution ids: `input.contributions` when given, otherwise every id declared in the manifest; an id not declared by the manifest throws `UnknownContributionError`
+3. If the manifest declares `contributes.agents`, verify the loaded plugin is an `AgentPlugin` using `isAgentPlugin`; otherwise throw `PluginValidationError`
+4. Call the plugin's `install()` method, when implemented, with a `PluginInstallContext` (`config`, `contributions`, and `options`, forwarded as given and omitted when not provided). `contributions` carries the selected ids; when the manifest declares `contributes.agents`, the context is an `AgentInstallContext` whose `contributions` carries only the selected ids of the `agents` kind (a mixed-kind plugin never sees its non-agent ids in `install`). When the manifest declares `agents` but none of the selected ids is an `agents` id, `install()` is still called, with `contributions: []`. A plugin without `install` is a successful no-op
+5. Return a generic result whose `contributions` is exactly the list passed to the hook (so output and hook always match) and the manifest `defaultConfig` (no config mutation — that is the CLI's responsibility)
+
+The use case MUST NOT call `init` or `destroy`.
 
 ### Requirement: Error handling
 
 On failure, the use case MUST throw an appropriate error:
 
 - `PluginNotFoundError` — when the plugin package cannot be resolved
-- `PluginValidationError` — when the plugin fails type guard validation (not an `AgentPlugin`)
-- `PluginValidationError` — when `install()` throws
+- `PluginValidationError` — when the plugin declares `agents` but is not an `AgentPlugin`
+- `UnknownContributionError` — when a requested id is not declared by the manifest
+- `PluginValidationError` naming the plugin, with the original error as `cause`, when `install()` throws an error that is not already a `SpecdError`; a `SpecdError` thrown by the hook propagates unchanged
 
 ### Requirement: Agent Initialization Phase
 
-`InstallPlugin` MUST delegate agent prompt initialization, block injection, and native asset deployment to the target `AgentPlugin.install()` implementation.
+This requirement is an informative pointer: the normative behaviour lives in the `plugin-agent-*` specs (and in `skills:shared-folder-owners` for the shared folder), and cannot be verified by plugin-manager unit tests. `InstallPlugin` delegates agent prompt initialization, block injection, and native asset deployment to the target `AgentPlugin.install()` implementation.
 
-- `InstallPlugin.execute()` MUST call `plugin.install(input.config, input.options)`.
+- `InstallPlugin.execute()` MUST call `plugin.install({ config: input.config, contributions, options: input.options })`.
 - Each `AgentPlugin` implementation MUST utilize `@specd/skills` prompt rendering (`renderBaseAgentInstruction`) and block management (`injectSpecdBlock`, `removeSpecdBlock`) during its `install()` / `uninstall()` lifecycle.
 - Reference-counted cleanup on shared instruction files (`AGENTS.md`) MUST be maintained so that the base `<!-- <specd> -->` block persists until all agent plugins targeting that file are uninstalled.
 
 ## Constraints
 
 - This use case does NOT modify config — it only calls the plugin's install.
-- Config mutation is the CLI's responsibility via ConfigWriter.
+- Config mutation (including persisting `defaultConfig` when the entry has no config) is the CLI's responsibility via ConfigWriter.
+- Installation MUST NOT depend on the plugin being initialized or on a kernel.
 
 ## Spec Dependencies
 
-- [`core:config`](../../core/core/config/spec.md) — defines SpecdConfig type
-- [`plugin-manager:agent-plugin-type`](../agent-plugin-type/spec.md) — plugin interface
+- [`core:config`](../../core/core/config/spec.md) — defines SpecdConfig type and the flat plugins list
 - [`plugin-manager:plugin-loader`](../plugin-loader/spec.md) — loads plugins dynamically
+- [`plugin-manager:plugin-errors`](../plugin-errors/spec.md) — typed errors thrown by the use case
+- [`plugin-manager:agent-plugin-type`](../agent-plugin-type/spec.md) — `AgentPlugin`, `isAgentPlugin` and the agents install context

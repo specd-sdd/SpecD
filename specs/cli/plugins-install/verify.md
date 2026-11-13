@@ -14,11 +14,48 @@
 - **WHEN** `specd plugins install @specd/plugin-agent-claude @specd/plugin-agent-copilot` is invoked
 - **THEN** the command attempts to install both plugins
 
+#### Scenario: Unscoped name rejected
+
+- **WHEN** `specd plugins install my-plugin` is invoked
+- **THEN** the command fails for that name before any load is attempted
+
+#### Scenario: Contributions restriction
+
+- **WHEN** `specd plugins install @acme/x --contributions audit` is invoked
+- **THEN** the `InstallPlugin` use case receives `['audit']`
+- **AND** `addPlugin` records `contributions: ['audit']`
+
+#### Scenario: Contributions with several plugins rejected
+
+- **WHEN** `specd plugins install @acme/x @acme/y --contributions audit` is invoked
+- **THEN** the command fails with a usage error
+
+#### Scenario: Empty contributions value rejected
+
+- **WHEN** `specd plugins install @acme/x --contributions ""` is invoked
+- **THEN** the command exits with code 1 and reports that at least one contribution id is required
+- **AND** `InstallPlugin` is not called
+- **AND** `addPlugin` is not called
+
+#### Scenario: Plugin with a kind that has no handler is rejected
+
+- **GIVEN** a plugin whose manifest declares a contribution kind other than `agents`
+- **WHEN** `specd plugins install @acme/x` is invoked
+- **THEN** the result for `@acme/x` is `error` and its detail is the `UnknownContributionKindError` message, which names the plugin and the kind
+- **AND** `addPlugin` is not called and the command exits with code 1
+
+#### Scenario: Unscoped name triggers no install
+
+- **WHEN** `specd plugins install my-plugin` is invoked
+- **THEN** `InstallPlugin` is not called
+- **AND** `addPlugin` is not called
+- **AND** the command exits with code 1
+
 ### Requirement: Declaration source
 
 #### Scenario: Already-installed check uses config.plugins
 
-- **GIVEN** `@specd/plugin-agent-claude` is declared under `plugins.agents` in the loaded config
+- **GIVEN** `@specd/plugin-agent-claude` is declared in the `plugins` list of the loaded config
 - **WHEN** `specd plugins install @specd/plugin-agent-claude` is invoked
 - **THEN** the command detects the plugin as already installed from `config.plugins`
 - **AND** it does not call `kernel.project.listPlugins`
@@ -37,14 +74,20 @@
 - **GIVEN** `@specd/plugin-agent-claude` is already in `specd.yaml`
 - **WHEN** `specd plugins install @specd/plugin-agent-claude` is invoked
 - **THEN** a warning containing "already installed" and "update" is emitted
-- **AND** the plugin is NOT re-installed
+- **AND** `InstallPlugin` is NOT called
+- **AND** `addPlugin` is NOT called
+
+#### Scenario: Duplicate name in one invocation
+
+- **WHEN** `specd plugins install @acme/x @acme/x` is invoked and `@acme/x` is not yet declared
+- **THEN** the plugin is installed once and the second occurrence is reported as already installed
 
 ### Requirement: Display name
 
 #### Scenario: Output displays appropriate header
 
-- **WHEN** `specd plugins install @specd/plugin-agent-claude` is invoked
-- **THEN** output displays a header `Installed plugins:` followed by plugin details
+- **WHEN** `specd plugins install @specd/plugin-agent-claude` is invoked in text format
+- **THEN** output displays a header line exactly `Installed plugins:` followed by plugin details
 
 ### Requirement: Installation workflow
 
@@ -52,8 +95,40 @@
 
 - **WHEN** `specd plugins install @specd/plugin-agent-claude` is invoked with plugin not installed
 - **THEN** `InstallPlugin` use case is called
-- **AND** `createConfigWriter().addPlugin` is called to record the plugin in `specd.yaml`
+- **AND** `createConfigWriter().addPlugin(configPath, name, options)` is called to record the plugin in `specd.yaml`
 - **AND** `kernel.project.addPlugin` is not called
+
+#### Scenario: Default config persisted when declared
+
+- **GIVEN** a plugin whose manifest has `defaultConfig`
+- **WHEN** it is installed without existing config
+- **THEN** `addPlugin` receives that `defaultConfig` as `config`
+
+#### Scenario: No empty config written
+
+- **GIVEN** a plugin without `defaultConfig`
+- **WHEN** it is installed
+- **THEN** the recorded entry has no `config` key
+
+#### Scenario: Init is not run
+
+- **WHEN** a plugin is installed
+- **THEN** the plugin's `init` is not called
+
+#### Scenario: Remaining plugins processed after a failure
+
+- **GIVEN** `specd plugins install @acme/x @acme/y` where installing `@acme/x` fails
+- **WHEN** the command runs
+- **THEN** `@acme/y` is still installed and recorded
+- **AND** `@acme/x` is reported as an error and is not recorded
+
+### Requirement: Host bootstrap without plugins
+
+#### Scenario: Install works with a broken configured plugin
+
+- **GIVEN** a configured plugin that fails to load
+- **WHEN** `specd plugins install @specd/plugin-agent-codex` is invoked
+- **THEN** the host is opened with `plugins: false` and the install proceeds
 
 ### Requirement: Exit code
 
@@ -68,4 +143,5 @@
 #### Scenario: JSON format
 
 - **WHEN** `--format json` is passed
-- **THEN** output is machine-parseable JSON
+- **THEN** output is machine-parseable JSON of the shape `{ plugins: [{ name, status, detail? }], hasErrors }`
+- **AND** `hasErrors` is `true` if and only if at least one plugin failed

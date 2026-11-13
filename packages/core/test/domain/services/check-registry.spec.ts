@@ -4,6 +4,7 @@ import {
   DuplicateCheckBindingError,
   DuplicateCheckError,
   InvalidCheckKindError,
+  InvalidCheckIdError,
   InvalidPluginNameError,
   UnknownCheckError,
 } from '../../../src/domain/errors/check-registry-errors.js'
@@ -11,7 +12,7 @@ import { InvalidInputError } from '../../../src/domain/errors/invalid-input-erro
 import type { CustomCheckDefinition } from '../../../src/domain/services/transition-checks.js'
 
 describe('CheckRegistry', () => {
-  it('registers custom predicate checks under the @<plugin>.<id> namespace', () => {
+  it('registers custom predicate checks under the <plugin-package>.<id> namespace', () => {
     const registry = new CheckRegistry()
     const checkDef: CustomCheckDefinition = {
       id: 'custom-lint',
@@ -25,7 +26,7 @@ describe('CheckRegistry', () => {
       }),
     }
 
-    registry.register('my-plugin', checkDef, [
+    registry.register('@acme/my-plugin', checkDef, [
       {
         scope: 'transition',
         from: 'implementing',
@@ -34,13 +35,16 @@ describe('CheckRegistry', () => {
       },
     ])
 
-    const resolved = registry.get('@my-plugin.custom-lint')
+    expect(() => registry.register('my-plugin', checkDef)).toThrow(InvalidPluginNameError)
+    expect(() => registry.register('@acme/my.plugin', checkDef)).toThrow(InvalidPluginNameError)
+
+    const resolved = registry.get('@acme/my-plugin.custom-lint')
     expect(resolved).toBeDefined()
-    expect(resolved?.id).toBe('@my-plugin.custom-lint')
+    expect(resolved?.id).toBe('@acme/my-plugin.custom-lint')
     expect(resolved?.label).toBe('Custom Linter')
     expect(resolved?.kind).toBe('predicate')
 
-    const bindings = registry.getBindings('@my-plugin.custom-lint')
+    const bindings = registry.getBindings('@acme/my-plugin.custom-lint')
     expect(bindings).toHaveLength(1)
     expect(bindings[0]?.applicability[0]?.scope).toBe('transition')
     expect(bindings[0]?.skippable).toBe(true)
@@ -61,11 +65,42 @@ describe('CheckRegistry', () => {
     }
 
     expect(() => registry.register('', checkDef)).toThrow(InvalidPluginNameError)
-    expect(() => registry.register('plugin@invalid', checkDef)).toThrow(InvalidPluginNameError)
+    expect(() => registry.register('@acme/plugin@invalid', checkDef)).toThrow(
+      InvalidPluginNameError,
+    )
+    expect(registry.register('@acme/1plugin', checkDef)).toBe('@acme/1plugin.custom-check')
+    expect(() => registry.register('@_acme/plugin', checkDef)).toThrow(InvalidPluginNameError)
+    expect(() => registry.register('@acme/_plugin', checkDef)).toThrow(InvalidPluginNameError)
   })
 
-  it.each(['MyPlugin', '123plugin', 'my_plugin'])(
-    'accepts the complete documented plugin namespace grammar: %s',
+  it('InvalidPluginNameError message states the scoped grammar', () => {
+    const registry = new CheckRegistry()
+    const checkDef: CustomCheckDefinition = {
+      id: 'x',
+      label: 'X',
+      execute: async () => ({
+        id: 'x',
+        label: 'X',
+        kind: 'predicate',
+        outcome: 'pass',
+        details: {},
+      }),
+    }
+    let caught: unknown
+    try {
+      registry.register('@Acme/x', checkDef)
+    } catch (err) {
+      caught = err
+    }
+    expect(caught).toBeInstanceOf(InvalidPluginNameError)
+    const message = (caught as Error).message
+    expect(message).toContain('@scope/name')
+    expect(message).toContain('lowercase')
+    expect(message).not.toContain('a-zA-Z')
+  })
+
+  it.each(['@acme/compliance', '@specd/plugin-agent-claude', '@acme/specd-compliance'])(
+    'accepts scoped plugin names: %s',
     (pluginName) => {
       const registry = new CheckRegistry()
       const id = registry.register(pluginName, {
@@ -73,7 +108,9 @@ describe('CheckRegistry', () => {
         label: 'Check',
         execute: async () => ({ id: 'check', label: 'Check', kind: 'predicate', outcome: 'pass' }),
       })
-      expect(id).toBe(`@${pluginName}.check`)
+      expect(id).toBe(`${pluginName}.check`)
+      expect(id.startsWith('@')).toBe(true)
+      expect(id.slice(1)).not.toContain('@')
     },
   )
 
@@ -92,7 +129,7 @@ describe('CheckRegistry', () => {
       }),
     }
 
-    expect(() => registry.register('my-plugin', effectDef as CustomCheckDefinition)).toThrow(
+    expect(() => registry.register('@acme/my-plugin', effectDef as CustomCheckDefinition)).toThrow(
       InvalidCheckKindError,
     )
   })
@@ -111,8 +148,8 @@ describe('CheckRegistry', () => {
       }),
     }
 
-    registry.register('my-plugin', checkDef)
-    expect(() => registry.register('my-plugin', checkDef)).toThrow(DuplicateCheckError)
+    registry.register('@acme/my-plugin', checkDef)
+    expect(() => registry.register('@acme/my-plugin', checkDef)).toThrow(DuplicateCheckError)
   })
 
   it('rejects duplicate coordinate bindings with DuplicateCheckBindingError', () => {
@@ -130,7 +167,7 @@ describe('CheckRegistry', () => {
     }
 
     expect(() =>
-      registry.register('my-plugin', checkDef, [
+      registry.register('@acme/my-plugin', checkDef, [
         {
           scope: 'transition',
           from: 'implementing',
@@ -176,12 +213,12 @@ describe('CheckRegistry', () => {
       }),
     }
 
-    registry.register('my-plugin', checkDef, [], {
+    registry.register('@acme/my-plugin', checkDef, [], {
       allowBindingOverride: false,
       allowConfigOverride: false,
     })
 
-    const governance = registry.getGovernance('@my-plugin.strict-check')
+    const governance = registry.getGovernance('@acme/my-plugin.strict-check')
     expect(governance?.allowBindingOverride).toBe(false)
     expect(governance?.allowConfigOverride).toBe(false)
   })
@@ -204,9 +241,9 @@ describe('CheckRegistry', () => {
       }),
     }
 
-    // Even if pluginName is 'protocol' and check id is 'edge', canonical id is '@protocol.edge'
-    const registeredId = registry.register('protocol', spoofDef)
-    expect(registeredId).toBe('@protocol.edge')
+    // Even if pluginName is 'protocol' and check id is 'edge', canonical id is '@acme/protocol.edge'
+    const registeredId = registry.register('@acme/protocol', spoofDef)
+    expect(registeredId).toBe('@acme/protocol.edge')
 
     // Original built-in check 'protocol.edge' MUST remain completely untouched and un-clobbered
     const currentProtocolEdge = registry.get('protocol.edge')
@@ -215,9 +252,9 @@ describe('CheckRegistry', () => {
     expect(currentProtocolEdge?.label).not.toBe('Malicious Protocol Edge Spoof')
 
     // Custom check is in its own namespaced slot
-    const customCheck = registry.get('@protocol.edge')
+    const customCheck = registry.get('@acme/protocol.edge')
     expect(customCheck).toBeDefined()
-    expect(customCheck?.id).toBe('@protocol.edge')
+    expect(customCheck?.id).toBe('@acme/protocol.edge')
     expect(customCheck?.label).toBe('Malicious Protocol Edge Spoof')
   })
 
@@ -233,11 +270,17 @@ describe('CheckRegistry', () => {
       '',
       ' ',
       '  ',
+      'my-plugin',
+      'MyPlugin',
+      'QA',
       '../escape',
       'plugin/sub',
       'plugin.name',
       'plugin:name',
       '@scope',
+      '@Acme/Plugin',
+      '@acme/my.plugin',
+      '@ac.me/plugin',
       'plugin with spaces',
       'plugin$dollar',
     ]
@@ -247,19 +290,33 @@ describe('CheckRegistry', () => {
     }
   })
 
-  it('enforces @ prefix namespace isolation even if custom check id contains dots, internal names, or @ symbols', () => {
+  it('rejects check ids containing dots, @ symbols or other characters outside the id grammar', () => {
+    const registry = new CheckRegistry()
+    for (const id of ['@protocol.edge', 'a.b', 'Upper', '', '-lead', 'with space']) {
+      const checkDef: CustomCheckDefinition = {
+        id,
+        label: 'Check with invalid id',
+        execute: async () => ({ id: 'c', label: 'C', kind: 'predicate', outcome: 'pass' }),
+      }
+      expect(() => registry.register('@acme/myplugin', checkDef)).toThrow(InvalidCheckIdError)
+    }
+    expect(registry.get('@acme/myplugin.a.b')).toBeUndefined()
+    expect(new InvalidCheckIdError('a.b').code).toBe('INVALID_CHECK_ID')
+  })
+
+  it('keeps plugin check ids isolated from built-in ids under the plugin namespace', () => {
     const registry = new CheckRegistry()
     const checkDef: CustomCheckDefinition = {
-      id: '@protocol.edge',
-      label: 'Check with tricky id',
+      id: 'edge',
+      label: 'Check named like a built-in',
       execute: async () => ({ id: 'c', label: 'C', kind: 'predicate', outcome: 'pass' }),
     }
 
-    const id = registry.register('myplugin', checkDef)
-    expect(id).toBe('@myplugin.@protocol.edge')
+    const id = registry.register('@protocol/x', checkDef)
+    expect(id).toBe('@protocol/x.edge')
     expect(registry.get('protocol.edge')?.id).toBe('protocol.edge')
-    expect(registry.get('@protocol.edge')).toBeUndefined()
-    expect(registry.get('@myplugin.@protocol.edge')).toBeDefined()
+    expect(registry.get('edge')).toBeUndefined()
+    expect(registry.get('@protocol/x.edge')).toBeDefined()
   })
 
   it('rejects invalid check kinds with InvalidCheckKindError', () => {
@@ -279,7 +336,7 @@ describe('CheckRegistry', () => {
         }),
       }
       expect(() =>
-        registry.register('myplugin', badDef as unknown as CustomCheckDefinition),
+        registry.register('@acme/myplugin', badDef as unknown as CustomCheckDefinition),
       ).toThrow(InvalidCheckKindError)
     }
   })
@@ -325,10 +382,10 @@ describe('CheckRegistry', () => {
       execute: async () => ({ id: 'c', label: 'C', kind: 'predicate', outcome: 'pass' }),
     }
 
-    const defaultId = registry.register('sec', checkDef)
+    const defaultId = registry.register('@acme/sec', checkDef)
     expect(registry.getGovernance(defaultId)?.allowDisable).toBe(true)
 
-    const lockedId = registry.register('sec', { ...checkDef, id: 'mandatory' }, [], {
+    const lockedId = registry.register('@acme/sec', { ...checkDef, id: 'mandatory' }, [], {
       allowDisable: false,
     })
     expect(registry.getGovernance(lockedId)?.allowDisable).toBe(false)
@@ -342,7 +399,7 @@ describe('CheckRegistry', () => {
       execute: async () => ({ id: 'c', label: 'C', kind: 'predicate', outcome: 'pass' }),
     }
 
-    registry.register('compliance', checkDef, [
+    registry.register('@acme/compliance', checkDef, [
       {
         scope: 'transition',
         to: 'ready',
@@ -350,7 +407,7 @@ describe('CheckRegistry', () => {
       },
     ])
 
-    const bindings = registry.getBindings('@compliance.audit')
+    const bindings = registry.getBindings('@acme/compliance.audit')
     expect(bindings).toHaveLength(1)
     expect(bindings[0]?.allowDisable).toBe(false)
   })
@@ -363,7 +420,7 @@ describe('CheckRegistry', () => {
       execute: async () => ({ id: 'c', label: 'C', kind: 'predicate', outcome: 'pass' }),
     }
 
-    registry.register('workflow', checkDef, [
+    registry.register('@acme/workflow', checkDef, [
       {
         scope: 'step-skip',
         step: 'implementing',
@@ -371,7 +428,7 @@ describe('CheckRegistry', () => {
     ])
 
     expect(() =>
-      registry.register('workflow', { ...checkDef, id: 'task-gate-2' }, [
+      registry.register('@acme/workflow', { ...checkDef, id: 'task-gate-2' }, [
         {
           scope: 'step-skip',
           step: 'implementing',
@@ -381,7 +438,7 @@ describe('CheckRegistry', () => {
 
     // Same check id duplicate coordinate binding
     expect(() =>
-      registry.register('workflow-dup', checkDef, [
+      registry.register('@acme/workflow-dup', checkDef, [
         {
           scope: 'step-skip',
           step: 'implementing',
@@ -403,7 +460,7 @@ describe('CheckRegistry', () => {
     }
 
     expect(() =>
-      registry.register('workflow', checkDef, [
+      registry.register('@acme/workflow', checkDef, [
         {
           scope: 'step-skip',
           step: 'implementing',
@@ -415,7 +472,7 @@ describe('CheckRegistry', () => {
       ]),
     ).not.toThrow()
 
-    const bindings = registry.getBindings('@workflow.validator')
+    const bindings = registry.getBindings('@acme/workflow.validator')
     expect(bindings).toHaveLength(2)
   })
   it('lists the sixteen built-ins plus registered plugin checks and reports has() accurately', () => {
@@ -428,13 +485,13 @@ describe('CheckRegistry', () => {
         kind: 'predicate',
         execute: () => ({ ok: true }),
       }) as unknown as CustomCheckDefinition
-    registry.register('p', definition('one'))
-    registry.register('p', definition('two'))
+    registry.register('@acme/p', definition('one'))
+    registry.register('@acme/p', definition('two'))
 
     expect(registry.list()).toHaveLength(18)
-    expect(registry.has('@p.one')).toBe(true)
-    expect(registry.has('@p.two')).toBe(true)
-    expect(registry.has('@p.three')).toBe(false)
+    expect(registry.has('@acme/p.one')).toBe(true)
+    expect(registry.has('@acme/p.two')).toBe(true)
+    expect(registry.has('@acme/p.three')).toBe(false)
     expect(registry.has('impl.linksInScope')).toBe(true)
   })
 
@@ -467,14 +524,14 @@ describe('CheckRegistry', () => {
       kind: 'predicate',
       execute: () => ({ ok: true }),
     } as unknown as CustomCheckDefinition
-    registry.register('p', check)
-    registry.register('p', { ...check, id: 'bound' }, [{ scope: 'archive' }])
-    registry.register('p', { ...check, id: 'explicit' }, [{ scope: 'archive' }], {
+    registry.register('@acme/p', check)
+    registry.register('@acme/p', { ...check, id: 'bound' }, [{ scope: 'archive' }])
+    registry.register('@acme/p', { ...check, id: 'explicit' }, [{ scope: 'archive' }], {
       allowSchemaEmbedding: true,
     })
-    expect(registry.getGovernance('@p.free')?.allowSchemaEmbedding).toBe(true)
-    expect(registry.getGovernance('@p.bound')?.allowSchemaEmbedding).toBe(false)
-    expect(registry.getGovernance('@p.explicit')?.allowSchemaEmbedding).toBe(true)
+    expect(registry.getGovernance('@acme/p.free')?.allowSchemaEmbedding).toBe(true)
+    expect(registry.getGovernance('@acme/p.bound')?.allowSchemaEmbedding).toBe(false)
+    expect(registry.getGovernance('@acme/p.explicit')?.allowSchemaEmbedding).toBe(true)
   })
 
   it('withExecutableBuiltins replaces built-ins and rejects non-built-ins or kind mismatches', () => {
@@ -486,10 +543,29 @@ describe('CheckRegistry', () => {
     expect(registry.get('impl.linksInScope')).toBe(original)
     expect(copy.list()).toHaveLength(registry.list().length)
     expect(copy.bindings()).toHaveLength(registry.bindings().length)
+    expect(
+      copy
+        .list()
+        .map((c) => c.id)
+        .sort(),
+    ).toEqual(
+      registry
+        .list()
+        .map((c) => c.id)
+        .sort(),
+    )
+    const bindingKeys = (r: CheckRegistry) =>
+      r
+        .bindings()
+        .map((b) => JSON.stringify(b))
+        .sort()
+    expect(bindingKeys(copy)).toEqual(bindingKeys(registry))
     expect(copy.getGovernance('impl.linksInScope')).toEqual(
       registry.getGovernance('impl.linksInScope'),
     )
-    expect(() => registry.withExecutableBuiltins({ '@p.x': instance })).toThrow(InvalidInputError)
+    expect(() => registry.withExecutableBuiltins({ '@acme/p.x': instance })).toThrow(
+      InvalidInputError,
+    )
     expect(() =>
       registry.withExecutableBuiltins({
         'impl.linksInScope': { ...original, kind: 'effect' } as never,
@@ -535,16 +611,55 @@ describe('CheckRegistry — archive bindings', () => {
 
   it('registers a plugin archive binding after the built-in ones', () => {
     const registry = new CheckRegistry()
-    registry.register('sec', pluginCheck, [{ scope: 'archive', skippable: true }])
-    const binding = registry.getBindings('@sec.scan')[0]
+    registry.register('@acme/sec', pluginCheck, [{ scope: 'archive', skippable: true }])
+    const binding = registry.getBindings('@acme/sec.scan')[0]
     expect(binding?.applicability).toEqual([{ scope: 'archive' }])
     expect(binding?.skippable).toBe(true)
+  })
+
+  it('rejects @@ in plugin names', () => {
+    const registry = new CheckRegistry()
+    const checkDef: CustomCheckDefinition = {
+      id: 'check',
+      label: 'Check',
+      execute: async () => ({
+        id: 'check',
+        label: 'Check',
+        kind: 'predicate',
+        outcome: 'pass',
+        details: {},
+      }),
+    }
+    expect(() => registry.register('@@acme/plugin', checkDef)).toThrow(InvalidPluginNameError)
+  })
+
+  it('accepts hyphen and underscore in scoped plugin names', () => {
+    const registry = new CheckRegistry()
+    const checkDef: CustomCheckDefinition = {
+      id: 'check',
+      label: 'Check',
+      execute: async () => ({
+        id: 'check',
+        label: 'Check',
+        kind: 'predicate',
+        outcome: 'pass',
+        details: {},
+      }),
+    }
+    expect(registry.register('@acme/my-plugin', checkDef)).toBe('@acme/my-plugin.check')
+    expect(registry.register('@acme/my_plugin', checkDef)).toBe('@acme/my_plugin.check')
+  })
+
+  it('returns empty bindings and undefined governance for unknown check ids', () => {
+    const registry = new CheckRegistry()
+    expect(registry.getBindings('@acme/unknown.check')).toEqual([])
+    expect(registry.getGovernance('@acme/unknown.check')).toBeUndefined()
   })
 
   it('rejects a second archive binding for the same plugin check', () => {
     const registry = new CheckRegistry()
     expect(() =>
-      registry.register('sec', pluginCheck, [{ scope: 'archive' }, { scope: 'archive' }]),
+      registry.register('@acme/sec', pluginCheck, [{ scope: 'archive' }, { scope: 'archive' }]),
     ).toThrow(DuplicateCheckBindingError)
   })
 })

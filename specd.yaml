@@ -1,4 +1,5 @@
 schema: '@specd/schema-std'
+configVersion: 2
 
 logging:
   level: debug
@@ -358,9 +359,8 @@ schemaOverrides:
               run: 'node dev/scripts/hooks/post-archive-changeset.js {{change.archivedName}}'
 
 plugins:
-  agents:
-    - name: '@specd/plugin-agent-claude'
-    - name: '@specd/plugin-agent-copilot'
-    - name: '@specd/plugin-agent-standard'
-    - name: '@specd/plugin-agent-codex'
-    - name: '@specd/plugin-agent-opencode'
+  - name: '@specd/plugin-agent-claude'
+  - name: '@specd/plugin-agent-copilot'
+  - name: '@specd/plugin-agent-standard'
+  - name: '@specd/plugin-agent-codex'
+  - name: '@specd/plugin-agent-opencode'

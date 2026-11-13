@@ -11,14 +11,15 @@ describe('Real Delta Validation Logic', () => {
     {
       id: 'verify-requirement-delta-has-scenario',
       selector: {
-        type: 'sequence-item'
+        type: 'sequence-item',
       },
       // Logic: IF ((op:added AND content:### Requirement:) OR (op:modified AND matches:Requirement:))
       //        THEN MUST have #### Scenario:
       // We use lookaheads (?=...) with [\s\S]* to ensure we match across lines and regardless of field order.
-      contentMatches: '^(?:(?!(?=^[\\s\\S]*op: added)(?=[\\s\\S]*content:[^]*### Requirement:)|(?=[\\s\\S]*op: modified)(?=[\\s\\S]*matches:[^]*Requirement:))[\\s\\S]*|[\\s\\S]*#### Scenario:[\\s\\S]*)$',
-      required: true
-    }
+      contentMatches:
+        '^(?:(?!(?=^[\\s\\S]*op: added)(?=[\\s\\S]*content:[^]*### Requirement:)|(?=[\\s\\S]*op: modified)(?=[\\s\\S]*matches:[^]*Requirement:))[\\s\\S]*|[\\s\\S]*#### Scenario:[\\s\\S]*)$',
+      required: true,
+    },
   ]
 
   it('passes when adding a requirement with a scenario', () => {
@@ -104,7 +105,7 @@ describe('Real Delta Validation Logic', () => {
     const result = evaluateRules(rules, ast.root, artifactId, parser)
     expect(result.failures).toHaveLength(0)
   })
-  
+
   it('allows removal without scenarios', () => {
     const delta = `
 - op: removed

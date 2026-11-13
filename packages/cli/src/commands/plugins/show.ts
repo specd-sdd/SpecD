@@ -1,6 +1,11 @@
 import { type Command } from 'commander'
-import { LoadPlugin, createPluginLoader } from '@specd/plugin-manager'
-import type { SpecdPlugin } from '@specd/plugin-manager'
+import {
+  LoadPlugin,
+  buildContributionAddress,
+  createPluginLoader,
+  type SpecdPlugin,
+  type SpecdPluginManifest,
+} from '@specd/plugin-manager'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
@@ -20,25 +25,53 @@ export function registerPluginsShow(parent: Command): void {
     .action(async (pluginName: string, opts: { format: string; config?: string }) => {
       try {
         const fmt = parseFormat(opts.format)
-        const { config } = await resolveCliContext({ configPath: opts.config })
+        const { config } = await resolveCliContext({
+          configPath: opts.config,
+          plugins: false,
+        })
         const loader = createPluginLoader({ config })
         const load = new LoadPlugin(loader)
-        const { plugin } = await load.execute({ pluginName })
+        const { plugin, manifest } = await load.execute({ pluginName })
+        const contributions = Object.entries(manifest.contributes).flatMap(([kind, entries]) =>
+          Object.keys(entries).map((id) => ({
+            kind,
+            id,
+            address: buildContributionAddress(plugin.name, id),
+          })),
+        )
 
+        const capabilities = buildCapabilities(plugin, manifest)
         const payload = {
           name: plugin.name,
-          type: plugin.type,
           version: plugin.version,
-          configSchema: plugin.configSchema,
-          capabilities: buildCapabilities(plugin),
+          contributions,
+          ...(manifest.configSchema !== undefined ? { configSchema: manifest.configSchema } : {}),
+          ...(manifest.defaultConfig !== undefined
+            ? { defaultConfig: manifest.defaultConfig }
+            : {}),
+          ...(capabilities.length > 0 ? { capabilities } : {}),
         }
 
         if (fmt === 'text') {
           output(`name: ${payload.name}`, 'text')
-          output(`type: ${payload.type}`, 'text')
           output(`version: ${payload.version}`, 'text')
-          output(`capabilities: ${payload.capabilities.join(', ')}`, 'text')
-          output(`configSchema: ${JSON.stringify(payload.configSchema)}`, 'text')
+          if (payload.contributions.length === 0) {
+            output('contributions: (none)', 'text')
+          } else {
+            output('contributions:', 'text')
+            for (const entry of payload.contributions) {
+              output(`  ${entry.kind} ${entry.id} ${entry.address}`, 'text')
+            }
+          }
+          if (manifest.configSchema !== undefined) {
+            output(`configSchema: ${JSON.stringify(manifest.configSchema)}`, 'text')
+          }
+          if (manifest.defaultConfig !== undefined) {
+            output(`defaultConfig: ${JSON.stringify(manifest.defaultConfig)}`, 'text')
+          }
+          if (payload.capabilities !== undefined) {
+            output(`capabilities: ${payload.capabilities.join(', ')}`, 'text')
+          }
           return
         }
         output(payload, fmt)
@@ -52,16 +85,15 @@ export function registerPluginsShow(parent: Command): void {
  * Derives a capability list from a plugin instance.
  *
  * @param plugin - Loaded runtime plugin.
- * @returns Capability names.
+ * @param manifest - Parsed plugin manifest.
+ * @returns Capability names. `init` and `destroy` are the base contract and are
+ * not listed. Install hooks are listed when the plugin implements them or
+ * declares the `agents` kind.
  */
-function buildCapabilities(plugin: SpecdPlugin): string[] {
-  const record = plugin as unknown as Record<string, unknown>
-  const capabilities = ['init', 'destroy']
-  if (typeof record['install'] === 'function') {
-    capabilities.push('install')
-  }
-  if (typeof record['uninstall'] === 'function') {
-    capabilities.push('uninstall')
-  }
+function buildCapabilities(plugin: SpecdPlugin, manifest: SpecdPluginManifest): string[] {
+  const agents = manifest.contributes['agents'] !== undefined
+  const capabilities: string[] = []
+  if (typeof plugin.install === 'function' || agents) capabilities.push('install')
+  if (typeof plugin.uninstall === 'function' || agents) capabilities.push('uninstall')
   return capabilities
 }

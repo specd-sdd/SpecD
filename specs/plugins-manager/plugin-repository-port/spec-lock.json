@@ -3,6 +3,14 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["plugin-manager:specd-plugin-type"],
-  "implementation": []
+  "dependsOn": ["plugin-manager:specd-plugin-type", "core:config-writer-port"],
+  "implementation": [
+    {
+      "file": "plugin-manager:src/application/ports/plugin-repository.ts",
+      "symbols": ["PluginRepositoryPort", "DeclaredPlugin"]
+    },
+    {
+      "file": "plugin-manager:test/application/plugin-repository-port.spec.ts"
+    }
+  ]
 }

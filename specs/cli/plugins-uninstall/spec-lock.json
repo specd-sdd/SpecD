@@ -5,9 +5,9 @@
   },
   "dependsOn": [
     "plugin-manager:uninstall-plugin-use-case",
-    "plugin-manager:load-plugin-use-case",
     "core:composition",
-    "core:config-writer-port"
+    "core:config-writer-port",
+    "cli:host-context"
   ],
   "implementation": [
     {

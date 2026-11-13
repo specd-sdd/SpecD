@@ -30,7 +30,50 @@
 
 - **GIVEN** interactive mode is active
 - **WHEN** the user selects plugins
-- **THEN** selected plugins are marked for installation
+- **THEN** selected plugins are marked for installation and installed after init
+
+#### Scenario: Selecting no plugin is valid
+
+- **GIVEN** interactive mode is active
+- **WHEN** the user confirms the plugin multi-select with nothing selected
+- **THEN** init completes and no plugin is installed
+
+#### Scenario: Overwrite confirmation for an existing config
+
+- **GIVEN** interactive mode is active and `specd.yaml` already exists
+- **WHEN** the wizard starts
+- **THEN** the user is told the config exists and asked whether to overwrite or cancel
+- **AND** the confirmation names the config path and states that overwriting replaces the existing configuration, including its declared plugins and workspaces
+
+#### Scenario: Cancelling the wizard
+
+- **GIVEN** interactive mode is active
+- **WHEN** the user cancels a prompt
+- **THEN** `initProject` is not called and nothing is written
+- **AND** the command exits with code 0
+
+#### Scenario: Declining the overwrite
+
+- **GIVEN** interactive mode is active and `specd.yaml` already exists
+- **WHEN** the user declines the overwrite confirmation
+- **THEN** `initProject` is not called, the existing file is untouched and the command exits with code 0
+
+#### Scenario: Help documents the cancel exit code
+
+- **WHEN** `specd project init --help` is run
+- **THEN** the help states that cancelling exits with code 0
+
+#### Scenario: Banner shown only in the wizard
+
+- **GIVEN** interactive mode is active
+- **WHEN** the wizard starts
+- **THEN** the ASCII banner is printed
+
+#### Scenario: Explicit default flag value keeps non-interactive mode
+
+- **GIVEN** stdout is a TTY
+- **WHEN** `specd project init --workspace default` is run
+- **THEN** the wizard is not entered because a configuration flag was provided
 
 ### Requirement: Known plugin options
 
@@ -45,6 +88,7 @@
 - **GIVEN** interactive mode is active
 - **WHEN** the plugin selection options are rendered
 - **THEN** `@specd/plugin-agent-standard` is listed as a selectable plugin option
+- **AND** the options are exactly claude, copilot, codex, opencode and standard
 
 ### Requirement: Non-interactive mode
 
@@ -53,6 +97,11 @@
 - **WHEN** `specd project init --workspace default --workspace-path specs/` is run
 - **THEN** `specd.yaml` is written with `schema: '@specd/schema-std'`, workspace `default` at `specs/`
 - **AND** the process exits with code 0
+
+#### Scenario: No banner in non-interactive text output
+
+- **WHEN** `specd project init --workspace default --workspace-path specs/` is run in text format
+- **THEN** stdout starts with `initialized specd in ...` and contains no ASCII banner
 
 #### Scenario: JSON output contains plugins install results
 
@@ -106,16 +155,16 @@
 
 #### Scenario: tmp gitignore created idempotently
 
-- **GIVEN** a clean project root with resolved config path `.specd`
+- **GIVEN** a clean project root with the default resolved config path `.specd/config`
 - **WHEN** `specd project init --workspace default` completes successfully
-- **THEN** `.specd/tmp/.gitignore` exists
+- **THEN** `.specd/config/tmp/.gitignore` exists
 - **AND** its contents are `*` on the first line and `!.gitignore` on the second line
 
 #### Scenario: tmp gitignore preserved on re-init with --force
 
-- **GIVEN** `.specd/tmp/.gitignore` already exists with the normative contents
+- **GIVEN** `.specd/config/tmp/.gitignore` already exists with the normative contents
 - **WHEN** `specd project init --force --workspace default` completes successfully
-- **THEN** `.specd/tmp/.gitignore` still contains `*` and `!.gitignore`
+- **THEN** `.specd/config/tmp/.gitignore` still contains `*` and `!.gitignore`
 
 #### Scenario: Metadata cache directory created idempotently
 
@@ -136,13 +185,33 @@
 - **THEN** the `metadataCachePath` shown to the caller is read directly from the `InitProject` result
 - **AND** the CLI does not independently recompute the metadata cache path
 
-### Requirement: Skills installation after init
+### Requirement: Plugin installation after init
 
 #### Scenario: Plugins are installed for selected plugins after init
 
 - **WHEN** `specd project init --plugin @specd/plugin-agent-claude` is run
-- **THEN** each plugin's `install()` method is called
-- **AND** `specd.yaml` records the plugin under `plugins.agents`
+- **THEN** the plugin is installed through the plugin install logic
+- **AND** `specd.yaml` records the plugin in the `plugins` list
+- **AND** `specd.yaml` contains `configVersion: 2`
+
+#### Scenario: Post-init install host is opened without plugins
+
+- **WHEN** `specd project init --plugin @specd/plugin-agent-claude` is run
+- **THEN** the install step calls `resolveCliContext` with the new `configPath` and `plugins: false`
+
+#### Scenario: Plugin install failure after init
+
+- **GIVEN** `initProject` succeeds and installing the selected plugin fails
+- **WHEN** `specd project init --plugin @acme/broken` is run
+- **THEN** the init output (config, directories, metadata cache) remains
+- **AND** the failure is reported in the per-plugin results
+- **AND** the process exits with code 1
+
+#### Scenario: Invalid plugin name rejected before init
+
+- **WHEN** `specd project init --plugin my-plugin` is run
+- **THEN** the command exits with code 1
+- **AND** `initProject` is not called and no file is written
 
 ### Requirement: Already initialised
 

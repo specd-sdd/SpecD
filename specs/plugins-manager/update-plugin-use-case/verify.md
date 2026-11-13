@@ -23,7 +23,45 @@
 
 - **WHEN** UpdatePlugin is executed
 - **THEN** it loads the plugin via `PluginLoader`
-- **AND** validates it is an `AgentPlugin`
+
+#### Scenario: Selection is preserved
+
+- **GIVEN** a plugin declaring `a` and `b` and a selection `['a']`
+- **WHEN** UpdatePlugin is executed
+- **THEN** `install()` receives `['a']` and `b` is not activated
+
+#### Scenario: Selected id removed by new version
+
+- **GIVEN** a selection `['a']` and an updated manifest that no longer declares `a`
+- **WHEN** UpdatePlugin is executed
+- **THEN** UnknownContributionError is thrown
+
+#### Scenario: Plugin not found
+
+- **WHEN** UpdatePlugin is executed with a non-existent plugin
+- **THEN** `PluginNotFoundError` is thrown
+
+#### Scenario: Output shape
+
+- **WHEN** UpdatePlugin completes
+- **THEN** the output has `success`, `message` and `contributions`, and no `defaultConfig`
+
+#### Scenario: Update is idempotent
+
+- **GIVEN** the same input
+- **WHEN** UpdatePlugin is executed twice
+- **THEN** both calls succeed with the same output and `install()` received the same ids both times
+
+#### Scenario: Mixed kinds pass only agents ids to the hook
+
+- **GIVEN** a plugin declaring `agents` contribution `claude` and a `checks` contribution `audit`
+- **WHEN** UpdatePlugin is executed
+- **THEN** `install()` receives `['claude']` and the output `contributions` is `['claude']`
+
+#### Scenario: Config is not modified
+
+- **WHEN** UpdatePlugin is executed
+- **THEN** no config is written
 
 ### Requirement: Idempotency
 
@@ -35,8 +73,20 @@
 
 ### Requirement: Error handling
 
-#### Scenario: Non-agent plugin rejected
+#### Scenario: Agent declaration without agent contract rejected
 
-- **GIVEN** a loaded plugin that is a valid SpecdPlugin but not an AgentPlugin
+- **GIVEN** a plugin whose manifest declares `contributes.agents` but lacks `install` or `uninstall`
 - **WHEN** `UpdatePlugin.execute()` is called
 - **THEN** `PluginValidationError` is thrown
+
+#### Scenario: Update failure is wrapped
+
+- **GIVEN** a plugin whose `install()` throws during update
+- **WHEN** `UpdatePlugin.execute()` is called
+- **THEN** `PluginValidationError` naming the plugin is thrown with the original error as `cause`
+
+#### Scenario: SpecdError from the hook propagates unchanged
+
+- **GIVEN** a plugin whose hook throws a `SpecdError`
+- **WHEN** the use case is executed
+- **THEN** that same `SpecdError` is rethrown without wrapping

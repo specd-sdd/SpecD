@@ -14,7 +14,8 @@
   },
   "dependencies": {
     "@specd/code-graph": "workspace:*",
-    "@specd/core": "workspace:*"
+    "@specd/core": "workspace:*",
+    "@specd/plugin-manager": "workspace:*"
   },
   "exports": {
     ".": {

@@ -18,7 +18,20 @@ export {
   type RenderBaseAgentInstructionOptions,
 } from './application/render-base-agent-instruction.js'
 export { injectSpecdBlock, removeSpecdBlock } from './application/specd-block-manager.js'
+export { splitTopLevelCommas } from './application/split-top-level-commas.js'
 export { mergeJsonConfig, unmergeJsonConfig } from './application/json-config-manager.js'
+export {
+  selectManagedNames,
+  type ManagedNameSelection,
+  type SkippedName,
+  type UninstallResult,
+} from './application/select-managed-names.js'
+export {
+  addSharedOwner,
+  removeSharedFolderIfEmpty,
+  removeSharedOwner,
+  type SharedOwnerRelease,
+} from './application/shared-folder-owners.js'
 
 /**
  * Legacy flat skill shape kept temporarily for the old CLI `skills *` commands

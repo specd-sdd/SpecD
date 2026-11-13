@@ -64,7 +64,7 @@ export type PluginCheckDefaultBinding =
  * Registration descriptor for a custom transition check.
  */
 export interface PluginCheckRegistration {
-  /** Plugin namespace matching ^[a-zA-Z0-9_-]+$ */
+  /** Scoped plugin name matching ^@[a-z0-9][a-z0-9_-]*\/[a-z0-9][a-z0-9_-]*$ */
   readonly pluginName: string
   /** Custom check implementation */
   readonly check: CustomCheckDefinition

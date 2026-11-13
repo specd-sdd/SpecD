@@ -11,7 +11,10 @@ Most CLI commands need a loaded `SpecdConfig`, config file path, and wired `Kern
 `resolveCliContext` in `packages/cli/src/helpers/cli-context.ts` MUST obtain the host through the CLI host-opening helper (see **CLI host-opening helper**), which calls `openSpecdHost` from `@specd/sdk` with:
 
 - `configPath` from caller options when provided
-- `kernelOptions` derived from CLI-specific logging configuration (verbosity from argv, console log destination, optional callback destination)
+- `options.kernel` (the kernel options object) derived from CLI-specific logging configuration (verbosity from argv, console log destination, optional callback destination)
+- `options.plugins` set to the caller's `plugins` option when provided (default `true`)
+
+`resolveCliContext` MUST accept an optional `plugins?: boolean` option. Commands that manage plugins (`plugins install|uninstall|update|list|show`, `project update`) and any command that must keep working with a broken configured plugin MUST pass `plugins: false`, so that no plugin is loaded, initialized or disposed for that command.
 
 It MUST return the opened host as `CliContext`: an `SdkHostContext` extended with `config` and `configFilePath`, so the result carries `kernel`, `createGraphProvider`, `dispose` and `[Symbol.asyncDispose]`.
 
@@ -37,15 +40,15 @@ The CLI MUST NOT wrap a kernel it did not create into an `SdkHostContext`: `reso
 
 ### Requirement: CLI cleanup registry
 
-The CLI SHALL provide a cleanup registry (`registerCliCleanup(fn)` and `runCliCleanup()`) in `packages/cli/src/helpers/`. `runCliCleanup()` SHALL run the registered cleanups in reverse registration order, awaiting each one, and SHALL be idempotent: a second or concurrent call returns the same promise and each cleanup runs at most once. A failing cleanup MUST NOT stop the others; its failure SHALL be reported on stderr as a `warning:` line and MUST NOT change the process exit code.
+The CLI SHALL provide a cleanup registry (`registerCliCleanup(fn)` and `runCliCleanup()`) in `packages/cli/src/helpers/`. `runCliCleanup()` SHALL run the registered cleanups in reverse registration order, awaiting each one, and SHALL be idempotent: a second or concurrent call returns the same promise and each cleanup runs at most once. A failing cleanup MUST NOT stop the others; its failure SHALL be reported on stderr as a `warning: cleanup failed: <message>` line (an `AggregateError` is flattened into one line per cause) and MUST NOT change the process exit code.
 
-Once `runCliCleanup()` has started, a cleanup passed to `registerCliCleanup` SHALL be invoked immediately instead of being queued; its failure is reported as a `warning:` line like any other and MUST NOT change the exit code.
+Once `runCliCleanup()` has started, a cleanup passed to `registerCliCleanup` SHALL be invoked immediately instead of being queued; its failure is reported as a `warning: cleanup failed: <message>` line like any other and MUST NOT change the exit code.
 
-The entrypoint, not individual commands, SHALL trigger the registry on every exit path (see [`cli:entrypoint`](../entrypoint/spec.md)).
+The entrypoint, not individual commands, SHALL trigger the registry on every exit path, including error exits and signals (see [`cli:entrypoint`](../entrypoint/spec.md)).
 
 ### Requirement: Graph index worker releases its host
 
-`packages/cli/src/graph-index-task.ts` runs in its own process and SHALL NOT depend on the CLI cleanup registry. It SHALL dispose the host it opens, in a `finally` block, before the worker finishes, on success and on failure.
+`packages/cli/src/graph-index-task.ts` runs in its own process and SHALL NOT depend on the CLI cleanup registry. It SHALL open its host with plugins disabled (`plugins: false`), because indexing needs no plugin contribution and a broken plugin must not break the index worker. It SHALL dispose the host it opens, in a `finally` block, before the worker finishes, on success and on failure.
 
 ### Requirement: CLI package runtime dependencies
 
@@ -56,4 +59,4 @@ The `@specd/cli` package runtime dependencies MUST include `@specd/sdk` as the s
 - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery semantics consumed by host bootstrap; exit paths that trigger cleanup
 - [`sdk:host-context`](../../sdk/host-context/spec.md) — `openSpecdHost`, `SdkHostContext` and `dispose`
 - [`sdk:composition`](../../sdk/composition/spec.md) — SDK package boundary and re-exports
-- [`core:kernel`](../../../../specs/core/kernel/spec.md) — disposal semantics (order, aggregation, timeout) inherited through the SDK host
+- [`core:kernel`](../../core/kernel/spec.md) — disposal semantics (order, aggregation, timeout) inherited through the SDK host

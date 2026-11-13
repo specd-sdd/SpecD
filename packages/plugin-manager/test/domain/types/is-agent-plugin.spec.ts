@@ -6,10 +6,8 @@ import type { AgentInstallOptions } from '../../../src/index.js'
 
 function makeSpecdPlugin(overrides: Record<string, unknown> = {}): SpecdPlugin {
   return {
-    name: 'test-plugin',
-    type: 'agent',
+    name: '@acme/test-plugin',
     version: '1.0.0',
-    configSchema: {},
     init: async () => {},
     destroy: async () => {},
     ...overrides,
@@ -32,17 +30,23 @@ describe('isAgentPlugin', () => {
     expect(isAgentPlugin(plugin)).toBe(false)
   })
 
-  it('given a SpecdPlugin with wrong type, when checked, then returns false', () => {
+  it('given a SpecdPlugin with install but no uninstall, when checked, then returns false', () => {
     const plugin = makeSpecdPlugin({
-      type: 'integration',
       install: async () => ({ installed: [], skipped: [] }),
-      uninstall: async () => {},
     })
     expect(isAgentPlugin(plugin)).toBe(false)
   })
 
-  it('given recursive variables and capabilities in install options, when install is typed, then the type guard remains valid', () => {
-    const installOptions: AgentInstallOptions = {
+  it('given install and uninstall functions, when type is absent, then returns true', () => {
+    const plugin = makeSpecdPlugin({
+      install: async () => ({ installed: [], skipped: [] }),
+      uninstall: async () => {},
+    })
+    expect(isAgentPlugin(plugin)).toBe(true)
+  })
+
+  it('given recursive variables and capabilities in install options, when install is called with the context, then the options reach the hook unchanged', async () => {
+    const options: AgentInstallOptions = {
       variables: {
         sharedFolder: '.specd/config/skills/shared',
         frontmatter: {
@@ -52,15 +56,19 @@ describe('isAgentPlugin', () => {
       },
       capabilities: ['mcp', 'frontmatter'],
     }
-
+    const received: unknown[] = []
     const plugin = makeSpecdPlugin({
-      install: async (_config: SpecdConfig, options?: AgentInstallOptions) => {
-        expect(options).toEqual(installOptions)
+      install: async (context: { options?: AgentInstallOptions }) => {
+        received.push(context.options)
         return { installed: [], skipped: [] }
       },
       uninstall: async () => {},
     })
 
     expect(isAgentPlugin(plugin)).toBe(true)
+    if (isAgentPlugin(plugin)) {
+      await plugin.install({ config: {} as SpecdConfig, contributions: [], options })
+    }
+    expect(received).toEqual([options])
   })
 })

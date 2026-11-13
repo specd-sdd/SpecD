@@ -3,6 +3,14 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["cli:entrypoint", "cli:skills-update", "core:config"],
-  "implementation": []
+  "dependsOn": ["cli:entrypoint", "cli:plugins-update", "cli:host-context", "core:config"],
+  "implementation": [
+    {
+      "file": "cli:src/commands/project/update.ts",
+      "symbols": ["registerProjectUpdate"]
+    },
+    {
+      "file": "cli:test/commands/project-update.spec.ts"
+    }
+  ]
 }

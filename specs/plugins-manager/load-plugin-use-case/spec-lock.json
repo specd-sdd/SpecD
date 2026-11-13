@@ -4,5 +4,9 @@
     "version": 1
   },
   "dependsOn": ["plugin-manager:plugin-loader"],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "plugin-manager:test/application/load-plugin.spec.ts"
+    }
+  ]
 }

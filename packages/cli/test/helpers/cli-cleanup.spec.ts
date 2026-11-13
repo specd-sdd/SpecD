@@ -70,6 +70,42 @@ describe('CLI cleanup registry', () => {
     expect(write).toHaveBeenCalledWith('warning: cleanup failed: two\n')
   })
 
+  it('reports the message of an AggregateError without inner errors', async () => {
+    const write = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    registerCliCleanup(() => {
+      throw new AggregateError([], 'nothing inside')
+    })
+
+    await runCliCleanup()
+
+    expect(write).toHaveBeenCalledWith('warning: cleanup failed: nothing inside\n')
+  })
+
+  it('flattens nested AggregateErrors recursively into one warning per leaf failure', async () => {
+    const write = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    registerCliCleanup(() => {
+      throw new AggregateError(
+        [
+          new Error('one'),
+          new AggregateError(
+            [new Error('two'), new AggregateError([new Error('three')], 'inner')],
+            'mid',
+          ),
+        ],
+        'outer',
+      )
+    })
+
+    await runCliCleanup()
+
+    const lines = write.mock.calls.map((call) => String(call[0]))
+    expect(lines).toEqual([
+      'warning: cleanup failed: one\n',
+      'warning: cleanup failed: two\n',
+      'warning: cleanup failed: three\n',
+    ])
+  })
+
   it('invokes a cleanup registered after the run started', async () => {
     registerCliCleanup(() => {})
     await runCliCleanup()

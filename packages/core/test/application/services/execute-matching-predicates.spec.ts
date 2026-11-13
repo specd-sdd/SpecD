@@ -234,7 +234,7 @@ describe('executeMatchingPredicates', () => {
 
   it('cascades and deep-merges configuration across check-default, binding, and schema step levels', async () => {
     let capturedConfig: Record<string, unknown> | undefined
-    const checkId = '@qa.matrix'
+    const checkId = '@acme/qa.matrix'
     const customCheck: Check = {
       id: checkId,
       label: 'Matrix Check',
@@ -252,7 +252,7 @@ describe('executeMatchingPredicates', () => {
 
     const registry = new CheckRegistry()
     registry.register(
-      'qa',
+      '@acme/qa',
       {
         id: 'matrix',
         label: 'Matrix Check',
@@ -366,7 +366,7 @@ describe('executeMatchingPredicates', () => {
 
   it('omits checks declared with disabled: true on the target workflow step from execution', async () => {
     let executed = false
-    const checkId = '@qa.optional-check'
+    const checkId = '@acme/qa.optional-check'
     const optionalCheck: Check = {
       id: checkId,
       label: 'Optional QA Check',
@@ -446,12 +446,12 @@ describe('executeMatchingPredicates', () => {
       let captured: Record<string, unknown> | undefined
       const registry = new CheckRegistry()
       registry.register(
-        'qa',
+        '@acme/qa',
         {
           id: 'arrays',
           label: 'Array Check',
           execute: async () => ({
-            id: '@qa.arrays',
+            id: '@acme/qa.arrays',
             label: 'x',
             kind: 'predicate',
             outcome: 'pass',
@@ -460,7 +460,7 @@ describe('executeMatchingPredicates', () => {
         undefined,
         { defaultConfig: { tags: ['default'] } },
       )
-      const check = arrayCheck('@qa.arrays', (config) => {
+      const check = arrayCheck('@acme/qa.arrays', (config) => {
         captured = config
       })
       const binding = makeBinding(
@@ -475,7 +475,7 @@ describe('executeMatchingPredicates', () => {
             requires: [],
             requiresTaskCompletion: [],
             hooks: { pre: [], post: [] },
-            checks: [{ id: '@qa.arrays', config: { tags: ['b'] } }],
+            checks: [{ id: '@acme/qa.arrays', config: { tags: ['b'] } }],
           },
         ],
       })
@@ -504,12 +504,12 @@ describe('executeMatchingPredicates', () => {
       let captured: Record<string, unknown> | undefined
       const registry = new CheckRegistry()
       registry.register(
-        'qa',
+        '@acme/qa',
         {
           id: 'plain',
           label: 'Plain',
           execute: async () => ({
-            id: '@qa.plain',
+            id: '@acme/qa.plain',
             label: 'x',
             kind: 'predicate',
             outcome: 'pass',
@@ -518,7 +518,7 @@ describe('executeMatchingPredicates', () => {
         undefined,
         { defaultConfig: { tags: ['default'] } },
       )
-      const check = arrayCheck('@qa.plain', (config) => {
+      const check = arrayCheck('@acme/qa.plain', (config) => {
         captured = config
       })
       const binding = makeBinding(
@@ -546,13 +546,13 @@ describe('executeMatchingPredicates', () => {
       attempt: 'forward' | 'redesign',
     ) {
       const execute = vi.fn(async () => ({
-        id: '@qa.step' as const,
+        id: '@acme/qa.step' as const,
         label: 'Step',
         kind: 'predicate' as const,
         outcome: 'pass' as const,
       }))
       const registry = new CheckRegistry()
-      registry.register('qa', {
+      registry.register('@acme/qa', {
         id: 'step',
         label: 'Step',
         execute,
@@ -564,7 +564,7 @@ describe('executeMatchingPredicates', () => {
             requires: [],
             requiresTaskCompletion: [],
             hooks: { pre: [], post: [] },
-            checks: [{ id: '@qa.step', ...decl }],
+            checks: [{ id: '@acme/qa.step', ...decl }],
           },
         ],
       })
@@ -623,7 +623,7 @@ describe('executeMatchingPredicates', () => {
   it('emits check-done with a skip outcome when the user bypasses a check', async () => {
     const execute = vi.fn()
     const check: Check = {
-      id: '@qa.bypassed',
+      id: '@acme/qa.bypassed',
       label: 'Bypassed',
       kind: 'predicate',
       execute,
@@ -637,7 +637,7 @@ describe('executeMatchingPredicates', () => {
       schema: makeSchema(),
       attempt: { scope: 'transition', from: 'designing', to: 'ready', along: 'forward' },
       approvals: { spec: false, signoff: false },
-      skipChecks: ['@qa.bypassed'],
+      skipChecks: ['@acme/qa.bypassed'],
       onCheckProgress: (event) => events.push(event),
     })
 
@@ -646,7 +646,7 @@ describe('executeMatchingPredicates', () => {
     expect(execute).not.toHaveBeenCalled()
     expect(result.checks[0]).toMatchObject({ outcome: 'skip', details: { bypassedByUser: true } })
     expect(events).toContainEqual(
-      expect.objectContaining({ type: 'check-done', id: '@qa.bypassed', outcome: 'skip' }),
+      expect.objectContaining({ type: 'check-done', id: '@acme/qa.bypassed', outcome: 'skip' }),
     )
   })
 })

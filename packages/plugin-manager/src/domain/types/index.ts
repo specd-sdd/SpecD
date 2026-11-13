@@ -1,6 +1,23 @@
-export type { ConfigSchemaEntry, PluginContext, PluginType, SpecdPlugin } from './specd-plugin.js'
-export { PLUGIN_TYPES, isSpecdPlugin } from './specd-plugin.js'
+export type { PluginContext, PluginInstallContext, SpecdPlugin } from './specd-plugin.js'
+export {
+  CONTRIBUTION_ID_REGEX,
+  baseContractFields,
+  buildContributionAddress,
+  isSpecdPlugin,
+  parseContributionAddress,
+} from './specd-plugin.js'
 export type {
+  ConfigSchemaNode,
+  ContributionBlocks,
+  PluginConfigSchema,
+  SpecdPluginManifest,
+} from './plugin-manifest.js'
+export type {
+  ContributionActivationContext,
+  ContributionKindHandler,
+} from './contribution-kind-handler.js'
+export type {
+  AgentInstallContext,
   AgentInstallOptions,
   AgentInstallResult,
   AgentPlugin,

@@ -18,14 +18,20 @@ specd plugins update [<plugin>...]
 
 The command MUST enumerate declared plugins from the loaded `SpecdConfig.plugins` field (via `loadConfig` or an equivalent config snapshot). It MUST NOT call `kernel.project.listPlugins` or `ConfigWriter.listPlugins` when a config snapshot is already available.
 
-When no plugin names are provided, the command MUST derive the update set from `config.plugins.agents` (or the appropriate declared type buckets).
+When no plugin names are provided, the command MUST derive the update set from the flat `config.plugins` list.
 
 ### Requirement: Update behavior
 
 - **Without arguments**: Updates all declared plugins in `specd.yaml`.
-- **With plugin names**: Updates only the specified plugins.
-- The command MUST be idempotent — running update multiple times produces the same result.
+- **With plugin names**: Updates only the specified plugins; a name not declared in `config.plugins` is reported as an error for that name.
+- Each plugin MUST be updated with its recorded selection: the `contributions` allowlist from its `config.plugins` entry, passed only when the entry has one (when absent the use case selects every declared id). An update MUST NOT activate a contribution that was not selected.
+- The command MUST be idempotent — running update multiple times produces the same result. A plugin name given more than once is updated once; each repeat is reported as `skipped` with the detail `already processed`.
 - The command MUST NOT mutate the plugin configuration in `specd.yaml`.
+- The command MUST NOT call the plugin's `init`.
+
+### Requirement: Host bootstrap without plugins
+
+The command MUST obtain its host context with plugins disabled (`resolveCliContext({ plugins: false })`), so that a broken configured plugin can still be updated.
 
 ### Requirement: Exit code
 
@@ -36,9 +42,11 @@ The command MUST exit with code 1 if any plugin fails to update.
 For each plugin, the command MUST output:
 
 - Plugin name
-- Update status (`updated`, `skipped`, or error message)
+- Update status (`updated` or `error` with its message). There is no `skipped` status.
 
-The format MUST be machine-parseable when invoked with `--format json`.
+The format MUST be machine-parseable when invoked with `--format json` (or `toon`). The structured output MUST be an object `{ plugins: [...], hasErrors: boolean }` (same shape as `specd plugins install` and `specd project update`).
+
+In text format, when no plugin is declared the command MUST print `no plugins to update`.
 
 ## Constraints
 
@@ -49,3 +57,4 @@ The format MUST be machine-parseable when invoked with `--format json`.
 
 - [`plugin-manager:update-plugin-use-case`](../../plugin-manager/update-plugin-use-case/spec.md) — orchestrates plugin update
 - [`core:get-config`](../../core/get-config/spec.md) — readonly `SpecdConfig` snapshot; `plugins` holds declarations
+- [`cli:host-context`](../host-context/spec.md) — host bootstrap with `plugins: false`

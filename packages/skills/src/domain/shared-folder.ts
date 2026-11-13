@@ -23,22 +23,31 @@ export interface ResolvedSharedFolder {
  * @param configPath - Runtime config path.
  * @param sharedFolder - Optional plugin-provided override.
  * @returns Project-relative and absolute shared-folder paths.
- * @throws {InvalidSharedFolderError} When the path escapes the project root.
+ * @throws {InvalidSharedFolderError} When the path is empty, is the project root itself, or escapes it.
  */
 export function resolveSharedFolder(
   projectRoot: string,
   configPath: string,
   sharedFolder?: string,
 ): ResolvedSharedFolder {
-  const relativePath = normalizeSharedFolder(
+  const normalized = normalizeSharedFolder(
     sharedFolder ?? defaultSharedFolder(projectRoot, configPath),
   )
-  const absolutePath = path.resolve(projectRoot, relativePath)
+  const absolutePath = path.resolve(projectRoot, normalized)
   const resolvedRoot = path.resolve(projectRoot)
   const containment = path.relative(resolvedRoot, absolutePath)
-  if (containment.startsWith('..') || path.isAbsolute(containment)) {
-    throw new InvalidSharedFolderError(relativePath)
+  if (
+    normalized === '' ||
+    containment === '' ||
+    containment === '..' ||
+    containment.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(containment)
+  ) {
+    throw new InvalidSharedFolderError(normalized)
   }
+  const relativePath = path.isAbsolute(normalized)
+    ? containment.replaceAll(path.sep, '/')
+    : normalized
 
   return { relativePath, absolutePath }
 }

@@ -11,6 +11,80 @@
 - **WHEN** PluginLoader loads it
 - **THEN** it returns the plugin instance
 
+#### Scenario: Manifest validated before import
+
+- **GIVEN** a package whose manifest is invalid
+- **WHEN** PluginLoader loads it
+- **THEN** the error is thrown without importing the package code
+
+#### Scenario: Version mismatch rejected
+
+- **GIVEN** a manifest with `version: "1.0.0"` and a factory returning a plugin with `version: "2.0.0"`
+- **WHEN** PluginLoader loads it
+- **THEN** `PluginValidationError` is thrown
+
+#### Scenario: Name mismatch rejected
+
+- **GIVEN** a manifest with `name: "@acme/a"` and a factory returning a plugin named `@acme/b`
+- **WHEN** PluginLoader loads it
+- **THEN** `PluginValidationError` is thrown
+
+#### Scenario: Requested name differs from manifest name
+
+- **GIVEN** a `plugins` entry `@acme/a` resolving to a package whose manifest declares `name: "@acme/b"`
+- **WHEN** PluginLoader loads `@acme/a`
+- **THEN** `PluginValidationError` naming `@acme/a` is thrown
+
+#### Scenario: Named create export accepted
+
+- **GIVEN** a package exporting a named `create`
+- **WHEN** PluginLoader loads it
+- **THEN** it returns the plugin
+
+#### Scenario: Default export that is the factory function accepted
+
+- **GIVEN** a package using `export default create`
+- **WHEN** PluginLoader loads it
+- **THEN** it returns the plugin
+
+#### Scenario: Default export object with create accepted
+
+- **GIVEN** a package whose default export is `{ create }`
+- **WHEN** PluginLoader loads it
+- **THEN** it returns the plugin
+
+#### Scenario: No factory export rejected
+
+- **GIVEN** a package with no resolvable `create`
+- **WHEN** PluginLoader loads it
+- **THEN** `PluginValidationError` naming the field `create` is thrown
+
+#### Scenario: Entry module that fails to import is wrapped
+
+- **GIVEN** a package whose entry module throws while being imported
+- **WHEN** PluginLoader loads it
+- **THEN** `PluginValidationError` naming the field `entry` is thrown with the import error as `cause`
+- **AND** the thrown error is an instance of `SpecdError`
+
+#### Scenario: Throwing factory is wrapped
+
+- **GIVEN** a `create` factory that throws a plain `Error`
+- **WHEN** PluginLoader loads it
+- **THEN** `PluginValidationError` naming the field `create` is thrown with the original error as `cause`
+- **AND** a `SpecdError` thrown by the factory propagates unchanged
+
+#### Scenario: Async factory awaited
+
+- **GIVEN** a `create` that returns a promise of a plugin
+- **WHEN** PluginLoader loads it
+- **THEN** the resolved plugin is returned
+
+#### Scenario: Factory receives config only
+
+- **GIVEN** a loader created with extra `handlers`
+- **WHEN** PluginLoader loads a plugin
+- **THEN** `create` is called with an object containing only `config`
+
 ### Requirement: Manifest schema
 
 #### Scenario: Manifest schema validates required fields
@@ -25,17 +99,47 @@
 - **WHEN** PluginLoader loads it
 - **THEN** PluginValidationError is thrown
 
-#### Scenario: Unknown plugin type rejected at runtime
+#### Scenario: Unscoped name rejected
 
-- **GIVEN** a plugin whose manifest declares `pluginType: 'agent'` but the runtime object's `type` is not in `PLUGIN_TYPES`
-- **WHEN** PluginLoader validates the interface
-- **THEN** `isSpecdPlugin` returns `false` and `PluginValidationError` is thrown
+- **GIVEN** a manifest with `name: "my-plugin"`
+- **WHEN** PluginLoader loads it
+- **THEN** PluginValidationError is thrown
 
-#### Scenario: Agent plugin missing install method
+#### Scenario: pluginType rejected
 
-- **GIVEN** a plugin whose manifest declares `pluginType: 'agent'` but the runtime object lacks `install` or `uninstall`
-- **WHEN** PluginLoader validates the interface
-- **THEN** `isAgentPlugin` returns `false` and `PluginValidationError` is thrown
+- **GIVEN** a manifest with `pluginType: "agent"`
+- **WHEN** PluginLoader loads it
+- **THEN** PluginValidationError is thrown
+
+#### Scenario: Duplicate contribution id across kinds
+
+- **GIVEN** a manifest declaring id `audit` under two different kinds
+- **WHEN** PluginLoader loads it
+- **THEN** DuplicateContributionError is thrown naming the plugin
+
+#### Scenario: Unregistered kind
+
+- **GIVEN** a manifest with `contributes.widgets` and no handler for `widgets`
+- **WHEN** PluginLoader loads it
+- **THEN** UnknownContributionKindError is thrown
+
+#### Scenario: Invalid block for kind
+
+- **GIVEN** a registered kind whose `blockSchema` rejects the manifest block
+- **WHEN** PluginLoader loads it
+- **THEN** PluginValidationError is thrown
+
+#### Scenario: Unsupported schema keyword
+
+- **GIVEN** a `configSchema` using `$ref`
+- **WHEN** PluginLoader loads it
+- **THEN** UnsupportedSchemaKeywordError is thrown
+
+#### Scenario: defaultConfig violates configSchema
+
+- **GIVEN** a `defaultConfig` that fails its `configSchema`
+- **WHEN** PluginLoader loads it
+- **THEN** InvalidPluginConfigError is thrown
 
 #### Scenario: Valid manifest passes Zod validation
 
@@ -51,11 +155,59 @@
 - **WHEN** PluginLoader validates it
 - **THEN** PluginValidationError is thrown
 
+#### Scenario: Base contract violation names the failing fields
+
+- **GIVEN** a plugin missing only `destroy`
+- **WHEN** PluginLoader validates it
+- **THEN** `PluginValidationError.fields` contains `destroy` and does not contain `name`, `version` or `init`
+
+#### Scenario: Host handler for agents rejected
+
+- **GIVEN** `createPluginLoader` options with a host handler whose kind is `agents`
+- **WHEN** the loader is created
+- **THEN** `DuplicateHandlerKindError` is thrown before any plugin is loaded
+
+#### Scenario: Two host handlers of one kind rejected
+
+- **GIVEN** `createPluginLoader` options with two handlers of kind `widgets`
+- **WHEN** the loader is created
+- **THEN** `DuplicateHandlerKindError` is thrown
+
+#### Scenario: Handler validatePlugin runs after the base check
+
+- **GIVEN** a manifest declaring `agents` and a plugin without `uninstall`
+- **WHEN** PluginLoader loads it
+- **THEN** `PluginValidationError` naming the plugin is thrown by the `agents` handler's `validatePlugin(plugin, pluginName)`
+
+#### Scenario: Loader does not run lifecycle
+
+- **WHEN** PluginLoader loads a valid plugin
+- **THEN** `init`, `install` and `destroy` are not called
+
+#### Scenario: Throwing handler validation is wrapped
+
+- **GIVEN** a host handler whose `validatePlugin` throws a plain `Error`
+- **WHEN** PluginLoader loads a plugin that uses that kind
+- **THEN** `PluginValidationError` naming the plugin and the kind is thrown with the original error as `cause`
+- **AND** a `SpecdError` thrown by the handler propagates unchanged
+
+#### Scenario: Non-string project root is rejected
+
+- **GIVEN** a loader created with a config whose `projectRoot` is not a string
+- **WHEN** a plugin is loaded
+- **THEN** `PluginValidationError` with `fields: ['projectRoot']` is thrown
+
+#### Scenario: Unknown manifest key is named
+
+- **GIVEN** a manifest containing the unknown top-level key `pluginType`
+- **WHEN** PluginLoader loads the plugin
+- **THEN** `PluginValidationError` is thrown and its `fields` contain `pluginType`
+
 ### Requirement: Factory function
 
 #### Scenario: Plugin exports create factory
 
 - **GIVEN** a plugin npm package
 - **WHEN** PluginLoader loads it
-- **THEN** it calls `create(options: PluginLoaderOptions)` factory function
-- **AND** passes the fully-resolved SpecdConfig
+- **THEN** it calls the `create` factory with an object that carries `config` only
+- **AND** `config` is the fully-resolved SpecdConfig

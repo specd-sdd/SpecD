@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
@@ -63,6 +63,31 @@ async function createTempProjectRoot(): Promise<string> {
   return mkdtemp(path.join(tmpdir(), 'specd-plugin-agent-opencode-'))
 }
 
+function useSharedBundle(): void {
+  repositoryMock.get.mockImplementation(async (name: string) => ({
+    name,
+    description: name,
+    templates: [],
+    kind: 'skill' as const,
+    metadata: {
+      kind: 'skill' as const,
+      supportedCapabilities: [],
+      requiredCapabilities: [],
+      requiredSharedTemplates: [],
+    },
+  }))
+  repositoryMock.getBundle.mockImplementation(async (name: string) => ({
+    name,
+    description: name,
+    files: [
+      { filename: 'SKILL.md', content: `# ${name}` },
+      { filename: 'shared.md', content: 'shared-content', shared: true },
+    ],
+    install: async () => {},
+    uninstall: async () => {},
+  }))
+}
+
 function makeMockConfig(projectRoot: string): SpecdConfig {
   return {
     projectRoot,
@@ -92,7 +117,7 @@ function makeMockConfig(projectRoot: string): SpecdConfig {
     },
     approvals: { spec: false, signoff: false },
     invalidation: DEFAULT_INVALIDATION_POLICY,
-    plugins: { agents: [] },
+    plugins: [],
   }
 }
 
@@ -103,7 +128,11 @@ describe('plugin-agent-opencode create()', () => {
     try {
       const { create } = await import('../src/index.js')
       const plugin = await create({ config })
-      const result = await plugin.install(config, { skills: ['specd'] })
+      const result = await plugin.install({
+        config,
+        contributions: [],
+        options: { skills: ['specd'] },
+      })
 
       expect(result.installed.length).toBe(1)
       expect(repositoryMock.getBundle).toHaveBeenCalledWith(
@@ -133,7 +162,7 @@ describe('plugin-agent-opencode create()', () => {
       expect(sharedContent).toBe('shared-content')
       expect(sharedContent).not.toContain('name: "specd"')
 
-      await plugin.uninstall(config, { skills: ['specd'] })
+      await plugin.uninstall({ config, contributions: [], options: { skills: ['specd'] } })
       await expect(readFile(sharedFilePath, 'utf8')).resolves.toBe('shared-content')
 
       const userSkillFilePath = path.join(
@@ -146,7 +175,7 @@ describe('plugin-agent-opencode create()', () => {
       await mkdir(path.dirname(userSkillFilePath), { recursive: true })
       await writeFile(userSkillFilePath, '# user-skill\n', 'utf8')
 
-      await plugin.uninstall(config)
+      await plugin.uninstall({ config, contributions: [] })
       await expect(readFile(sharedFilePath, 'utf8')).rejects.toThrow()
       await expect(readFile(userSkillFilePath, 'utf8')).resolves.toBe('# user-skill\n')
     } finally {
@@ -210,7 +239,7 @@ describe('plugin-agent-opencode create()', () => {
 
       const { create } = await import('../src/index.js')
       const plugin = await create({ config })
-      await plugin.install(config)
+      await plugin.install({ config, contributions: [] })
 
       expect(repositoryMock.getBundle).toHaveBeenCalledWith(
         'specd-fasttrack',
@@ -281,9 +310,13 @@ describe('plugin-agent-opencode create()', () => {
         }
       })
 
-      const result = await plugin.install(config, {
-        skills: [],
-        agents: ['specd-project-context-optimizer'],
+      const result = await plugin.install({
+        config,
+        contributions: [],
+        options: {
+          skills: [],
+          agents: ['specd-project-context-optimizer'],
+        },
       })
       expect(result.installed).toContainEqual(
         expect.objectContaining({ skill: 'specd-project-context-optimizer' }),
@@ -298,14 +331,16 @@ describe('plugin-agent-opencode create()', () => {
               description:
                 'Generates a high-density, token-efficient version of project-level context.',
               mode: 'subagent',
-              permissions: [
-                { bash: 'allow' },
-                { bash: 'allow' },
-                { bash: 'allow' },
-                { bash: 'allow' },
-                { read: 'allow' },
-                { write: 'allow' },
-              ],
+              permission: {
+                bash: {
+                  'node *': 'allow',
+                  'specd *': 'allow',
+                  'cat *': 'allow',
+                  'rm *': 'allow',
+                },
+                read: 'allow',
+                write: 'allow',
+              },
             },
           }),
         }),
@@ -325,7 +360,7 @@ describe('plugin-agent-opencode create()', () => {
     }
   })
 
-  it('given project root, when install runs, then injects AGENTS.md prompt block and opencode marker, deploys plugin script, merges opencode.json, and uninstalls cleanly', async () => {
+  it('given project root, when install runs, then injects the AGENTS.md prompt block, writes no plugin script, and uninstalls cleanly', async () => {
     const projectRoot = await createTempProjectRoot()
     const config = makeMockConfig(projectRoot)
 
@@ -367,7 +402,7 @@ describe('plugin-agent-opencode create()', () => {
         'utf8',
       )
 
-      await plugin.install(config, { skills: ['specd'] })
+      await plugin.install({ config, contributions: [], options: { skills: ['specd'] } })
 
       // Verify AGENTS.md base block is present and legacy marker block is removed
       const agentsContent = await readFile(agentsMdPath, 'utf8')
@@ -382,7 +417,7 @@ describe('plugin-agent-opencode create()', () => {
       expect(scriptExistsBefore).toBe(false)
 
       // Uninstall and verify reference-counted cleanup
-      await plugin.uninstall(config)
+      await plugin.uninstall({ config, contributions: [] })
 
       const remainingAgentsContent = await readFile(agentsMdPath, 'utf8')
       expect(remainingAgentsContent).not.toContain('<!-- <specd')
@@ -392,6 +427,196 @@ describe('plugin-agent-opencode create()', () => {
         .then(() => true)
         .catch(() => false)
       expect(scriptExistsAfter).toBe(false)
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('given opencode and another owner, when opencode uninstalls, then the other prompt reference and shared.md remain', async () => {
+    const projectRoot = await createTempProjectRoot()
+    const config = makeMockConfig(projectRoot)
+    try {
+      useSharedBundle()
+      const { addSharedOwner, injectSpecdBlock } = await import('@specd/skills')
+      const { create } = await import('../src/index.js')
+      const plugin = await create({ config })
+      await plugin.install({ config, contributions: [], options: { skills: ['specd'] } })
+      const sharedDir = path.join(projectRoot, '.specd', 'config', 'skills', 'shared')
+      await addSharedOwner(sharedDir, 'codex')
+      const agentsMdPath = path.join(projectRoot, 'AGENTS.md')
+      await injectSpecdBlock(agentsMdPath, 'codex prompt', 'codex')
+      await plugin.uninstall({ config, contributions: [] })
+      const content = await readFile(agentsMdPath, 'utf8')
+      expect(content).toContain('agents="codex"')
+      expect(content).not.toContain('agents="opencode"')
+      expect(await readFile(path.join(sharedDir, 'shared.md'), 'utf8')).toBe('shared-content')
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('given capabilities without agents, when an agent is installed, then it is written next to shared.md', async () => {
+    const projectRoot = await createTempProjectRoot()
+    const config = makeMockConfig(projectRoot)
+    try {
+      repositoryMock.get.mockImplementation(async (name: string) =>
+        name === 'specd-project-context-optimizer'
+          ? {
+              name,
+              description: 'optimizer',
+              kind: 'agent' as const,
+              templates: [],
+              metadata: {
+                kind: 'agent' as const,
+                supportedCapabilities: [],
+                requiredCapabilities: [],
+                requiredSharedTemplates: [],
+              },
+            }
+          : undefined,
+      )
+      repositoryMock.getBundle.mockImplementation(async (name: string) => ({
+        name,
+        description: name,
+        files: [{ filename: 'SPECD-AGENT.md', content: 'prompt-content' }],
+        install: async () => {},
+        uninstall: async () => {},
+      }))
+      const { create } = await import('../src/index.js')
+      const plugin = await create({ config })
+      await plugin.install({
+        config,
+        contributions: [],
+        options: {
+          skills: [],
+          agents: ['specd-project-context-optimizer'],
+          capabilities: ['frontmatter'],
+        },
+      })
+      expect(
+        await readFile(
+          path.join(
+            projectRoot,
+            '.specd',
+            'config',
+            'skills',
+            'shared',
+            'specd-project-context-optimizer.agent.md',
+          ),
+          'utf8',
+        ),
+      ).toContain('prompt-content')
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('given opencode is the only owner, when opencode is fully uninstalled, then specd shared files and the empty folder are removed', async () => {
+    const projectRoot = await createTempProjectRoot()
+    const config = makeMockConfig(projectRoot)
+    try {
+      useSharedBundle()
+      const { create } = await import('../src/index.js')
+      const plugin = await create({ config })
+      await plugin.install({ config, contributions: [], options: { skills: ['specd'] } })
+      const sharedDir = path.join(projectRoot, '.specd', 'config', 'skills', 'shared')
+      await plugin.uninstall({ config, contributions: [] })
+      await expect(readFile(path.join(sharedDir, 'shared.md'), 'utf8')).rejects.toMatchObject({
+        code: 'ENOENT',
+      })
+      await expect(stat(sharedDir)).rejects.toMatchObject({ code: 'ENOENT' })
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('given a foreign file and opencode as the only owner, when opencode is fully uninstalled, then the folder remains', async () => {
+    const projectRoot = await createTempProjectRoot()
+    const config = makeMockConfig(projectRoot)
+    try {
+      useSharedBundle()
+      const { create } = await import('../src/index.js')
+      const plugin = await create({ config })
+      await plugin.install({ config, contributions: [], options: { skills: ['specd'] } })
+      const notes = path.join(projectRoot, '.specd', 'config', 'skills', 'shared', 'notes.txt')
+      await writeFile(notes, 'user', 'utf8')
+      await plugin.uninstall({ config, contributions: [] })
+      expect(await readFile(notes, 'utf8')).toBe('user')
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('given a skills filter, when opencode is uninstalled, then the marker and shared files stay', async () => {
+    const projectRoot = await createTempProjectRoot()
+    const config = makeMockConfig(projectRoot)
+    try {
+      useSharedBundle()
+      const { create } = await import('../src/index.js')
+      const plugin = await create({ config })
+      await plugin.install({ config, contributions: [], options: { skills: ['specd'] } })
+      const sharedDir = path.join(projectRoot, '.specd', 'config', 'skills', 'shared')
+      const before = await readFile(path.join(sharedDir, '.owners.json'), 'utf8')
+      await plugin.uninstall({ config, contributions: [], options: { skills: ['specd'] } })
+      expect(await readFile(path.join(sharedDir, '.owners.json'), 'utf8')).toBe(before)
+      expect(await readFile(path.join(sharedDir, 'shared.md'), 'utf8')).toBe('shared-content')
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('given the first shared write fails, when install rejects, then the marker lists opencode and a later full uninstall releases it and cleans up', async () => {
+    const projectRoot = await createTempProjectRoot()
+    const config = makeMockConfig(projectRoot)
+    try {
+      useSharedBundle()
+      repositoryMock.getBundle.mockImplementation(async (name: string) => ({
+        name,
+        description: name,
+        files: [
+          { filename: 'SKILL.md', content: `# ${name}` },
+          { filename: 'blocked', content: 'x', shared: true },
+          { filename: 'shared.md', content: 'shared-content', shared: true },
+        ],
+        install: async () => {},
+        uninstall: async () => {},
+      }))
+      const sharedDir = path.join(projectRoot, '.specd', 'config', 'skills', 'shared')
+      // A directory named like the FIRST shared file makes the first shared write fail.
+      await mkdir(path.join(sharedDir, 'blocked'), { recursive: true })
+      const { create } = await import('../src/index.js')
+      const plugin = await create({ config })
+      await expect(
+        plugin.install({ config, contributions: [], options: { skills: ['specd'] } }),
+      ).rejects.toThrow()
+      // No shared file was written, yet the owner is already registered.
+      await expect(readFile(path.join(sharedDir, 'shared.md'), 'utf8')).rejects.toMatchObject({
+        code: 'ENOENT',
+      })
+      const owners = JSON.parse(await readFile(path.join(sharedDir, '.owners.json'), 'utf8')) as {
+        owners: string[]
+      }
+      expect(owners.owners).toEqual(['opencode'])
+
+      await rm(path.join(sharedDir, 'blocked'), { recursive: true, force: true })
+      await plugin.uninstall({ config, contributions: [] })
+      await expect(stat(sharedDir)).rejects.toMatchObject({ code: 'ENOENT' })
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('given a legacy shared folder without a marker, when opencode is fully uninstalled, then shared.md remains', async () => {
+    const projectRoot = await createTempProjectRoot()
+    const config = makeMockConfig(projectRoot)
+    try {
+      const sharedFile = path.join(projectRoot, '.specd', 'config', 'skills', 'shared', 'shared.md')
+      await mkdir(path.dirname(sharedFile), { recursive: true })
+      await writeFile(sharedFile, 'legacy', 'utf8')
+      const { create } = await import('../src/index.js')
+      const plugin = await create({ config })
+      await plugin.uninstall({ config, contributions: [] })
+      expect(await readFile(sharedFile, 'utf8')).toBe('legacy')
     } finally {
       await rm(projectRoot, { recursive: true, force: true })
     }

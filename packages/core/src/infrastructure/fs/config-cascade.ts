@@ -3,6 +3,7 @@ import path from 'node:path'
 import { parse as parseYaml } from 'yaml'
 import { z } from 'zod'
 import { isEnoent } from './is-enoent.js'
+import { CURRENT_CONFIG_VERSION } from '../../domain/errors/unsupported-config-version-error.js'
 import { ConfigValidationError } from '../../domain/errors/config-validation-error.js'
 import {
   isRecord,
@@ -29,7 +30,7 @@ export const LayerRemovalZodSchema = z
     workspaces: z.array(z.string()).optional(),
     storage: z.array(z.string()).optional(),
     context: z.array(RemovalMatcherZodSchema).optional(),
-    plugins: z.object({ agents: z.array(z.object({ name: z.string() })) }).optional(),
+    plugins: z.array(z.object({ name: z.string() })).optional(),
   })
   .strict()
 
@@ -57,9 +58,7 @@ export interface CascadeRemoval {
     readonly file?: string
     readonly instruction?: string
   }>
-  readonly plugins?: {
-    readonly agents?: ReadonlyArray<{ readonly name: string }>
-  }
+  readonly plugins?: ReadonlyArray<{ readonly name: string }>
 }
 
 /**
@@ -203,7 +202,10 @@ export async function parseCascadeLayer(filePath: string): Promise<ConfigCascade
     content = await fs.readFile(filePath, 'utf-8')
   } catch (err) {
     if (isEnoent(err)) throw new ConfigValidationError(filePath, 'config file not found')
-    throw err
+    throw new ConfigValidationError(
+      filePath,
+      `cannot read config file: ${err instanceof Error ? err.message : String(err)}`,
+    )
   }
   let raw: unknown
   try {
@@ -441,12 +443,14 @@ export function findContextEntryIndex(
  * @param accumulated - The accumulated config object to mutate
  * @param removal - The removal directives to apply
  * @param layerPath - Path to the layer declaring the removals, for error messages
+ * @param layerRaw - The declaring layer's raw config, used to explain removals of its own plugins
  * @throws {ConfigValidationError} When a removal target is not found or is ambiguous
  */
 export function applyRemovals(
   accumulated: Record<string, unknown>,
   removal: CascadeRemoval,
   layerPath: string,
+  layerRaw?: Record<string, unknown>,
 ): void {
   if (removal.root) {
     for (const field of removal.root) delete accumulated[field]
@@ -494,22 +498,56 @@ export function applyRemovals(
       context.splice(result, 1)
     }
   }
-  if (removal.plugins?.agents) {
-    const plugins = accumulated['plugins'] as Record<string, unknown> | undefined
-    const agents = plugins?.['agents'] as Array<Record<string, unknown>> | undefined
-    if (!agents) {
-      throw new ConfigValidationError(
-        layerPath,
-        'remove.plugins.agents: no agents in inherited config',
-      )
+  if (removal.plugins) {
+    const plugins = accumulated['plugins']
+    if (!Array.isArray(plugins)) {
+      throw new ConfigValidationError(layerPath, 'remove.plugins: no plugins in inherited config')
     }
-    for (const { name } of removal.plugins.agents) {
-      const idx = agents.findIndex((entry) => entry['name'] === name)
-      if (idx === -1) {
-        throw new ConfigValidationError(layerPath, `remove.plugins.agents: '${name}' not found`)
+    const removedNames = new Set<string>()
+    for (const { name } of removal.plugins) {
+      if (removedNames.has(name)) {
+        throw new ConfigValidationError(
+          layerPath,
+          `remove.plugins: duplicate plugin name '${name}'`,
+        )
       }
-      agents.splice(idx, 1)
+      removedNames.add(name)
+      const idx = plugins.findIndex((entry) => isRecord(entry) && entry['name'] === name)
+      if (idx === -1) {
+        const own = layerRaw?.['plugins']
+        const declaredHere =
+          Array.isArray(own) && own.some((entry) => isRecord(entry) && entry['name'] === name)
+        throw new ConfigValidationError(
+          layerPath,
+          declaredHere
+            ? `remove.plugins: '${name}' is declared by this layer and is not inherited`
+            : `remove.plugins: '${name}' not found`,
+        )
+      }
+      plugins.splice(idx, 1)
     }
+  }
+}
+
+/**
+ * Rejects a `plugins` list that declares the same plugin name more than once.
+ *
+ * Runs on each layer's own raw list before it is merged, so duplicates are never
+ * silently collapsed by name-based merging.
+ *
+ * @param plugins - The layer's raw `plugins` value
+ * @param layerPath - Path to the layer, for error messages
+ * @throws {ConfigValidationError} When a plugin name appears more than once in the layer
+ */
+function assertNoDuplicateLayerPlugins(plugins: unknown, layerPath: string): void {
+  if (!Array.isArray(plugins)) return
+  const seen = new Set<string>()
+  for (const entry of plugins) {
+    if (!isRecord(entry) || typeof entry['name'] !== 'string') continue
+    if (seen.has(entry['name'])) {
+      throw new ConfigValidationError(layerPath, `duplicate plugin name '${entry['name']}'`)
+    }
+    seen.add(entry['name'])
   }
 }
 
@@ -526,15 +564,49 @@ export function mergeActiveLayers(cascade: ResolvedConfigCascade): Record<string
     throw new ConfigValidationError(cascade.rootPath, 'no active config layers to merge')
   }
   const rootRaw = cascade.activeLayers[0]!.raw
+  const rootVersion = rootRaw['configVersion'] as number | undefined
+  // An absent root configVersion means the current version.
+  const effectiveRootVersion = rootVersion ?? CURRENT_CONFIG_VERSION
+  // Duplicate names are rejected in every layer, root included, before anything is merged,
+  // so a later `remove.plugins` cannot erase a duplicate.
+  for (const layer of cascade.activeLayers) {
+    assertNoDuplicateLayerPlugins(layer.raw['plugins'], layer.path)
+  }
   let accumulated: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(rootRaw)) {
     if (key !== 'extends' && key !== 'remove') accumulated[key] = value
   }
   for (let i = 1; i < cascade.activeLayers.length; i++) {
     const layer = cascade.activeLayers[i]!
+    if ('configVersion' in layer.raw && layer.raw['configVersion'] !== effectiveRootVersion) {
+      throw new ConfigValidationError(
+        layer.path,
+        `configVersion ${String(layer.raw['configVersion'])} does not match the root configVersion (${
+          rootVersion === undefined
+            ? `absent, meaning ${String(CURRENT_CONFIG_VERSION)}`
+            : String(rootVersion)
+        })`,
+      )
+    }
+    // Plugin removals target only inherited entries, so they run before the layer's own
+    // `plugins` are merged. Copy first so the previous layer's raw array is never mutated.
+    if (layer.removal?.plugins) {
+      if (Array.isArray(accumulated['plugins'])) {
+        accumulated['plugins'] = Array.from(accumulated['plugins'] as readonly unknown[])
+      }
+      applyRemovals(accumulated, { plugins: layer.removal.plugins }, layer.path, layer.raw)
+    }
     accumulated = deepMergeRawConfig(accumulated, layer.raw)
-    if (layer.removal) applyRemovals(accumulated, layer.removal, layer.path)
+    if (layer.removal) {
+      const remaining: { -readonly [K in keyof CascadeRemoval]: CascadeRemoval[K] } = {
+        ...layer.removal,
+      }
+      delete remaining.plugins
+      applyRemovals(accumulated, remaining, layer.path)
+    }
   }
+  if (rootVersion === undefined) delete accumulated['configVersion']
+  else accumulated['configVersion'] = rootVersion
   return accumulated
 }
 

@@ -1,22 +1,32 @@
 import { rm } from 'node:fs/promises'
-import { createSkillRepository, removeSpecdBlock } from '@specd/skills'
+import {
+  createSkillRepository,
+  removeSharedFolderIfEmpty,
+  removeSharedOwner,
+  removeSpecdBlock,
+  resolveSharedFolder,
+  selectManagedNames,
+  type UninstallResult,
+} from '@specd/skills'
 import path from 'node:path'
 import type { SpecdConfig } from '@specd/core'
 import type { AgentInstallOptions } from '@specd/plugin-manager'
-import { resolveSharedFolder } from './shared-folder.js'
 
 /**
  * Uninstalls selected or all specd skills from the Agent Skills standard project-local skills directory.
  */
 export class UninstallSkills {
   /**
-   * Removes installed skills from `.agents/skills`.
+   * Removes installed skills from `.agents/skills` and specd-managed agent files.
+   *
+   * Names in `options.skills` / `options.agents` are validated against the specd-managed
+   * names before the filesystem is touched; unknown or unsafe names are skipped and reported.
    *
    * @param config - Project configuration.
    * @param options - Uninstall options.
-   * @returns A promise that resolves when uninstall finishes.
+   * @returns The requested names that were skipped because they are not specd-managed.
    */
-  async execute(config: SpecdConfig, options?: AgentInstallOptions): Promise<void> {
+  async execute(config: SpecdConfig, options?: AgentInstallOptions): Promise<UninstallResult> {
     const targetDir = path.join(config.projectRoot, '.agents', 'skills')
     const sharedDir = resolveSharedFolder(
       config.projectRoot,
@@ -25,37 +35,53 @@ export class UninstallSkills {
         ? options.variables['sharedFolder']
         : undefined,
     ).absolutePath
-    let hasFilter = false
-    if (options?.skills !== undefined && options.skills.length > 0) {
-      hasFilter = true
-      for (const skill of options.skills) {
+    const filteredAgentsDir = sharedDir
+    const filteredAgentFile = (agent: string): string => `${agent}.agent.md`
+
+    const managedItems = await createSkillRepository().list()
+    const managedSkills = managedItems
+      .filter((item) => item.kind === 'skill')
+      .map((item) => item.name)
+    const managedAgents = managedItems
+      .filter((item) => item.kind === 'agent')
+      .map((item) => item.name)
+
+    const skillFilter = options?.skills !== undefined && options.skills.length > 0
+    const agentFilter = options?.agents !== undefined && options.agents.length > 0
+    if (skillFilter || agentFilter) {
+      const selectedSkills = selectManagedNames(
+        skillFilter ? (options.skills ?? []) : [],
+        managedSkills,
+      )
+      const selectedAgents = selectManagedNames(
+        agentFilter ? (options.agents ?? []) : [],
+        managedAgents,
+      )
+      for (const skill of selectedSkills.accepted) {
         await rm(path.join(targetDir, skill), { recursive: true, force: true })
         await rm(path.join(targetDir, `${skill}.md`), { force: true })
       }
-    }
-    if (options?.agents !== undefined && options.agents.length > 0) {
-      hasFilter = true
-      for (const agent of options.agents) {
-        await rm(path.join(sharedDir, `${agent}.agent.md`), { force: true })
+      for (const agent of selectedAgents.accepted) {
+        await rm(path.join(filteredAgentsDir, filteredAgentFile(agent)), { force: true })
       }
+      return { skipped: [...selectedSkills.skipped, ...selectedAgents.skipped] }
     }
-    if (hasFilter) {
-      return
-    }
-    const managedSkills = (await createSkillRepository().list()).map((skill) => skill.name)
+
     for (const skill of managedSkills) {
       await rm(path.join(targetDir, skill), { recursive: true, force: true })
       await rm(path.join(targetDir, `${skill}.md`), { force: true })
     }
-    await rm(path.join(sharedDir, 'shared.md'), { force: true })
-    try {
-      await rm(sharedDir)
-    } catch {
-      // Ignore if sharedDir contains other non-specd user files
-    }
 
-    // Remove plugin registration from AGENTS.md (reference-counted block manager removes block when 0 agents remain)
-    const agentsMdPath = path.join(config.projectRoot, 'AGENTS.md')
-    await removeSpecdBlock(agentsMdPath, 'standard')
+    await removeSpecdBlock(path.join(config.projectRoot, 'AGENTS.md'), 'standard')
+
+    const release = await removeSharedOwner(sharedDir, 'standard')
+    if (release.hadMarker && release.remaining.length === 0) {
+      await rm(path.join(sharedDir, 'shared.md'), { force: true })
+      for (const agent of managedAgents) {
+        await rm(path.join(sharedDir, `${agent}.agent.md`), { force: true })
+      }
+      await removeSharedFolderIfEmpty(sharedDir)
+    }
+    return { skipped: [] }
   }
 }

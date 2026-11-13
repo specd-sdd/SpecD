@@ -168,14 +168,14 @@ The generated configuration file declares your schema and default workspace:
 
 ```yaml title="specd.yaml"
 schema: '@specd/schema-std'
+configVersion: 2
 
 workspaces:
   default:
     specsPath: specs/
 
 plugins:
-  agents:
-    - name: '@specd/plugin-agent-standard'
+  - name: '@specd/plugin-agent-standard'
 ```
 
 ### Automatic `.gitignore` Updates
@@ -221,8 +221,8 @@ Example output:
 
 ```text
 Installed plugins:
-@specd/plugin-agent-claude    agents  0.2.0  installed
-@specd/plugin-agent-copilot   agents  0.2.0  installed
+@specd/plugin-agent-claude    0.2.0  installed  [claude]
+@specd/plugin-agent-copilot   0.2.0  installed  [copilot]
 ```
 
 ### Inspecting Plugin Capabilities
@@ -243,7 +243,7 @@ specd plugins uninstall @specd/plugin-agent-copilot
 
 ### Synchronizing Project Assets (`specd project update`)
 
-When you manually add, remove, or edit plugins in `specd.yaml` (under `plugins.agents`) rather than using `specd plugins install`, or when you update `@specd/cli` or plugin packages via your package manager (`pnpm update`, `npm update`), run:
+When you manually add, remove, or edit plugins in `specd.yaml` (under `plugins`) rather than using `specd plugins install`, or when you update `@specd/cli` or plugin packages via your package manager (`pnpm update`, `npm update`), run:
 
 ```bash
 specd project update
@@ -251,7 +251,7 @@ specd project update
 
 This command inspects all declared plugins in `specd.yaml` and executes their installation orchestration to regenerate and synchronize project-managed assets on disk (`AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md`, and skill templates).
 
-- **Required:** After manual modifications to `plugins.agents` in `specd.yaml`.
+- **Required:** After manual modifications to `plugins` in `specd.yaml`.
 - **Recommended:** After upgrading SpecD CLI or agent plugin package versions.
 - **Not required:** When changing general configuration options in `specd.yaml` (`workspaces`, `codeRoot`, `ownership`, `specs`, etc.), which are read dynamically on every CLI command with zero update step required.
 

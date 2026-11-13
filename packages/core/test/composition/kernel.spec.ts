@@ -254,12 +254,12 @@ describe('createKernel', () => {
     it('executes custom check during transition and succeeds when it passes', async () => {
       const kernel = await makeTestKernel([
         {
-          pluginName: 'qa',
+          pluginName: '@acme/qa',
           check: {
             id: 'smoke',
             label: 'QA Smoke Test',
             execute: async () => ({
-              id: '@qa.smoke',
+              id: '@acme/qa.smoke',
               label: 'QA Smoke Test',
               kind: 'predicate',
               outcome: 'pass',
@@ -289,12 +289,12 @@ describe('createKernel', () => {
     it('aborts transition with CheckPredicateFailedError when custom check fails', async () => {
       const kernel = await makeTestKernel([
         {
-          pluginName: 'qa',
+          pluginName: '@acme/qa',
           check: {
             id: 'smoke',
             label: 'QA Smoke Test',
             execute: async () => ({
-              id: '@qa.smoke',
+              id: '@acme/qa.smoke',
               label: 'QA Smoke Test',
               kind: 'predicate',
               outcome: 'fail',
@@ -330,7 +330,7 @@ describe('createKernel', () => {
       } catch (err) {
         expect(err).toBeInstanceOf(CheckPredicateFailedError)
         const checkErr = err as CheckPredicateFailedError
-        expect(checkErr.checkId).toBe('@qa.smoke')
+        expect(checkErr.checkId).toBe('@acme/qa.smoke')
         expect(checkErr.label).toBe('QA Smoke Test')
         expect(checkErr.code).toBe('QA_SMOKE_FAILED')
         expect(checkErr.message).toContain('Smoke test assertions failed')
@@ -340,12 +340,12 @@ describe('createKernel', () => {
     it('bypasses a failing custom check via skipChecks', async () => {
       const kernel = await makeTestKernel([
         {
-          pluginName: 'qa',
+          pluginName: '@acme/qa',
           check: {
             id: 'smoke',
             label: 'QA Smoke Test',
             execute: async () => ({
-              id: '@qa.smoke',
+              id: '@acme/qa.smoke',
               label: 'QA Smoke Test',
               kind: 'predicate',
               outcome: 'fail',
@@ -369,7 +369,7 @@ describe('createKernel', () => {
       const result = await kernel.changes.transition.execute({
         name: 'bypass-check-change',
         to: 'designing',
-        skipChecks: ['@qa.smoke'],
+        skipChecks: ['@acme/qa.smoke'],
       })
 
       expect(result.change.state).toBe('designing')
@@ -436,14 +436,14 @@ describe('createKernel', () => {
       let customCheckExecuted = false
       const kernel = await makeTestKernel([
         {
-          pluginName: 'qa',
+          pluginName: '@acme/qa',
           check: {
             id: 'always-pass',
             label: 'Always Pass',
             execute: async () => {
               customCheckExecuted = true
               return {
-                id: '@qa.always-pass',
+                id: '@acme/qa.always-pass',
                 label: 'Always Pass',
                 kind: 'predicate',
                 outcome: 'pass',

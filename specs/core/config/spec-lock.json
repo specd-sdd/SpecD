@@ -3,15 +3,19 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:vcs-adapter-port", "default:_global/architecture"],
+  "dependsOn": ["core:vcs-adapter-port", "default:_global/architecture", "core:transition-checks"],
   "implementation": [
     {
-      "file": "core:src/application/ports/config-writer.ts",
-      "symbols": ["ConfigWriter"]
+      "file": "core:src/domain/plugin-name.ts",
+      "symbols": ["PLUGIN_NAME_REGEX", "isPluginName"]
     },
     {
-      "file": "core:src/infrastructure/fs/config-writer.ts",
-      "symbols": ["FsConfigWriter"]
+      "file": "core:src/domain/errors/legacy-config-format-error.ts",
+      "symbols": ["LegacyConfigFormatError"]
+    },
+    {
+      "file": "core:src/domain/errors/unsupported-config-version-error.ts",
+      "symbols": ["UnsupportedConfigVersionError", "CURRENT_CONFIG_VERSION"]
     }
   ],
   "optimizations": {

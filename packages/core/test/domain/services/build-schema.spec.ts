@@ -853,7 +853,7 @@ describe('buildSchema', () => {
   describe('workflow checks validation and governance', () => {
     it('accepts valid custom checks registered in CheckRegistry', () => {
       const registry = new CheckRegistry()
-      registry.register('my-plugin', {
+      registry.register('@acme/my-plugin', {
         id: 'linter',
         label: 'Linter',
         execute: async () => ({
@@ -869,7 +869,7 @@ describe('buildSchema', () => {
         ...minimalData([
           {
             ...step('implementing'),
-            checks: [{ id: '@my-plugin.linter', config: { strict: true } }],
+            checks: [{ id: '@acme/my-plugin.linter', config: { strict: true } }],
           },
         ]),
       }
@@ -877,7 +877,7 @@ describe('buildSchema', () => {
       const schema = buildSchema('#test', data, new Map(), registry)
       const stepObj = schema.workflowStep('implementing')
       expect(stepObj?.checks).toBeDefined()
-      expect(stepObj?.checks?.[0]?.id).toBe('@my-plugin.linter')
+      expect(stepObj?.checks?.[0]?.id).toBe('@acme/my-plugin.linter')
       expect(stepObj?.checks?.[0]?.config).toEqual({ strict: true })
     })
 
@@ -897,7 +897,7 @@ describe('buildSchema', () => {
 
     it('rejects duplicate check IDs in the same workflow step with DuplicateCheckBindingError', () => {
       const registry = new CheckRegistry()
-      registry.register('my-plugin', {
+      registry.register('@acme/my-plugin', {
         id: 'linter',
         label: 'Linter',
         execute: async () => ({
@@ -913,7 +913,7 @@ describe('buildSchema', () => {
         ...minimalData([
           {
             ...step('implementing'),
-            checks: [{ id: '@my-plugin.linter' }, { id: '@my-plugin.linter' }],
+            checks: [{ id: '@acme/my-plugin.linter' }, { id: '@acme/my-plugin.linter' }],
           },
         ]),
       }
@@ -966,20 +966,20 @@ describe('buildSchema', () => {
     it('applies only check-level locks to schema-owned declarations of a bound plugin check', () => {
       const registry = new CheckRegistry()
       registry.register(
-        'p',
+        '@acme/p',
         { id: 'bound', label: 'bound', kind: 'predicate', execute: () => ({ ok: true }) } as never,
         [{ scope: 'transition', to: 'ready', along: 'forward', allowConfigOverride: false }],
         { allowSchemaEmbedding: true, allowConfigOverride: true },
       )
       // Not the code-defined coordinate: binding-level lock on config does not apply
       const data = minimalData([
-        { ...step('verifying'), checks: [{ id: '@p.bound', config: { x: 1 } }] },
+        { ...step('verifying'), checks: [{ id: '@acme/p.bound', config: { x: 1 } }] },
       ])
       expect(() => buildSchema('#test', data, new Map(), registry)).not.toThrow()
 
       const locked = new CheckRegistry()
       locked.register(
-        'p',
+        '@acme/p',
         { id: 'bound', label: 'bound', kind: 'predicate', execute: () => ({ ok: true }) } as never,
         [{ scope: 'transition', to: 'ready', along: 'forward' }],
         { allowSchemaEmbedding: true, allowConfigOverride: false },
@@ -1022,19 +1022,19 @@ describe('buildSchema', () => {
       it('still applies the check-level config lock to a later layer on a schema-owned declaration', () => {
         const registry = new CheckRegistry()
         registry.register(
-          'p',
+          '@acme/p',
           { id: 'locked', label: 'Locked', execute: async () => ({}) } as never,
           undefined,
           { allowConfigOverride: false },
         )
-        const base = doneWithCheck({ id: '@p.locked' })
+        const base = doneWithCheck({ id: '@acme/p.locked' })
         const merged = mergeSchemaLayers(base, [
           {
             source: 'override',
             ref: 'override',
             operations: {
               set: {
-                workflow: [{ step: 'done', checks: [{ id: '@p.locked', config: { x: 1 } }] }],
+                workflow: [{ step: 'done', checks: [{ id: '@acme/p.locked', config: { x: 1 } }] }],
               },
             } as never,
           },
@@ -1103,7 +1103,7 @@ describe('buildSchema', () => {
     it('rejects binding override when allowBindingOverride is false with CheckBindingOverrideForbiddenError', () => {
       const registry = new CheckRegistry()
       registry.register(
-        'my-plugin',
+        '@acme/my-plugin',
         {
           id: 'locked-binding',
           label: 'Locked Binding',
@@ -1129,7 +1129,7 @@ describe('buildSchema', () => {
         ...minimalData([
           {
             ...step('implementing'),
-            checks: [{ id: '@my-plugin.locked-binding', skippable: true }],
+            checks: [{ id: '@acme/my-plugin.locked-binding', skippable: true }],
           },
         ]),
       }
@@ -1142,7 +1142,7 @@ describe('buildSchema', () => {
     it('allows modifying onFailure and skippable when check has an existing binding and allowBindingOverride is true', () => {
       const registry = new CheckRegistry()
       registry.register(
-        'my-plugin',
+        '@acme/my-plugin',
         {
           id: 'customizable-binding',
           label: 'Customizable Binding',
@@ -1172,7 +1172,7 @@ describe('buildSchema', () => {
             ...step('implementing'),
             checks: [
               {
-                id: '@my-plugin.customizable-binding',
+                id: '@acme/my-plugin.customizable-binding',
                 onFailure: 'warn',
                 skippable: true,
               },
@@ -1183,7 +1183,9 @@ describe('buildSchema', () => {
 
       const schema = buildSchema('#test', data, new Map(), registry)
       const stepObj = schema.workflowStep('implementing')
-      const declaredCheck = stepObj?.checks?.find((c) => c.id === '@my-plugin.customizable-binding')
+      const declaredCheck = stepObj?.checks?.find(
+        (c) => c.id === '@acme/my-plugin.customizable-binding',
+      )
       expect(declaredCheck).toBeDefined()
       expect(declaredCheck?.onFailure).toBe('warn')
       expect(declaredCheck?.skippable).toBe(true)
@@ -1192,7 +1194,7 @@ describe('buildSchema', () => {
     it('rejects config override when allowConfigOverride is false with CheckConfigOverrideForbiddenError', () => {
       const registry = new CheckRegistry()
       registry.register(
-        'my-plugin',
+        '@acme/my-plugin',
         {
           id: 'locked-config',
           label: 'Locked Config',
@@ -1212,7 +1214,7 @@ describe('buildSchema', () => {
         ...minimalData([
           {
             ...step('implementing'),
-            checks: [{ id: '@my-plugin.locked-config', config: { override: true } }],
+            checks: [{ id: '@acme/my-plugin.locked-config', config: { override: true } }],
           },
         ]),
       }
@@ -1225,7 +1227,7 @@ describe('buildSchema', () => {
     it('allows config override when check has an existing binding and allowConfigOverride is true', () => {
       const registry = new CheckRegistry()
       registry.register(
-        'my-plugin',
+        '@acme/my-plugin',
         {
           id: 'configurable-check',
           label: 'Configurable Check',
@@ -1255,7 +1257,7 @@ describe('buildSchema', () => {
             ...step('verifying'),
             checks: [
               {
-                id: '@my-plugin.configurable-check',
+                id: '@acme/my-plugin.configurable-check',
                 along: 'forward',
                 config: { defaultTimeout: 5000, extraParam: 'active' },
               },
@@ -1267,7 +1269,7 @@ describe('buildSchema', () => {
       const schema = buildSchema('#test', data, new Map(), registry)
       const verifyingStep = schema.workflowStep('verifying')
       const declaredCheck = verifyingStep?.checks?.find(
-        (c) => c.id === '@my-plugin.configurable-check',
+        (c) => c.id === '@acme/my-plugin.configurable-check',
       )
       expect(declaredCheck).toBeDefined()
       expect(declaredCheck?.config).toEqual({ defaultTimeout: 5000, extraParam: 'active' })
@@ -1276,7 +1278,7 @@ describe('buildSchema', () => {
     it('rejects disabled: true when check has allowDisable: false with CheckDisableForbiddenError', () => {
       const registry = new CheckRegistry()
       registry.register(
-        'my-plugin',
+        '@acme/my-plugin',
         {
           id: 'non-disableable',
           label: 'Non Disableable',
@@ -1296,7 +1298,7 @@ describe('buildSchema', () => {
         ...minimalData([
           {
             ...step('implementing'),
-            checks: [{ id: '@my-plugin.non-disableable', disabled: true }],
+            checks: [{ id: '@acme/my-plugin.non-disableable', disabled: true }],
           },
         ]),
       }
@@ -1309,7 +1311,7 @@ describe('buildSchema', () => {
     it('rejects disabled: true when binding has allowDisable: false with CheckDisableForbiddenError', () => {
       const registry = new CheckRegistry()
       registry.register(
-        'my-plugin',
+        '@acme/my-plugin',
         {
           id: 'binding-locked',
           label: 'Binding Locked',
@@ -1335,7 +1337,7 @@ describe('buildSchema', () => {
         ...minimalData([
           {
             ...step('implementing'),
-            checks: [{ id: '@my-plugin.binding-locked', disabled: true }],
+            checks: [{ id: '@acme/my-plugin.binding-locked', disabled: true }],
           },
         ]),
       }
@@ -1348,7 +1350,7 @@ describe('buildSchema', () => {
     it('preserves existing binding allowDisable lock when an identical binding is redeclared in schema', () => {
       const registry = new CheckRegistry()
       registry.register(
-        'compliance',
+        '@acme/compliance',
         {
           id: 'audit',
           label: 'Audit Check',
@@ -1377,7 +1379,7 @@ describe('buildSchema', () => {
             ...step('verifying'),
             checks: [
               {
-                id: '@compliance.audit',
+                id: '@acme/compliance.audit',
                 along: 'forward',
                 disabled: true,
               },
@@ -1395,7 +1397,7 @@ describe('buildSchema', () => {
     it('allows disabled: true when allowDisable is true', () => {
       const registry = new CheckRegistry()
       registry.register(
-        'my-plugin',
+        '@acme/my-plugin',
         {
           id: 'optional-check',
           label: 'Optional Check',
@@ -1415,7 +1417,7 @@ describe('buildSchema', () => {
         ...minimalData([
           {
             ...step('implementing'),
-            checks: [{ id: '@my-plugin.optional-check', disabled: true }],
+            checks: [{ id: '@acme/my-plugin.optional-check', disabled: true }],
           },
         ]),
       }
@@ -1442,7 +1444,7 @@ describe('buildSchema', () => {
     it('rejects duplicate check coordinate in skipChecks with DuplicateCheckBindingError', () => {
       const registry = new CheckRegistry()
       registry.register(
-        'my-plugin',
+        '@acme/my-plugin',
         {
           id: 'dup-check',
           label: 'Dup Check',
@@ -1461,7 +1463,7 @@ describe('buildSchema', () => {
         ...minimalData([
           {
             ...step('implementing'),
-            skipChecks: [{ id: '@my-plugin.dup-check' }, { id: '@my-plugin.dup-check' }],
+            skipChecks: [{ id: '@acme/my-plugin.dup-check' }, { id: '@acme/my-plugin.dup-check' }],
           },
         ]),
       }
@@ -1492,7 +1494,7 @@ describe('buildSchema', () => {
     it('rejects modifying locked onFailure on skipChecks with CheckBindingOverrideForbiddenError', () => {
       const registry = new CheckRegistry()
       registry.register(
-        'my-plugin',
+        '@acme/my-plugin',
         {
           id: 'locked-policy',
           label: 'Locked Policy',
@@ -1518,7 +1520,7 @@ describe('buildSchema', () => {
         ...minimalData([
           {
             ...step('implementing'),
-            skipChecks: [{ id: '@my-plugin.locked-policy', onFailure: 'warn' }],
+            skipChecks: [{ id: '@acme/my-plugin.locked-policy', onFailure: 'warn' }],
           },
         ]),
       }
@@ -1530,7 +1532,7 @@ describe('buildSchema', () => {
     it('rejects modifying locked skippable on skipChecks with CheckBindingOverrideForbiddenError', () => {
       const registry = new CheckRegistry()
       registry.register(
-        'my-plugin',
+        '@acme/my-plugin',
         {
           id: 'locked-skippable',
           label: 'Locked Skippable',
@@ -1556,7 +1558,7 @@ describe('buildSchema', () => {
         ...minimalData([
           {
             ...step('implementing'),
-            skipChecks: [{ id: '@my-plugin.locked-skippable', skippable: true }],
+            skipChecks: [{ id: '@acme/my-plugin.locked-skippable', skippable: true }],
           },
         ]),
       }
@@ -1568,7 +1570,7 @@ describe('buildSchema', () => {
     it('allows modifying onFailure and skippable when check has an existing step-skip binding and allowBindingOverride is true', () => {
       const registry = new CheckRegistry()
       registry.register(
-        'my-plugin',
+        '@acme/my-plugin',
         {
           id: 'customizable-skip-policy',
           label: 'Customizable Skip Policy',
@@ -1599,7 +1601,7 @@ describe('buildSchema', () => {
             optional: true,
             skipChecks: [
               {
-                id: '@my-plugin.customizable-skip-policy',
+                id: '@acme/my-plugin.customizable-skip-policy',
                 onFailure: 'warn',
                 skippable: true,
               },
@@ -1611,7 +1613,7 @@ describe('buildSchema', () => {
       const schema = buildSchema('#test', data, new Map(), registry)
       const stepObj = schema.workflowStep('implementing')
       const declaredSkip = stepObj?.skipChecks?.find(
-        (c) => c.id === '@my-plugin.customizable-skip-policy',
+        (c) => c.id === '@acme/my-plugin.customizable-skip-policy',
       )
       expect(declaredSkip).toBeDefined()
       expect(declaredSkip?.onFailure).toBe('warn')
@@ -1621,7 +1623,7 @@ describe('buildSchema', () => {
     it('rejects config override when allowConfigOverride is false on skipChecks with CheckConfigOverrideForbiddenError', () => {
       const registry = new CheckRegistry()
       registry.register(
-        'my-plugin',
+        '@acme/my-plugin',
         {
           id: 'locked-config',
           label: 'Locked Config',
@@ -1646,7 +1648,7 @@ describe('buildSchema', () => {
         ...minimalData([
           {
             ...step('implementing'),
-            skipChecks: [{ id: '@my-plugin.locked-config', config: { foo: 'bar' } }],
+            skipChecks: [{ id: '@acme/my-plugin.locked-config', config: { foo: 'bar' } }],
           },
         ]),
       }
@@ -1658,7 +1660,7 @@ describe('buildSchema', () => {
     it('rejects disabled: true when check/binding has allowDisable: false on skipChecks with CheckDisableForbiddenError', () => {
       const registry = new CheckRegistry()
       registry.register(
-        'my-plugin',
+        '@acme/my-plugin',
         {
           id: 'locked-disable',
           label: 'Locked Disable',
@@ -1683,7 +1685,7 @@ describe('buildSchema', () => {
         ...minimalData([
           {
             ...step('implementing'),
-            skipChecks: [{ id: '@my-plugin.locked-disable', disabled: true }],
+            skipChecks: [{ id: '@acme/my-plugin.locked-disable', disabled: true }],
           },
         ]),
       }
@@ -1695,7 +1697,7 @@ describe('buildSchema', () => {
     it('rejects skipChecks declared on a disabled: true workflow step with SchemaValidationError', () => {
       const registry = new CheckRegistry()
       registry.register(
-        'my-plugin',
+        '@acme/my-plugin',
         {
           id: 'some-check',
           label: 'Some Check',
@@ -1715,7 +1717,7 @@ describe('buildSchema', () => {
           {
             ...step('implementing'),
             disabled: true,
-            skipChecks: [{ id: '@my-plugin.some-check' }],
+            skipChecks: [{ id: '@acme/my-plugin.some-check' }],
           },
         ]),
       }
@@ -1725,7 +1727,7 @@ describe('buildSchema', () => {
     it('accepts valid skipChecks with allowed overrides and stores them on WorkflowStep', () => {
       const registry = new CheckRegistry()
       registry.register(
-        'my-plugin',
+        '@acme/my-plugin',
         {
           id: 'custom-skip',
           label: 'Custom Skip',
@@ -1748,7 +1750,7 @@ describe('buildSchema', () => {
             optional: true,
             skipChecks: [
               {
-                id: '@my-plugin.custom-skip',
+                id: '@acme/my-plugin.custom-skip',
                 onFailure: 'warn',
                 skippable: true,
                 config: { threshold: 10 },
@@ -1762,7 +1764,7 @@ describe('buildSchema', () => {
       const stepObj = schema.workflowStep('implementing')
       expect(stepObj?.skipChecks).toHaveLength(1)
       expect(stepObj?.skipChecks?.[0]).toEqual({
-        id: '@my-plugin.custom-skip',
+        id: '@acme/my-plugin.custom-skip',
         onFailure: 'warn',
         skippable: true,
         config: { threshold: 10 },
@@ -1772,7 +1774,7 @@ describe('buildSchema', () => {
     it('allows config override when check has an existing step-skip binding and allowConfigOverride is true', () => {
       const registry = new CheckRegistry()
       registry.register(
-        'my-plugin',
+        '@acme/my-plugin',
         {
           id: 'configurable-skip-check',
           label: 'Configurable Skip Check',
@@ -1802,7 +1804,7 @@ describe('buildSchema', () => {
             optional: true,
             skipChecks: [
               {
-                id: '@my-plugin.configurable-skip-check',
+                id: '@acme/my-plugin.configurable-skip-check',
                 config: { threshold: 10, mode: 'strict' },
               },
             ],
@@ -1813,7 +1815,7 @@ describe('buildSchema', () => {
       const schema = buildSchema('#test', data, new Map(), registry)
       const stepObj = schema.workflowStep('implementing')
       const declaredSkip = stepObj?.skipChecks?.find(
-        (c) => c.id === '@my-plugin.configurable-skip-check',
+        (c) => c.id === '@acme/my-plugin.configurable-skip-check',
       )
       expect(declaredSkip).toBeDefined()
       expect(declaredSkip?.config).toEqual({ threshold: 10, mode: 'strict' })
@@ -1907,7 +1909,7 @@ describe('verification-attempt-11 workflow validation', () => {
   it('lets a coordinate binding allow policy changes despite a check-level lock', () => {
     const registry = new CheckRegistry()
     registry.register(
-      'my-plugin',
+      '@acme/my-plugin',
       {
         id: 'confined',
         label: 'Confined',
@@ -1926,7 +1928,7 @@ describe('verification-attempt-11 workflow validation', () => {
     const schema = buildSchema(
       '#test',
       minimalData([
-        { ...step('implementing'), checks: [{ id: '@my-plugin.confined', skippable: true }] },
+        { ...step('implementing'), checks: [{ id: '@acme/my-plugin.confined', skippable: true }] },
       ]),
       new Map(),
       registry,
@@ -1937,7 +1939,7 @@ describe('verification-attempt-11 workflow validation', () => {
   it('still blocks embedding a confined check at a new coordinate', () => {
     const registry = new CheckRegistry()
     registry.register(
-      'my-plugin',
+      '@acme/my-plugin',
       {
         id: 'confined',
         label: 'Confined',
@@ -1956,7 +1958,7 @@ describe('verification-attempt-11 workflow validation', () => {
     expect(() =>
       buildSchema(
         '#test',
-        minimalData([{ ...step('verifying'), checks: [{ id: '@my-plugin.confined' }] }]),
+        minimalData([{ ...step('verifying'), checks: [{ id: '@acme/my-plugin.confined' }] }]),
         new Map(),
         registry,
       ),

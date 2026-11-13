@@ -1,0 +1,112 @@
+- op: removed
+  selector:
+    type: section
+    matches: 'Scenario: Filter by type'
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Declarations read from loaded config snapshot'
+  content: |
+    - **GIVEN** plugins are declared in the `plugins` list of `specd.yaml`
+    - **WHEN** `specd plugins list` is invoked
+    - **THEN** the command enumerates plugins from the loaded `SpecdConfig.plugins` field
+    - **AND** it does not call `kernel.project.listPlugins`
+    - **AND** it does not call `ConfigWriter.listPlugins`
+
+- op: removed
+  selector:
+    type: section
+    matches: 'Scenario: Default type is agents when --type omitted'
+
+- op: removed
+  selector:
+    type: section
+    matches: 'Scenario: Unknown type yields empty declaration list'
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Declaration source'
+    after:
+      type: section
+      matches: 'Scenario: Declarations read from loaded config snapshot'
+  content: |
+    #### Scenario: All declared plugins listed regardless of kind
+
+    - **GIVEN** a plugin contributing agents and a plugin contributing checks are both declared
+    - **WHEN** `specd plugins list` is invoked
+    - **THEN** both are listed
+
+    #### Scenario: Lists with a broken configured plugin
+
+    - **GIVEN** a configured plugin whose `init` would throw
+    - **WHEN** `specd plugins list` is invoked
+    - **THEN** the host is opened with `plugins: false`
+    - **AND** the plugin is listed instead of failing the command
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Text output includes plugin details'
+  content: |
+    - **WHEN** `specd plugins list` is invoked
+    - **THEN** output includes plugin name, contributions with their selection, version, and status
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Output format'
+    after:
+      type: section
+      matches: 'Scenario: Text output includes plugin details'
+  content: |
+    #### Scenario: Allowlist shown
+
+    - **GIVEN** `@acme/x` declares `a` and `b` and is recorded with `contributions: ['a']`
+    - **WHEN** `specd plugins list` is invoked
+    - **THEN** `a` is shown as selected and `b` as available but not selected
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Plugin not found'
+  content: |
+    - **GIVEN** a plugin is in config but npm package is not installed
+    - **WHEN** `specd plugins list` is invoked
+    - **THEN** status shows "not\_found"
+    - **AND** `contributions.declared` is empty and `contributions.selected` is the recorded allowlist or empty
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Plugin load error'
+  content: |
+    - **GIVEN** a plugin is in config but fails to load
+    - **WHEN** `specd plugins list` is invoked
+    - **THEN** status shows "error" with the error message as detail
+    - **AND** `contributions.declared` is empty
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Output format'
+    after:
+      type: section
+      matches: 'Scenario: Text output includes plugin details'
+  content: |
+    #### Scenario: Version column and fallback
+
+    - **GIVEN** one plugin with a known version and one without
+    - **WHEN** `specd plugins list` is invoked in text format
+    - **THEN** the first shows its version and the second shows `-`
+
+    #### Scenario: Nothing declared
+
+    - **GIVEN** no plugins are declared
+    - **WHEN** `specd plugins list` is invoked
+    - **THEN** text output is `no plugins declared`
+    - **AND** JSON output is `{ "plugins": [] }`

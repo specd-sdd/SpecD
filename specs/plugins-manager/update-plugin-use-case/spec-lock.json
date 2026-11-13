@@ -3,6 +3,20 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:config", "plugin-manager:agent-plugin-type", "plugin-manager:plugin-loader"],
-  "implementation": []
+  "dependsOn": [
+    "core:config",
+    "plugin-manager:plugin-loader",
+    "plugin-manager:install-plugin-use-case",
+    "plugin-manager:plugin-errors",
+    "plugin-manager:agent-plugin-type"
+  ],
+  "implementation": [
+    {
+      "file": "plugin-manager:src/application/use-cases/update-plugin.ts",
+      "symbols": ["UpdatePlugin"]
+    },
+    {
+      "file": "plugin-manager:test/application/update-plugin.spec.ts"
+    }
+  ]
 }

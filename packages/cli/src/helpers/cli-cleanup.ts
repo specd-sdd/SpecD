@@ -5,16 +5,15 @@ const registered: CliCleanup[] = []
 let running: Promise<void> | undefined
 
 /**
- * Describes a cleanup failure as one or more stderr-friendly messages.
+ * Describes a cleanup failure as one or more stderr-friendly messages, flattening nested
+ * `AggregateError`s recursively.
  *
  * @param error - Failure thrown or rejected by a cleanup
  * @returns One message per underlying failure
  */
 function describeFailure(error: unknown): string[] {
-  if (error instanceof AggregateError) {
-    return error.errors.map((inner: unknown) =>
-      inner instanceof Error ? inner.message : String(inner),
-    )
+  if (error instanceof AggregateError && error.errors.length > 0) {
+    return error.errors.flatMap((inner: unknown) => describeFailure(inner))
   }
   return [error instanceof Error ? error.message : String(error)]
 }

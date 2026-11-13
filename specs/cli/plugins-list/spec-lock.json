@@ -3,15 +3,14 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["plugin-manager:load-plugin-use-case", "core:get-config"],
+  "dependsOn": ["plugin-manager:load-plugin-use-case", "core:get-config", "cli:host-context"],
   "implementation": [
-    {
-      "file": "cli:src/commands/plugins/get-declared-plugins.ts",
-      "symbols": ["getDeclaredPlugins", "DeclaredPluginEntry"]
-    },
     {
       "file": "cli:src/commands/plugins/list.ts",
       "symbols": ["registerPluginsList"]
+    },
+    {
+      "file": "cli:test/commands/plugins.spec.ts"
     }
   ]
 }

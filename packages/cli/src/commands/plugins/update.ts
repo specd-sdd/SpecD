@@ -34,16 +34,14 @@ export interface PluginUpdateBatchResult {
  *
  * @param input - Update input.
  * @param input.config - Fully-resolved project configuration.
- * @param input.configPath - Absolute path to `specd.yaml`.
  * @param input.pluginNames - Optional plugin-name filter.
  * @returns Batch update results.
  */
 export async function updatePluginsWithKernel(input: {
   readonly config: SpecdConfig
-  readonly configPath: string
   readonly pluginNames?: readonly string[]
 }): Promise<PluginUpdateBatchResult> {
-  const declared = getDeclaredPlugins(input.config, 'agents')
+  const declared = getDeclaredPlugins(input.config)
   const declaredMap = new Map(declared.map((plugin) => [plugin.name, plugin]))
 
   const selectedNames =
@@ -55,13 +53,20 @@ export async function updatePluginsWithKernel(input: {
   const update = new UpdatePlugin(loader)
   const plugins: PluginUpdateEntry[] = []
   let hasErrors = false
+  const processed = new Set<string>()
 
   for (const pluginName of selectedNames) {
+    if (processed.has(pluginName)) {
+      plugins.push({ name: pluginName, status: 'skipped', detail: 'already processed' })
+      continue
+    }
+    processed.add(pluginName)
     const declaration = declaredMap.get(pluginName)
     if (declaration === undefined) {
+      hasErrors = true
       plugins.push({
         name: pluginName,
-        status: 'skipped',
+        status: 'error',
         detail: `plugin '${pluginName}' is not declared in specd.yaml`,
       })
       continue
@@ -71,7 +76,9 @@ export async function updatePluginsWithKernel(input: {
       await update.execute({
         pluginName,
         config: input.config,
-        ...(declaration.config !== undefined ? { options: declaration.config } : {}),
+        ...(declaration.contributions !== undefined
+          ? { contributions: declaration.contributions }
+          : {}),
       })
       plugins.push({
         name: pluginName,
@@ -106,13 +113,12 @@ export function registerPluginsUpdate(parent: Command): void {
     .action(async (pluginNames: string[], opts: { format: string; config?: string }) => {
       try {
         const fmt = parseFormat(opts.format)
-        const { config, configFilePath } = await resolveCliContext({
+        const { config } = await resolveCliContext({
           configPath: opts.config,
+          plugins: false,
         })
-        const configPath = configFilePath ?? `${config.projectRoot}/specd.yaml`
         const result = await updatePluginsWithKernel({
           config,
-          configPath,
           ...(pluginNames.length > 0 ? { pluginNames } : {}),
         })
 

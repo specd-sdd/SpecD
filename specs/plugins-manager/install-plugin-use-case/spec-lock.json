@@ -3,15 +3,16 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:config", "plugin-manager:agent-plugin-type", "plugin-manager:plugin-loader"],
+  "dependsOn": [
+    "core:config",
+    "plugin-manager:plugin-loader",
+    "plugin-manager:plugin-errors",
+    "plugin-manager:agent-plugin-type"
+  ],
   "implementation": [
     {
       "file": "plugin-manager:src/application/use-cases/install-plugin.ts",
       "symbols": ["InstallPlugin"]
-    },
-    {
-      "file": "plugin-manager:src/application/use-cases/uninstall-plugin.ts",
-      "symbols": ["UninstallPlugin"]
     },
     {
       "file": "plugin-manager:test/application/install-plugin.spec.ts"

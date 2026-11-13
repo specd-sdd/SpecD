@@ -24,27 +24,25 @@ export function registerProjectUpdate(parent: Command): void {
       `
 JSON/TOON output schema:
   {
-    plugins: Array<{ name: string, status: "updated" | "skipped" | "error", detail: string }>
+    plugins: Array<{ name: string, status: "updated" | "error", detail: string }>
+    hasErrors: boolean
   }
 `,
     )
     .action(async (opts: { format: string; config?: string }) => {
       try {
         const fmt = parseFormat(opts.format)
-        const { config, configFilePath } = await resolveCliContext({
+        const { config } = await resolveCliContext({
           configPath: opts.config,
+          plugins: false,
         })
-        const configPath = configFilePath ?? `${config.projectRoot}/specd.yaml`
-        const result = await updatePluginsWithKernel({
-          config,
-          configPath,
-        })
+        const result = await updatePluginsWithKernel({ config })
 
         if (result.plugins.length === 0) {
           if (fmt === 'text') {
             output('project is up to date', 'text')
           } else {
-            output({ plugins: [] }, fmt)
+            output({ plugins: [], hasErrors: false }, fmt)
           }
           return
         }
@@ -58,7 +56,7 @@ JSON/TOON output schema:
             }
           }
         } else {
-          output({ plugins: result.plugins }, fmt)
+          output({ plugins: result.plugins, hasErrors: result.hasErrors }, fmt)
         }
 
         if (result.hasErrors) {

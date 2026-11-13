@@ -6,10 +6,10 @@
 
 #### Scenario: Retrieve registered check by canonical ID
 
-- **GIVEN** a CheckRegistry initialized with built-in checks and a registered plugin check `@security.code-scan`
-- **WHEN** querying `registry.get('@security.code-scan')`
+- **GIVEN** a CheckRegistry initialized with built-in checks and a check `code-scan` registered under plugin `@acme/security`
+- **WHEN** querying `registry.get('@acme/security.code-scan')`
 - **THEN** it returns the registered Check instance with matching identifier and properties
-- **AND** `registry.has('@security.code-scan')` returns true
+- **AND** `registry.has('@acme/security.code-scan')` returns true
 
 #### Scenario: Query unregistered check returns undefined
 
@@ -24,6 +24,27 @@
 - **WHEN** calling `registry.list()`
 - **THEN** it returns an array of exactly 18 Check instances
 
+#### Scenario: getBindings returns the default bindings of one check
+
+- **GIVEN** a plugin check registered with two default bindings
+- **WHEN** `registry.getBindings(canonicalId)` is called
+- **THEN** it returns exactly those two bindings
+- **AND** an unknown id returns an empty array
+
+#### Scenario: getGovernance returns the governance record
+
+- **GIVEN** a plugin check registered with `PluginCheckRegistrationOptions` `{ allowSchemaEmbedding: true }`
+- **WHEN** `registry.getGovernance(canonicalId)` is called
+- **THEN** it returns a record with `allowSchemaEmbedding: true`
+- **AND** an unknown id returns `undefined`
+
+#### Scenario: withExecutableBuiltins keeps ids, bindings and governance
+
+- **GIVEN** a registry and executable instances for some built-in checks
+- **WHEN** `registry.withExecutableBuiltins(instances)` is called
+- **THEN** the returned registry lists the same ids, bindings and governance
+- **AND** `get()` on a covered built-in returns the executable instance
+
 ### Requirement: Immutability of built-in checks
 
 #### Scenario: Built-in checks injected at construction
@@ -35,20 +56,20 @@
 #### Scenario: External registrations are always namespaced and never shadow built-ins
 
 - **GIVEN** a CheckRegistry instance
-- **WHEN** a plugin named `protocol` registers a check with id `edge`
-- **THEN** the check is registered as `@protocol.edge`
+- **WHEN** a plugin named `@acme/protocol` registers a check with id `edge`
+- **THEN** the check is registered as `@acme/protocol.edge`
 - **AND** `registry.get('protocol.edge')` still returns the immutable built-in check
 
 #### Scenario: Invalid plugin name is rejected
 
 - **GIVEN** a CheckRegistry instance
-- **WHEN** a plugin registers with a name that is empty or contains whitespace, dots, symbols, or path traversal
+- **WHEN** a plugin registers with a name that is empty, unscoped, or contains whitespace, dots, uppercase, symbols, or path traversal
 - **THEN** the registration throws `InvalidPluginNameError`
 
 #### Scenario: Plugin namespace accepts the documented grammar
 
-- **GIVEN** plugin names matching `^[a-zA-Z0-9_-]+$`
-- **WHEN** registering checks under names containing uppercase letters, a leading digit, or an underscore
+- **GIVEN** plugin names matching `^@[a-z0-9][a-z0-9_-]*\/[a-z0-9][a-z0-9_-]*$`
+- **WHEN** registering checks under names containing a leading digit, a hyphen or an underscore
 - **THEN** each valid namespace is accepted
 
 ### Requirement: Canonical namespacing and plugin registration
@@ -56,20 +77,42 @@
 #### Scenario: Valid plugin registration produces canonical namespaced identifier
 
 - **GIVEN** a CheckRegistry and a valid custom check with id `'audit'`
-- **WHEN** registering via `registry.register('compliance', check)`
-- **THEN** the returned canonical identifier is `'@compliance.audit'`
-- **AND** the check is indexed under `'@compliance.audit'`
+- **WHEN** registering via `registry.register('@acme/compliance', check)`
+- **THEN** the returned canonical identifier is `'@acme/compliance.audit'`
+- **AND** the check is indexed under `'@acme/compliance.audit'`
+
+#### Scenario: Canonical identifier has a single leading at-sign
+
+- **WHEN** registering via `registry.register('@acme/compliance', check)`
+- **THEN** the returned identifier does not start with `'@@'`
+
+#### Scenario: Reject unscoped plugin name
+
+- **GIVEN** a CheckRegistry
+- **WHEN** attempting to register with plugin name `'compliance'`
+- **THEN** it throws `InvalidPluginNameError`
 
 #### Scenario: Reject invalid plugin name containing special characters
 
 - **GIVEN** a CheckRegistry
-- **WHEN** attempting to register with plugin name `'@invalid.name'` or empty string `''`
+- **WHEN** attempting to register with plugin name `'@acme/invalid.name'` or empty string `''`
 - **THEN** it throws `InvalidPluginNameError`
+
+#### Scenario: Invalid plugin name error states the scoped grammar
+
+- **WHEN** a plugin is registered under `@Acme/x`
+- **THEN** `InvalidPluginNameError` is thrown
+- **AND** its message describes the `@scope/name` grammar with lowercase characters
+
+#### Scenario: Check id containing a dot is rejected
+
+- **WHEN** a check with `id: 'a.b'` is registered under `@acme/qa`
+- **THEN** `InvalidCheckIdError` is thrown and nothing is registered
 
 #### Scenario: Reject duplicate check registration under same canonical identifier
 
-- **GIVEN** a CheckRegistry with an existing check `'@security.scan'`
-- **WHEN** attempting to register another check with id `'scan'` under plugin `'security'`
+- **GIVEN** a CheckRegistry with an existing check `'@acme/security.scan'`
+- **WHEN** attempting to register another check with id `'scan'` under plugin `'@acme/security'`
 - **THEN** it throws `DuplicateCheckError`
 
 ### Requirement: Adaptation of CustomCheckDefinition to internal Check
@@ -77,20 +120,20 @@
 #### Scenario: CustomCheckDefinition automatically adapted to predicate kind
 
 - **GIVEN** a `CustomCheckDefinition` specifying `id: 'lint'` and `label: 'Linting files'` without a `kind` property
-- **WHEN** registering the check via `registry.register('qa', checkDef)`
+- **WHEN** registering the check via `registry.register('@acme/qa', checkDef)`
 - **THEN** the adapted check in the registry has `kind: 'predicate'`
 
 #### Scenario: Reject check definition explicitly declaring effect kind
 
 - **GIVEN** a check definition providing `kind: 'effect'`
-- **WHEN** attempting to register it via `registry.register('shell', checkDef)`
+- **WHEN** attempting to register it via `registry.register('@acme/shell', checkDef)`
 - **THEN** it throws `InvalidCheckKindError`
 
 ### Requirement: Binding coordinate identity and duplicate prevention
 
 #### Scenario: Register valid check binding coordinates
 
-- **GIVEN** a registered check `'@security.scan'`
+- **GIVEN** a registered check `'@acme/security.scan'`
 - **WHEN** registering default bindings for `{ scope: 'transition', to: 'ready', along: 'forward' }` and `{ scope: 'step-skip', step: 'implementing' }`
 - **THEN** both bindings are successfully recorded and accessible via `registry.bindings()`
 

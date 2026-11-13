@@ -4,11 +4,16 @@
 
 ### Requirement: Package identity and dependencies
 
-#### Scenario: SDK depends only on core and code-graph
+#### Scenario: SDK depends on core, code-graph and plugin-manager
 
 - **WHEN** inspecting `packages/sdk/package.json` dependencies
-- **THEN** only `@specd/core` and `@specd/code-graph` workspace packages are listed as runtime dependencies
-- **AND** `@specd/cli` and `@specd/mcp` are absent
+- **THEN** only `@specd/core`, `@specd/code-graph` and `@specd/plugin-manager` workspace packages are listed as runtime dependencies
+- **AND** `@specd/cli`, `@specd/mcp` and any `@specd/plugin-agent-*` package are absent
+
+#### Scenario: Dependency graph stays acyclic
+
+- **WHEN** the workspace dependency graph is inspected
+- **THEN** `@specd/plugin-manager` does not depend on `@specd/sdk`
 
 ### Requirement: Layer structure
 
@@ -64,6 +69,17 @@
 - **WHEN** importing `ChangeRepository` from `@specd/sdk/ports`
 - **THEN** the type resolves to the same contract as `@specd/core/ports`
 
+#### Scenario: SDK exports handler contracts for plugin hosts
+
+- **WHEN** importing from `@specd/sdk`
+- **THEN** `ContributionKindHandler`, `ContributionActivationContext` and `SdkContextOptions` are available (type-level assertion)
+
+#### Scenario: SDK re-exports plugin error classes
+
+- **WHEN** importing from `@specd/sdk`
+- **THEN** `PluginInitError`, `PluginDestroyError`, `PluginValidationError`, `PluginNotFoundError`, `DuplicateContributionError`, `UnknownContributionError`, `UnknownContributionKindError`, `InvalidPluginConfigError`, `UnsupportedSchemaKeywordError`, `DuplicateHandlerKindError` and `InvalidContributionAddressError` are available
+- **AND** each is the same class as the one exported by `@specd/plugin-manager`
+
 ### Requirement: Public barrel exports for host adapters
 
 #### Scenario: Isolated graph worker is available from SDK
@@ -108,10 +124,12 @@
 
 ### Requirement: Import policy for integrators
 
-#### Scenario: CLI has no direct core dependency
+#### Scenario: CLI has no direct core or code-graph dependency
 
 - **WHEN** `packages/cli/package.json` runtime dependencies are inspected
-- **THEN** only `@specd/sdk` is listed among specd platform packages
+- **THEN** `@specd/sdk` is listed
+- **AND** `@specd/core` and `@specd/code-graph` are not listed
+- **AND** other specd packages (`@specd/plugin-manager`, `@specd/schema-std`, `@specd/guide`, `@specd/plugin-agent-*`) MAY be listed
 
 #### Scenario: Plugin may depend on core directly
 

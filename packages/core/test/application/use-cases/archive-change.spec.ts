@@ -4851,19 +4851,19 @@ describe('ArchiveChange — effective archive bindings and skipChecks', () => {
 
     it('synthesizes a failing embedded check from the schema as non-skippable', async () => {
       const registry = new CheckRegistry()
-      registry.register('qa', {
+      registry.register('@acme/qa', {
         id: 'lint',
         label: 'Linting',
         execute: async () =>
-          failResult('@qa.lint', 'LINT_FAILED', 'bad', undefined, 'predicate', 'Linting'),
+          failResult('@acme/qa.lint', 'LINT_FAILED', 'bad', undefined, 'predicate', 'Linting'),
       })
-      const { uc } = setup({ registry, schema: archivingSchema([{ id: '@qa.lint' }]) })
+      const { uc } = setup({ registry, schema: archivingSchema([{ id: '@acme/qa.lint' }]) })
       try {
         await uc.execute({ name: 'my-change' })
         expect.unreachable()
       } catch (error) {
         expect(error).toBeInstanceOf(CheckPredicateFailedError)
-        expect((error as CheckPredicateFailedError).checkId).toBe('@qa.lint')
+        expect((error as CheckPredicateFailedError).checkId).toBe('@acme/qa.lint')
         expect((error as CheckPredicateFailedError).skippable).toBe(false)
       }
     })
@@ -4871,24 +4871,24 @@ describe('ArchiveChange — effective archive bindings and skipChecks', () => {
     it('evaluates embedded checks in declaration order after the built-ins', async () => {
       const registry = new CheckRegistry()
       for (const [plugin, id] of [
-        ['a', 'lint'],
-        ['b', 'scan'],
+        ['@acme/a', 'lint'],
+        ['@acme/b', 'scan'],
       ] as const) {
         registry.register(plugin, {
           id,
           label: id,
-          execute: async () => passResult(`@${plugin}.${id}`, 'predicate', id),
+          execute: async () => passResult(`${plugin}.${id}`, 'predicate', id),
         })
       }
       const { uc } = setup({
         registry,
-        schema: archivingSchema([{ id: '@a.lint' }, { id: '@b.scan' }]),
+        schema: archivingSchema([{ id: '@acme/a.lint' }, { id: '@acme/b.scan' }]),
       })
       const events: CheckProgressEvent[] = []
       await uc.execute({ name: 'my-change' }, (event) => events.push(event))
       const order = events.filter((e) => e.type === 'check-start').map((e) => e.id)
-      expect(order.indexOf('@a.lint')).toBeLessThan(order.indexOf('@b.scan'))
-      expect(order.indexOf('@a.lint')).toBeGreaterThan(order.indexOf('impl.linksInScope'))
+      expect(order.indexOf('@acme/a.lint')).toBeLessThan(order.indexOf('@acme/b.scan'))
+      expect(order.indexOf('@acme/a.lint')).toBeGreaterThan(order.indexOf('impl.linksInScope'))
     })
   })
 

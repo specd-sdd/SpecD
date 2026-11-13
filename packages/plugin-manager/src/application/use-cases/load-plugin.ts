@@ -1,25 +1,18 @@
-import type { SpecdPlugin } from '../../domain/types/specd-plugin.js'
-import type { PluginLoader } from '../ports/plugin-loader.js'
+import { loadPluginSafely } from './load-plugin-safely.js'
+import type { LoadedPlugin, PluginLoader } from '../ports/plugin-loader.js'
 
 /**
  * Input for loading one plugin.
  */
 export interface LoadPluginInput {
-  /**
-   * Plugin package name.
-   */
+  /** Plugin package name. */
   readonly pluginName: string
 }
 
 /**
  * Output for loading one plugin.
  */
-export interface LoadPluginOutput {
-  /**
-   * Loaded plugin instance.
-   */
-  readonly plugin: SpecdPlugin
-}
+export type LoadPluginOutput = LoadedPlugin
 
 /**
  * Loads and validates one plugin through the loader.
@@ -28,18 +21,17 @@ export class LoadPlugin {
   /**
    * Creates a load-plugin use case.
    *
-   * @param loader - Plugin loader dependency.
+   * @param loader - Plugin loader dependency
    */
   constructor(private readonly loader: PluginLoader) {}
 
   /**
    * Executes the use case.
    *
-   * @param input - Plugin input.
-   * @returns Loaded plugin.
+   * @param input - Plugin input
+   * @returns Loaded plugin and manifest
    */
   async execute(input: LoadPluginInput): Promise<LoadPluginOutput> {
-    const plugin = await this.loader.load(input.pluginName)
-    return { plugin }
+    return loadPluginSafely(this.loader, input.pluginName)
   }
 }

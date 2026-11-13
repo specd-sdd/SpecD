@@ -24,6 +24,7 @@ import {
 } from './composition-registries.js'
 import { createKernel, type Kernel, type KernelOptions } from './kernel.js'
 import { type KernelDisposer } from './kernel-disposal.js'
+import type { LogDestination } from '../application/ports/logger.port.js'
 
 /**
  * Mutable working state used internally by {@link createKernelBuilder}.
@@ -41,6 +42,7 @@ interface KernelBuilderState {
   readonly externalHookRunners: ExternalHookRunner[]
   readonly checks: PluginCheckRegistration[]
   readonly disposers: KernelDisposer[]
+  readonly additionalDestinations?: LogDestination[]
   readonly repositories: {
     changes?: ChangeRepository
     archive?: ArchiveRepository
@@ -174,7 +176,7 @@ export interface KernelBuilder {
   /**
    * Registers a custom transition check with the builder.
    *
-   * @param pluginName - Plugin namespace matching ^[a-zA-Z0-9_-]+$
+   * @param pluginName - Scoped plugin name matching ^@[a-z0-9][a-z0-9_-]*\/[a-z0-9][a-z0-9_-]*$
    * @param check - Custom check definition
    * @param defaultBindings - Optional default bindings for this check
    * @param options - Check-level governance and configuration options
@@ -260,6 +262,9 @@ function cloneOptions(base?: Partial<KernelOptions>): KernelBuilderState {
     externalHookRunners: [...(base?.externalHookRunners ?? [])],
     checks: [...(base?.checks ?? [])],
     disposers: [...(base?.disposers ?? [])],
+    ...(base?.additionalDestinations !== undefined
+      ? { additionalDestinations: [...base.additionalDestinations] }
+      : {}),
     repositories: {
       ...(base?.repositories ?? {}),
     },
@@ -300,6 +305,9 @@ function toKernelOptions(state: KernelBuilderState): KernelOptions {
       : {}),
     ...(state.checks.length > 0 ? { checks: [...state.checks] } : {}),
     ...(state.disposers.length > 0 ? { disposers: [...state.disposers] } : {}),
+    ...(state.additionalDestinations !== undefined && state.additionalDestinations.length > 0
+      ? { additionalDestinations: [...state.additionalDestinations] }
+      : {}),
     ...(state.repositories && Object.keys(state.repositories).length > 0
       ? { repositories: { ...state.repositories } }
       : {}),

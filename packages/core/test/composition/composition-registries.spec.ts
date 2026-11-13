@@ -46,7 +46,7 @@ describe('createCompositionRegistryView', () => {
       id: 'audit',
       label: 'Auditing',
       execute: async () => ({
-        id: '@qa.audit',
+        id: '@acme/qa.audit',
         label: 'Auditing',
         kind: 'predicate' as const,
         outcome: 'pass' as const,
@@ -54,22 +54,22 @@ describe('createCompositionRegistryView', () => {
     }
     const view = createCompositionRegistryView(createBuiltinCompositionRegistry(), {
       checks: [
-        { pluginName: 'qa', check, allowDisable: false },
-        { pluginName: 'qb', check, options: { allowDisable: false } },
-        { pluginName: 'qc', check },
+        { pluginName: '@acme/qa', check, allowDisable: false },
+        { pluginName: '@acme/qb', check, options: { allowDisable: false } },
+        { pluginName: '@acme/qc', check },
       ],
     })
 
-    expect(view.checks.getGovernance('@qa.audit')?.allowDisable).toBe(false)
-    expect(view.checks.getGovernance('@qb.audit')?.allowDisable).toBe(false)
-    expect(view.checks.getGovernance('@qc.audit')?.allowDisable).toBe(true)
+    expect(view.checks.getGovernance('@acme/qa.audit')?.allowDisable).toBe(false)
+    expect(view.checks.getGovernance('@acme/qb.audit')?.allowDisable).toBe(false)
+    expect(view.checks.getGovernance('@acme/qc.audit')?.allowDisable).toBe(true)
   })
   it('exposes the archive bindings with the archive locks and accepts a plugin archive binding', () => {
     const check = {
       id: 'scan',
       label: 'Scanning',
       execute: async () => ({
-        id: '@sec.scan',
+        id: '@acme/sec.scan',
         label: 'Scanning',
         kind: 'predicate' as const,
         outcome: 'pass' as const,
@@ -77,7 +77,11 @@ describe('createCompositionRegistryView', () => {
     }
     const view = createCompositionRegistryView(createBuiltinCompositionRegistry(), {
       checks: [
-        { pluginName: 'sec', check, defaultBindings: [{ scope: 'archive', skippable: true }] },
+        {
+          pluginName: '@acme/sec',
+          check,
+          defaultBindings: [{ scope: 'archive', skippable: true }],
+        },
       ],
     })
 
@@ -88,7 +92,7 @@ describe('createCompositionRegistryView', () => {
       expect(archive?.allowDisable, id).toBe(false)
       expect(archive?.allowBindingOverride, id).toBe(false)
     }
-    const plugin = view.checks.getBindings('@sec.scan')[0]
+    const plugin = view.checks.getBindings('@acme/sec.scan')[0]
     expect(plugin?.applicability).toEqual([{ scope: 'archive' }])
     expect(plugin?.skippable).toBe(true)
   })
@@ -98,7 +102,7 @@ describe('createCompositionRegistryView', () => {
       id: 'gate',
       label: 'Gating',
       execute: async () => ({
-        id: '@qa.gate',
+        id: '@acme/qa.gate',
         label: 'Gating',
         kind: 'predicate' as const,
         outcome: 'pass' as const,
@@ -107,21 +111,21 @@ describe('createCompositionRegistryView', () => {
     const bound = [{ scope: 'transition', to: 'ready', along: 'forward' }]
     const view = createCompositionRegistryView(createBuiltinCompositionRegistry(), {
       checks: [
-        { pluginName: 'qa', check, defaultBindings: bound, allowSchemaEmbedding: true },
+        { pluginName: '@acme/qa', check, defaultBindings: bound, allowSchemaEmbedding: true },
         {
-          pluginName: 'qb',
+          pluginName: '@acme/qb',
           check,
           defaultBindings: bound,
           options: { allowSchemaEmbedding: true },
         },
-        { pluginName: 'qc', check, defaultBindings: bound },
+        { pluginName: '@acme/qc', check, defaultBindings: bound },
       ],
     })
 
-    expect(view.checks.getGovernance('@qa.gate')?.allowSchemaEmbedding).toBe(true)
-    expect(view.checks.getGovernance('@qb.gate')?.allowSchemaEmbedding).toBe(true)
+    expect(view.checks.getGovernance('@acme/qa.gate')?.allowSchemaEmbedding).toBe(true)
+    expect(view.checks.getGovernance('@acme/qb.gate')?.allowSchemaEmbedding).toBe(true)
     // Default bindings without an explicit lock make the check non-embeddable.
-    expect(view.checks.getGovernance('@qc.gate')?.allowSchemaEmbedding).toBe(false)
+    expect(view.checks.getGovernance('@acme/qc.gate')?.allowSchemaEmbedding).toBe(false)
 
     const build = (id: string) =>
       buildSchema(
@@ -144,7 +148,8 @@ describe('createCompositionRegistryView', () => {
         new Map(),
         view.checks,
       )
-    expect(() => build('@qa.gate')).not.toThrow()
-    expect(() => build('@qc.gate')).toThrow(CheckEmbeddingForbiddenError)
+    expect(() => build('@acme/qa.gate')).not.toThrow()
+    expect(() => build('@acme/qc.gate')).toThrow(CheckEmbeddingForbiddenError)
+    expect(() => build('@acme/qc.gate')).toThrow(/allowSchemaEmbedding/)
   })
 })

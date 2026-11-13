@@ -8,9 +8,15 @@ Open Code support is required to keep agent-plugin behavior consistent across th
 
 ### Requirement: Factory export
 
-The package MUST export `create(options: PluginLoaderOptions): AgentPlugin` as a named export.
+The package MUST export `create(options: PluginLoaderOptions): AgentPlugin | Promise<AgentPlugin>` as a named export. `create` MUST read `name` and `version` from the package `specd-plugin.json` and MUST throw `PluginValidationError` (fields `specd-plugin.json: name` or `specd-plugin.json: version`) when the manifest it resolves lacks a non-empty string for either; the resulting plugin has no `type`.
 
-The factory function MUST read `specd-plugin.json` at the infrastructure boundary to obtain `name` and `version`. It MUST search for the manifest in its own directory first, then the parent directory as fallback. The `type` field MUST remain hardcoded as `'agent'`.
+The factory function MUST read `specd-plugin.json` at the infrastructure boundary to obtain `name` and `version`. It MUST search for the manifest in its own directory first, then the parent directory as fallback. The loader awaits the result, so `create` MAY be `async`. The returned plugin MUST NOT carry a `type` discriminator.
+
+### Requirement: Manifest and install context
+
+The manifest `specd-plugin.json` MUST declare `schemaVersion: 2`, MUST NOT declare `pluginType`, and MUST declare one contribution of kind `agents` with the local id `opencode` (`contributes: { "agents": { "opencode": {} } }`), addressable as `@specd/plugin-agent-opencode.opencode`.
+
+`install` and `uninstall` receive an `AgentInstallContext` (`config`, `options`, `contributions`) as defined by `plugin-manager:agent-plugin-type`. Wherever this spec refers to `config` and `options` of `install` and `uninstall`, they are `context.config` and `context.options`. The plugin declares no `configSchema`, so it accepts no plugin `config`.
 
 ### Requirement: Domain layer
 
@@ -20,7 +26,7 @@ The domain layer MUST define:
 - an Open Code frontmatter type reflecting the supported Open Code keys
 - a per-skill frontmatter map keyed by skill name
 
-The plugin class constructor MUST accept `name` and `version` as parameters. The `type` getter MUST return `'agent'` (hardcoded).
+The plugin class constructor MUST accept `name` and `version` as parameters.
 
 ### Requirement: Frontmatter type contract
 
@@ -34,6 +40,8 @@ The Open Code frontmatter value model MUST support this exact field set:
 
 Unknown fields MUST NOT be represented in the structured value collection for generated `SKILL.md` files.
 
+This field set applies to skills. Agent entries MAY additionally carry `allowed_tools` (comma-separated tool names), which `install()` transforms into the Open Code `permission` map of the generated agent file; it is never written to `SKILL.md`.
+
 ### Requirement: Application layer
 
 The application layer MUST have an `InstallSkills` use case that orchestrates:
@@ -45,12 +53,12 @@ The application layer MUST have an `InstallSkills` use case that orchestrates:
 5. Pass `variables.sharedFolder` only when overriding the default shared path contract
 6. Install files not marked as shared to categorized directories relative to `projectRoot`:
    - Skills to `.opencode/skills/<skill-name>/`
-   - Agents to `.opencode/agents/<agent-name>/`
+   - Agents to `.opencode/agents/<agent-name>.md`
 7. Install files marked as shared to the rendered `sharedFolder` location under the project root
 8. Fallback: If `agents` capability is missing, install agents into the same directory as the shared context file.
 9. Sub-agent Mapping: When installing an agent, the plugin MUST:
    - Set `mode: "subagent"` in the YAML frontmatter.
-   - Transform `allowedTools` (e.g., `Bash`, `Read`) into a YAML permissions list (e.g., `- bash: allow`, `- read: allow`).
+   - Transform `allowedTools` into the OpenCode frontmatter key `permission` (singular), which MUST be a map `{ <tool>: allow }` keyed by the lowercased tool name (for example `read: allow`). A tool with pattern restrictions (for example `Bash(node *)`) MUST be emitted as a nested map of patterns (`bash: { "node *": allow }`); patterns MUST be preserved, and a bare tool listed together with patterned entries of the same tool becomes the pattern `"*": allow` of that map. The map MUST NOT contain duplicate keys.
    - Prepend the rendered system prompt with the generated YAML frontmatter.
 
 The plugin MUST NOT prepend YAML frontmatter for standard skills after bundle resolution.
@@ -77,10 +85,11 @@ The resolved shared location MUST NOT contain a `SKILL.md` file.
 
 `OpenCodeAgentPlugin.install()` MUST perform agent prompt initialization on the shared `AGENTS.md` file.
 
-- `install()` MUST inject the base agent instruction prompt into `AGENTS.md` under the project root using `injectSpecdBlock(agentsMdPath, prompt)`.
-- `install()` MUST call `removeSpecdBlock(agentsMdPath, "opencode")` to purge any legacy plugin marker blocks left by previous versions.
-- `uninstall()` MUST call `removeSpecdBlock(agentsMdPath, "opencode")` (no-op if not present), then `removeSpecdBlock(agentsMdPath)` to remove the base block.
-- No plugin marker block (`<!-- <specd-plugin:opencode> -->`) is injected during install.
+- `install()` MUST call `injectSpecdBlock(agentsMdPath, prompt, 'opencode')`. The base `<!-- <specd agents="…"> -->` block in `AGENTS.md` is shared and reference-counted by plugin id, so several agent plugins can target the same file.
+- `install()` MUST leave no legacy plugin marker block (`<!-- <specd-plugin:opencode> -->`) behind: injecting the shared block purges it.
+- `uninstall()` MUST call `removeSpecdBlock(agentsMdPath, 'opencode')`, which drops the `opencode` reference, purges any legacy `<!-- <specd-plugin:opencode> -->` block, and removes the shared base block only when no other agent plugin still references it.
+- No separate plugin marker block (`<!-- <specd-plugin:opencode> -->`) is injected during install.
+- Only a full `uninstall()` calls `removeSpecdBlock`; a filtered `uninstall()` keeps the block.
 
 ### Requirement: Project init wizard integration
 
@@ -92,15 +101,24 @@ The `@specd/specd` meta package MUST declare `@specd/plugin-agent-opencode` as a
 
 ### Requirement: Uninstall behavior
 
-`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.opencode/skills/` and agent files from `.opencode/agents/` relative to `config.projectRoot`.
+`uninstall(context: AgentInstallContext)` MUST remove installed skill directories from `.opencode/skills/` and agent files from `.opencode/agents/` relative to `context.config.projectRoot`, honouring `context.options`.
 
-When `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory at the resolved `sharedFolder` location MUST remain in place because other installed skills may still reference it.
+**Filtered uninstall.** An empty `skills` or `agents` array counts as not provided. Selected names MUST be validated against the specd-managed skill and agent names: a name that is not managed (including any name with a path separator or `..`) is skipped, reported in the result of `uninstallWithResult()` (the plugin method that returns the report; `uninstall()` itself resolves to nothing, as the `AgentPlugin` contract requires), and never touches the filesystem. A full uninstall removes the managed agent files from both the runtime agents directory (when the runtime has one) and the shared folder, whatever `capabilities` it receives. When `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. When `options.agents` is provided, uninstall MUST remove only the selected specd-managed agent files from `.opencode/agents/`. A filtered uninstall MUST NOT remove the shared folder, any file in it (except the `<agent-name>.agent.md` files selected through `options.agents` that live there because the runtime lacks the `agents` capability; uninstall evaluates `capabilities` the way install does, and the default set includes `agents`), or the owners marker (`.owners.json`), and MUST NOT call `removeSharedOwner`. It MUST keep the `opencode` reference in the prompt block of `AGENTS.md`.
 
-When `options.agents` is provided, uninstall MUST remove only the selected specd-managed agent files from `.opencode/agents/`.
+**Full uninstall.** When neither `options.skills` nor `options.agents` is provided, uninstall MUST:
 
-When no filters are provided, uninstall MUST remove all specd-managed skill directories, all specd-managed agent files under `.opencode/agents/`, and the resolved sharedFolder location.
+1. remove all specd-managed skill directories under `.opencode/skills/`, including legacy flat `<skill>.md` files left by previous versions;
+2. remove all specd-managed agent files under `.opencode/agents/`;
+3. call `removeSpecdBlock` for `AGENTS.md`, which drops only this plugin's `opencode` reference (the block itself disappears only when no other agent plugin references it);
+4. follow the uninstall protocol of `skills:shared-folder-owners` for the resolved `sharedFolder` location: call `removeSharedOwner(sharedDir, 'opencode')`; when `hadMarker` is `false` (legacy install or unreadable marker) every shared file MUST be left untouched; when other owners remain every shared file MUST be left untouched; when no owner remains, delete `shared.md`, every managed `<agent>.agent.md` file and the marker, and then call `removeSharedFolderIfEmpty` so that the folder survives when foreign files remain. Errors other than `ENOTEMPTY` and `ENOENT` MUST propagate.
 
-Uninstall MUST NOT remove unrelated directories or files under `.opencode/skills/` or `.opencode/agents/` that are not part of the specd-managed skill or agent set.
+Uninstall MUST NOT remove unrelated directories or files under `.opencode/skills/`, `.opencode/agents/` or the shared folder that are not part of the specd-managed set.
+
+### Requirement: Shared folder ownership and agent placement
+
+Before writing the first file into the resolved `sharedFolder` location (including agent files placed there as a fallback), `install()` MUST call `addSharedOwner(sharedDir, 'opencode')` from `@specd/skills`, for filtered and unfiltered installs alike, so that `skills:shared-folder-owners` can tell when the last owner leaves.
+
+The target directory for agent files MUST be derived from the `capabilities` declared to `@specd/skills`: when they include `agents`, agents are written to `.opencode/agents/`; otherwise they are written next to `shared.md` in the resolved `sharedFolder` location. The declared set normally includes `agents`, but the install routine MUST honour the fallback when it does not (so the branch is exercisable by passing a capability list without `agents`).
 
 ### Requirement: Fast-track skill installation
 
@@ -118,7 +136,6 @@ The OpenCode fast-track frontmatter description MUST state that the skill is man
 - The plugin MUST implement the `AgentPlugin` contract defined by `@specd/plugin-manager`.
 - The plugin MUST remain an adapter package with no domain logic outside plugin orchestration concerns.
 - `name` and `version` MUST be read from `specd-plugin.json` by the factory and passed to the plugin constructor — never hardcoded in the class.
-- `type` MUST remain hardcoded as `'agent'` for type safety.
 
 ## Spec Dependencies
 
@@ -129,3 +146,4 @@ The OpenCode fast-track frontmatter description MUST state that the skill is man
 - [`skills:resolve-bundle`](../skills/resolve-bundle/spec.md) — canonical install-time bundle resolution
 - [`skills:agents`](../skills/agents/spec.md) — defines specialized optimizer agents
 - [`skills:agent-instruction-template`](../skills/agent-instruction-template/spec.md) — shared base prompt rendering and block management
+- [`skills:shared-folder-owners`](../skills/shared-folder-owners/spec.md) — owners marker for the shared folder

@@ -6,6 +6,8 @@
   "dependsOn": [
     "cli:entrypoint",
     "cli:plugins-install",
+    "cli:host-context",
+    "plugin-manager:specd-plugin-type",
     "core:composition",
     "core:config-writer-port"
   ],

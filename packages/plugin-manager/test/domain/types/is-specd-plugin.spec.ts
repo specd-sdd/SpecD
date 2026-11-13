@@ -3,10 +3,8 @@ import { isSpecdPlugin } from '../../../src/index.js'
 
 function makeBasePlugin(overrides: Record<string, unknown> = {}) {
   return {
-    name: 'test-plugin',
-    type: 'agent' as const,
+    name: '@acme/test-plugin',
     version: '1.0.0',
-    configSchema: {},
     init: async () => {},
     destroy: async () => {},
     ...overrides,
@@ -14,12 +12,16 @@ function makeBasePlugin(overrides: Record<string, unknown> = {}) {
 }
 
 describe('isSpecdPlugin', () => {
-  it('given a valid SpecdPlugin with known type, when checked, then returns true', () => {
+  it('given a scoped plugin, when checked, then returns true', () => {
     expect(isSpecdPlugin(makeBasePlugin())).toBe(true)
   })
 
-  it('given a valid shape but unknown type, when checked, then returns false', () => {
-    expect(isSpecdPlugin(makeBasePlugin({ type: 'unknown-type' }))).toBe(false)
+  it('given an unscoped name, when checked, then returns false', () => {
+    expect(isSpecdPlugin(makeBasePlugin({ name: 'test-plugin' }))).toBe(false)
+  })
+
+  it('given a non-function install hook, when checked, then returns false', () => {
+    expect(isSpecdPlugin(makeBasePlugin({ install: 'nope' }))).toBe(false)
   })
 
   it('given null, when checked, then returns false', () => {

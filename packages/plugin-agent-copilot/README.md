@@ -8,6 +8,8 @@ GitHub Copilot agent plugin for [specd](https://github.com/specd-sdd/SpecD). For
 specd plugins install @specd/plugin-agent-copilot
 ```
 
+The package manifest is `specd-plugin.json` with `schemaVersion: 2` and an `agents.copilot` contribution.
+
 ## Supported frontmatter fields
 
 | Field                      | Required | Description               |

@@ -213,6 +213,61 @@
 - **WHEN** `load()` is called
 - **THEN** the structural error is thrown before any path resolution occurs
 
+#### Scenario: Legacy plugins object produces migration message
+
+- **GIVEN** `plugins: { agents: [{ name: '@specd/plugin-agent-claude' }] }`
+- **WHEN** `load()` is called
+- **THEN** `LegacyConfigFormatError` is thrown before strict schema validation
+- **AND** the message contains the flat `plugins` list and `configVersion: 2`
+
+#### Scenario: Newer configVersion
+
+- **GIVEN** `configVersion: 3`
+- **WHEN** `load()` is called
+- **THEN** `UnsupportedConfigVersionError` is thrown
+
+#### Scenario: Newer version takes precedence over legacy format
+
+- **GIVEN** a layer with `configVersion: 3` and `plugins: { agents: [...] }`
+- **WHEN** `load()` is called
+- **THEN** `UnsupportedConfigVersionError` is thrown
+
+#### Scenario: Legacy format in an extending layer
+
+- **GIVEN** a valid root layer and an extending layer with `plugins: { agents: [...] }`
+- **WHEN** `load()` is called
+- **THEN** `LegacyConfigFormatError` is thrown for the extending layer
+
+#### Scenario: Legacy detection is not a generic schema error
+
+- **GIVEN** `plugins: { agents: [{ name: '@specd/plugin-agent-claude' }] }`
+- **WHEN** `load()` is called
+- **THEN** the thrown error is `LegacyConfigFormatError` with code `LEGACY_CONFIG_FORMAT`, not a strict-schema error message
+
+#### Scenario: remove.plugins of an absent name fails
+
+- **GIVEN** a base layer declaring `@acme/x` and a later layer with `remove: { plugins: [{ name: '@acme/absent' }] }`
+- **WHEN** `load()` is called
+- **THEN** `ConfigValidationError` is thrown
+
+#### Scenario: Absent configVersion with current shape
+
+- **GIVEN** a flat `plugins` list and no `configVersion`
+- **WHEN** `load()` is called
+- **THEN** loading succeeds
+
+#### Scenario: Unscoped plugin name
+
+- **GIVEN** `plugins: [{ name: 'my-plugin' }]`
+- **WHEN** `load()` is called
+- **THEN** `ConfigValidationError` is thrown
+
+#### Scenario: Duplicate plugin name
+
+- **GIVEN** the same plugin name twice
+- **WHEN** `load()` is called
+- **THEN** `ConfigValidationError` is thrown
+
 ### Requirement: Default workspace is required
 
 #### Scenario: Missing default workspace
@@ -420,12 +475,18 @@
 - **WHEN** `load()` is called
 - **THEN** the mapped context entry preserves both `id` and `file`
 
-#### Scenario: Agent plugin identity is name
+#### Scenario: Plugin identity is name
 
-- **GIVEN** the config declares `plugins.agents: [{ name: '@specd/plugin-agent-codex', config: { commandsDir: '.codex/commands' } }]`
+- **GIVEN** the config declares `plugins: [{ name: '@specd/plugin-agent-codex', config: { commandsDir: '.codex/commands' }, contributions: ['codex'] }]`
 - **WHEN** `load()` is called
-- **THEN** the mapped plugin entry preserves `name` and `config`
+- **THEN** the mapped plugin entry preserves `name`, `config` and `contributions`
 - **AND** inherited removal resolves that entry by `name`
+
+#### Scenario: Plugins are not loaded by the loader
+
+- **GIVEN** a plugin entry whose package is not installed
+- **WHEN** `load()` is called
+- **THEN** loading the config succeeds
 
 ### Requirement: Approvals default to false
 
@@ -447,7 +508,8 @@
 
 - **GIVEN** any validation failure occurs during `load()`
 - **WHEN** the error is caught
-- **THEN** it is an instance of `ConfigValidationError`
+- **THEN** it is a `ConfigValidationError`
+- **AND** `LegacyConfigFormatError` and `UnsupportedConfigVersionError` are instances of it
 
 #### Scenario: Invalid cascade chain still uses ConfigValidationError
 

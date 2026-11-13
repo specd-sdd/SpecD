@@ -116,12 +116,12 @@ describe('resolveWorkflowCheckRegistry', () => {
   it('appends plugin archive bindings after the built-in ones and keeps archive locks', () => {
     const checks = new CheckRegistry()
     checks.register(
-      'sec',
+      '@acme/sec',
       {
         id: 'scan',
         label: 'Scanning',
         execute: async () => ({
-          id: '@sec.scan',
+          id: '@acme/sec.scan',
           label: 'Scanning',
           kind: 'predicate',
           outcome: 'pass',
@@ -135,16 +135,16 @@ describe('resolveWorkflowCheckRegistry', () => {
     const registry = resolveWorkflowCheckRegistry(resolver)
 
     const ids = registry.archiveBindings.map((binding) => binding.check.id)
-    expect(ids.at(-1)).toBe('@sec.scan')
-    expect(ids.indexOf('@sec.scan')).toBeGreaterThan(ids.indexOf('impl.linksInScope'))
+    expect(ids.at(-1)).toBe('@acme/sec.scan')
+    expect(ids.indexOf('@acme/sec.scan')).toBeGreaterThan(ids.indexOf('impl.linksInScope'))
     expect(registry.archiveBindings.at(-1)?.skippable).toBe(true)
     const readOnly = registry.checkRegistry
       ?.getBindings('workspace.readOnly')
       .find((binding) => binding.applicability.some((row) => row.scope === 'archive'))
     expect(readOnly?.allowBindingOverride).toBe(false)
-    expect(registry.transitionBindings.some((binding) => binding.check.id === '@sec.scan')).toBe(
-      false,
-    )
+    expect(
+      registry.transitionBindings.some((binding) => binding.check.id === '@acme/sec.scan'),
+    ).toBe(false)
   })
 
   it('binds verification.current only on verifying to done and reuses it for archive', () => {
@@ -331,11 +331,16 @@ describe('resolveWorkflowCheckRegistry', () => {
   it('includes plugin step-skip default bindings in the transition base table', () => {
     const checks = new CheckRegistry()
     checks.register(
-      'qa',
+      '@acme/qa',
       {
         id: 'freeze',
         label: 'Freezing',
-        execute: async () => ({ id: '@qa.freeze', label: 'x', kind: 'predicate', outcome: 'pass' }),
+        execute: async () => ({
+          id: '@acme/qa.freeze',
+          label: 'x',
+          kind: 'predicate',
+          outcome: 'pass',
+        }),
       },
       [{ scope: 'step-skip', step: 'implementing', skippable: false }],
     )
@@ -344,7 +349,7 @@ describe('resolveWorkflowCheckRegistry', () => {
 
     const registry = resolveWorkflowCheckRegistry(resolver)
 
-    const binding = registry.transitionBindings.find((b) => b.check.id === '@qa.freeze')
+    const binding = registry.transitionBindings.find((b) => b.check.id === '@acme/qa.freeze')
     expect(binding?.applicability).toEqual([{ scope: 'step-skip', step: 'implementing' }])
   })
   it('exposes a registry whose built-ins are the executable instances', () => {

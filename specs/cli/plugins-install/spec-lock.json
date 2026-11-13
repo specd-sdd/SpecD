@@ -5,15 +5,20 @@
   },
   "dependsOn": [
     "plugin-manager:install-plugin-use-case",
-    "plugin-manager:load-plugin-use-case",
+    "plugin-manager:specd-plugin-type",
     "core:composition",
     "core:config-writer-port",
-    "core:get-config"
+    "core:get-config",
+    "cli:host-context"
   ],
   "implementation": [
     {
       "file": "cli:src/commands/plugins/install.ts",
       "symbols": ["installPluginsWithKernel"]
+    },
+    {
+      "file": "cli:src/commands/plugins/get-declared-plugins.ts",
+      "symbols": ["getDeclaredPlugins", "findDeclaredPlugin"]
     },
     {
       "file": "cli:test/commands/plugins.spec.ts"

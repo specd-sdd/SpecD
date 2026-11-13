@@ -8,14 +8,26 @@
 
 - **WHEN** `InstallPlugin.execute()` is called
 - **THEN** the input includes `pluginName` and `config`
-- **AND** optional plugin-specific options
+- **AND** optional `contributions` and plugin-specific options
+
+#### Scenario: Contributions input is optional
+
+- **WHEN** `InstallPlugin.execute()` is called without `contributions`
+- **THEN** every contribution declared by the manifest is selected
 
 ### Requirement: Output
 
 #### Scenario: Output indicates success or failure
 
 - **WHEN** `InstallPlugin.execute()` completes
-- **THEN** output includes `success: boolean`, `message: string`, and optional `data`
+- **THEN** output includes `success: boolean`, `message: string`, `contributions`, and optional `defaultConfig` and `data`
+
+#### Scenario: Default config returned, not written
+
+- **GIVEN** a manifest with `defaultConfig`
+- **WHEN** `InstallPlugin.execute()` completes
+- **THEN** the output carries `defaultConfig`
+- **AND** no config file is modified
 
 ### Requirement: Behavior
 
@@ -30,19 +42,66 @@
 - **WHEN** InstallPlugin is executed with valid plugin and configuration
 - **THEN** it returns success with message
 
-#### Scenario: Loads plugin via PluginLoader
+#### Scenario: All contributions selected by default
+
+- **GIVEN** a plugin declaring contributions `a` and `b` and no `contributions` input
+- **WHEN** InstallPlugin is executed
+- **THEN** `install()` receives `['a', 'b']`
+
+#### Scenario: Allowlist respected
+
+- **GIVEN** a plugin declaring `a` and `b` and `contributions: ['a']`
+- **WHEN** InstallPlugin is executed
+- **THEN** `install()` receives `['a']`
+
+#### Scenario: Mixed kinds pass only agents ids to the hook
+
+- **GIVEN** a plugin declaring `agents` contribution `claude` and a `checks` contribution `audit`, both selected
+- **WHEN** InstallPlugin is executed
+- **THEN** `install()` receives `['claude']`
+- **AND** the output `contributions` is `['claude']`
+
+#### Scenario: Options forwarded only when provided
+
+- **WHEN** InstallPlugin is executed once with `options` and once without
+- **THEN** `context.options` equals the given options in the first call and is absent in the second
+
+#### Scenario: Unknown contribution id
+
+- **GIVEN** `contributions: ['nope']` not declared by the manifest
+- **WHEN** InstallPlugin is executed
+- **THEN** UnknownContributionError is thrown
+
+#### Scenario: Plugin without install hook
+
+- **GIVEN** a plugin that does not implement `install`
+- **WHEN** InstallPlugin is executed
+- **THEN** it returns success and does not fail
+
+#### Scenario: Init is not called
 
 - **WHEN** InstallPlugin is executed
-- **THEN** it loads the plugin via `PluginLoader`
-- **AND** validates it is an `AgentPlugin`
+- **THEN** `init` is not called on the plugin
 
 ### Requirement: Error handling
 
-#### Scenario: Non-agent plugin rejected
+#### Scenario: Agent declaration without agent contract rejected
 
-- **GIVEN** a loaded plugin that is a valid SpecdPlugin but not an AgentPlugin
+- **GIVEN** a plugin whose manifest declares `contributes.agents` but that lacks `install` or `uninstall`
 - **WHEN** `InstallPlugin.execute()` is called
 - **THEN** `PluginValidationError` is thrown
+
+#### Scenario: Install failure is wrapped
+
+- **GIVEN** a plugin whose `install()` throws
+- **WHEN** `InstallPlugin.execute()` is called
+- **THEN** `PluginValidationError` naming the plugin is thrown with the original error as `cause`
+
+#### Scenario: SpecdError from the hook propagates unchanged
+
+- **GIVEN** a plugin whose hook throws a `SpecdError`
+- **WHEN** the use case is executed
+- **THEN** that same `SpecdError` is rethrown without wrapping
 
 ### Requirement: Agent Initialization Phase
 
@@ -56,14 +115,13 @@
 
 #### Scenario: Uninstall removes plugin-specific block from shared file while other plugins remain
 
-- **GIVEN** `AGENTS.md` containing `<!-- <specd> -->` shared by two agent plugins with markers `<!-- <specd-plugin:opencode> -->` and `<!-- <specd-plugin:codex> -->`
+- **GIVEN** `AGENTS.md` containing the shared block `<!-- <specd agents="codex,opencode"> -->` referenced by two agent plugins
 - **WHEN** `UninstallPlugin.execute()` runs for the opencode plugin
-- **THEN** `<!-- <specd-plugin:opencode> -->` is removed from `AGENTS.md`
-- **AND** `AGENTS.md` retains the `<!-- <specd> -->` base block (codex still registered)
+- **THEN** `opencode` is dropped from the `agents` attribute of the shared block
+- **AND** `AGENTS.md` retains the shared block (codex still registered)
 
 #### Scenario: Uninstall removes base block when last plugin is removed from shared file
 
-- **GIVEN** `AGENTS.md` containing `<!-- <specd> -->` with only one remaining plugin marker `<!-- <specd-plugin:codex> -->`
+- **GIVEN** `AGENTS.md` containing the shared block `<!-- <specd agents="codex"> -->` with one remaining agent plugin
 - **WHEN** `UninstallPlugin.execute()` runs for the codex plugin
-- **THEN** `<!-- <specd-plugin:codex> -->` is removed
-- **AND** `<!-- <specd> -->` base block is also removed from `AGENTS.md`
+- **THEN** the shared block is removed from `AGENTS.md`

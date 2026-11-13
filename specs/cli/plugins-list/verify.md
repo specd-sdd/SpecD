@@ -9,33 +9,28 @@
 - **WHEN** `specd plugins list` is invoked
 - **THEN** all declared plugins are listed
 
-#### Scenario: Filter by type
-
-- **WHEN** `specd plugins list --type agents` is invoked
-- **THEN** only plugins of type "agents" are listed
-
 ### Requirement: Declaration source
 
 #### Scenario: Declarations read from loaded config snapshot
 
-- **GIVEN** plugins are declared in `specd.yaml` under `plugins.agents`
+- **GIVEN** plugins are declared in the `plugins` list of `specd.yaml`
 - **WHEN** `specd plugins list` is invoked
 - **THEN** the command enumerates plugins from the loaded `SpecdConfig.plugins` field
 - **AND** it does not call `kernel.project.listPlugins`
 - **AND** it does not call `ConfigWriter.listPlugins`
 
-#### Scenario: Default type is agents when --type omitted
+#### Scenario: All declared plugins listed regardless of kind
 
-- **GIVEN** `plugins.agents` and `plugins.other` are both declared
-- **WHEN** `specd plugins list` is invoked without `--type`
-- **THEN** only plugins under `plugins.agents` are considered
+- **GIVEN** a plugin contributing agents and a plugin contributing checks are both declared
+- **WHEN** `specd plugins list` is invoked
+- **THEN** both are listed
 
-#### Scenario: Unknown type yields empty declaration list
+#### Scenario: Lists with a broken configured plugin
 
-- **GIVEN** `specd.yaml` has no `plugins.missing` entries
-- **WHEN** `specd plugins list --type missing` is invoked
-- **THEN** no plugins are enumerated for that type
-- **AND** the command completes without error
+- **GIVEN** a configured plugin whose `init` would throw
+- **WHEN** `specd plugins list` is invoked
+- **THEN** the host is opened with `plugins: false`
+- **AND** the plugin is listed instead of failing the command
 
 ### Requirement: Plugin status detection
 
@@ -50,19 +45,40 @@
 - **GIVEN** a plugin is in config but npm package is not installed
 - **WHEN** `specd plugins list` is invoked
 - **THEN** status shows "not_found"
+- **AND** `contributions.declared` is empty and `contributions.selected` is the recorded allowlist or empty
 
 #### Scenario: Plugin load error
 
 - **GIVEN** a plugin is in config but fails to load
 - **WHEN** `specd plugins list` is invoked
-- **THEN** status shows "error" with error message
+- **THEN** status shows "error" with the error message as detail
+- **AND** `contributions.declared` is empty
 
 ### Requirement: Output format
 
 #### Scenario: Text output includes plugin details
 
 - **WHEN** `specd plugins list` is invoked
-- **THEN** output includes plugin name, type, version, and status
+- **THEN** output includes plugin name, contributions with their selection, version, and status
+
+#### Scenario: Version column and fallback
+
+- **GIVEN** one plugin with a known version and one without
+- **WHEN** `specd plugins list` is invoked in text format
+- **THEN** the first shows its version and the second shows `-`
+
+#### Scenario: Nothing declared
+
+- **GIVEN** no plugins are declared
+- **WHEN** `specd plugins list` is invoked
+- **THEN** text output is `no plugins declared`
+- **AND** JSON output is `{ "plugins": [] }`
+
+#### Scenario: Allowlist shown
+
+- **GIVEN** `@acme/x` declares `a` and `b` and is recorded with `contributions: ['a']`
+- **WHEN** `specd plugins list` is invoked
+- **THEN** `a` is shown as selected and `b` as available but not selected
 
 #### Scenario: JSON output is machine-parseable
 

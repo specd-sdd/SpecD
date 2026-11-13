@@ -14,6 +14,11 @@ export { ArtifactNotOptionalError } from './artifact-not-optional-error.js'
 export { HookFailedError } from './hook-failed-error.js'
 export { SchemaValidationError } from './schema-validation-error.js'
 export { ConfigValidationError } from './config-validation-error.js'
+export { LegacyConfigFormatError } from './legacy-config-format-error.js'
+export {
+  UnsupportedConfigVersionError,
+  CURRENT_CONFIG_VERSION,
+} from './unsupported-config-version-error.js'
 export { DeltaApplicationError } from './delta-application-error.js'
 export { UnsupportedPatternError } from './unsupported-pattern-error.js'
 export { CorruptedManifestError } from './corrupted-manifest-error.js'
@@ -52,6 +57,7 @@ export { ImplementationWorkspaceBoundaryError } from './implementation-workspace
 export { UnsupportedManifestVersionError } from './unsupported-manifest-version-error.js'
 export {
   InvalidPluginNameError,
+  InvalidCheckIdError,
   DuplicateCheckError,
   DuplicateCheckBindingError,
   InvalidCheckKindError,

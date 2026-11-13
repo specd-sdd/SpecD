@@ -1,29 +1,31 @@
 import { describe, expect, it } from 'vitest'
 import { makeMockConfig } from '../helpers.js'
-import { getDeclaredPlugins } from '../../../src/commands/plugins/get-declared-plugins.js'
+import {
+  findDeclaredPlugin,
+  getDeclaredPlugins,
+} from '../../../src/commands/plugins/get-declared-plugins.js'
 
 describe('getDeclaredPlugins', () => {
-  it('given plugins.agents declared, when type agents, then returns entries', () => {
+  it('given a flat plugins list, when queried, then returns entries', () => {
     const config = makeMockConfig({
-      plugins: {
-        agents: [{ name: '@specd/plugin-agent-claude' }],
-      },
+      plugins: [{ name: '@specd/plugin-agent-claude' }],
     })
 
-    expect(getDeclaredPlugins(config, 'agents')).toEqual([{ name: '@specd/plugin-agent-claude' }])
+    expect(getDeclaredPlugins(config)).toEqual([{ name: '@specd/plugin-agent-claude' }])
   })
 
-  it('given unknown type bucket, when queried, then returns empty list', () => {
+  it('given a named plugin, when found, then returns that entry', () => {
     const config = makeMockConfig({
-      plugins: {
-        agents: [{ name: '@specd/plugin-agent-claude' }],
-      },
+      plugins: [{ name: '@specd/plugin-agent-claude', contributions: ['claude'] }],
     })
 
-    expect(getDeclaredPlugins(config, 'missing')).toEqual([])
+    expect(findDeclaredPlugin(config, '@specd/plugin-agent-claude')).toEqual({
+      name: '@specd/plugin-agent-claude',
+      contributions: ['claude'],
+    })
   })
 
   it('given plugins undefined, when queried, then returns empty list', () => {
-    expect(getDeclaredPlugins(makeMockConfig(), 'agents')).toEqual([])
+    expect(getDeclaredPlugins(makeMockConfig())).toEqual([])
   })
 })

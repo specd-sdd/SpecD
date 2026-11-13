@@ -7,11 +7,20 @@
   "implementation": [
     {
       "file": "core:src/application/ports/config-writer.ts",
-      "symbols": ["ConfigWriter"]
+      "symbols": ["ConfigWriter", "AddPluginOptions"]
     },
     {
       "file": "core:src/infrastructure/fs/config-writer.ts",
       "symbols": ["FsConfigWriter"]
+    },
+    {
+      "file": "core:src/ports.ts"
+    },
+    {
+      "file": "core:test/infrastructure/fs/config-writer.spec.ts"
+    },
+    {
+      "file": "core:test/composition/config-writer.spec.ts"
     }
   ],
   "optimizations": {

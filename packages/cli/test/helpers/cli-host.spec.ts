@@ -6,9 +6,18 @@ vi.mock('@specd/sdk', async (importOriginal) => ({
   createSdkContext: vi.fn(),
 }))
 
+vi.mock('../../src/helpers/cli-cleanup.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../src/helpers/cli-cleanup.js')>()
+  return { ...original, registerCliCleanup: vi.fn(original.registerCliCleanup) }
+})
+
 import { createSdkContext, openSpecdHost } from '@specd/sdk'
 import { openCliHost } from '../../src/helpers/cli-host.js'
-import { resetCliCleanupForTests, runCliCleanup } from '../../src/helpers/cli-cleanup.js'
+import {
+  registerCliCleanup,
+  resetCliCleanupForTests,
+  runCliCleanup,
+} from '../../src/helpers/cli-cleanup.js'
 import { makeMockConfig, makeMockHost } from '../commands/helpers.js'
 
 afterEach(() => {
@@ -61,7 +70,11 @@ describe('openCliHost', () => {
   it('a failed open registers nothing', async () => {
     vi.mocked(openSpecdHost).mockRejectedValue(new Error('no config'))
 
+    vi.mocked(registerCliCleanup).mockClear()
+
     await expect(openCliHost()).rejects.toThrow('no config')
     await expect(runCliCleanup()).resolves.toBeUndefined()
+
+    expect(registerCliCleanup).not.toHaveBeenCalled()
   })
 })

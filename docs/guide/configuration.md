@@ -230,17 +230,16 @@ remove:
     - id: ci-only-instruction
     - file: CI_AGENTS.md
   plugins:
-    agents:
-      - name: '@specd/plugin-agent-copilot'
+    - name: '@specd/plugin-agent-copilot'
 ```
 
-| Removal target   | Keyed by                       | Effect                                |
-| ---------------- | ------------------------------ | ------------------------------------- |
-| `root`           | field name                     | Removes the named top-level field     |
-| `workspaces`     | workspace name                 | Removes the named workspace           |
-| `storage`        | storage key                    | Removes a storage binding             |
-| `context`        | `id`, `file`, or `instruction` | Removes matching context entries      |
-| `plugins.agents` | `name`                         | Removes a matching plugin declaration |
+| Removal target | Keyed by                       | Effect                                |
+| -------------- | ------------------------------ | ------------------------------------- |
+| `root`         | field name                     | Removes the named top-level field     |
+| `workspaces`   | workspace name                 | Removes the named workspace           |
+| `storage`      | storage key                    | Removes a storage binding             |
+| `context`      | `id`, `file`, or `instruction` | Removes matching context entries      |
+| `plugins`      | `name`                         | Removes a matching plugin declaration |
 
 Removals are applied immediately after the layer that declares them is merged. A `remove` block without `extends` is an error.
 
@@ -267,8 +266,7 @@ context:
   - instruction: 'Running in CI. Skip interactive prompts.'
 remove:
   plugins:
-    agents:
-      - name: '@specd/plugin-agent-copilot'
+    - name: '@specd/plugin-agent-copilot'
 ```
 
 **Standalone local config (fresh start, no inheritance):**
@@ -998,22 +996,25 @@ graph:
 
 ## Plugins
 
-SpecD supports agent plugins that integrate with coding assistants (Claude Code, Copilot, Codex, OpenCode):
+A plugin is a package that contributes one or more features. Names are scoped (`@scope/name`). `configVersion` may be absent and accepts any positive integer up to the current version (`2`); an absent version means the current one, and a newer version fails with `UNSUPPORTED_CONFIG_VERSION`.
 
 ```yaml
+configVersion: 2
 plugins:
-  agents:
-    - name: '@specd/plugin-agent-claude'
-    - name: '@specd/plugin-agent-copilot'
-      config:
-        model: 'gpt-4o'
+  - name: '@specd/plugin-agent-claude'
+  - name: '@specd/plugin-agent-copilot'
+    config:
+      model: 'gpt-4o'
+    contributions:
+      - copilot
 ```
 
-- **`plugins.agents`**: A list of agent plugin declarations.
-  - `name`: Package or module name of the plugin (e.g. `'@specd/plugin-agent-claude'`).
-  - `config`: Optional plugin-specific configuration record passed to the plugin adapter during initialization.
-  - _Default:_ None (no third-party plugins loaded; built-in plugins activate via project defaults).
-  - _Cascade behavior:_ Array — an overlay config **appends** new plugin declarations to the inherited list. To remove an inherited plugin in an overlay config, use `remove.plugins.agents: [{ name: '@specd/plugin-agent-copilot' }]`.
+- **`plugins`**: A flat list of plugin declarations.
+  - `name`: Scoped package name (for example `'@specd/plugin-agent-claude'`).
+  - `config`: Optional object validated against the plugin manifest schema.
+  - `contributions`: Optional allowlist of contribution ids. Omitted means every id the manifest declares; when present it must list at least one id (an empty list is rejected).
+  - _Default:_ None.
+  - _Cascade behavior:_ Entries merge by `name`. A later layer replaces the same name in place and appends new names. A plugin name may appear only once within a single layer, extending layers included (a duplicate fails with a configuration error). Remove an inherited plugin with `remove.plugins: [{ name: '@specd/plugin-agent-copilot' }]`; only entries inherited from lower layers can be removed, so adding and removing one name in the same layer fails.
 
 ### Synchronizing plugin assets with `specd project update`
 
@@ -1024,7 +1025,7 @@ specd project update
 ```
 
 - **When `specd project update` is required:**
-  - After manually editing `plugins.agents` in `specd.yaml` (e.g. adding, removing, or reconfiguring plugins by hand rather than using `specd plugins install`).
+  - After manually editing `plugins` in `specd.yaml` (adding, removing, or reconfiguring plugins by hand rather than using `specd plugins install`).
   - After upgrading SpecD CLI or agent plugin packages (`pnpm update @specd/cli` or `@specd/plugin-agent-*`), to regenerate agent instructions and skill templates with the newest upstream definitions.
 - **When `specd project update` is NOT required:**
   - For normal configuration changes (`workspaces`, `codeRoot`, `ownership`, `specs`, `archivePattern`, `contextIncludeSpecs`, etc.). SpecD reloads `specd.yaml` dynamically on every command execution, so general configuration updates take effect immediately in real time without needing any update command.
@@ -1094,20 +1095,21 @@ SpecD validates `specd.yaml` before executing any command that requires configur
 
 The following conditions are hard errors — SpecD exits immediately:
 
-| Condition                                                                        | Error Cause                                                      |
-| :------------------------------------------------------------------------------- | :--------------------------------------------------------------- |
-| `schema` field is missing                                                        | Config is invalid without a schema reference.                    |
-| `workspaces` section is missing or has no `default` workspace                    | Every project must declare a default workspace.                  |
-| `specs` section is missing in any workspace                                      | SpecD cannot locate specs without a specs adapter path.          |
-| `codeRoot` is missing in any non-`default` workspace                             | Required for non-default workspaces; no sensible default exists. |
-| `storage` section is missing, or `changes` or `archive` sub-key is absent        | Both storage directories are mandatory.                          |
-| `adapter` is missing in any `specs`, `schemas`, or `storage` section             | Required in every storage declaration.                           |
-| Required adapter-specific fields are absent (e.g. `config.path` when `type: fs`) | The adapter cannot function without its required options.        |
-| An adapter name has no registered factory at kernel construction time            | The kernel rejects unknown named adapters with a clear error.    |
-| Storage or config path resolves outside the repository root                      | Paths must remain within the VCS repository root boundary.       |
-| Invalid `contextIncludeSpecs` or `contextExcludeSpecs` pattern syntax            | e.g. `*` in a disallowed position.                               |
-| `llmOptimizedContext` is not a boolean                                           | Any other type is rejected.                                      |
-| Legacy `artifactRules` or `skills` fields are present                            | Use `schemaOverrides` or the plugin system instead.              |
+| Condition                                                                        | Error Cause                                                           |
+| :------------------------------------------------------------------------------- | :-------------------------------------------------------------------- |
+| `schema` field is missing                                                        | Config is invalid without a schema reference.                         |
+| `workspaces` section is missing or has no `default` workspace                    | Every project must declare a default workspace.                       |
+| `specs` section is missing in any workspace                                      | SpecD cannot locate specs without a specs adapter path.               |
+| `codeRoot` is missing in any non-`default` workspace                             | Required for non-default workspaces; no sensible default exists.      |
+| `storage` section is missing, or `changes` or `archive` sub-key is absent        | Both storage directories are mandatory.                               |
+| `adapter` is missing in any `specs`, `schemas`, or `storage` section             | Required in every storage declaration.                                |
+| Required adapter-specific fields are absent (e.g. `config.path` when `type: fs`) | The adapter cannot function without its required options.             |
+| An adapter name has no registered factory at kernel construction time            | The kernel rejects unknown named adapters with a clear error.         |
+| Storage or config path resolves outside the repository root                      | Paths must remain within the VCS repository root boundary.            |
+| Invalid `contextIncludeSpecs` or `contextExcludeSpecs` pattern syntax            | e.g. `*` in a disallowed position.                                    |
+| `llmOptimizedContext` is not a boolean                                           | Any other type is rejected.                                           |
+| Legacy `artifactRules` or `skills` fields are present                            | Use `schemaOverrides` or the plugin system instead.                   |
+| A plugin name appears twice in one layer, or `contributions` is an empty list    | Each plugin is declared once per layer; omit `contributions` for all. |
 
 #### Warnings that allow startup to proceed
 
@@ -1170,13 +1172,14 @@ The table below catalogs every configuration option supported by `specd.yaml` an
 | `schemaPlugins`                            | Project       | `string[]`                                                      | `[]` (None)                                      | **Appends**                                   | Schema package references merged into active schema prior to inline `schemaOverrides`.                                                                                                                                              |
 | `schemaOverrides`                          | Project       | `SchemaOverrides`                                               | `null` (None)                                    | **Deep-merges**                               | Inline schema modification operations: `create`, `remove`, `set`, `append`, `prepend`.                                                                                                                                              |
 | `invalidationPolicy`                       | Project       | `'none' \| 'surgical' \| 'downstream' \| 'global'`              | `'downstream'`                                   | **Replaces**                                  | Default artifact invalidation propagation policy assigned to newly created changes.                                                                                                                                                 |
-| `plugins.agents`                           | Project       | `PluginEntry[]`                                                 | `[]` (None)                                      | **Appends**                                   | Registered agent plugin definitions (`name` and optional `config`). Remove with `remove.plugins.agents`.                                                                                                                            |
+| `configVersion`                            | Project       | `number`                                                        | omitted                                          | **Root only**                                 | Config format version. Current supported value is `2`. An extending layer cannot change it.                                                                                                                                         |
+| `plugins`                                  | Project       | `{ name, config?, contributions? }[]`                           | `[]` (None)                                      | **Merge by name**                             | Flat plugin list. Same name replaces in place; new names append. Remove with `remove.plugins`.                                                                                                                                      |
 | `extends`                                  | Cascade Layer | `true \| string`                                                | `null` (Standalone)                              | _Special_                                     | Controls inheritance: `true` inherits from preceding layer; `<path>` inherits from specific active file.                                                                                                                            |
 | `remove.root`                              | Cascade Layer | `string[]`                                                      | `null`                                           | _Removal_                                     | Drops inherited top-level fields (e.g. `contextExcludeSpecs`, `actorProvider`). Cannot remove `schema`.                                                                                                                             |
 | `remove.workspaces`                        | Cascade Layer | `string[]`                                                      | `null`                                           | _Removal_                                     | Drops inherited workspace definitions by name.                                                                                                                                                                                      |
 | `remove.storage`                           | Cascade Layer | `string[]`                                                      | `null`                                           | _Removal_                                     | Drops inherited storage adapter bindings by key (`changes`, `drafts`, `discarded`, `archive`).                                                                                                                                      |
 | `remove.context`                           | Cascade Layer | `RemovalMatcher[]`                                              | `null`                                           | _Removal_                                     | Drops matching inherited context injection entries by `id`, `file`, or `instruction`.                                                                                                                                               |
-| `remove.plugins.agents`                    | Cascade Layer | `{ name: string }[]`                                            | `null`                                           | _Removal_                                     | Drops inherited agent plugin declarations by package name.                                                                                                                                                                          |
+| `remove.plugins`                           | Cascade Layer | `{ name: string }[]`                                            | `null`                                           | _Removal_                                     | Drops inherited plugin declarations by package name.                                                                                                                                                                                |
 
 ---
 

@@ -1,0 +1,54 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: SDK depends only on core and code-graph'
+  rename: 'Scenario: SDK depends on core, code-graph and plugin-manager'
+  content: |
+    - **WHEN** inspecting `packages/sdk/package.json` dependencies
+    - **THEN** only `@specd/core`, `@specd/code-graph` and `@specd/plugin-manager` workspace packages are listed as runtime dependencies
+    - **AND** `@specd/cli`, `@specd/mcp` and any `@specd/plugin-agent-*` package are absent
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Package identity and dependencies'
+    after:
+      type: section
+      matches: 'Scenario: SDK depends on core, code-graph and plugin-manager'
+  content: |
+    #### Scenario: Dependency graph stays acyclic
+
+    - **WHEN** the workspace dependency graph is inspected
+    - **THEN** `@specd/plugin-manager` does not depend on `@specd/sdk`
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Public barrel exports$'
+    after:
+      type: section
+      matches: 'Scenario: SDK ports subpath re-exports core ports'
+  content: |
+    #### Scenario: SDK exports handler contracts for plugin hosts
+
+    - **WHEN** importing from `@specd/sdk`
+    - **THEN** `ContributionKindHandler`, `ContributionActivationContext` and `SdkContextOptions` are available (type-level assertion)
+
+    #### Scenario: SDK re-exports plugin error classes
+
+    - **WHEN** importing from `@specd/sdk`
+    - **THEN** `PluginInitError`, `PluginDestroyError`, `PluginValidationError`, `PluginNotFoundError`, `DuplicateContributionError`, `UnknownContributionError`, `UnknownContributionKindError`, `InvalidPluginConfigError`, `UnsupportedSchemaKeywordError`, `DuplicateHandlerKindError` and `InvalidContributionAddressError` are available
+    - **AND** each is the same class as the one exported by `@specd/plugin-manager`
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: CLI has no direct core dependency'
+  rename: 'Scenario: CLI has no direct core or code-graph dependency'
+  content: |
+    - **WHEN** `packages/cli/package.json` runtime dependencies are inspected
+    - **THEN** `@specd/sdk` is listed
+    - **AND** `@specd/core` and `@specd/code-graph` are not listed
+    - **AND** other specd packages (`@specd/plugin-manager`, `@specd/schema-std`, `@specd/guide`, `@specd/plugin-agent-*`) MAY be listed

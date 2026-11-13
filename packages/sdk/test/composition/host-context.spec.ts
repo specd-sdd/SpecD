@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { type SpecdConfig } from '@specd/core'
+import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
+import { type KernelOptions, type SpecdConfig } from '@specd/core'
+import type { OpenSpecdHostInput, SdkContextOptions } from '../../src/composition/host-context.js'
 
 const kernelDispose = vi.fn(async () => {})
 const mockKernel = { id: 'kernel', dispose: kernelDispose }
@@ -7,11 +8,16 @@ const mockProviderA = { id: 'provider-a' }
 const mockProviderB = { id: 'provider-b' }
 let providerCallCount = 0
 
-const createKernel = vi.fn(async () => mockKernel)
+const build = vi.fn(async () => mockKernel)
+const registerDisposer = vi.fn()
+const createKernelBuilder = vi.fn(() => ({ build, registerDisposer }))
+const registerPlugins = vi.fn(async () => ({ dispose: vi.fn(async () => {}) }))
 const createDefaultConfigLoader = vi.fn(async () => ({ load, resolvePath }))
 const createVcsAdapter = vi.fn()
 const createBootstrapGraphConfig = vi.fn()
 class ConfigNotFoundError extends Error {}
+const loggerWarn = vi.fn()
+const Logger = { warn: loggerWarn }
 const createCodeGraphProvider = vi.fn(() => {
   providerCallCount += 1
   return providerCallCount === 1 ? mockProviderA : mockProviderB
@@ -20,10 +26,18 @@ const load = vi.fn()
 const resolvePath = vi.fn()
 
 vi.mock('@specd/core', () => ({
-  createKernel,
   createDefaultConfigLoader,
   createVcsAdapter,
   ConfigNotFoundError,
+  Logger,
+}))
+
+vi.mock('@specd/core/extensions', () => ({
+  createKernelBuilder,
+}))
+
+vi.mock('@specd/plugin-manager', () => ({
+  registerPlugins,
 }))
 
 vi.mock('@specd/code-graph', () => ({
@@ -46,11 +60,82 @@ describe('createSdkContext', () => {
 
   it('passes the same config to createKernel and createCodeGraphProvider', async () => {
     const ctx = await createSdkContext(sampleConfig)
-    expect(createKernel).toHaveBeenCalledWith(sampleConfig, undefined)
+    expect(createKernelBuilder).toHaveBeenCalledWith(sampleConfig, undefined)
+    expect(registerPlugins).toHaveBeenCalled()
+    expect(build).toHaveBeenCalled()
     ctx.createGraphProvider()
     expect(createCodeGraphProvider).toHaveBeenCalledWith(sampleConfig, undefined)
     expect(ctx.kernel).toBe(mockKernel)
+    const registerOrder = registerPlugins.mock.invocationCallOrder[0]
+    const buildOrder = build.mock.invocationCallOrder[0]
+    expect(registerOrder).toBeLessThan(buildOrder ?? 0)
   })
+
+  it('skips plugin registration when plugins is false', async () => {
+    await createSdkContext(sampleConfig, { plugins: false })
+    expect(registerPlugins).not.toHaveBeenCalled()
+    expect(build).toHaveBeenCalled()
+  })
+
+  it('rejects with the plugin init error and never builds a kernel', async () => {
+    const initError = new Error('plugin init failed')
+    registerPlugins.mockRejectedValueOnce(initError)
+    await expect(createSdkContext(sampleConfig)).rejects.toBe(initError)
+    expect(build).not.toHaveBeenCalled()
+  })
+
+  it('forwards plugin handlers and disposes them when build fails', async () => {
+    const dispose = vi.fn(async () => {})
+    registerPlugins.mockResolvedValueOnce({ dispose })
+    build.mockRejectedValueOnce(new Error('build failed'))
+    const handler = { kind: 'checks', blockSchema: { safeParse: () => ({ success: true }) } }
+    await expect(
+      createSdkContext(sampleConfig, { pluginHandlers: [handler as never] }),
+    ).rejects.toThrow('build failed')
+    expect(registerPlugins).toHaveBeenCalledWith(
+      expect.anything(),
+      sampleConfig,
+      expect.objectContaining({ handlers: [handler] }),
+    )
+    expect(dispose).toHaveBeenCalled()
+  })
+
+  it('keeps the build error when plugin disposal fails', async () => {
+    const disposeError = new Error('destroy failed')
+    registerPlugins.mockResolvedValueOnce({
+      dispose: vi.fn(async () => {
+        throw disposeError
+      }),
+    })
+    const buildError = new Error('build failed')
+    build.mockRejectedValueOnce(buildError)
+    await expect(createSdkContext(sampleConfig)).rejects.toBe(buildError)
+    expect(buildError).toMatchObject({ rollbackErrors: [disposeError] })
+  })
+
+  it.each([
+    ['string', 'boom'],
+    ['null', null],
+    ['number', 42],
+  ])(
+    'rethrows a primitive build error unchanged and logs the rollback errors (%s)',
+    async (_label, primitive) => {
+      const disposeError = new Error('destroy failed')
+      registerPlugins.mockResolvedValueOnce({
+        dispose: vi.fn(async () => {
+          throw disposeError
+        }),
+      })
+      build.mockRejectedValueOnce(primitive)
+      loggerWarn.mockClear()
+      const thrown: unknown = await createSdkContext(sampleConfig).catch((e: unknown) => e)
+      expect(thrown).toBe(primitive)
+      expect(loggerWarn).toHaveBeenCalledWith(
+        expect.stringContaining('plugin disposal failed'),
+        expect.objectContaining({ rollbackErrors: ['destroy failed'] }),
+      )
+    },
+  )
 
   it('forwards graph composition options into createGraphProvider', async () => {
     const graphOptions = { graphStoreId: 'sqlite' }
@@ -58,7 +143,7 @@ describe('createSdkContext', () => {
 
     ctx.createGraphProvider()
 
-    expect(createKernel).toHaveBeenCalledWith(sampleConfig, undefined)
+    expect(createKernelBuilder).toHaveBeenCalledWith(sampleConfig, undefined)
     expect(createCodeGraphProvider).toHaveBeenCalledWith(sampleConfig, graphOptions)
   })
 
@@ -127,8 +212,13 @@ describe('openSpecdHost', () => {
     })
 
     result.createGraphProvider()
-    expect(createKernel).toHaveBeenCalledWith(sampleConfig, kernelOptions)
+    expect(createKernelBuilder).toHaveBeenCalledWith(sampleConfig, kernelOptions)
     expect(createCodeGraphProvider).toHaveBeenCalledWith(sampleConfig, graphOptions)
+  })
+
+  it('forwards plugins: false through openSpecdHost', async () => {
+    await openSpecdHost({ options: { plugins: false } })
+    expect(registerPlugins).not.toHaveBeenCalled()
   })
 
   it('uses forced configPath when provided', async () => {
@@ -175,6 +265,43 @@ describe('openSpecdHost', () => {
     expect(createCodeGraphProvider).toHaveBeenCalledWith(syntheticConfig, {
       graphStoreId: 'sqlite',
     })
+  })
+
+  it.each([
+    ['omitted', {}],
+    ['false', { allowBootstrapFallback: false }],
+  ] as const)(
+    'keeps config discovery failing when allowBootstrapFallback is %s',
+    async (_label, flag) => {
+      const missing = new ConfigNotFoundError('missing config')
+      load.mockRejectedValue(missing)
+
+      await expect(openSpecdHost({ startDir: '/tmp/repository', ...flag })).rejects.toBe(missing)
+
+      expect(createVcsAdapter).not.toHaveBeenCalled()
+      expect(createBootstrapGraphConfig).not.toHaveBeenCalled()
+    },
+  )
+
+  it('keeps config discovery failing when no input is given at all', async () => {
+    const missing = new ConfigNotFoundError('missing config')
+    load.mockRejectedValue(missing)
+
+    await expect(openSpecdHost()).rejects.toBe(missing)
+
+    expect(createVcsAdapter).not.toHaveBeenCalled()
+  })
+
+  it('rethrows non-ConfigNotFoundError failures even when the fallback is enabled', async () => {
+    const broken = new Error('config is corrupt')
+    load.mockRejectedValue(broken)
+
+    await expect(
+      openSpecdHost({ startDir: '/tmp/repository', allowBootstrapFallback: true }),
+    ).rejects.toBe(broken)
+
+    expect(createVcsAdapter).not.toHaveBeenCalled()
+    expect(createBootstrapGraphConfig).not.toHaveBeenCalled()
   })
 
   it('never falls back to a synthetic host when an explicit configPath cannot be loaded', async () => {
@@ -270,5 +397,78 @@ describe('host disposal', () => {
       .sort()
 
     expect(contextFactories).toEqual(['createSdkContext', 'openSpecdHost'])
+  })
+
+  it('has bootstrap signatures that cannot accept a kernel instance', () => {
+    // Semantic (type-level, enforced by tsc): the only inputs are a config or loader
+    // parameters, and the `kernel` option is KernelOptions, never a built Kernel.
+    expectTypeOf<Parameters<typeof createSdkContext>[0]>().toEqualTypeOf<SpecdConfig>()
+    expectTypeOf<keyof SdkContextOptions>().toEqualTypeOf<
+      'kernel' | 'graph' | 'plugins' | 'pluginHandlers'
+    >()
+    expectTypeOf<SdkContextOptions['kernel']>().toEqualTypeOf<KernelOptions | undefined>()
+    expectTypeOf<keyof OpenSpecdHostInput>().toEqualTypeOf<
+      'configPath' | 'startDir' | 'allowBootstrapFallback' | 'options'
+    >()
+    // Runtime: a kernel-shaped object passed as config is not adopted as the host kernel.
+    expect(createSdkContext.length).toBeLessThanOrEqual(2)
+  })
+
+  it('unpacks AggregateError failures into rollbackErrors', async () => {
+    const first = new Error('destroy a')
+    const second = new Error('destroy b')
+    registerPlugins.mockResolvedValueOnce({
+      dispose: vi.fn(async () => {
+        throw new AggregateError([first, second], 'many')
+      }),
+    })
+    const buildError = new Error('build failed')
+    build.mockRejectedValueOnce(buildError)
+    await expect(createSdkContext(sampleConfig)).rejects.toBe(buildError)
+    expect(buildError).toMatchObject({ rollbackErrors: [first, second] })
+  })
+
+  it.each([
+    ['frozen', () => Object.freeze(new Error('build failed'))],
+    ['non-extensible', () => Object.preventExtensions(new Error('build failed'))],
+  ])(
+    'rethrows a %s build error unchanged and logs the rollback errors at warn',
+    async (_label, make) => {
+      const disposeError = new Error('destroy failed')
+      registerPlugins.mockResolvedValueOnce({
+        dispose: vi.fn(async () => {
+          throw disposeError
+        }),
+      })
+      const buildError = make()
+      build.mockRejectedValueOnce(buildError)
+      loggerWarn.mockClear()
+      const thrown: unknown = await createSdkContext(sampleConfig).catch((e: unknown) => e)
+      expect(thrown).toBe(buildError)
+      expect(thrown).not.toBeInstanceOf(TypeError)
+      expect(Object.prototype.hasOwnProperty.call(buildError, 'rollbackErrors')).toBe(false)
+      expect(loggerWarn).toHaveBeenCalledWith(
+        expect.stringContaining('plugin disposal failed'),
+        expect.objectContaining({ rollbackErrors: ['destroy failed'] }),
+      )
+    },
+  )
+
+  it('unpacks the individual destroy failures of a plugin disposal error into rollbackErrors', async () => {
+    const first = new Error('destroy a')
+    const second = new Error('destroy b')
+    const destroyError = Object.assign(new Error('2 plugin(s) failed during destroy'), {
+      code: 'PLUGIN_DESTROY_FAILED',
+      errors: [first, second],
+    })
+    registerPlugins.mockResolvedValueOnce({
+      dispose: vi.fn(async () => {
+        throw destroyError
+      }),
+    })
+    const buildError = new Error('build failed')
+    build.mockRejectedValueOnce(buildError)
+    await expect(createSdkContext(sampleConfig)).rejects.toBe(buildError)
+    expect(buildError).toMatchObject({ rollbackErrors: [first, second] })
   })
 })

@@ -203,6 +203,27 @@ describe('createKernelBuilder', () => {
     )
   })
 
+  it('forwards additionalDestinations of the base options to the kernel logger', async () => {
+    const config = await makeConfig()
+    const entries: Array<{ level: string; message: string }> = []
+    const onLog = vi.fn((entry: { level: string; message: string }) => {
+      entries.push({ level: entry.level, message: entry.message })
+    })
+
+    const kernel = await createKernelBuilder(config, {
+      additionalDestinations: [{ target: 'callback', level: 'info', format: 'json', onLog }],
+    }).build()
+    try {
+      const { Logger } = await import('../../src/application/logger.js')
+      Logger.info('builder destination probe')
+
+      expect(onLog).toHaveBeenCalled()
+      expect(entries.some((e) => e.message === 'builder destination probe')).toBe(true)
+    } finally {
+      await kernel.dispose()
+    }
+  })
+
   it('does not expose graph-store builder methods on the fluent contract', async () => {
     const config = await makeConfig()
     const builder = createKernelBuilder(config) as unknown as Record<string, unknown>

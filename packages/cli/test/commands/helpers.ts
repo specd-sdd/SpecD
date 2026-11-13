@@ -6,7 +6,7 @@
  * test files stay focused on what they're testing.
  */
 import type { Stats } from 'node:fs'
-import { vi } from 'vitest'
+import { expect, vi } from 'vitest'
 import { Command } from 'commander'
 import { CliExitError } from '../../src/helpers/cli-exit-error.js'
 import { type CliContext } from '../../src/helpers/cli-context-types.js'
@@ -564,4 +564,46 @@ export function makeMockUseCase<
 >(execute: ReturnType<typeof vi.fn> = vi.fn()): T {
   // Single-point cast: the mock structurally satisfies any use-case with an execute method
   return { execute } as unknown as T
+}
+
+/** Spies for the kernel plugin-management methods the CLI must never call. */
+export interface KernelPluginSpies {
+  /** `kernel.project.listPlugins` */
+  readonly listPlugins: ReturnType<typeof vi.fn>
+  /** `kernel.project.addPlugin` */
+  readonly addPlugin: ReturnType<typeof vi.fn>
+  /** `kernel.project.removePlugin` */
+  readonly removePlugin: ReturnType<typeof vi.fn>
+  /** `kernel.project.init` */
+  readonly init: ReturnType<typeof vi.fn>
+}
+
+/**
+ * Attaches spies for `kernel.project.listPlugins`, `addPlugin`, `removePlugin` and `init`
+ * so a test can prove a command never reaches them.
+ *
+ * @param kernel - Mock kernel to extend
+ * @returns The attached spies
+ */
+export function attachKernelPluginSpies(kernel: unknown): KernelPluginSpies {
+  const spies: KernelPluginSpies = {
+    listPlugins: vi.fn(),
+    addPlugin: vi.fn(),
+    removePlugin: vi.fn(),
+    init: vi.fn(),
+  }
+  Object.assign((kernel as { project: object }).project, spies)
+  return spies
+}
+
+/**
+ * Asserts none of the kernel plugin-management spies was called.
+ *
+ * @param spies - Spies returned by {@link attachKernelPluginSpies}
+ */
+export function expectNoKernelPluginCalls(spies: KernelPluginSpies): void {
+  expect(spies.listPlugins).not.toHaveBeenCalled()
+  expect(spies.addPlugin).not.toHaveBeenCalled()
+  expect(spies.removePlugin).not.toHaveBeenCalled()
+  expect(spies.init).not.toHaveBeenCalled()
 }

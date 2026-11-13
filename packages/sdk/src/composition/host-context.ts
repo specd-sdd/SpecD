@@ -1,12 +1,14 @@
 import {
   createDefaultConfigLoader,
-  createKernel,
   createVcsAdapter,
   ConfigNotFoundError,
+  Logger,
   type Kernel,
   type KernelOptions,
   type SpecdConfig,
 } from '@specd/core'
+import { createKernelBuilder } from '@specd/core/extensions'
+import { registerPlugins, type ContributionKindHandler } from '@specd/plugin-manager'
 import {
   createCodeGraphProvider,
   createBootstrapGraphConfig,
@@ -41,6 +43,13 @@ export interface SdkContextOptions {
   readonly kernel?: KernelOptions
   /** Optional code-graph composition overrides bound to the same config. */
   readonly graph?: CodeGraphCompositionOptions
+  /**
+   * When `false`, configured plugins are not loaded or initialized.
+   * Defaults to enabled.
+   */
+  readonly plugins?: boolean
+  /** Extra contribution-kind handlers supplied by the host. */
+  readonly pluginHandlers?: readonly ContributionKindHandler[]
 }
 
 /**
@@ -86,7 +95,25 @@ export async function createSdkContext(
   config: SpecdConfig,
   options?: SdkContextOptions,
 ): Promise<SdkHostContext> {
-  const kernel = await createKernel(config, options?.kernel)
+  const builder = createKernelBuilder(config, options?.kernel)
+  const registration =
+    options?.plugins === false
+      ? undefined
+      : await registerPlugins(builder, config, { handlers: options?.pluginHandlers ?? [] })
+  let kernel: Kernel
+  try {
+    kernel = await builder.build()
+  } catch (error) {
+    if (registration !== undefined) {
+      try {
+        await registration.dispose()
+      } catch (disposeError) {
+        const failures = readRollbackFailures(disposeError)
+        throw attachRollbackErrors(error, failures)
+      }
+    }
+    throw error
+  }
   const dispose = (): Promise<void> => kernel.dispose()
   return {
     kernel,
@@ -145,4 +172,71 @@ export async function openSpecdHost(input?: OpenSpecdHostInput): Promise<OpenSpe
     configFilePath,
     ...ctx,
   }
+}
+
+/**
+ * Collects the individual dispose failures behind a plugin disposal error.
+ *
+ * The plugin disposer rejects with a `PluginDestroyError` (or a plain
+ * `AggregateError`) carrying one entry per failed `destroy`; those entries are
+ * unpacked so `rollbackErrors` lists the real failures. Detection is
+ * structural so the SDK does not depend on the concrete error class identity.
+ *
+ * @param disposeError - Failure from plugin disposal
+ * @returns The individual dispose failures
+ */
+function readRollbackFailures(disposeError: unknown): readonly unknown[] {
+  if (
+    typeof disposeError === 'object' &&
+    disposeError !== null &&
+    'errors' in disposeError &&
+    Array.isArray(disposeError.errors) &&
+    (disposeError instanceof AggregateError ||
+      ('code' in disposeError && disposeError.code === 'PLUGIN_DESTROY_FAILED'))
+  ) {
+    return [...(disposeError.errors as readonly unknown[])]
+  }
+  return [disposeError]
+}
+
+/**
+ * Keeps dispose failures beside the build error that must still propagate.
+ *
+ * The build error is always the value that propagates, unchanged. An extensible
+ * object build error carries the failures as `rollbackErrors` (identity preserved).
+ * A primitive, `null`, or frozen/non-extensible build error cannot carry properties
+ * (`Object.defineProperty` throws), so it is returned untouched and its rollback
+ * failures are reported through core's `Logger` at `warn` instead of being lost.
+ *
+ * Limitation: `Logger` is the ambient core logger. `Logger.setImplementation` runs
+ * inside the kernel build, after the log directory is created. When the build fails
+ * before that point (or no kernel was ever built in this process) the ambient logger
+ * is still the null implementation and the warning is silently dropped. The warning
+ * does not reach `options.kernel.onLog` either. Only a non-carrying build error
+ * combined with a dispose failure is affected.
+ *
+ * @param error - Original build failure
+ * @param rollbackErrors - Failures from plugin disposal
+ * @returns `error` itself, to be thrown by the caller
+ */
+function attachRollbackErrors(error: unknown, rollbackErrors: readonly unknown[]): unknown {
+  if (rollbackErrors.length === 0) return error
+  if (typeof error === 'object' && error !== null) {
+    try {
+      Object.defineProperty(error, 'rollbackErrors', {
+        value: rollbackErrors,
+        enumerable: true,
+        configurable: true,
+      })
+      return error
+    } catch {
+      // Frozen or non-extensible: fall through to the logger.
+    }
+  }
+  Logger.warn('plugin disposal failed after the kernel build failed', {
+    rollbackErrors: rollbackErrors.map((failure) =>
+      failure instanceof Error ? failure.message : String(failure),
+    ),
+  })
+  return error
 }

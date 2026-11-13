@@ -97,6 +97,8 @@ The loader MUST attempt to load environment variables from `.env` and `.env.loca
 
 The loader MUST parse the config file as YAML. After parsing, the loader MUST validate the resulting object against a Zod schema.
 
+Before strict validation, the loader MUST check `configVersion` and detect the legacy plugins format of each layer: a `plugins` value that is an object with an `agents` key MUST raise `LegacyConfigFormatError` (code `LEGACY_CONFIG_FORMAT`) whose message contains the equivalent flat `plugins` list and `configVersion: 2`; a `configVersion` greater than the supported version MUST raise `UnsupportedConfigVersionError` (code `UNSUPPORTED_CONFIG_VERSION`). These run before the strict schema so users get the migration message instead of a generic schema error. Within a layer the `configVersion` check runs before the legacy check, so a layer that is both newer and legacy reports `UnsupportedConfigVersionError`. Legacy detection fires only for a `plugins` object with an `agents` key. `configVersion` must be a positive integer.
+
 Before validation, the loader MUST merge supported environment variables into the configuration object. Environment variables MUST take precedence over file-based configuration.
 
 ### Requirement: Default workspace is required
@@ -156,7 +158,7 @@ The loader MUST map `schemaPlugins` as an array of strings and `schemaOverrides`
 
 The loader MUST map raw `context` entries preserving their `{ file }`, `{ instruction }`, optional `id`, and layered removal semantics.
 
-The loader MUST preserve `plugins.agents` entries with `name` plus optional `config`, and MUST treat `name` as the array identity key for inherited removal.
+The loader MUST map `plugins` as a flat list of `{ name, config?, contributions? }`, validating the scoped plugin name and rejecting duplicate names, and MUST treat `name` as the list identity key: layer entries replace inherited entries of the same name in place, new names are appended, and `remove.plugins: [{ name }]` removes an inherited entry (a name absent from the inherited list, or a name repeated in the removal list, fails with `ConfigValidationError`). The loader MUST NOT load plugins or validate `config` against plugin schemas.
 
 ### Requirement: Approvals default to false
 
@@ -164,7 +166,7 @@ When the `approvals` section is absent or individual approval gates (`spec`, `si
 
 ### Requirement: All errors are ConfigValidationError
 
-Every validation failure during `load()` — missing config file, invalid YAML, structural mismatch, invalid cascade chain, invalid removal target, missing required fields, path containment violations, invalid patterns — MUST be surfaced as a `ConfigValidationError`.
+Every validation failure during `load()` — including a config path that exists but cannot be read as a file (a directory, a permission error) — missing config file, invalid YAML, structural mismatch, invalid cascade chain, invalid removal target, missing required fields, path containment violations, invalid patterns, legacy plugins format, unsupported `configVersion` — MUST be surfaced as a `ConfigValidationError` (`LegacyConfigFormatError` and `UnsupportedConfigVersionError` extend it).
 
 No generic YAML/runtime exception SHALL escape for configuration validation failures. Cascade-specific failures remain part of the normal `SpecdError` path.
 

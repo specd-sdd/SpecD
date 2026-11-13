@@ -10,6 +10,11 @@ export {
   type FsConfigLoaderOptions,
 } from './composition/config-loader.js'
 export { createConfigWriter, type FsConfigWriterOptions } from './composition/config-writer.js'
+export type {
+  AddPluginOptions,
+  ConfigDeclaredPlugin,
+  ConfigWriter,
+} from './application/ports/config-writer.js'
 export { createVcsAdapter } from './composition/vcs-adapter.js'
 export { createVcsActorResolver } from './composition/actor-resolver.js'
 export {
@@ -544,6 +549,7 @@ export {
   type OverlapChange,
   OverlapReport,
 } from './domain/value-objects/index.js'
+export { PLUGIN_NAME_REGEX, isPluginName } from './domain/plugin-name.js'
 
 // Domain errors
 export {
@@ -558,6 +564,9 @@ export {
   HookFailedError,
   SchemaValidationError,
   ConfigValidationError,
+  LegacyConfigFormatError,
+  UnsupportedConfigVersionError,
+  CURRENT_CONFIG_VERSION,
   DeltaApplicationError,
   UnsupportedPatternError,
   CorruptedManifestError,
@@ -582,6 +591,7 @@ export {
   DraftedChangeReadOnlyError,
   UnsupportedManifestVersionError,
   InvalidPluginNameError,
+  InvalidCheckIdError,
   DuplicateCheckError,
   DuplicateCheckBindingError,
   InvalidCheckKindError,

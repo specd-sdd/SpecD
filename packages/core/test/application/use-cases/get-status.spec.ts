@@ -1885,12 +1885,12 @@ describe('GetStatus — archive hints from the effective archive bindings', () =
 
   it('embeds a registered check declared by the schema and reports it without a flag', async () => {
     const registry = new CheckRegistry()
-    registry.register('qa', {
+    registry.register('@acme/qa', {
       id: 'lint',
       label: 'Linting',
-      execute: async () => fail('@qa.lint', 'LINT_FAILED', 'lint failed'),
+      execute: async () => fail('@acme/qa.lint', 'LINT_FAILED', 'lint failed'),
     })
-    const result = await statusFor([], [{ id: '@qa.lint' }], registry)
+    const result = await statusFor([], [{ id: '@acme/qa.lint' }], registry)
     const blocker = result.blockers.find((b) => b.code === 'LINT_FAILED')
     expect(blocker).toBeDefined()
     expect(blocker?.bypassFlag).toBeUndefined()

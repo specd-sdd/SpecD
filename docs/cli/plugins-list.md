@@ -5,12 +5,11 @@
 ## Command
 
 ```bash
-specd plugins list [--type <type>]
+specd plugins list
 ```
 
 Options:
 
-- `--type <type>` declaration bucket filter (for example, `agents`)
 - `--format <text|json|toon>` output format (default: `text`)
 - `--config <path>` explicit `specd.yaml` path
 
@@ -30,7 +29,7 @@ Text output prints:
 
 ```text
 Installed plugins:
-<plugin-name>  <type>  <version-or-dash>  <status>  <optional-detail>
+<plugin-name>  <status>  <version-or-dash>  selected: [<selected-ids>]  [available: <other-declared-ids>]  [<detail>]
 ```
 
 If no declarations exist, text output is:

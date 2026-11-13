@@ -8,7 +8,7 @@ import {
   ProjectGraphZodSchema,
   WorkspaceGraphZodSchema,
   LoggingZodSchema,
-  PluginsZodSchema,
+  PluginEntryZodSchema,
   SchemaOverridesZodSchema,
 } from '@specd/sdk/ports'
 
@@ -128,7 +128,7 @@ describe('Configuration Documentation Coverage (dynamic introspection)', () => {
   })
 
   describe('Plugins properties', () => {
-    const pluginKeys = extractShapeKeys(PluginsZodSchema)
+    const pluginKeys = extractShapeKeys(PluginEntryZodSchema)
 
     for (const key of pluginKeys) {
       it(`documents plugins option '${key}' in configuration.md`, () => {

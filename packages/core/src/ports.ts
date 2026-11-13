@@ -58,6 +58,8 @@ export {
   type LoggerPort,
 } from './application/ports/logger.port.js'
 export {
+  type AddPluginOptions,
+  type ConfigDeclaredPlugin,
   type ConfigWriter,
   type InitProjectOptions,
   type InitProjectResult,

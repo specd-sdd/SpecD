@@ -8,6 +8,8 @@ Codex agent plugin for [specd](https://github.com/specd-sdd/SpecD). For more inf
 specd plugins install @specd/plugin-agent-codex
 ```
 
+The package manifest is `specd-plugin.json` with `schemaVersion: 2` and an `agents.codex` contribution.
+
 ## Supported frontmatter fields
 
 | Field         | Required | Description        |

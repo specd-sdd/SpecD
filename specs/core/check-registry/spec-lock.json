@@ -6,11 +6,17 @@
   "dependsOn": ["core:transition-checks", "default:_global/architecture", "core:schema-format"],
   "implementation": [
     {
-      "file": "core:src/domain/services/check-bindings.ts",
-      "symbols": ["ARCHIVE_BINDING_SPECS"]
+      "file": "core:src/domain/services/check-registry.ts",
+      "symbols": ["CheckRegistry"]
     },
     {
-      "file": "core:src/domain/services/check-registry.ts",
+      "file": "core:test/composition/composition-registries.spec.ts"
+    },
+    {
+      "file": "core:test/composition/kernel.spec.ts"
+    },
+    {
+      "file": "core:test/domain/services/check-registry.spec.ts",
       "symbols": ["CheckRegistry"]
     }
   ],
