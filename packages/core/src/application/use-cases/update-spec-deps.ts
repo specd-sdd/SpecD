@@ -15,14 +15,34 @@ export interface UpdateSpecDepsInput {
   readonly remove?: readonly string[]
   /** Replace all dependencies for this spec. Mutually exclusive with `add`/`remove`. */
   readonly set?: readonly string[]
+  /** Remove all dependencies for this spec. Mutually exclusive with `add`/`remove`/`set`. */
+  readonly clear?: boolean
 }
 
 /** Result returned by a successful {@link UpdateSpecDeps} execution. */
 export interface UpdateSpecDepsResult {
-  /** The spec ID whose dependencies were updated. */
+  /** The fully-qualified spec ID whose dependencies were updated. */
   readonly specId: string
   /** The resulting dependency list after the update. */
   readonly dependsOn: readonly string[]
+}
+
+/**
+ * Normalizes a remove entry: valid IDs become fully qualified; invalid IDs are kept as given.
+ *
+ * @param id - Dependency ID to normalize for removal
+ * @param workspaces - Configured workspaces for validation
+ * @returns Qualified ID when valid, otherwise the original string
+ */
+function tryNormalizeDepId(
+  id: string,
+  workspaces: Iterable<string | { readonly name: string }>,
+): string {
+  try {
+    return parseSpecId(id, { workspaces }).specId
+  } catch {
+    return id
+  }
 }
 
 /**
@@ -33,14 +53,17 @@ export interface UpdateSpecDepsResult {
  */
 export class UpdateSpecDeps {
   private readonly _changes: ChangeRepository
+  private readonly _workspaces: readonly (string | { readonly name: string })[]
 
   /**
    * Creates a new `UpdateSpecDeps` use case instance.
    *
    * @param changes - Repository for loading and saving changes
+   * @param workspaces - Configured workspaces used to validate and normalize IDs
    */
-  constructor(changes: ChangeRepository) {
+  constructor(changes: ChangeRepository, workspaces: Iterable<string | { readonly name: string }>) {
     this._changes = changes
+    this._workspaces = [...workspaces]
   }
 
   /**
@@ -49,48 +72,66 @@ export class UpdateSpecDeps {
    * @param input - Update parameters
    * @returns The resulting dependency list for the spec
    * @throws {ChangeNotFoundError} If no change with the given name exists
-   * @throws {InvalidInputError} If `specId` is not in `change.specIds`, or if `set` is used with `add`/`remove`,
-   *   or if a `remove` value is not in current deps, or if no operation is specified
+   * @throws {InvalidInputError} If operations conflict, `specId` is not in the change,
+   *   a `remove` value is absent, or no operation is specified
+   * @throws {InvalidSpecIdError} If `specId`, `add`, or `set` entries fail validation
+   * @throws {WorkspaceNotFoundError} If a validated ID names an unknown workspace
    */
   async execute(input: UpdateSpecDepsInput): Promise<UpdateSpecDepsResult> {
-    // Validate mutual exclusivity
-    if (input.set !== undefined && (input.add !== undefined || input.remove !== undefined)) {
-      throw new InvalidInputError('--set is mutually exclusive with --add and --remove')
+    if (
+      input.set !== undefined &&
+      (input.add !== undefined || input.remove !== undefined || input.clear === true)
+    ) {
+      throw new InvalidInputError('--set is mutually exclusive with --add, --remove, and --clear')
+    }
+    if (input.clear === true && (input.add !== undefined || input.remove !== undefined)) {
+      throw new InvalidInputError('--clear is mutually exclusive with --add and --remove')
+    }
+    if (
+      input.set === undefined &&
+      input.add === undefined &&
+      input.remove === undefined &&
+      input.clear !== true
+    ) {
+      throw new InvalidInputError(
+        'at least one of --add, --remove, --set, or --clear must be provided',
+      )
     }
 
-    if (input.set === undefined && input.add === undefined && input.remove === undefined) {
-      throw new InvalidInputError('at least one of --add, --remove, or --set must be provided')
-    }
-
-    // Validate dep spec ID formats
-    const validateDepIds = (ids: readonly string[]): void => {
-      for (const id of ids) {
-        parseSpecId(id) // Throws on invalid format — actually parseSpecId doesn't throw, it's lenient
-      }
-    }
+    const workspaces = this._workspaces
+    const specId = parseSpecId(input.specId, { workspaces }).specId
+    const add =
+      input.add !== undefined
+        ? input.add.map((id) => parseSpecId(id, { workspaces }).specId)
+        : undefined
+    const set =
+      input.set !== undefined
+        ? input.set.map((id) => parseSpecId(id, { workspaces }).specId)
+        : undefined
+    const remove =
+      input.remove !== undefined
+        ? input.remove.map((id) => tryNormalizeDepId(id, workspaces))
+        : undefined
 
     const { result } = await this._changes.mutate(input.name, (change) => {
-      if (!change.specIds.includes(input.specId)) {
+      if (!change.specIds.includes(specId)) {
         throw new InvalidInputError(
-          `spec '${input.specId}' is not in change '${input.name}' — specIds: [${change.specIds.join(', ')}]`,
+          `spec '${specId}' is not in change '${input.name}' — specIds: [${change.specIds.join(', ')}]`,
         )
       }
 
-      let result: string[]
+      const current = [...(change.specDependsOn.get(specId) ?? [])]
+      const result = [
+        ...applyDependsOnMutation(current, {
+          ...(add !== undefined ? { add } : {}),
+          ...(remove !== undefined ? { remove } : {}),
+          ...(set !== undefined ? { set } : {}),
+          ...(input.clear === true ? { clear: true } : {}),
+        }),
+      ]
 
-      if (input.set !== undefined) {
-        validateDepIds(input.set)
-        result = [...applyDependsOnMutation([], { set: input.set })]
-      } else {
-        if (input.add !== undefined) {
-          validateDepIds(input.add)
-        }
-        const current = [...(change.specDependsOn.get(input.specId) ?? [])]
-        result = [...applyDependsOnMutation(current, input)]
-      }
-
-      change.setSpecDependsOn(input.specId, result)
-      return { specId: input.specId, dependsOn: result }
+      change.setSpecDependsOn(specId, result)
+      return { specId, dependsOn: result }
     })
     return result
   }

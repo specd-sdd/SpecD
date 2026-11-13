@@ -18,5 +18,41 @@
     {
       "file": "cli:test/commands/plugins.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "CLI plugins install validates package names, installs undeclared plugins, records successes, and reports partial failures.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:406ac03b97e41133c07ba7676391f825c5872b1e24c38837f9c41baa1561113d",
+          "lastModified": "2026-07-01T16:02:44.615Z"
+        },
+        "verify.md": {
+          "hash": "sha256:0ff07e0858fc69cf8775c4d81f265576ffbe99e8c468b9da6f0c9482c630e877",
+          "lastModified": "2026-07-01T16:02:44.615Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Plugins Install\n\n## Rules\n- `specd plugins install <plugin> [<plugin>...]`; one+ npm package names.\n- Declaration source: loaded `SpecdConfig.plugins`; already-installed detection via `config.plugins.agents` or appropriate type bucket. Config snapshot available → never `kernel.project.listPlugins` / `ConfigWriter.listPlugins`.\n- Tabular output header `Installed plugins:` then newline-separated details.\n- Already declared: warning containing `already installed` before `update`; SHOULD suggest update reinstall; skip installation.\n- Each undeclared plugin: call `InstallPlugin` from `@specd/plugin-manager`; success → `createConfigWriter().addPlugin(configPath, type, name, config)`; failure → emit error, continue remaining plugins.\n- Never `kernel.project.addPlugin`; SHOULD construct kernel only for subsequent required domain operations.\n- Any install failure → exit 1 after processing all plugins.\n- Output plugin name, status (`installed`, `skipped`, error message), additional details; `--format json` machine-parseable.\n\n## Constraints\n- Already installed → no specd.yaml mutation.\n- Validate plugin names before installation.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:406ac03b97e41133c07ba7676391f825c5872b1e24c38837f9c41baa1561113d",
+          "lastModified": "2026-07-01T16:02:44.615Z"
+        },
+        "verify.md": {
+          "hash": "sha256:0ff07e0858fc69cf8775c4d81f265576ffbe99e8c468b9da6f0c9482c630e877",
+          "lastModified": "2026-07-01T16:02:44.615Z"
+        }
+      }
+    }
+  }
 }

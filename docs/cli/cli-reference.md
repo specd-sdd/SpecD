@@ -36,13 +36,15 @@ Create a new change and place it in the active changes directory.
 
 `<name>` is a short slug identifying the change. It must be unique among active changes and match the slug conventions of your project (lowercase, hyphens). It becomes part of the change directory name and is used in all subsequent commands that reference this change.
 
-| Option                      | Description                                                                                      |
-| --------------------------- | ------------------------------------------------------------------------------------------------ |
-| `--spec <id>`               | Associate a spec with this change. Repeatable — pass multiple `--spec` flags for multiple specs. |
-| `--description <text>`      | Short description of the change's intent.                                                        |
-| `--invalidation-policy <p>` | Set the invalidation policy (`none\|surgical\|downstream\|global`). Defaults to `downstream`.    |
-| `--format text\|json\|toon` | Output format.                                                                                   |
-| `--config <path>`           | Config file path.                                                                                |
+| Option                      | Description                                                                                   |
+| --------------------------- | --------------------------------------------------------------------------------------------- |
+| `--spec <id>`               | Spec ID (repeatable). Each value is one raw ID — never comma-split. Bare IDs mean `default`.  |
+| `--description <text>`      | Short description of the change's intent.                                                     |
+| `--invalidation-policy <p>` | Set the invalidation policy (`none\|surgical\|downstream\|global`). Defaults to `downstream`. |
+| `--format text\|json\|toon` | Output format.                                                                                |
+| `--config <path>`           | Config file path.                                                                             |
+
+`--spec` values are validated by the core as canonical spec IDs. Invalid syntax fails with `INVALID_SPEC_ID`; an unknown workspace fails with `WORKSPACE_NOT_FOUND`. Pass one ID per flag (for example `--spec auth/login --spec core:change`), not a comma-separated list.
 
 ```bash
 # Create a change for two specs
@@ -188,14 +190,16 @@ specd changes edit <name> [options]
 
 Edit the spec scope or description of an existing change. At least one of the options below is required.
 
-| Option                      | Description                                                            |
-| --------------------------- | ---------------------------------------------------------------------- |
-| `--add-spec <id>`           | Add a spec to the change.                                              |
-| `--remove-spec <id>`        | Remove a spec from the change.                                         |
-| `--description <text>`      | Update the change description.                                         |
-| `--invalidation-policy <p>` | Change the invalidation policy (`none\|surgical\|downstream\|global`). |
-| `--format text\|json\|toon` | Output format.                                                         |
-| `--config <path>`           | Config file path.                                                      |
+| Option                      | Description                                                                   |
+| --------------------------- | ----------------------------------------------------------------------------- |
+| `--add-spec <id>`           | Add a spec ID (repeatable). Raw ID — never comma-split. Bare means `default`. |
+| `--remove-spec <id>`        | Remove a spec ID (repeatable). Raw ID — never comma-split.                    |
+| `--description <text>`      | Update the change description.                                                |
+| `--invalidation-policy <p>` | Change the invalidation policy (`none\|surgical\|downstream\|global`).        |
+| `--format text\|json\|toon` | Output format.                                                                |
+| `--config <path>`           | Config file path.                                                             |
+
+`--add-spec` values are validated like `changes create --spec` (`INVALID_SPEC_ID` / `WORKSPACE_NOT_FOUND`). `--remove-spec` removes a stored ID and does not re-validate syntax, so an invalid persisted ID can still be removed.
 
 ### change validate
 
@@ -369,6 +373,8 @@ Available subcommands:
 - `resolve` — mark a tracked file as reviewed/resolved
 - `unresolve` — reopen a resolved file back to `open`
 
+`--file` takes raw project-relative path(s). Use a listed form (`--file a.ts b.ts`) or repeat the flag. Commas are **not** separators — a comma is part of the path. `add` / `remove` take a single `--file <path>`; `ignore` / `resolve` / `unresolve` take `--file <paths...>`.
+
 `list` and `review` use one delivery-neutral SDK projection. For symbol links they
 report the original stored file and symbol plus:
 
@@ -494,18 +500,22 @@ specd changes invalidate my-change --reason "Minor fix" --target tasks --policy 
 ### change deps
 
 ```
-specd changes deps <name> <specId> [options]
+specd changes deps <name> [specId] [options]
 ```
 
-Manage the `dependsOn` relationships for a spec within a change. At least one of `--add`, `--remove`, or `--set` is required.
+Add, remove, replace, or clear declared spec dependencies for a change, or list current dependencies when no modification flags are provided. Modification flags require `<specId>`.
 
-| Option                      | Description                                         |
-| --------------------------- | --------------------------------------------------- |
-| `--add <specId>`            | Add a dependency. Repeatable.                       |
-| `--remove <specId>`         | Remove a dependency. Repeatable.                    |
-| `--set <specId>`            | Replace all dependencies with this set. Repeatable. |
-| `--format text\|json\|toon` | Output format.                                      |
-| `--config <path>`           | Config file path.                                   |
+| Option                      | Description                                                                                      |
+| --------------------------- | ------------------------------------------------------------------------------------------------ |
+| `--add <id>`                | Add a dependency spec ID (repeatable). Raw ID — never comma-split. Bare IDs mean `default`.      |
+| `--remove <id>`             | Remove a dependency spec ID (repeatable). Raw ID — never comma-split.                            |
+| `--set <id>`                | Replace all dependencies (repeatable; mutually exclusive with `--add` / `--remove` / `--clear`). |
+| `--clear`                   | Clear all dependencies for the spec (mutually exclusive with `--add` / `--remove` / `--set`).    |
+| `--force`                   | Skip confirmation for `--clear`.                                                                 |
+| `--format text\|json\|toon` | Output format.                                                                                   |
+| `--config <path>`           | Config file path.                                                                                |
+
+`--clear` prompts for confirmation unless `--force` is passed. Added and set IDs are validated as canonical spec IDs (`INVALID_SPEC_ID` / `WORKSPACE_NOT_FOUND`).
 
 ### change discard
 
@@ -943,7 +953,7 @@ specd specs deps list <specPath>
 specd specs deps add|remove|set|clear <specPath> [options]
 ```
 
-Manage persisted `dependsOn` links in `spec-lock.json`.
+Manage persisted `dependsOn` links in `spec-lock.json`. Dependency IDs use `--dep <id>` (repeatable, raw IDs — never comma-split). `specs deps clear` prompts for confirmation unless `--force` is passed.
 
 See [spec deps](spec-deps.md).
 
@@ -1068,7 +1078,7 @@ Initialize a new SpecD project in the current directory. When run in a TTY, laun
 | Option                      | Description                                                                                                                                                                                      |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `--schema <ref>`            | Schema reference to use (e.g. `@specd/schema-std`).                                                                                                                                              |
-| `--workspace <name>`        | Workspace name. Defaults to `default`.                                                                                                                                                           |
+| `--workspace <name>`        | Workspace name. Defaults to `default`. Must be two or more of `a-z`, `0-9` and `-`, start with a letter and not be a Windows device name (e.g. `nul`); the value is never trimmed.               |
 | `--workspace-path <path>`   | Path to the specs directory for the workspace.                                                                                                                                                   |
 | `--plugin <name>`           | Install skills for this agent plugin. Repeatable. Valid values include `@specd/plugin-agent-claude`, `@specd/plugin-agent-copilot`, `@specd/plugin-agent-codex`, `@specd/plugin-agent-opencode`. |
 | `--force`                   | Overwrite existing `specd.yaml` if present.                                                                                                                                                      |
@@ -1271,13 +1281,13 @@ Worker failures exit with code 3 and report structured diagnostics: failure caus
 `task-contract`, `task-error`, `protocol`, `cancelled`, `native-crash`, `resource-limit`,
 `exited`), last activity item and time ago, and trailing 16 KiB tails of child stdout and stderr.
 
-| Option                      | Description                                                                                                                                                    |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--force`                   | Logically rebuild every selected graph input; typed incompatible storage may be repaired once.                                                                 |
-| `--config <path>`           | Config file path. Mutually exclusive with `--path`.                                                                                                            |
-| `--path <path>`             | Repository root bootstrap path. Ignores any discovered config.                                                                                                 |
-| `--exclude-path <pattern>`  | Gitignore-syntax pattern, relative to the project root, added to the global exclusion layer (repeatable; comma-separated values accepted; merges with config). |
-| `--format text\|json\|toon` | Output format.                                                                                                                                                 |
+| Option                      | Description                                                                                                                                |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--force`                   | Logically rebuild every selected graph input; typed incompatible storage may be repaired once.                                             |
+| `--config <path>`           | Config file path. Mutually exclusive with `--path`.                                                                                        |
+| `--path <path>`             | Repository root bootstrap path. Ignores any discovered config.                                                                             |
+| `--exclude-path <glob...>`  | One or more gitignore-syntax patterns, relative to the project root, added to the global exclusion layer (repeatable; merges with config). |
+| `--format text\|json\|toon` | Output format.                                                                                                                             |
 
 #### Config fields: `graph.includePaths`, `graph.excludePaths`, `graph.respectGitignore`, `graph.maxFileBytes`, `graph.largeFilePaths`, and `workspace.graph.allowedPaths`
 
@@ -1332,10 +1342,11 @@ Filesystem-backed spec roots are excluded automatically from file/document disco
 
 #### `--exclude-path` merging
 
-CLI `--exclude-path` flags merge (append) on top of the effective exclusion list — either `graph.excludePaths` from config or the built-in defaults when config is absent. They never reduce the exclusion set. Patterns are relative to the project root and join the global exclusion layer, so a workspace-level `!` negation cannot re-include them. This flag may be repeated, and one flag may carry several comma-separated patterns:
+CLI `--exclude-path` flags merge (append) on top of the effective exclusion list — either `graph.excludePaths` from config or the built-in defaults when config is absent. They never reduce the exclusion set. Patterns are relative to the project root and join the global exclusion layer, so a workspace-level `!` negation cannot re-include them. Pass one or more whole gitignore patterns per flag (`--exclude-path <glob...>`), or repeat the flag. Commas are not separators — a comma is part of the pattern.
 
 ```
 specd graph index --exclude-path "packages/generated/*" --exclude-path "tmp/"
+specd graph index --exclude-path "packages/generated/*" "tmp/"
 ```
 
 #### Shared indexing lock

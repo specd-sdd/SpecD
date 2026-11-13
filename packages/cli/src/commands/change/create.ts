@@ -2,7 +2,6 @@ import { type Command } from 'commander'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
-import { parseSpecId } from '../../helpers/spec-path.js'
 import { collect } from '../../helpers/collect.js'
 
 /**
@@ -27,7 +26,7 @@ export function registerChangeCreate(parent: Command): void {
       'after',
       `
 JSON/TOON output schema:
-  { result: "ok", name: string, state: string }
+  { result: "ok", name: string, state: string, changePath: string }
 `,
     )
     .action(
@@ -44,38 +43,14 @@ JSON/TOON output schema:
         try {
           const { config, kernel } = await resolveCliContext({ configPath: opts.config })
 
-          const parsedSpecs = opts.spec.map((s) => parseSpecId(s, config))
-
-          const readOnlyErrors: string[] = []
-          for (const parsed of parsedSpecs) {
-            const ws = config.workspaces.find((w) => w.name === parsed.workspace)
-            if (ws && ws.ownership === 'readOnly') {
-              readOnlyErrors.push(
-                `Cannot add spec "${parsed.specId}" to change — workspace "${parsed.workspace}" is readOnly.\n\nReadOnly workspaces are protected: their specs and code cannot be modified by changes.`,
-              )
-            }
-          }
-          if (readOnlyErrors.length > 0) {
-            for (const msg of readOnlyErrors) {
-              process.stderr.write(`error: ${msg}\n`)
-            }
-            process.exit(1)
-          }
-
-          const specIds = parsedSpecs.map((p) => p.specId)
-
+          const invalidationPolicy: string | undefined =
+            opts.invalidationPolicy ?? config.invalidationPolicy
           const { change, changePath, overlapReport } = await kernel.changes.create.execute({
             name,
             ...(opts.description !== undefined ? { description: opts.description } : {}),
-            specIds,
-            ...(specIds.length > 0 ? { includeOverlapCheck: true } : {}),
-            ...(config.invalidationPolicy !== undefined || opts.invalidationPolicy !== undefined
-              ? {
-                  invalidationPolicy:
-                    (opts.invalidationPolicy as 'none' | 'surgical' | 'downstream' | 'global') ??
-                    config.invalidationPolicy,
-                }
-              : {}),
+            specIds: opts.spec,
+            ...(opts.spec.length > 0 ? { includeOverlapCheck: true } : {}),
+            ...(invalidationPolicy !== undefined ? { invalidationPolicy } : {}),
           })
 
           if (overlapReport?.hasOverlap === true) {

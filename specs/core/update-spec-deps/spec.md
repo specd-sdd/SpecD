@@ -11,34 +11,47 @@ Spec dependencies must be captured during authoring — before metadata files ex
 `UpdateSpecDeps.execute` SHALL accept an `UpdateSpecDepsInput` with the following fields:
 
 - `name` (required, string) — the change slug
-- `specId` (required, string) — the spec whose dependencies are being updated; MUST be present in the change's `specIds`
+- `specId` (required, string) — the spec whose dependencies are being updated; validated and normalized per "Spec ID validation", and MUST be present in the change's `specIds`
 - `add` (optional, readonly string array) — dependency spec IDs to merge with existing dependencies
 - `remove` (optional, readonly string array) — dependency spec IDs to remove from existing dependencies
 - `set` (optional, readonly string array) — replaces all dependencies for the spec
+- `clear` (optional, boolean) — when `true`, removes every declared dependency of the spec
+
+Every list carries whole spec IDs and is never split or joined by the use case.
 
 ### Requirement: Change lookup
 
-The use case MUST load the change by `name` via `ChangeRepository.get`. If no change with the given name exists, it MUST throw `ChangeNotFoundError`.
+The use case MUST load and mutate the change by `name` via `ChangeRepository.mutate`. If no change with the given name exists, it MUST throw `ChangeNotFoundError`.
 
 ### Requirement: Spec must belong to the change
 
-The `specId` MUST be present in `change.specIds`. If it is not, the use case MUST throw an `Error` indicating the spec is not in the change.
+The `specId` MUST be present in `change.specIds`. If it is not, the use case MUST throw `InvalidInputError` indicating the spec is not in the change.
 
 ### Requirement: Mutual exclusivity of set vs add/remove
 
-`set` MUST NOT be used together with `add` or `remove`. If both `set` and either `add` or `remove` are provided, the use case MUST throw an `Error`.
+`set`, `clear`, and the pair `add`/`remove` are mutually exclusive operations. If `set` is combined with `add`, `remove`, or `clear`, or `clear` is combined with `add` or `remove`, the use case MUST throw a typed error. `add` and `remove` MAY be used together.
 
 ### Requirement: At least one operation required
 
-If none of `add`, `remove`, or `set` are provided, the use case MUST throw an `Error` indicating that at least one operation must be specified.
+If none of `add`, `remove`, `set`, or `clear` is provided, the use case MUST throw a typed error indicating that at least one operation must be specified.
 
 ### Requirement: Set replaces all dependencies
 
-When `set` is provided, the use case MUST replace the entire dependency list for the spec with the given array, discarding any previously stored dependencies.
+When `set` is provided, the use case MUST replace the entire dependency list for the spec with the given array, discarding any previously stored dependencies. Every entry MUST be a valid spec ID per "Spec ID validation"; an empty or blank entry is rejected and nothing is stored. Clearing the list is the job of `clear`.
+
+### Requirement: Clear removes all dependencies
+
+When `clear` is `true`, the use case MUST replace the dependency list for the spec with an empty list through the shared `applyDependsOnMutation` helper and persist it. The result's `dependsOn` is empty. The use case does not ask for confirmation; confirmation is a delivery concern.
+
+### Requirement: Spec ID validation
+
+The use case MUST validate and normalize `specId` and every entry of `add` and `set` with `parseSpecId` and the configured workspaces (see `core:spec-id-format`), and MUST store the fully-qualified IDs. An invalid ID fails with `InvalidSpecIdError` and an unknown workspace with `WorkspaceNotFoundError`; validation happens before any mutation, so nothing is stored when any entry is invalid.
+
+A dependency target MAY name a spec that does not exist yet, because the change may create it; only syntax and workspace are checked, and a missing spec is not an error. Entries of `remove` are not rejected for syntax, so an invalid stored value can always be removed; the existence rule of "Remove validates existence" still applies. A `remove` entry that is a valid spec ID is normalized to its fully-qualified form before it is matched (a bare `auth/session` matches the stored `default:auth/session`); an entry that is not a valid spec ID is matched literally against the stored values.
 
 ### Requirement: Remove validates existence
 
-When `remove` is provided, each spec ID in the list MUST exist in the current dependencies for the spec. If any ID is not found, the use case MUST throw an `Error` identifying the missing dependency. Removals are applied sequentially — the first missing ID aborts the operation.
+When `remove` is provided, each spec ID in the list MUST exist in the current dependencies for the spec. If any ID is not found, the use case MUST throw `InvalidInputError` identifying the missing dependency. Removals are applied sequentially — the first missing ID aborts the operation.
 
 ### Requirement: Add is idempotent
 
@@ -72,6 +85,7 @@ The config-based `createUpdateSpecDeps(config, options?)` form MUST derive `Upda
 `resolveUpdateSpecDepsDeps(resolver)` MUST resolve:
 
 - `changes: ChangeRepository`
+- `workspaces`: the configured workspaces used to validate spec IDs
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
 
@@ -79,7 +93,8 @@ The helper is the only use-case-specific composition entry for config-based boot
 
 - Updating `specDependsOn` does NOT trigger approval invalidation — this is a dependency metadata operation, not a spec scope change
 - The use case does not resolve actor identity — dependency updates are not recorded as actor-attributed events
-- Dependency spec IDs are parsed via `parseSpecId` for format validation but the function is lenient and does not throw on invalid formats
+- Dependency spec IDs are validated with the strict `parseSpecId`; validation happens before any mutation
+- Dependency targets that do not exist yet are accepted
 
 ## Spec Dependencies
 

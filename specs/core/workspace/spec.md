@@ -8,7 +8,7 @@ Projects often span multiple code repositories or teams, and specd needs a struc
 
 ### Requirement: Workspace identity
 
-A workspace is identified by a unique name within a project's `specd.yaml`. Names must match `/^[a-z][a-z0-9-]*$/`.
+A workspace is identified by a unique name within a project's `specd.yaml`. Names must match `^[a-z][a-z0-9-]+$`: a lowercase letter followed by one or more lowercase letters, digits, or `-` (two characters or more, so that `c:foo` is never read as a Windows drive path). The rule is the one defined once by `core:spec-id-format` ("Workspace name rule") and is not repeated by other consumers. Every producer of a workspace name applies it too: `specd project init` validates the default workspace id with the shared rule, so it never writes a name the loader rejects.
 
 The following names are RESERVED and MUST NOT be used for spec workspaces:
 
@@ -56,19 +56,21 @@ When a workspace's ownership is `readOnly`, the following operations MUST be rej
 
 1. **Change scope** — adding a spec from a `readOnly` workspace to a change via `change create --spec` or `change edit --add-spec` MUST fail. A `readOnly` spec cannot be part of a change's `specIds`.
 2. **Archive** — `ArchiveChange` MUST reject archiving when any spec in the change belongs to a `readOnly` workspace. This is a defense-in-depth guard — upstream guards should prevent this state, but the archive MUST NOT silently merge deltas into protected specs.
-3. **Direct spec writes** — `SpecRepository.save()` and `SpecRepository.saveMetadata()` MUST reject writes when the repository's workspace is `readOnly`. This is the lowest-level guard and cannot be bypassed by any code path.
+3. **Canonical spec writes** — `SpecRepository.save()` and `SpecRepository.writePersistedState()` MUST reject writes when the repository's workspace is `readOnly`. This is the lowest-level guard and cannot be bypassed by any code path.
+
+`SpecRepository.writeMetadataSnapshot()` MAY write a disposable generated metadata cache for a `readOnly` source workspace. Cache ownership is separate from canonical spec ownership, as defined by `core:spec-repository-port`.
 
 Error messages MUST state what operation was blocked and why (the workspace is `readOnly`). Error messages MUST NOT suggest remediation steps (e.g. "change ownership in specd.yaml") to prevent LLM agents from autonomously modifying configuration to bypass the restriction.
 
-`readOnly` workspaces MAY still be read — specs can be loaded, listed, used as context dependencies, and referenced in `dependsOn`. Only write operations are blocked.
+`readOnly` workspaces MAY still be read — specs can be loaded, listed, used as context dependencies, and referenced in `dependsOn`. Canonical source writes are blocked.
 
-`shared` ownership permits all write operations identical to `owned`. No enforcement distinction exists between `owned` and `shared` for write operations.
+`shared` ownership permits all canonical spec writes identical to `owned`. No enforcement distinction exists between `owned` and `shared` for write operations.
 
 ### Requirement: Prefix semantics
 
 When a workspace declares a `prefix`, the prefix is prepended to all capability paths in that workspace. A spec stored at `architecture/` on disk becomes `<prefix>/architecture` in the specd model. When no prefix is declared, specs use bare capability paths.
 
-Prefixes may be single-segment (`_global`) or multi-segment (`team/shared/core`). Two workspaces may share the same prefix — the prefix is not a unique identifier; the workspace name is.
+Prefixes may be single-segment (`_global`) or multi-segment (`team/shared/core`). Every prefix segment is a folder and MUST satisfy the capability path segment rule of `core:spec-id-format` (`^[a-z0-9_][a-z0-9_-]*$`, never a Windows device name). Two workspaces may share the same prefix — the prefix is not a unique identifier; the workspace name is.
 
 Invalid prefix syntax produces a `ConfigValidationError` at startup.
 
@@ -76,22 +78,15 @@ Invalid prefix syntax produces a `ConfigValidationError` at startup.
 
 Every spec is identified by a fully-qualified spec ID in the format `workspace:capabilityPath`. The colon separates the workspace name from the capability path; `/` always belongs to the capability path.
 
-A bare path (no colon) is shorthand for `default:path`. An unknown workspace qualifier in a spec ID is rejected with an error.
+A bare path (no colon) is shorthand for `default:path`, resolved by the core at input boundaries as defined by `core:spec-id-format`. An unknown workspace qualifier in a spec ID is rejected with a `WorkspaceNotFoundError`, and a malformed spec ID with an `InvalidSpecIdError`.
 
-Internally, specd always uses the fully-qualified form. The bare-path shorthand is a user-facing convenience only.
+Internally, specd always uses the fully-qualified form. Delivery adapters pass raw IDs and do not normalize them, including in read-only display paths.
 
 ### Requirement: Active workspace determination
 
 A workspace is considered active in the context of a change when at least one of the change's `specIds` belongs to that workspace. Active workspaces determine which workspace-level context patterns are applied during context compilation.
 
 The set of active workspaces is derived at runtime from `specIds` via the `workspaces` computed getter, which extracts the workspace component of each spec ID using `parseSpecId()`. It is not a persisted field.
-
-### Requirement: Primary workspace
-
-The primary workspace of a change is the first entry in the computed `change.workspaces` (derived from `specIds`). It is used for:
-
-- Archive path template resolution (`{{change.workspace}}`)
-- Default metadata attribution when archiving
 
 ### Requirement: Port-per-workspace pattern
 
@@ -132,11 +127,12 @@ Each project's `specd.yaml` is the sole source of truth for that project's view 
 ## Constraints
 
 - Every project must declare a default workspace
-- Workspace names must match /^\[a-z]\[a-z0-9-]\*$/
+- Workspace names must match `^[a-z][a-z0-9-]+$` (two or more characters)
 - codeRoot is required for non-default workspaces
 - isExternal is inferred, never declared
 - Spec IDs are always workspace-qualified internally
 - A change's workspaces are derived from its specIds via parseSpecId() — not persisted
+- A change has no singular or primary workspace; each spec belongs to exactly one workspace
 - When specIds is empty, workspaces is empty
 - Workspace-level exclude patterns do not apply to specs reached via dependsOn
 - External repository configurations are never read — each project declares its own view

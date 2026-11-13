@@ -36,6 +36,22 @@
 - **WHEN** `execute({ specPath: 'default:auth/login' })` is called
 - **THEN** a `SpecNotFoundError` is thrown
 
+#### Scenario: Invalid specPath rejected
+
+- **WHEN** `ValidateSpecs.execute` receives `specPath: 'ws:'`
+- **THEN** it throws `InvalidSpecIdError`
+
+#### Scenario: Bare specPath resolved to the default workspace
+
+- **WHEN** it receives `specPath: '_global/architecture'`
+- **THEN** it validates `default:_global/architecture`
+- **AND** the result entry is identified by `default:_global/architecture`
+
+#### Scenario: Comma in specPath is not split
+
+- **WHEN** it receives `specPath: 'auth/a,b'`
+- **THEN** it throws `InvalidSpecIdError` quoting `auth/a,b`
+
 ### Requirement: Workspace validation mode
 
 #### Scenario: All specs in workspace validated
@@ -144,45 +160,69 @@
 
 ### Requirement: Metadata materialization and validation
 
+#### Scenario: Full validation delegates using the qualified spec ID
+
+- **GIVEN** validation of `auth/login` resolves to `default:auth/login` and has no result-cache hit
+- **WHEN** `ValidateSpecs` validates that spec
+- **THEN** it calls `GetSpecMetadata.execute({ specId: 'default:auth/login' })` once
+- **AND** it does not read the metadata snapshot directly to decide metadata validity
+
 #### Scenario: Stale persisted metadata is self-healed, not a failure
 
-- **GIVEN** a spec has `metadata.json` whose `contentHashes` no longer match the current required artifacts
+- **GIVEN** a spec's metadata cache is missing, invalid or stale
+- **AND** `GetSpecMetadata` successfully returns usable metadata
 - **WHEN** `ValidateSpecs` validates that spec
-- **THEN** `GetSpecMetadata` self-heals a fresh in-memory projection (delegating with `policy: 'if-needed'`)
-- **AND** no `ValidationFailure` is recorded solely because the persisted cache was stale
+- **THEN** no failure is recorded solely because of the prior cache state
+
+#### Scenario: Lock-less extracted dependencies are accepted
+
+- **GIVEN** a spec has no persisted lock and its schema extracts `dependsOn: ['core:storage']`
+- **AND** `GetSpecMetadata` successfully returns that dependency projection
+- **WHEN** `ValidateSpecs` validates that spec
+- **THEN** it accepts the metadata without comparing the dependencies against `[]`
+- **AND** it performs no independent dependency extraction or persisted-state comparison
+
+#### Scenario: Successful metadata is not checked against another lock observation
+
+- **GIVEN** `GetSpecMetadata` successfully returns metadata with `dependsOn: ['core:storage']`
+- **AND** a second persisted-state observation would return different dependencies
+- **WHEN** `ValidateSpecs` validates that spec
+- **THEN** it does not obtain that observation to revalidate the returned dependencies
+- **AND** it records no second-model dependency mismatch
+
+#### Scenario: Successful metadata does not require schema dependency extraction
+
+- **GIVEN** the schema omits `metadataExtraction.dependsOn`
+- **AND** `GetSpecMetadata` successfully returns usable metadata
+- **WHEN** `ValidateSpecs` validates that spec
+- **THEN** it accepts the metadata without reconstructing a dependency baseline
 
 #### Scenario: Materialization failure becomes a validation failure
 
-- **GIVEN** `GetSpecMetadata` cannot produce a valid metadata projection for a spec (for example, a source read failure or a projection that fails structural validation even after regeneration)
+- **GIVEN** `GetSpecMetadata` fails because usable metadata cannot be produced
 - **WHEN** `ValidateSpecs` validates that spec
-- **THEN** the spec entry includes a `ValidationFailure` indicating that metadata could not be materialized
+- **THEN** the spec entry includes a metadata `ValidationFailure` with the materialization failure reason
 
-#### Scenario: Post-materialization dependsOn mismatch becomes a validation failure
+#### Scenario: Dependency conflict is reported by the metadata authority
 
-- **GIVEN** the materialized metadata's normalized `dependsOn` differs from `SpecRepository.readPersistedState(spec).dependsOn` (or `[]` for a lock-less spec)
+- **GIVEN** `GetSpecMetadata` rejects an extraction and persisted-dependency conflict
 - **WHEN** `ValidateSpecs` validates that spec
-- **THEN** the spec entry includes a `ValidationFailure` describing the internal inconsistency
-
-#### Scenario: Extracted dependsOn mismatch becomes a validation failure
-
-- **GIVEN** the schema declares `metadataExtraction.dependsOn`
-- **AND** extraction yields a dependency set different from the persisted dependency state
-- **WHEN** `ValidateSpecs` validates that spec
-- **THEN** the spec entry includes a `ValidationFailure`
-
-#### Scenario: Persisted dependency projection remains valid without extraction
-
-- **GIVEN** the schema omits `metadataExtraction.dependsOn`
-- **AND** `metadata.json.dependsOn` matches the persisted dependency state
-- **WHEN** `ValidateSpecs` validates that spec
-- **THEN** no dependency-projection failure is recorded for that check
+- **THEN** it records the materialization failure with the conflict reason
+- **AND** it does not repeat dependency extraction or comparison after the failure
 
 #### Scenario: metadata-cache-write-failed is a warning, not a failure
 
-- **GIVEN** materialization returns a `metadata-cache-write-failed` warning while still producing a valid in-memory projection
+- **GIVEN** `GetSpecMetadata` returns usable metadata and a `metadata-cache-write-failed` warning
 - **WHEN** `ValidateSpecs` validates that spec
-- **THEN** the warning is surfaced as a `ValidationWarning` on the spec's entry
-- **AND** it is not recorded as a `ValidationFailure`
+- **THEN** the spec entry includes a `ValidationWarning` preserving the warning kind, spec identity and error diagnostics
+- **AND** the warning does not become a failure or produce a duplicate log
+
+#### Scenario: Successful metadata preserves artifact failures
+
+- **GIVEN** artifact or cross-artifact validation has already recorded a failure
+- **AND** `GetSpecMetadata` successfully returns usable metadata
+- **WHEN** `ValidateSpecs` assembles the spec entry
+- **THEN** the original failure remains and the spec does not pass
 
 ### Requirement: Persisted optimization staleness is an independent failure
 
@@ -261,6 +301,13 @@
 - **THEN** it passes the list Meta stamps into `lookup`
 - **AND** it does not call `repo.get()` solely to obtain stamps for those hard hits
 
+#### Scenario: Metadata delegation change invalidates the old validation engine bucket
+
+- **GIVEN** a cached entry was produced by the engine that independently compared metadata dependencies
+- **WHEN** validation runs with the engine implementing metadata delegation
+- **THEN** the changed `engineVersion` prevents reuse of the old entry
+- **AND** full validation uses `GetSpecMetadata` before storing the new outcome
+
 ### Requirement: Config-based factory delegates through resolveValidateSpecsDeps
 
 #### Scenario: createValidateSpecs config form derives ValidateSpecsDeps through resolveValidateSpecsDeps
@@ -276,11 +323,11 @@
   - `extractorTransforms: ExtractorTransformRegistry`
   - `workspaceRoutes: readonly SpecWorkspaceRoute[]`
   - `validationResultCaches: ReadonlyMap<string, ValidationResultCache>`
-  - `getMetadata: ReadonlyMap<string, GetSpecMetadata>`
+  - `getMetadata: GetSpecMetadata`
 - **AND** the factory delegates to canonical `createValidateSpecs(deps)`
 
-#### Scenario: resolveValidateSpecsDeps wires one GetSpecMetadata instance per workspace
+#### Scenario: resolveValidateSpecsDeps wires a shared GetSpecMetadata instance
 
 - **WHEN** `resolveValidateSpecsDeps(resolver)` runs
-- **THEN** the resolved deps include `getMetadata: ReadonlyMap<string, GetSpecMetadata>` with one instance per configured workspace
+- **THEN** the resolved deps include `getMetadata: GetSpecMetadata`
 - **AND** it is used to self-heal metadata before normalized-content validation

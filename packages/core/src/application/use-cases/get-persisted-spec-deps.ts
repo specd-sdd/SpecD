@@ -2,7 +2,6 @@ import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { SpecNotFoundError } from '../errors/spec-not-found-error.js'
-import { WorkspaceNotFoundError } from '../errors/workspace-not-found-error.js'
 
 /** Input for {@link GetPersistedSpecDeps}. */
 export interface GetPersistedSpecDepsInput {
@@ -32,20 +31,19 @@ export class GetPersistedSpecDeps {
    * @returns Persisted dependency list and initialization flag
    */
   async execute(input: GetPersistedSpecDepsInput): Promise<GetPersistedSpecDepsResult> {
-    const { workspace, capPath } = parseSpecId(input.specId)
-    const repo = this.specRepositories.get(workspace)
-    if (repo === undefined) {
-      throw new WorkspaceNotFoundError(workspace)
-    }
+    const { workspace, capPath, specId } = parseSpecId(input.specId, {
+      workspaces: this.specRepositories.keys(),
+    })
+    const repo = this.specRepositories.get(workspace)!
 
     const spec = await repo.get(SpecPath.parse(capPath))
     if (spec === null) {
-      throw new SpecNotFoundError(input.specId)
+      throw new SpecNotFoundError(specId)
     }
 
     const persisted = await repo.readPersistedState(spec)
     return {
-      specId: input.specId,
+      specId,
       dependsOn: persisted?.dependsOn ?? [],
       initialized: persisted !== null,
     }

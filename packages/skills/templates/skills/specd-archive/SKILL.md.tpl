@@ -107,14 +107,13 @@ specd changes implementation resolve <name> --file <path>
   symbols merges them into the existing link.
 - Use `--symbol` for named code constructs (functions, classes, types, methods).
   Omit `--symbol` only for file-level links (config, templates, docs).
-- `resolve` marks one or more tracked files as fully reviewed. It supports a
-  comma-separated list of paths for efficient bulk resolution.
-  `specd changes implementation resolve <name> --file <path1>,<path2>,...`
+- `resolve` marks one or more tracked files as fully reviewed. Pass each path as
+  its own `--file` value (repeat the option or list paths after it):
+  `specd changes implementation resolve <name> --file <path1> --file <path2> ...`
 - `ignore` is for files that do **not** belong to the change's implementation surface.
-  It also supports comma-separated lists. Files with active confirmed links **cannot**
-  be ignored.
+  Pass each path as its own `--file` value. Ignoring a file preserves any confirmed links on it.
   ```bash
-  specd changes implementation ignore <name> --file <path1>,<path2>
+  specd changes implementation ignore <name> --file <path1> --file <path2> ...
   ```
 
 You know which files belong to the implementation surface based on your understanding of

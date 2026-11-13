@@ -421,7 +421,7 @@ workspaces:
 
 ### Workspace prefixes
 
-Spec IDs always use the form `workspace:capability-path`. A spec in the `payments` workspace at `specs/checkout.md` has the ID `payments:checkout`. If you want every spec in a workspace to live under a leading path segment — for example to mirror a directory structure — you can declare `prefix`:
+Spec IDs always use the form `workspace:capability-path`. Workspace names must match `^[a-z][a-z0-9-]+$` (at least two characters; see [Workspaces — Spec IDs](./workspaces.md#spec-ids-and-the-prefix-field)). A bare ID at an input boundary means the `default` workspace. A spec in the `payments` workspace at `specs/checkout.md` has the ID `payments:checkout`. If you want every spec in a workspace to live under a leading path segment — for example to mirror a directory structure — you can declare `prefix`:
 
 ```yaml
 workspaces:

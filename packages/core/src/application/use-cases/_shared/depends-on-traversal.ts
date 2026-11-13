@@ -152,7 +152,9 @@ export async function traverseDependsOn(
   const newAncestors = new Set([...ancestors, key])
 
   for (const dep of dependsOn) {
-    const { workspace: depWorkspace, capPath: depCapPath } = parseSpecId(dep, workspace)
+    const { workspace: depWorkspace, capPath: depCapPath } = parseSpecId(dep, {
+      defaultWorkspace: workspace,
+    })
 
     await traverseDependsOn(
       depWorkspace,

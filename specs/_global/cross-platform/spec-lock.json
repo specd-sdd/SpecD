@@ -4,5 +4,41 @@
     "version": 1
   },
   "dependsOn": [],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Production code MUST behave equivalently on macOS, Linux, Windows; isolate platform diffs in one helper/adapter.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:8d9865c3aba19bef7ae21651f09f311f5a56e9874e37cc06ecf6a53be6567de6",
+          "lastModified": "2026-11-03T12:19:19.816Z"
+        },
+        "verify.md": {
+          "hash": "sha256:c1e5dd71ae025e475ae211efdd5b3fdd267ed23d51229567b146710be7a61b92",
+          "lastModified": "2026-11-03T12:19:19.817Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Cross-Platform Portability\n\n## Rules\n- All production code: equivalent on macOS, Linux, Windows; MUST NOT assume POSIX host/shell/FS layout; platform diffs isolated in one helper/adapter, MUST NOT leak to callers\n- Paths: build/split/compare via `node:path` (`join`, `resolve`, `relative`, `dirname`, `basename`, `sep`); MUST NOT concat/split on hardcoded `/` or `\\`\n- Logical path IDs (index keys, manifests, locks): normalize to `/` before store/compare; convert to host path only when touching FS\n- `path.win32`/`path.posix` only for deliberate platform-specific rules, never as host `path` replacement\n- File URLs: `pathToFileURL`/`fileURLToPath`, not string concat\n- Case: MUST NOT rely on FS case-sensitivity; case-only path diffs MUST NOT be distinct files on Windows/macOS; MUST NOT depend on on-disk casing match\n- Names reaching disk: valid Windows+POSIX; forbid `< > : \" | ? *`, control chars, trailing `.`/space, reserved devices (`CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9` ±ext); validate at accept boundary\n- Text: CRLF/CR/LF equivalent on read; hashes/markers/change-detect on LF-normalized content; write UTF-8 no BOM; readers tolerate BOM; MUST NOT use `os.EOL` for persisted format\n- Processes: prefer `spawn`/`execFile` arg array, no shell; shell only for explicit shell cmds or Windows `*.cmd`/`*.bat`; no POSIX-only builtins/syntax (`printf`, `sleep`, `&&`-as-sh, `$VAR`) unless execution layer translates; `windowsHide` for non-interactive; account cmd vs POSIX quoting\n- Permissions/symlinks: MUST NOT rely on POSIX `chmod`/exec/`0o000` for Windows-required behaviour; symlink features optional with copy/fallback when creation denied\n- File lock/replace: MUST NOT assume open file deletable/renamable (Windows rejects); atomic write = temp in same dir + rename; retry briefly on `EBUSY`/`EPERM`/`EACCES`; keep paths short; MUST NOT depend on paths > Windows default limit\n- Env/dirs: `os.homedir()`, `os.tmpdir()`, `process.cwd()`/config; MUST NOT hardcode `/tmp`, `/home/...`, `~`, `C:\\`; env name lookups case-insensitive; `process.platform` in one isolated helper\n- Enforcement: tests per `_global/testing`; gate via `_global/continuous-integration` 3-OS job; undocumented cross-OS behaviour without isolated adapter → reject in review\n\n## Constraints\n- Production code all packages; test rules in `_global/testing`\n- No hardcoded path separators or absolute POSIX paths in production\n- No shell / POSIX-only builtins by default for external programs\n- Disk names Windows-valid incl. reserved devices\n- Persisted text UTF-8 no BOM; LF-normalized comparison\n- Platform-specific behaviour isolated in single helper/adapter",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:8d9865c3aba19bef7ae21651f09f311f5a56e9874e37cc06ecf6a53be6567de6",
+          "lastModified": "2026-11-03T12:19:19.816Z"
+        },
+        "verify.md": {
+          "hash": "sha256:c1e5dd71ae025e475ae211efdd5b3fdd267ed23d51229567b146710be7a61b92",
+          "lastModified": "2026-11-03T12:19:19.817Z"
+        }
+      }
+    }
+  }
 }

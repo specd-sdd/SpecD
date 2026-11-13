@@ -3,7 +3,21 @@ import { ArtifactFile } from '../../domain/value-objects/artifact-file.js'
 import { ChangeArtifact } from '../../domain/entities/change-artifact.js'
 import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/change-state.js'
 import { CorruptedManifestError } from '../../domain/errors/corrupted-manifest-error.js'
+import { isFullyQualifiedSpecId } from '../../domain/services/parse-spec-id.js'
 import { type ChangeManifest, type RawChangeEvent } from './manifest.js'
+
+/**
+ * Asserts that a persisted manifest field holds a fully-qualified valid spec ID.
+ *
+ * @param value - Candidate spec ID
+ * @param fieldPath - Manifest field path for the error message
+ * @throws {CorruptedManifestError} When `value` is not a fully-qualified valid spec ID
+ */
+function assertQualifiedSpecId(value: string, fieldPath: string): void {
+  if (!isFullyQualifiedSpecId(value)) {
+    throw new CorruptedManifestError(`Invalid fully-qualified spec ID '${value}' at ${fieldPath}`)
+  }
+}
 
 const CHANGE_STATES = Object.keys(VALID_TRANSITIONS) as ChangeState[]
 
@@ -59,10 +73,18 @@ export function loadChangeFromManifest(manifest: ChangeManifest): Change {
 
   const history = manifest.history.map(deserializeManifestEvent)
 
+  for (const [index, specId] of manifest.specIds.entries()) {
+    assertQualifiedSpecId(specId, `specIds.${index}`)
+  }
+
   let specDependsOn: Map<string, readonly string[]> | undefined
   if (manifest.specDependsOn !== undefined) {
     specDependsOn = new Map<string, readonly string[]>()
     for (const [key, deps] of Object.entries(manifest.specDependsOn)) {
+      assertQualifiedSpecId(key, `specDependsOn.${key}`)
+      for (const [depIndex, dep] of deps.entries()) {
+        assertQualifiedSpecId(dep, `specDependsOn.${key}.${depIndex}`)
+      }
       specDependsOn.set(key, deps)
     }
   }

@@ -61,9 +61,9 @@ describe('GetSpecOutline', () => {
     it('resolves ALL spec-scoped artifacts from the schema', async () => {
       const { uc, specPath } = setup()
 
-      const result = await uc.execute({ workspace: 'default', specPath })
+      const result = await uc.execute({ specId: `default:${specPath.toString()}` })
 
-      const filenames = result.map((r) => r.filename).sort()
+      const filenames = result.outlines.map((r) => r.filename).sort()
       expect(filenames).toEqual(['spec.md', 'verify.md'])
     })
 
@@ -74,10 +74,10 @@ describe('GetSpecOutline', () => {
         },
       })
 
-      const result = await uc.execute({ workspace: 'default', specPath })
+      const result = await uc.execute({ specId: `default:${specPath.toString()}` })
 
-      expect(result).toHaveLength(1)
-      expect(result[0]!.filename).toBe('spec.md')
+      expect(result.outlines).toHaveLength(1)
+      expect(result.outlines[0]!.filename).toBe('spec.md')
     })
   })
 
@@ -85,17 +85,20 @@ describe('GetSpecOutline', () => {
     it('resolves verify to verify.md and returns its outline', async () => {
       const { uc, specPath } = setup()
 
-      const result = await uc.execute({ workspace: 'default', specPath, artifactId: 'verify' })
+      const result = await uc.execute({
+        specId: `default:${specPath.toString()}`,
+        artifactId: 'verify',
+      })
 
-      expect(result).toHaveLength(1)
-      expect(result[0]!.filename).toBe('verify.md')
+      expect(result.outlines).toHaveLength(1)
+      expect(result.outlines[0]!.filename).toBe('verify.md')
     })
 
     it('throws when artifactId is unknown in schema', async () => {
       const { uc, specPath } = setup()
 
       await expect(
-        uc.execute({ workspace: 'default', specPath, artifactId: 'nonexistent' }),
+        uc.execute({ specId: `default:${specPath.toString()}`, artifactId: 'nonexistent' }),
       ).rejects.toThrow(SpecNotFoundError)
     })
 
@@ -103,7 +106,7 @@ describe('GetSpecOutline', () => {
       const { uc, specPath } = setup()
 
       await expect(
-        uc.execute({ workspace: 'default', specPath, artifactId: 'design' }),
+        uc.execute({ specId: `default:${specPath.toString()}`, artifactId: 'design' }),
       ).rejects.toThrow("artifact 'design' has scope 'change' (must be 'spec')")
     })
   })
@@ -117,10 +120,13 @@ describe('GetSpecOutline', () => {
         },
       })
 
-      const result = await uc.execute({ workspace: 'default', specPath, filename: 'custom.md' })
+      const result = await uc.execute({
+        specId: `default:${specPath.toString()}`,
+        filename: 'custom.md',
+      })
 
-      expect(result).toHaveLength(1)
-      expect(result[0]!.filename).toBe('custom.md')
+      expect(result.outlines).toHaveLength(1)
+      expect(result.outlines[0]!.filename).toBe('custom.md')
     })
   })
 
@@ -129,28 +135,26 @@ describe('GetSpecOutline', () => {
       const { uc, specPath } = setup()
 
       const result = await uc.execute({
-        workspace: 'default',
-        specPath,
+        specId: `default:${specPath.toString()}`,
         artifactId: 'specs',
         filename: 'spec.md',
       })
 
-      expect(result).toHaveLength(1)
-      expect(result[0]!.filename).toBe('spec.md')
+      expect(result.outlines).toHaveLength(1)
+      expect(result.outlines[0]!.filename).toBe('spec.md')
     })
 
     it('returns both when artifactId and filename resolve to different files', async () => {
       const { uc, specPath } = setup()
 
       const result = await uc.execute({
-        workspace: 'default',
-        specPath,
+        specId: `default:${specPath.toString()}`,
         artifactId: 'verify',
         filename: 'spec.md',
       })
 
-      expect(result).toHaveLength(2)
-      const filenames = result.map((r) => r.filename).sort()
+      expect(result.outlines).toHaveLength(2)
+      const filenames = result.outlines.map((r) => r.filename).sort()
       expect(filenames).toEqual(['spec.md', 'verify.md'])
     })
   })
@@ -164,17 +168,17 @@ describe('GetSpecOutline', () => {
       ]) as unknown as Map<string, ReturnType<typeof makeParser>>
       const { uc, specPath } = setup({ parsers })
 
-      const result = await uc.execute({ workspace: 'default', specPath })
+      const result = await uc.execute({ specId: `default:${specPath.toString()}` })
 
-      expect(result.length).toBeGreaterThanOrEqual(1)
-      expect(result[0]!.outline).toEqual(mdOutline)
+      expect(result.outlines.length).toBeGreaterThanOrEqual(1)
+      expect(result.outlines[0]!.outline).toEqual(mdOutline)
     })
 
     it('throws when no parser is registered for the format', async () => {
       const emptyParsers = new Map() as unknown as Map<string, ReturnType<typeof makeParser>>
       const { uc, specPath } = setup({ parsers: emptyParsers })
 
-      await expect(uc.execute({ workspace: 'default', specPath })).rejects.toThrow(
+      await expect(uc.execute({ specId: `default:${specPath.toString()}` })).rejects.toThrow(
         ParserNotRegisteredError,
       )
     })
@@ -191,7 +195,7 @@ describe('GetSpecOutline', () => {
       const uc = new GetSpecOutline(specRepos, makeSchemaProvider(schema), makeParsers())
 
       await expect(
-        uc.execute({ workspace: 'default', specPath, filename: 'data.xyz' }),
+        uc.execute({ specId: `default:${specPath.toString()}`, filename: 'data.xyz' }),
       ).rejects.toThrow(ParserNotRegisteredError)
     })
   })
@@ -200,7 +204,7 @@ describe('GetSpecOutline', () => {
     it('throws WorkspaceNotFoundError when workspace does not exist', async () => {
       const { uc, specPath } = setup()
 
-      await expect(uc.execute({ workspace: 'unknown', specPath })).rejects.toThrow(
+      await expect(uc.execute({ specId: `unknown:${specPath.toString()}` })).rejects.toThrow(
         WorkspaceNotFoundError,
       )
     })
@@ -212,7 +216,7 @@ describe('GetSpecOutline', () => {
       const schema = makeSchema()
       const uc = new GetSpecOutline(specRepos, makeSchemaProvider(schema), makeParsers())
 
-      await expect(uc.execute({ workspace: 'default', specPath })).rejects.toThrow(
+      await expect(uc.execute({ specId: `default:${specPath.toString()}` })).rejects.toThrow(
         SpecNotFoundError,
       )
     })
@@ -221,7 +225,7 @@ describe('GetSpecOutline', () => {
       const { uc, specPath } = setup()
 
       await expect(
-        uc.execute({ workspace: 'default', specPath, filename: 'non-existent.md' }),
+        uc.execute({ specId: `default:${specPath.toString()}`, filename: 'non-existent.md' }),
       ).rejects.toThrow("file 'non-existent.md' not found")
     })
 
@@ -231,7 +235,7 @@ describe('GetSpecOutline', () => {
       })
 
       await expect(
-        uc.execute({ workspace: 'default', specPath, artifactId: 'specs' }),
+        uc.execute({ specId: `default:${specPath.toString()}`, artifactId: 'specs' }),
       ).rejects.toThrow("file 'spec.md' not found")
     })
   })
@@ -260,9 +264,10 @@ describe('GetSpecOutline', () => {
       ]) as unknown as Map<string, ReturnType<typeof makeParser>>
       const { uc, specPath } = setup({ parsers })
 
-      const result = await uc.execute({ workspace: 'default', specPath })
+      const result = await uc.execute({ specId: `default:${specPath.toString()}` })
 
-      expect(result).toEqual([
+      expect(result.specId).toBe('default:auth/oauth')
+      expect(result.outlines).toEqual([
         { filename: 'spec.md', outline },
         { filename: 'verify.md', outline },
       ])
@@ -290,12 +295,11 @@ describe('GetSpecOutline', () => {
       const { uc, specPath } = setup({ parsers })
 
       const result = await uc.execute({
-        workspace: 'default',
-        specPath,
+        specId: `default:${specPath.toString()}`,
         artifactId: 'specs',
         hints: true,
       })
-      expect(result[0]?.selectorHints?.section).toEqual({
+      expect(result.outlines[0]?.selectorHints?.section).toEqual({
         matches: '<value>',
         level: '<level>',
       })
@@ -310,7 +314,11 @@ describe('GetSpecOutline', () => {
       >
       const { uc, specPath } = setup({ parsers })
 
-      await uc.execute({ workspace: 'default', specPath, artifactId: 'specs', full: true })
+      await uc.execute({
+        specId: `default:${specPath.toString()}`,
+        artifactId: 'specs',
+        full: true,
+      })
       expect(outlineSpy).toHaveBeenCalledWith(expect.any(Object), { full: true })
     })
   })

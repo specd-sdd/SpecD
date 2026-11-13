@@ -6,6 +6,8 @@ import {
 } from '../../../src/application/use-cases/preview-spec.js'
 import { SpecNotInChangeError } from '../../../src/application/errors/spec-not-in-change-error.js'
 import { SchemaMismatchError } from '../../../src/application/errors/schema-mismatch-error.js'
+import { InvalidSpecIdError } from '../../../src/domain/errors/invalid-spec-id-error.js'
+import { WorkspaceNotFoundError } from '../../../src/domain/errors/workspace-not-found-error.js'
 import { Change } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
@@ -108,7 +110,11 @@ function makeSut(opts: {
   })
   ;(changes as unknown as { artifact: typeof artifactFn }).artifact = artifactFn
 
-  const specRepos: Map<string, ReturnType<typeof makeSpecRepository>> = opts.specRepos ?? new Map()
+  const specRepos: Map<string, ReturnType<typeof makeSpecRepository>> = opts.specRepos ??
+  new Map([
+    ['core', makeSpecRepository()],
+    ['default', makeSpecRepository()],
+  ])
 
   const parsers: ArtifactParserRegistry = opts.parsers ?? makeParsers()
   const diffGenerator = opts.diffGenerator ?? makeDiffGenerator()
@@ -287,7 +293,7 @@ describe('PreviewSpec', () => {
 
       const useCase = new PreviewSpec(
         makeChangeRepository([change]),
-        new Map(),
+        new Map([['core', makeSpecRepository()]]),
         schemaProvider,
         makeParsers(),
         makeDiffGenerator(),
@@ -311,7 +317,7 @@ describe('PreviewSpec', () => {
 
       const useCase = new PreviewSpec(
         makeChangeRepository([change]),
-        new Map(),
+        new Map([['core', makeSpecRepository()]]),
         schemaProvider,
         makeParsers(),
         makeDiffGenerator(),
@@ -481,7 +487,7 @@ describe('PreviewSpec', () => {
 
       const useCase = new PreviewSpec(
         makeChangeRepository([change]),
-        new Map(),
+        new Map([['core', makeSpecRepository()]]),
         schemaProvider,
         makeParsers(),
         makeDiffGenerator(),
@@ -505,7 +511,7 @@ describe('PreviewSpec', () => {
 
       const useCase = new PreviewSpec(
         makeChangeRepository([change]),
-        new Map(),
+        new Map([['core', makeSpecRepository()]]),
         schemaProvider,
         makeParsers(),
         makeDiffGenerator(),
@@ -584,6 +590,95 @@ describe('PreviewSpec', () => {
       expect(result.files[0]?.merged).toBe('# New Spec\n')
       expect(result.files[0]?.diff).toBeUndefined()
       expect(result.warnings.some((warning) => warning.includes('diff failed'))).toBe(true)
+    })
+  })
+
+  describe('spec ID validation', () => {
+    it('rejects an invalid specId before any spec repository call', async () => {
+      const change = makeChangeWithArtifacts([SPEC_ID])
+      const repo = makeSpecRepository({ specs: [makePreviewSpec('core', 'core/config')] })
+      const getSpy = vi.spyOn(repo, 'get')
+      const { useCase } = makeSut({
+        change,
+        specRepos: new Map([['core', repo]]),
+      })
+
+      await expect(useCase.execute({ name: CHANGE_NAME, specId: '' })).rejects.toThrow(
+        InvalidSpecIdError,
+      )
+      await expect(useCase.execute({ name: CHANGE_NAME, specId: 'Core/Foo' })).rejects.toThrow(
+        InvalidSpecIdError,
+      )
+      expect(getSpy).not.toHaveBeenCalled()
+    })
+
+    it('resolves a bare specId to the default workspace', async () => {
+      const bareId = 'auth/login'
+      const change = makeChangeWithArtifacts([`default:${bareId}`])
+      const repo = makeSpecRepository({
+        specs: [makePreviewSpec('default', bareId)],
+      })
+      const { useCase } = makeSut({
+        change,
+        specRepos: new Map([['default', repo]]),
+      })
+
+      const result = await useCase.execute({ name: CHANGE_NAME, specId: bareId })
+      expect(result.specId).toBe(`default:${bareId}`)
+    })
+
+    it('accepts a fully qualified specId', async () => {
+      const change = makeChangeWithArtifacts([SPEC_ID])
+      const { useCase } = makeSut({ change })
+
+      const result = await useCase.execute({ name: CHANGE_NAME, specId: SPEC_ID })
+      expect(result.specId).toBe(SPEC_ID)
+    })
+
+    it('rejects an unknown workspace before loading the change', async () => {
+      const { useCase, changes } = makeSut({
+        specRepos: new Map([['default', makeSpecRepository({ specs: [] })]]),
+      })
+      const getSpy = vi.spyOn(changes, 'get')
+
+      await expect(
+        useCase.execute({ name: CHANGE_NAME, specId: 'nope:auth/login' }),
+      ).rejects.toThrow(WorkspaceNotFoundError)
+      expect(getSpy).not.toHaveBeenCalled()
+    })
+
+    it('validates the specId before looking up the change', async () => {
+      const { useCase, changes } = makeSut({})
+      const getSpy = vi.spyOn(changes, 'get')
+
+      await expect(useCase.execute({ name: CHANGE_NAME, specId: '' })).rejects.toThrow(
+        InvalidSpecIdError,
+      )
+      expect(getSpy).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('spec ID validation (audit hardening)', () => {
+    it.each([
+      ['Bad Id', 'Bad Id'],
+      ['auth/a,b', 'auth/a,b'],
+      ['ws:', 'ws:'],
+    ])('rejects %j quoting the whole value', async (specId, quoted) => {
+      const { useCase } = makeSut({})
+
+      const err = await useCase.execute({ name: CHANGE_NAME, specId }).catch((e: unknown) => e)
+
+      expect(err).toBeInstanceOf(InvalidSpecIdError)
+      expect((err as Error).message).toContain(quoted)
+    })
+
+    it('rejects a valid ID that is outside the change', async () => {
+      const change = makeChangeWithArtifacts([SPEC_ID])
+      const { useCase } = makeSut({ change })
+
+      await expect(
+        useCase.execute({ name: CHANGE_NAME, specId: 'default:not/in-change' }),
+      ).rejects.toThrow(SpecNotInChangeError)
     })
   })
 })

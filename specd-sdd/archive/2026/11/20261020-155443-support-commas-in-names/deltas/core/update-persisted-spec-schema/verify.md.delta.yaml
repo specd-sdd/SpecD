@@ -1,0 +1,95 @@
+- op: added
+  description: Spec ID validation scenarios
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Spec ID validation
+
+    #### Scenario: Empty spec ID rejected before any repository access
+
+    - **WHEN** `execute` is called with `specId: ''`
+    - **THEN** `InvalidSpecIdError` is thrown
+    - **AND** no repository is read or written
+
+    #### Scenario: Malformed spec ID rejected
+
+    - **WHEN** `execute` is called with `specId: 'Bad Id'`
+    - **THEN** `InvalidSpecIdError` is thrown quoting `Bad Id`
+
+    #### Scenario: Unknown workspace rejected
+
+    - **WHEN** `execute` is called with `specId: 'nope:auth/login'`
+    - **THEN** `WorkspaceNotFoundError` is thrown
+
+    #### Scenario: Bare spec ID resolved to the default workspace
+
+    - **WHEN** `execute` is called with `specId: '_global/architecture'`
+    - **THEN** it behaves as for `default:_global/architecture`
+    - **AND** any `specId` in the result is `default:_global/architecture`
+
+    #### Scenario: Qualified spec ID accepted unchanged
+
+    - **WHEN** `execute` is called with `specId: 'core:storage'`
+    - **THEN** it proceeds with workspace `core` and path `storage`
+
+- op: added
+  description: Reassignment behavior scenarios (audit)
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Constructing and writing the reassigned state'
+  content: |
+    #### Scenario: Reassignment succeeds and preserves other state
+
+    - **GIVEN** an initialized spec with `implementation` and `optimizations`
+    - **WHEN** a different compatible schema is selected
+    - **THEN** the result has `changed: true` and the new schema identity
+    - **AND** `implementation` and `optimizations` are written verbatim
+
+    #### Scenario: Same schema is a no-op
+
+    - **WHEN** the resolved schema equals the persisted one
+    - **THEN** `changed` is `false`, `writePersistedState` is not called, and dependency conflict validation is skipped
+
+    #### Scenario: Target schema resolved in ref mode
+
+    - **WHEN** the use case resolves the target schema
+    - **THEN** `GetActiveSchema.execute` is called with `{ mode: 'ref', ref }` and no project fallback
+
+    #### Scenario: Parse failure aborts without mutation, even without dependency extraction
+
+    - **GIVEN** the target schema declares no dependency extraction and a canonical artifact does not parse under it
+    - **WHEN** the schema is selected
+    - **THEN** a typed error is thrown and `writePersistedState` is not called
+
+    #### Scenario: Dependencies preserved when the target does not extract them
+
+    - **WHEN** the target schema declares no dependency extraction
+    - **THEN** the written `dependsOn` equals the current `dependsOn`
+
+    #### Scenario: Extracted dependencies equal the current ones
+
+    - **WHEN** the target schema extracts a list equal to the current `dependsOn`
+    - **THEN** reassignment proceeds with the current value
+
+    #### Scenario: Extracted dependencies differ
+
+    - **WHEN** the extracted list differs from the current `dependsOn`
+    - **THEN** `PersistedSchemaDependencyConflictError` is thrown with `specId`, current, and extracted lists and nothing is written
+
+    #### Scenario: Optimizations become stale after reassignment
+
+    - **WHEN** reassignment succeeds
+    - **THEN** the optimizations remain stored and freshness reports `schema-changed`
+
+    #### Scenario: Revision, conflict, unknown spec, and readOnly
+
+    - **WHEN** schema reassignment is requested
+    - **THEN** the write carries `expectedRevision` equal to the observed `originalHash`, an `ArtifactConflictError` is rethrown, an unknown spec fails with `SpecNotFoundError` before the initialization check, and a `readOnly` workspace fails with `ReadOnlyWorkspaceError`
+
+    #### Scenario: Factory resolves collaborators
+
+    - **WHEN** the config-based factory is invoked
+    - **THEN** its deps come from the resolver helper and include `specs` and `getActiveSchema`

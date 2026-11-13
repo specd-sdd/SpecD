@@ -1,0 +1,15 @@
+- op: modified
+  description: Schema resolution records hasExtraction without skipping source-state provenance
+  selector:
+    type: section
+    matches: 'Requirement: Schema resolution'
+  content: |
+    The use case obtains the active schema via `SchemaProvider.get()`. If the schema cannot be resolved, `get()` throws `SchemaNotFoundError` or `SchemaValidationError` — the use case does not catch these. When the resolved schema has no `metadataExtraction` declarations, `hasExtraction` is `false`, and the use case still resolves the spec and computes artifact `contentHashes` and `sourceState` provenance.
+
+- op: modified
+  description: Spec resolution validates and normalizes the ID
+  selector:
+    type: section
+    matches: 'Requirement: Spec resolution'
+  content: |
+    The use case validates and normalizes `specId` with `parseSpecId` and the configured workspaces (see `core:spec-id-format`), obtaining a workspace name and capability path and a fully-qualified ID. An invalid ID fails with `InvalidSpecIdError`. It then looks up the workspace's `SpecRepository` from the injected map. If the workspace is unknown, it throws `WorkspaceNotFoundError`. If the spec is not found via `SpecRepository.get()`, it throws `SpecNotFoundError`. Delivery adapters pass the raw string and perform no validation of their own.

@@ -1,0 +1,27 @@
+- op: added
+  description: specId is validated and normalized by the use case
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Input contract'
+  content: |
+    ### Requirement: Spec ID validation
+
+    Before resolving any repository, the use case MUST validate and normalize `specId` with `parseSpecId` and the configured workspaces (see `core:spec-id-format`). A bare path is resolved to the `default` workspace, so the input accepts a bare or fully-qualified valid ID, and every `specId` in the result is the fully-qualified form. An invalid ID fails with `InvalidSpecIdError` and an unknown workspace with `WorkspaceNotFoundError`, quoting the full original value. Delivery adapters pass the raw string and perform no validation of their own.
+
+- op: modified
+  description: Align resolveGetPersistedSpecImplementationDeps property name with specRepositories
+  selector:
+    type: section
+    matches: 'Requirement: Config-based factory delegates through resolveGetPersistedSpecImplementationDeps'
+  content: |
+    The config-based `createGetPersistedSpecImplementation(config, options?)` form MUST derive `GetPersistedSpecImplementationDeps` through `resolveGetPersistedSpecImplementationDeps(resolver)` and then delegate to canonical `createGetPersistedSpecImplementation(deps)`.
+
+    `resolveGetPersistedSpecImplementationDeps(resolver)` MUST resolve:
+
+    - `specRepositories: ReadonlyMap<string, SpecRepository>` — one repository instance per workspace
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.

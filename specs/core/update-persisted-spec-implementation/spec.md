@@ -15,6 +15,10 @@ Archived implementation traceability sometimes needs correction outside the chan
 - `file` (required, string) — a project-relative file path, relative to the codeRoot of `specId`'s workspace
 - `symbols` (optional, readonly string array) — symbol refinements for the link
 
+### Requirement: Spec ID validation
+
+Before workspace resolution, schema resolution, artifact reads, or persisted-state I/O, the use case MUST validate and normalize `specId` with `parseSpecId` and the configured workspaces (see `core:spec-id-format`). A bare path is resolved to the `default` workspace, so the input accepts a bare or fully-qualified valid ID, and every `specId` in the result is the fully-qualified form. An invalid ID fails with `InvalidSpecIdError` and an unknown workspace with `WorkspaceNotFoundError`, quoting the full original value, and nothing is written. Delivery adapters pass the raw string and perform no validation of their own.
+
 ### Requirement: File must exist for add
 
 When `action = 'add'`, the use case MUST require the target file to exist on disk within the codeRoot of `specId`'s workspace. When it does not, the use case MUST throw `ImplementationFileNotFoundError` and MUST NOT mutate persisted state.
@@ -23,7 +27,9 @@ When `action = 'add'`, the use case MUST require the target file to exist on dis
 
 Before mutating persisted state, the use case MUST normalize `file` into the canonical `workspace:path` implementation identity defined by [`core:spec-lock`](../spec-lock/spec.md): forward-slash-normalized, relative to the codeRoot of `specId`'s workspace, using workspace lookup from [`core:workspace`](../workspace/spec.md) and path resolution from [`core:storage`](../storage/spec.md).
 
-When `file` resolves outside the codeRoot implied by `specId`'s workspace, the use case MUST throw `ImplementationWorkspaceBoundaryError` and MUST NOT mutate persisted state. It MUST NOT silently coerce or drop an out-of-boundary path.
+Confinement MUST be decided by a path-relative containment test: the resolved path relative to the codeRoot MUST NOT be empty, MUST NOT be `..` or start with `..` followed by a path separator (a name such as `..foo/x` is a legitimate path inside the codeRoot), and MUST NOT be absolute. A bare string-prefix comparison is not acceptable, because a sibling directory whose name starts with the codeRoot's name (for example `/repo/core-evil` next to `/repo/core`) is outside the codeRoot. The same test applies to a `file` that already carries a `workspace:` qualifier: `core:../x` and `core:../../etc/passwd` resolve against the codeRoot of the named workspace and are rejected when they leave it. A qualifier naming a workspace other than the one implied by `specId` is also outside the boundary. Because workspace names have at least two characters, a leading single letter followed by `:` (a Windows drive such as `C:\x`) is never read as a workspace qualifier; it is treated as an absolute host path and confined like any other.
+
+When `file` resolves outside the codeRoot implied by `specId`'s workspace, the use case MUST throw `ImplementationWorkspaceBoundaryError` and MUST NOT mutate persisted state. It MUST NOT silently coerce or drop an out-of-boundary path. The file-existence check for `add` runs only on a path that passed confinement.
 
 ### Requirement: Add creates or enriches a canonical link
 
@@ -71,10 +77,13 @@ The config-based `createUpdatePersistedSpecImplementation(config, options?)` for
 
 `resolveUpdatePersistedSpecImplementationDeps(resolver)` MUST resolve:
 
-- `specs: ReadonlyMap<string, SpecRepository>` — one repository instance per workspace
-- `workspaces` — workspace configuration lookup used to resolve codeRoot for path normalization
+- `specRepositories: ReadonlyMap<string, SpecRepository>` — one repository instance per workspace
+- `listWorkspaces: ListWorkspaces` — workspace configuration lookup used to resolve `codeRoot` for path normalization
 - `files: FileReader` — used for file-existence checks
-- `initializePersistedSpecState` collaborator sufficient to invoke `resolveInitialPersistedDependsOn()` for the add creation path
+- `getActiveSchema: GetActiveSchema`
+- `parsers: ArtifactParserRegistry`
+- `extractorTransforms: ExtractorTransformRegistry`
+- `contentHasher: ContentHasher`
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
 

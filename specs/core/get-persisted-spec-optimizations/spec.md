@@ -13,6 +13,10 @@ An optimized field is only useful to a consumer if it can be trusted, so reading
 - `specId` (required, string) — the fully-qualified spec identity to read
 - `field` (optional, `'optimizedDescription' | 'optimizedContext'`) — when provided, restricts the result to that single field
 
+### Requirement: Spec ID validation
+
+Before resolving any repository, the use case MUST validate and normalize `specId` with `parseSpecId` and the configured workspaces (see `core:spec-id-format`). A bare path is resolved to the `default` workspace, so the input accepts a bare or fully-qualified valid ID, and every `specId` in the result is the fully-qualified form. An invalid ID fails with `InvalidSpecIdError` and an unknown workspace with `WorkspaceNotFoundError`, quoting the full original value. Delivery adapters pass the raw string and perform no validation of their own.
+
 ### Requirement: Reads persisted state through the repository port
 
 The use case MUST resolve the spec's workspace repository and call `SpecRepository.readPersistedState(spec)` to obtain the persisted `optimizations` block, if any. It MUST NOT read `spec-lock.json` directly and MUST NOT materialize or read generated metadata to answer this query.
@@ -23,7 +27,7 @@ When `readPersistedState` returns `null`, `execute` SHALL return a `GetPersisted
 
 ### Requirement: Result contract for an initialized spec with no optimizations
 
-When persisted state exists but has no `optimizations` block, or the requested `field` is absent from it, `execute` SHALL return `initialized: true` with that field omitted from the result and annotated with reason `missing` rather than treated as a validation error.
+When persisted state exists but has no `optimizations` block, or a `field` filter names a field absent from it, `execute` SHALL return `initialized: true` and, for each requested field that is absent, a field entry of the form `{ freshness: 'missing', reasons: ['missing'] }` with no `value`. An absent field is therefore reported explicitly, never silently dropped, and is never treated as a validation error. When no `field` filter is given and there is no `optimizations` block, the result contains an entry for neither field and `fresh` is `false`.
 
 ### Requirement: Per-field freshness computation
 
@@ -46,6 +50,8 @@ Each present field in the result MUST include:
 - `freshness` — `'fresh' | 'stale'`
 - `reasons` — the ordered list of staleness reasons that produced a non-fresh result (empty when fresh)
 
+A requested field that is absent from persisted state is represented by `{ freshness: 'missing', reasons: ['missing'] }` without `value`, as defined by "Result contract for an initialized spec with no optimizations".
+
 ### Requirement: Aggregate freshness
 
 `execute` SHALL return a top-level `fresh` boolean that is `true` only when persisted state exists, at least one optimization field is present, and every present field (or the single field requested via `field`) is `fresh`.
@@ -60,7 +66,8 @@ The config-based `createGetPersistedSpecOptimizations(config, options?)` form MU
 
 `resolveGetPersistedSpecOptimizationsDeps(resolver)` MUST resolve:
 
-- `specs: ReadonlyMap<string, SpecRepository>` — one repository instance per workspace
+- `specRepositories: ReadonlyMap<string, SpecRepository>` — one repository instance per workspace
+- `getActiveSchema: GetActiveSchema` — active schema resolver used to enumerate `scope: spec` artifacts
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
 

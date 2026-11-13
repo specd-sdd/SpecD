@@ -424,6 +424,57 @@ import { InvalidSpecPathError } from '@specd/core'
 
 ---
 
+### InvalidSpecIdError
+
+**Code:** `'INVALID_SPEC_ID'`
+
+Thrown when a spec ID string fails canonical syntax validation — for example empty/blank input, a one-character workspace, empty capability-path segments, uppercase letters, spaces, commas, backslashes, or Windows device names. See the [workspace Spec ID grammar](../guide/workspaces.md#spec-ids-and-the-prefix-field).
+
+```typescript
+import { InvalidSpecIdError } from '@specd/core'
+
+// Message: "Invalid spec ID '<value>': <reason>"
+// Properties: value, reason, segment?
+```
+
+**Thrown by:** `parseSpecId` and use cases that accept spec IDs at system boundaries.
+
+---
+
+### InvalidSpecPatternError
+
+**Code:** `'INVALID_SPEC_PATTERN'`
+
+Thrown when a context include/exclude pattern fails grammar validation (for example a `*` in a disallowed position, or an invalid workspace/capability segment inside the pattern).
+
+```typescript
+import { InvalidSpecPatternError } from '@specd/core'
+
+// Message: "Invalid spec pattern '<pattern>': <reason>"
+// Properties: pattern, reason
+```
+
+**Thrown by:** `parseSpecPattern` and configuration validation of `contextIncludeSpecs` / `contextExcludeSpecs`.
+
+---
+
+### InvalidSpecLockError
+
+**Code:** `'INVALID_SPEC_LOCK'`
+
+Thrown when a persisted `spec-lock.json` fails structural or ID validation. The message names the owning spec (when known), the file location, and the failing field path so the lock can be corrected in place.
+
+```typescript
+import { InvalidSpecLockError } from '@specd/core'
+
+// Message: "Invalid spec-lock for '<specId>' at <location>: field '<fieldPath> <reason>. ..."
+// Properties: specId?, location?, fieldPath, reason
+```
+
+**Thrown by:** Spec-lock readers and use cases that load persisted dependencies, implementation links, optimizations, or schema overrides from `spec-lock.json`.
+
+---
+
 ### InvalidChangeError
 
 **Code:** `'INVALID_CHANGE'`
@@ -682,7 +733,17 @@ import { ArtifactParseError } from '@specd/core'
 // Message: "Failed to parse <format> artifact: <reason>"
 ```
 
-**Thrown by:** `ArtifactParser.parse()` implementations.
+**Thrown by:** `ArtifactParser.parse()` implementations, and by `UpdatePersistedSpecSchema` when a spec-scoped artifact cannot be parsed while reassigning the persisted schema.
+
+---
+
+### ReadOnlyWorkspaceError
+
+**Code:** `'READ_ONLY_WORKSPACE'`
+
+Thrown when an operation would modify a spec or code in a `readOnly` workspace. `ReadOnlyWorkspaceError.forSpec(specId, workspace)` builds the persisted-state variant: `Cannot modify spec "<id>" — workspace "<ws>" is readOnly.`
+
+**Thrown by:** `CreateChange`, `EditChange`, `UpdatePersistedSpecDeps` and other persisted-state mutations.
 
 ---
 
@@ -708,6 +769,9 @@ import { ArtifactParseError } from '@specd/core'
 | `ARTIFACT_CONFLICT`           | `ArtifactConflictError`         | Domain      |
 | `DELTA_APPLICATION`           | `DeltaApplicationError`         | Domain      |
 | `INVALID_SPEC_PATH`           | `InvalidSpecPathError`          | Domain      |
+| `INVALID_SPEC_ID`             | `InvalidSpecIdError`            | Domain      |
+| `INVALID_SPEC_PATTERN`        | `InvalidSpecPatternError`       | Domain      |
+| `INVALID_SPEC_LOCK`           | `InvalidSpecLockError`          | Domain      |
 | `INVALID_CHANGE`              | `InvalidChangeError`            | Domain      |
 | `ARTIFACT_NOT_OPTIONAL`       | `ArtifactNotOptionalError`      | Domain      |
 | `SCHEMA_VALIDATION_ERROR`     | `SchemaValidationError`         | Domain      |

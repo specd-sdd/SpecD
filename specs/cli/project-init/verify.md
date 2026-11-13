@@ -160,3 +160,41 @@
 - **WHEN** `specd project init --force --schema @specd/schema-std --workspace default` is run
 - **THEN** the command exits with code 0
 - **AND** `specd.yaml` now contains the new schema reference
+
+### Requirement: Workspace id validation
+
+#### Scenario: One-character workspace id rejected
+
+- **GIVEN** a clean directory with no existing `specd.yaml`
+- **WHEN** `specd init --workspace a` is run
+- **THEN** the command exits with code 1
+- **AND** stderr starts with `error:` and quotes `a` and names the workspace name rule
+- **AND** no `specd.yaml` is written
+
+#### Scenario: Windows device name rejected
+
+- **WHEN** `specd init --workspace nul` is run
+- **THEN** the command exits with code 1 and writes no file
+- **AND** `specd init --workspace con-foo` is accepted
+
+#### Scenario: Uppercase and underscore rejected
+
+- **WHEN** `specd init --workspace Core` and `specd init --workspace my_ws` are run
+- **THEN** each exits with code 1 and writes no file
+
+#### Scenario: Two-character workspace id accepted
+
+- **WHEN** `specd init --workspace ab` is run
+- **THEN** workspace id validation accepts `ab` and `initProject` is invoked with `workspaceId: 'ab'` (writing `specd.yaml`)
+
+#### Scenario: Interactive prompt asks again
+
+- **GIVEN** interactive mode
+- **WHEN** the user types `a` for the default workspace id
+- **THEN** the wizard shows the validation message and asks again
+- **AND** no file is written until a valid id is given
+
+#### Scenario: No private expression
+
+- **WHEN** the command source is inspected
+- **THEN** it calls `isValidWorkspaceName` and declares no workspace name regex of its own

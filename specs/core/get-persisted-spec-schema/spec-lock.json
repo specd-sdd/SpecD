@@ -4,5 +4,10 @@
     "version": 1
   },
   "dependsOn": ["core:spec-repository-port", "core:spec-id-format"],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/get-persisted-spec-schema.ts",
+      "symbols": ["GetPersistedSpecSchema"]
+    }
+  ]
 }

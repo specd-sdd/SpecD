@@ -1,0 +1,17 @@
+- op: added
+  description: Document the lenient dependsOn read option (audit)
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Aggregate persisted state, Meta observations, and specFingerprint'
+  content: |
+    ### Requirement: readPersistedState lenient dependsOn option
+
+    `readPersistedState(spec, options?)` accepts an optional `options.lenientDependsOn`. By default (`false` or omitted) the read is strict: any structurally invalid field of the sidecar, including a bare, empty, or malformed `dependsOn` entry, fails with `InvalidSpecLockError` as specified by [`core:spec-lock`](../spec-lock/spec.md).
+
+    When `lenientDependsOn` is `true`, invalid `dependsOn` entries are returned as stored and do not fail the read; every other field is still validated strictly and still fails with `InvalidSpecLockError`. The option exists so that dependency-repair mutations (`remove`, `set`, `clear` of `core:update-persisted-spec-deps`) can read a lock they are about to repair. A read, strict or lenient, never rewrites the sidecar.
+
+    `writePersistedState` compares `expectedRevision` against the revision of the sidecar currently on disk and reads it leniently for that comparison, because only the revision matters there; a lock with invalid `dependsOn` entries can therefore be replaced by a valid state without first being readable strictly.

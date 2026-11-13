@@ -81,6 +81,9 @@ export {
   type EditChangeResult,
   type SkipArtifact,
   type SkipArtifactInput,
+  type GetChangeSpecDeps,
+  type GetChangeSpecDepsInput,
+  type GetChangeSpecDepsResult,
   type UpdateSpecDepsInput,
   type UpdateSpecDepsResult,
   type ListSpecs,
@@ -269,6 +272,7 @@ export {
   type InvalidateChangeResult,
   type GetSpecOutline,
   type GetSpecOutlineInput,
+  type GetSpecOutlineResult,
   type SpecOutlineResult,
   type GetProjectMetadata,
   type GetProjectMetadataResult,
@@ -354,6 +358,8 @@ export {
   type PreviewSpecDeps,
   createResolveSchema,
   type ResolveSchemaDeps,
+  createGetChangeSpecDeps,
+  type GetChangeSpecDepsDeps,
   createUpdateSpecDeps,
   type UpdateSpecDepsDeps,
   createInvalidateChange,
@@ -516,6 +522,10 @@ export {
   type TransitionFailureReason,
   ApprovalRequiredError,
   InvalidSpecPathError,
+  InvalidSpecIdError,
+  InvalidSpecLockError,
+  InvalidSpecPatternError,
+  type WorkspaceNotFoundContext,
   ArtifactConflictError,
   ArtifactNotOptionalError,
   HookFailedError,
@@ -595,7 +605,21 @@ export {
   type SpecLockData,
   type SpecLockImplementationEntry,
 } from './domain/services/parse-spec-lock.js'
-export { parseSpecId } from './domain/services/parse-spec-id.js'
+export {
+  parseSpecId,
+  isFullyQualifiedSpecId,
+  type ParseSpecIdOptions,
+  type ParsedSpecId,
+} from './domain/services/parse-spec-id.js'
+export {
+  parseSpecPattern,
+  type ParseSpecPatternOptions,
+  type ParsedSpecPattern,
+  type SpecPatternKind,
+} from './domain/services/parse-spec-pattern.js'
+export { isValidWorkspaceName, isValidCapabilitySegment } from './domain/services/spec-id-rules.js'
+export { toLogicalFilePath } from './domain/services/to-logical-file-path.js'
+export { sameTrackedFile } from './domain/services/same-tracked-file.js'
 export { extractSpecSummary } from './domain/services/spec-summary.js'
 export { inferFormat } from './domain/services/format-inference.js'
 export { safeRegex } from './domain/services/safe-regex.js'

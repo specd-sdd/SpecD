@@ -142,17 +142,28 @@ declared types and formats:
 
 - `title` (required) must be a non-empty string
 - `description` (required) must be a non-empty string
-- `keywords` must be an array of non-empty lowercase strings
-- `dependsOn` must be an array of strings, each matching a valid spec ID pattern
-- `contentHashes` (required) must be a non-empty record of filename to hash
-  string
-- `rules` must be an array of objects with `requirement` and `rules`
+- `keywords` must be an array of non-empty strings, each matching
+  `^[a-z][a-z0-9-]*$` (lowercase, digits and hyphens, starting with a letter)
+- `dependsOn` must be an array of fully-qualified spec IDs, each satisfying the
+  rules of `core:spec-id-format` (a bare, empty, or malformed entry is
+  rejected; the schema does not keep its own copy of the expressions)
+- `implementation.files[]` and `implementation.symbols[]` entries must have a
+  fully-qualified `specId` under the same rules, a non-empty `file`, and (for
+  symbols) a non-empty `symbol`
+- `contentHashes` (required) must be a non-empty record of filename to hash,
+  each hash matching `sha256:<64 lowercase hex characters>`
+- `rules` must be an array of objects with a non-empty `requirement` and a
+  non-empty array `rules` of non-empty strings
 - `constraints` must be a non-empty array of non-empty strings
-- `scenarios` must be an array of objects with `requirement`, `name`, `when`,
-  `then`, and `given`
+- `scenarios` must be an array of objects with a non-empty `requirement` and
+  `name`, a non-empty array `then` of strings, and optional `given` and `when`
+  arrays of strings
+- `context` must be an array of non-empty strings
+- `generatedBy` must be `core` or `agent`
 - `optimizedDescription` must be a non-empty string
 - `optimizedContext` must be a non-empty string
-- `provenance` must conform to `SpecMetadataProvenance`
+- `provenance` and other keys not listed here are carried through
+  (`.passthrough()`) and are not validated by this guard
 
 If validation fails, persistence is rejected with a typed validation error and
 the file is not written. This guard is not a public editor: it is invoked only
@@ -311,3 +322,4 @@ If a spec has no persisted implementation links, the `implementation` property S
 - [`core:spec-optimization`](../spec-optimization/spec.md) — the per-field
   optimization record and freshness reasons projected into
   `optimizedDescription` / `optimizedContext`
+- [`core:spec-id-format`](../spec-id-format/spec.md) — `dependsOn` entries follow the fully-qualified spec ID rules

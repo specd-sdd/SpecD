@@ -73,11 +73,22 @@ For most single-repo projects, this is all you ever need. Additional workspaces 
 
 ## Spec IDs and the prefix field
 
-Every spec in specd has a fully-qualified spec ID in the format `workspace:capability-path`. The workspace name comes first, separated by a colon from the capability path — which mirrors the directory structure inside the workspace's specs directory.
+Every spec in SpecD has a fully-qualified spec ID. The canonical grammar is:
 
-For example, a spec stored at `specs/auth/login/` in the `default` workspace has the ID `default:auth/login`. A spec in a `payments` workspace at `specs/checkout/` has the ID `payments:checkout`.
+```text
+specId      := workspace ':' capPath | capPath
+workspace   := [a-z][a-z0-9-]+          # ≥2 characters; not a Windows device name
+capPath     := segment ('/' segment)*
+segment     := [a-z0-9_][a-z0-9_-]*     # not a Windows device name; no '.', spaces, commas, ':', or '\'
+```
 
-Bare paths (without a colon) are shorthand for `default:path`. So `auth/login` and `default:auth/login` are equivalent. Internally, specd always uses the fully-qualified form.
+Examples: a spec at `specs/auth/login/` in the `default` workspace is `default:auth/login`. A spec in a `payments` workspace at `specs/checkout/` is `payments:checkout`.
+
+**Bare IDs at input boundaries.** When no `:` is present, the core treats the string as a capability path in the `default` workspace (for example `auth/login` → `default:auth/login`). This normalization happens in use cases that receive IDs from the CLI, MCP, or SDK — not as a silent assumption deeper in the domain. Persisted artifacts always store the fully-qualified form.
+
+**Two-character workspace rule.** Workspace names must be at least two characters (`^[a-z][a-z0-9-]+$`) so a one-character name like `c:foo` can never be mistaken for a Windows drive path. Declared workspace keys in `specd.yaml` follow the same rule; `'root'` remains reserved for graph identities and cannot be a workspace name.
+
+**Error codes.** Invalid syntax raises `InvalidSpecIdError` (`INVALID_SPEC_ID`). Invalid context include/exclude patterns raise `InvalidSpecPatternError` (`INVALID_SPEC_PATTERN`). A persisted `spec-lock.json` that fails structural or ID validation raises `InvalidSpecLockError` (`INVALID_SPEC_LOCK`). An ID that names a configured-but-missing workspace raises `WorkspaceNotFoundError` (`WORKSPACE_NOT_FOUND`).
 
 ### The prefix field
 

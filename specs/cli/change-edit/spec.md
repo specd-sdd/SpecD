@@ -11,39 +11,31 @@ A change's scope often evolves after creation — specs get added, removed, or s
 ```
 specd change edit <name>
   [--add-spec <id>] [--remove-spec <id>]
-  [--description <text>]
-  [--format text|json|toon]
+  [--description <text>] [--invalidation-policy <policy>]
+  [--format text|json|toon] [--config <path>]
 ```
 
 - `<name>` — required positional; the name of the change to edit
-- `--add-spec <id>` — repeatable; adds a spec ID to `specIds`. `<id>` follows the same `[<workspace>:]<capability-path>` format as `change create`, defaulting to `default` workspace when prefix is omitted
-- `--remove-spec <id>` — repeatable; removes a spec ID from `specIds`
+- `--add-spec <id>` — repeatable; adds a spec ID to `specIds`. `<id>` follows the `[<workspace>:]<capability-path>` format of `core:spec-id-format`; the value is passed to `EditChange` unchanged and the use case validates it and resolves a missing workspace to `default`
+- `--remove-spec <id>` — repeatable; removes a spec ID from `specIds`; passed unchanged
 - `--description <text>` — optional; sets or replaces the free-text description of the change
+- `--invalidation-policy <policy>` — optional; sets the invalidation policy of the change (`none`, `surgical`, `downstream`, or `global`)
 - `--format text|json|toon` — optional; output format, defaults to `text`
+- `--config <path>` — optional; path to `specd.yaml`
 
-At least one flag must be provided; running with no flags is a CLI usage error (exit code 1).
+Each value is one whole spec ID and is never split on commas. The command does not validate, qualify, or normalize spec IDs.
+
+At least one of `--add-spec`, `--remove-spec`, `--description`, or `--invalidation-policy` must be provided; running with none of them is a CLI usage error (exit code 1). The usage check happens before configuration is resolved, so a missing `specd.yaml` never masks the usage error.
 
 ### Requirement: Workspace derivation
 
-After computing the new `specIds`, the CLI derives the new `workspaces` set from the workspace prefixes of all resulting spec IDs — the same logic as `change create`. Workspaces that are no longer referenced by any spec are removed automatically; new workspaces required by added specs are added automatically. The user never specifies workspace IDs directly.
+The command derives no workspaces itself. `EditChange` derives the `workspaces` set from the workspace prefixes of all resulting spec IDs (the `Change.workspaces` getter): workspaces no longer referenced by any spec disappear, and workspaces required by added specs appear. The command only prints the `workspaces` of the returned change. The user never specifies workspace IDs directly.
 
 ### Requirement: ReadOnly workspace rejection
 
-After resolving the workspace for each `--add-spec` value, the CLI MUST check the workspace's `ownership` from `SpecdConfig`. If any spec's workspace has `readOnly` ownership, the command MUST exit with code 1 and print an error message to stderr:
-
-```text
-error: Cannot add spec "<specId>" to change — workspace "<workspace>" is readOnly.
-
-ReadOnly workspaces are protected: their specs and code cannot be modified by changes.
-```
-
-This check MUST occur before applying any edits to the change. If multiple specs target readOnly workspaces, one error per spec MUST be printed. The error message MUST NOT suggest remediation steps.
+The command MUST NOT resolve workspaces or check ownership itself. `EditChange` rejects specs in `readOnly` workspaces with `ReadOnlyWorkspaceError` before any edit is applied (see `core:edit-change`), and the command MUST map that error to exit code 1 and print its message to stderr, with one line per offending spec and no remediation steps.
 
 The `--remove-spec` flag is not subject to ownership checks — removing a spec from a change does not write to the workspace.
-
-### Requirement: Invariant enforcement
-
-The change must retain at least one `specId` after editing. If `--remove-spec` operations would leave `specIds` empty, the command exits with code 1 before making any changes.
 
 ### Requirement: Approval invalidation
 
@@ -54,15 +46,16 @@ Any modification to `specIds` (and by extension `workspaces`) causes the domain 
 On success, output depends on `--format`:
 
 - `text` (default): prints a human-readable success message to stdout showing the updated change name, spec IDs, and workspaces. If approval invalidation occurred, a warning is also printed to stderr.
-- `json` or `toon`: outputs (encoded in the respective format):
+- `json` or `toon`: outputs `{ result: "ok", name, specIds, workspaces, invalidated, state }` (encoded in the respective format); `specIds` and `workspaces` are arrays, one whole name per element.
 
 ### Requirement: Error cases
 
 - If the change does not exist, exits with code 1.
 - If a `--remove-spec` value is not in the current `specIds`, exits with code 1.
-- If an `--add-spec` value uses a workspace prefix not declared in `specd.yaml`, exits with code 1.
+- If an `--add-spec` value is not a valid spec ID, exits with code 1 and prints the `InvalidSpecIdError` message, which quotes the full value.
+- If an `--add-spec` value uses a workspace not declared in `specd.yaml`, exits with code 1 and prints the `WorkspaceNotFoundError` message.
 - If an `--add-spec` value targets a workspace with `readOnly` ownership, exits with code 1.
-- If the result would leave `specIds` empty, exits with code 1.
+- If `--invalidation-policy` is not one of `none`, `surgical`, `downstream`, or `global`, exits with code 1 and prints the `InvalidInputError` message from `EditChange`.
 
 ## Constraints
 
@@ -70,8 +63,9 @@ On success, output depends on `--format`:
 - The change name and `createdAt` are immutable and cannot be changed
 - A discarded change cannot be edited
 - Workspaces are always derived from `specIds` — they are never set independently
-- Specs targeting readOnly workspaces are rejected via --add-spec before any edits are applied
+- Specs targeting readOnly workspaces are rejected by `EditChange` before any edits are applied
 - \--remove-spec is not subject to ownership checks
+- The command holds no spec ID or ownership rule; it forwards raw values to the use case
 
 ## Examples
 
@@ -95,3 +89,4 @@ specd change edit add-oauth-login --description "Add OAuth2 login via Google and
 - [`core:change`](../../core/change/spec.md) — mutable fields, approval invalidation rules
 - [`cli:change-create`](../change-create/spec.md) — spec id format and workspace derivation logic
 - [`core:spec-id-format`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format
+- [`core:edit-change`](../../core/edit-change/spec.md) — validation, `readOnly` rejection, invalidation policy and `specIds` rules live in the use case

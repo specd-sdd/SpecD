@@ -288,6 +288,7 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
     skipArtifact: { execute: vi.fn() },
     compile: { execute: vi.fn() },
     updateSpecDeps: { execute: vi.fn() },
+    getSpecDeps: { execute: vi.fn() },
     updateImplementationTracking: { execute: vi.fn() },
     refreshImplementationTracking: {
       execute: vi.fn().mockResolvedValue({

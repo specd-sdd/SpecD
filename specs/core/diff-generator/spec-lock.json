@@ -21,5 +21,41 @@
       "file": "core:src/composition/diff-generator.ts",
       "symbols": ["createDefaultDiffGenerator"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "DiffGenerator turns preview base/merged file content into presentation-neutral unified diffs for PreviewSpec.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:cc0ad557b02909e665fd9470d6213b45f71a64050b59100dcfa27dfaaf4426e1",
+          "lastModified": "2026-07-15T16:04:34.216Z"
+        },
+        "verify.md": {
+          "hash": "sha256:c61622d8b4fc2a7e1c49303ceecf0d9dbda3d021fba219a8c8ec9c288d0abbf8",
+          "lastModified": "2026-07-15T16:04:34.216Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# DiffGenerator\n\n## Rules\n\n- TypeScript `interface` named `DiffGenerator` with single method `generate`. NOT abstract class.\n- `generate({ filename, base, merged, contextLines? })` — `filename` artifact name (e.g. `spec.md`); `base` original; `merged` after change; optional context lines. Empty `base` allowed for newly introduced artifacts.\n- Returns plain unified diff string: no ANSI, no terminal control sequences, no host-specific separators. Labels: `a/<filename> (base)`, `b/<filename> (merged)`.\n- Dedicated typed failure `DiffGenerationError` for non-fatal review-surface problems after merge succeeded. Default impl raises when concrete mechanism fails usable unified diff. Lets `PreviewSpec` distinguish failed diff surface vs failed merge/preview.\n- Omitted `contextLines` → default impl uses 3 lines (CLI-compatible).\n- Core MUST provide default implementation factory for config-based composition. Concrete library choice encapsulated behind port.\n- Internal core capability for shared preview (`PreviewSpec`); MUST NOT force delivery mechanisms for unrelated diff workflows.\n\n## Constraints\n\n- Lives in `application/ports/` per hexagonal structure.\n- Port MUST NOT depend directly on concrete diff library.\n- Plain text only; colorization/host presentation outside port.\n- Models file-to-file unified diffs; not semantic review comments or artifact filtering.\n- Caller-handled failures MUST surface via `DiffGenerationError`, not anonymous library-specific errors.\n",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:cc0ad557b02909e665fd9470d6213b45f71a64050b59100dcfa27dfaaf4426e1",
+          "lastModified": "2026-07-15T16:04:34.216Z"
+        },
+        "verify.md": {
+          "hash": "sha256:c61622d8b4fc2a7e1c49303ceecf0d9dbda3d021fba219a8c8ec9c288d0abbf8",
+          "lastModified": "2026-07-15T16:04:34.216Z"
+        }
+      }
+    }
+  }
 }

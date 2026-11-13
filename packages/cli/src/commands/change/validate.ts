@@ -3,7 +3,6 @@ import { type Command } from 'commander'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
 import { resolveCliContext } from '../../helpers/cli-context.js'
-import { parseSpecId } from '../../helpers/spec-path.js'
 
 /** Validation file states emitted by `change validate`. */
 type ValidationFileStatus = 'validated' | 'missing' | 'skipped'
@@ -35,6 +34,7 @@ interface ValidateResult {
   readonly failures: ValidateFailure[]
   readonly notes: ValidateNote[]
   readonly files: ValidationFileEntry[]
+  readonly specId?: string
 }
 
 /** Artifact scope supported by schema-defined artifact types. */
@@ -75,6 +75,7 @@ function toValidateResult(value: unknown): ValidateResult {
   if (!isRecord(value)) {
     return { passed: false, failures: [], notes: [], files: [] }
   }
+  const specId = typeof value['specId'] === 'string' ? value['specId'] : undefined
 
   const failures: ValidateFailure[] = Array.isArray(value['failures'])
     ? value['failures']
@@ -128,7 +129,13 @@ function toValidateResult(value: unknown): ValidateResult {
     : []
 
   const passed = typeof value['passed'] === 'boolean' ? value['passed'] : failures.length === 0
-  return { passed, failures, notes, files }
+  return {
+    passed,
+    failures,
+    notes,
+    files,
+    ...(specId !== undefined ? { specId } : {}),
+  }
 }
 
 /**
@@ -348,7 +355,7 @@ JSON/TOON output schema:
  * Validates a single spec (existing behaviour).
  *
  * @param kernel - The wired kernel instance
- * @param config - The loaded specd configuration
+ * @param _config - Unused (kept for call-site compatibility)
  * @param name - The change name
  * @param specPath - The spec ID to validate
  * @param opts - Command options
@@ -358,26 +365,26 @@ JSON/TOON output schema:
  */
 async function executeSingle(
   kernel: import('@specd/sdk').Kernel,
-  config: import('@specd/sdk').SpecdConfig,
+  _config: import('@specd/sdk').SpecdConfig,
   name: string,
   specPath: string,
   opts: { format: string; artifact?: string },
   requestedArtifactScope?: ArtifactScope,
 ): Promise<void> {
-  const parsed = parseSpecId(specPath, config)
-  const fullSpecPath = `${parsed.workspace}:${parsed.capabilityPath}`
   const isChangeScopedArtifact = opts.artifact !== undefined && requestedArtifactScope === 'change'
-  const displayTarget = isChangeScopedArtifact
-    ? `${name} [artifact:${opts.artifact}]`
-    : `${name}/${fullSpecPath}`
 
   const result = toValidateResult(
     await kernel.changes.validate.execute({
       name,
-      ...(isChangeScopedArtifact ? {} : { specPath: fullSpecPath }),
+      ...(isChangeScopedArtifact ? {} : { specPath }),
       ...(opts.artifact !== undefined ? { artifactId: opts.artifact } : {}),
     }),
   )
+
+  const fullSpecPath = result.specId ?? specPath
+  const displayTarget = isChangeScopedArtifact
+    ? `${name} [artifact:${opts.artifact}]`
+    : `${name}/${fullSpecPath}`
 
   const fmt = parseFormat(opts.format)
   const passed = result.failures.length === 0

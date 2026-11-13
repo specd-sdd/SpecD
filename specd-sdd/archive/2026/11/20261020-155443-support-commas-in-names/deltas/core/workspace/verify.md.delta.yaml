@@ -1,0 +1,105 @@
+- op: added
+  description: Workspace name length scenarios
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Workspace identity'
+  content: |
+    #### Scenario: One-character workspace name rejected
+
+    - **GIVEN** `specd.yaml` declares a workspace named `a`
+    - **WHEN** the configuration is loaded
+    - **THEN** loading fails with `ConfigValidationError` because workspace names need two or more characters
+
+    #### Scenario: Two-character workspace name accepted
+
+    - **GIVEN** `specd.yaml` declares a workspace named `ab` with a valid `codeRoot`
+    - **WHEN** the configuration is loaded
+    - **THEN** the workspace is accepted
+
+    #### Scenario: Names produced by project init are loadable
+
+    - **WHEN** `specd project init --workspace <id>` accepts an id
+    - **THEN** `ConfigLoader` accepts the same id
+    - **AND** ids such as `a` and `nul` are rejected by init as well as by the loader
+
+    #### Scenario: Existing project workspaces remain valid
+
+    - **WHEN** the workspaces `core`, `cli`, `sdk`, and `plugin-agent-claude` are validated
+    - **THEN** each is accepted
+
+- op: added
+  description: Prefix segment scenarios
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Prefix semantics'
+  content: |
+    #### Scenario: Prefix segment violating the segment rule
+
+    - **GIVEN** a workspace declares `prefix: team/Shared`
+    - **WHEN** the configuration is loaded
+    - **THEN** loading fails with `ConfigValidationError`
+
+- op: added
+  description: Spec ID resolution scenarios
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Workspace-qualified spec IDs'
+  content: |
+    #### Scenario: Unknown workspace in a spec ID raises the typed error
+
+    - **WHEN** a use case receives `nope:auth/login`
+    - **THEN** it throws `WorkspaceNotFoundError`
+
+    #### Scenario: Malformed spec ID raises the typed error
+
+    - **WHEN** a use case receives `ws:` as a spec ID
+    - **THEN** it throws `InvalidSpecIdError`
+
+    #### Scenario: Adapters do not qualify IDs even for display
+
+    - **WHEN** a delivery adapter prints a spec ID
+    - **THEN** it prints the raw argument or the use case result
+    - **AND** it does not call `parseSpecId`
+
+- op: modified
+  description: Read-only ownership protects canonical state
+  selector:
+    type: section
+    matches: 'Scenario: ReadOnly workspace blocks direct spec writes'
+  content: |
+    - **GIVEN** a `SpecRepository` bound to a workspace with `readOnly` ownership
+    - **WHEN** `save()` or `writePersistedState()` is called
+    - **THEN** `ReadOnlyWorkspaceError` is thrown before any filesystem operation
+
+- op: modified
+  description: Current repository read operation names
+  selector:
+    type: section
+    matches: 'Scenario: ReadOnly workspace allows reads'
+  content: |
+    - **GIVEN** a workspace with `ownership: readOnly`
+    - **WHEN** `SpecRepository.get()`, `list()`, `artifact()`, or `readMetadataSnapshot()` is called
+    - **THEN** the operation succeeds normally
+
+- op: added
+  description: Disposable metadata cache writes remain allowed
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Ownership semantics'
+  content: |
+    #### Scenario: ReadOnly workspace permits metadata cache writes
+
+    - **GIVEN** a `SpecRepository` bound to a workspace with `readOnly` ownership
+    - **WHEN** `writeMetadataSnapshot()` persists generated metadata
+    - **THEN** the disposable cache write is permitted
+    - **AND** the canonical spec artifacts and persisted lock remain unchanged
+
+- op: removed
+  description: Changes have no primary workspace or change.workspace archive token
+  selector:
+    type: section
+    matches: 'Requirement: Primary workspace'

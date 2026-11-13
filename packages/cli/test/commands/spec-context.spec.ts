@@ -36,6 +36,7 @@ describe('spec context', () => {
   it('renders spec header with workspace:path in text mode', async () => {
     const { kernel, stdout } = setup()
     kernel.specs.getContext.execute.mockResolvedValue({
+      specId: 'default:auth/login',
       entries: [
         {
           spec: 'default:auth/login',
@@ -68,6 +69,7 @@ describe('spec context', () => {
   it('includes description and all sections when no flags', async () => {
     const { kernel, stdout } = setup()
     kernel.specs.getContext.execute.mockResolvedValue({
+      specId: 'default:auth/login',
       entries: [
         {
           spec: 'default:auth/login',
@@ -103,6 +105,7 @@ describe('spec context', () => {
   it('filters to only --rules when flag provided', async () => {
     const { kernel, stdout } = setup()
     kernel.specs.getContext.execute.mockResolvedValue({
+      specId: 'default:auth/login',
       entries: [
         {
           spec: 'default:auth/login',
@@ -127,6 +130,7 @@ describe('spec context', () => {
   it('outputs JSON with specs array and warnings', async () => {
     const { kernel, stdout } = setup()
     kernel.specs.getContext.execute.mockResolvedValue({
+      specId: 'default:auth/login',
       entries: [
         {
           spec: 'default:auth/login',
@@ -150,6 +154,7 @@ describe('spec context', () => {
   it('exits 1 when spec not found', async () => {
     const { kernel } = setup()
     kernel.specs.getContext.execute.mockResolvedValue({
+      specId: 'default:auth/login',
       entries: [],
       warnings: [
         {
@@ -183,6 +188,7 @@ describe('spec context', () => {
   it('warns to stderr when use case returns warnings', async () => {
     const { kernel, stderr } = setup()
     kernel.specs.getContext.execute.mockResolvedValue({
+      specId: 'default:auth/login',
       entries: [{ spec: 'default:auth/login', stale: true }],
       warnings: [
         {
@@ -205,6 +211,7 @@ describe('spec context', () => {
     const { kernel, config } = setup()
     ;(config as any).llmOptimizedContext = true
     kernel.specs.getContext.execute.mockResolvedValue({
+      specId: 'default:auth/login',
       entries: [{ spec: 'default:auth/login', stale: false }],
       warnings: [],
     })
@@ -229,6 +236,7 @@ describe('spec context', () => {
     const { kernel, config } = setup()
     ;(config as any).llmOptimizedContext = true
     kernel.specs.getContext.execute.mockResolvedValue({
+      specId: 'default:auth/login',
       entries: [{ spec: 'default:auth/login', stale: false }],
       warnings: [],
     })

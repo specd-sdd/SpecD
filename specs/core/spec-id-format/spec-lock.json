@@ -12,15 +12,27 @@
   ],
   "implementation": [
     {
-      "file": "core:src/domain/services/windows-device-name.ts",
-      "symbols": ["isWindowsDeviceName"]
+      "file": "core:src/domain/services/spec-id-rules.ts",
+      "symbols": ["isValidWorkspaceName", "isValidCapabilitySegment"]
     },
     {
-      "file": "core:src/domain/value-objects/spec-path.ts",
-      "symbols": ["SpecPath"]
+      "file": "core:src/domain/services/parse-spec-id.ts",
+      "symbols": ["parseSpecId", "isFullyQualifiedSpecId"]
     },
     {
-      "file": "core:test/domain/value-objects/spec-path.spec.ts"
+      "file": "core:src/domain/services/parse-spec-pattern.ts",
+      "symbols": ["parseSpecPattern"]
+    },
+    {
+      "file": "core:src/domain/errors/invalid-spec-id-error.ts",
+      "symbols": ["InvalidSpecIdError"]
+    },
+    {
+      "file": "core:src/domain/errors/invalid-spec-pattern-error.ts",
+      "symbols": ["InvalidSpecPatternError"]
+    },
+    {
+      "file": "core:test/domain/services/parse-spec-id.spec.ts"
     }
   ],
   "optimizations": {

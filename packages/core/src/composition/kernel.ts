@@ -26,6 +26,10 @@ import { type GetSpec } from '../application/use-cases/get-spec.js'
 import { type GetSpecContext } from '../application/use-cases/get-spec-context.js'
 import { type GetSpecOutline } from '../application/use-cases/get-spec-outline.js'
 import { type GetSpecsHealth } from '../application/use-cases/get-specs-health.js'
+import {
+  type GetChangeSpecDeps,
+  GetChangeSpecDeps as GetChangeSpecDepsClass,
+} from '../application/use-cases/get-change-spec-deps.js'
 import { type GetStatus } from '../application/use-cases/get-status.js'
 import { type InvalidateChange } from '../application/use-cases/invalidate-change.js'
 import { type MaterializeSpecMetadata } from '../application/use-cases/materialize-spec-metadata.js'
@@ -209,6 +213,7 @@ export interface Kernel {
     invalidate: InvalidateChange
     skipArtifact: SkipArtifact
     updateSpecDeps: UpdateSpecDeps
+    getSpecDeps: GetChangeSpecDeps
     listArchived: ListArchived
     getArchived: GetArchivedChange
     runStepHooks: RunStepHooks
@@ -374,6 +379,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
   const invalidate = createInvalidateChange(resolveInvalidateChangeDeps(resolver))
   const skipArtifact = createSkipArtifact(resolveSkipArtifactDeps(resolver))
   const updateSpecDeps = createUpdateSpecDeps(resolveUpdateSpecDepsDeps(resolver))
+  const getSpecDeps = new GetChangeSpecDepsClass(status, [...specsRepos.keys()])
   const getHookInstructions = createGetHookInstructions(resolveGetHookInstructionsDeps(resolver))
   const getArtifactInstruction = createGetArtifactInstruction(
     resolveGetArtifactInstructionDeps(resolver),
@@ -434,6 +440,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       invalidate,
       skipArtifact,
       updateSpecDeps,
+      getSpecDeps,
       listArchived,
       getArchived,
       runStepHooks,

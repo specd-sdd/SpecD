@@ -200,6 +200,14 @@ workspaces:
 
 **Workspace-specific context filtering:** Each workspace may optionally declare `context.includeSpecs` and `context.excludeSpecs` arrays to filter which specs appear in compiled context for changes touching that workspace's specs. These follow the same glob-like pattern syntax as the project-level `context.includeSpecs` / `context.excludeSpecs` and are combined (intersected) with the project-level filters.
 
+### Requirement: Workspace names and context patterns use the shared rules
+
+A workspace name declared under `workspaces` MUST satisfy the workspace name rule of `core:spec-id-format` (`^[a-z][a-z0-9-]+$`, two or more characters, never a Windows device name) so that every workspace can be referenced by a valid spec ID. A `prefix` declared for a workspace MUST be made of segments that satisfy the capability path segment rule of the same spec.
+
+The `contextIncludeSpecs` and `contextExcludeSpecs` pattern grammar defined in "Context spec selection" is parsed by `parseSpecPattern` from `core:spec-id-format`, both when the configuration is loaded and when specs are matched, so a pattern accepted at startup is interpreted identically afterwards. A qualifier-less pattern keeps its contextual meaning (`default` at project level, the owning workspace at workspace level), supplied by the caller as the default workspace, never assumed silently. An unknown workspace in a pattern keeps producing a warning and matches no specs.
+
+A pattern that does not parse at match time (possible only for a pattern passed programmatically, since configuration patterns are validated at load) raises `InvalidSpecPatternError` quoting the pattern; it is never ignored silently and never downgraded to a warning. Every caller that matches patterns (spec listing and context compilation alike) supplies the contextual default workspace.
+
 ### Requirement: Workspace-level graph configuration
 
 Each workspace entry in `specd.yaml` MAY declare an optional `graph` block controlling how the code graph indexer discovers files for that workspace. All paths and patterns in this block are project-root-relative, as defined by Requirement: Project-relative graph path semantics:
@@ -844,6 +852,7 @@ schemaOverrides:
 
 - [`core:vcs-adapter-port`](../vcs-adapter-port/spec.md) — configuration bounding relies on vcs adapter
 - [`default:_global/architecture`](../../_global/architecture/spec.md)
+- [`core:spec-id-format`](../spec-id-format/spec.md) — workspace name rule, capability path segment rule, and `parseSpecPattern`
 
 ## ADRs
 

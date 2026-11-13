@@ -15,7 +15,7 @@ import {
 import { type SchemaOperations } from '../../domain/services/merge-schema-layers.js'
 import { ConfigValidationError } from '../../domain/errors/config-validation-error.js'
 import { isPathInside } from './path-platform.js'
-import { isWindowsDeviceName } from '../../domain/services/windows-device-name.js'
+import { isValidWorkspaceName } from '../../domain/services/spec-id-rules.js'
 import { StorageDirectoryNotFoundError } from '../../domain/errors/index.js'
 import {
   isRecord,
@@ -388,10 +388,10 @@ export class FsConfigLoader extends ConfigLoader {
     const warnings: string[] = []
 
     const workspaces: SpecdWorkspaceConfig[] = Object.entries(data.workspaces).map(([name, ws]) => {
-      if (isWindowsDeviceName(name)) {
+      if (!isValidWorkspaceName(name)) {
         throw new ConfigValidationError(
           rootConfigPath,
-          `'workspaces.${name}' is invalid because '${name}' is a Windows device name`,
+          `'workspaces.${name}' is invalid because '${name}' is not a valid workspace name`,
         )
       }
       const specsBinding = resolveAdapterBinding(

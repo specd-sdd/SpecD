@@ -3,8 +3,6 @@ import { type SpecMetadata } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
-import { parseSpecId } from '../../helpers/spec-path.js'
-
 /**
  * Formats metadata as structured text for terminal output.
  *
@@ -95,15 +93,14 @@ JSON/TOON output schema:
     )
     .action(async (specPath: string, opts: { format: string; config?: string }) => {
       try {
-        const { config, kernel } = await resolveCliContext({ configPath: opts.config })
-        const specId = parseSpecId(specPath, config).specId
-        const result = await kernel.specs.getMetadata.execute({ specId })
+        const { kernel } = await resolveCliContext({ configPath: opts.config })
+        const result = await kernel.specs.getMetadata.execute({ specId: specPath })
         const fmt = parseFormat(opts.format)
 
         if (fmt === 'text') {
           output(
             formatMetadataText(
-              specId,
+              specPath,
               result.metadata,
               result.source,
               result.regenerated,
@@ -115,7 +112,7 @@ JSON/TOON output schema:
         } else {
           output(
             {
-              spec: specId,
+              spec: specPath,
               source: result.source,
               regenerated: result.regenerated,
               metadataFingerprint: result.metadataFingerprint,

@@ -99,7 +99,7 @@ describe('graph index', () => {
       '/project/specd.yaml',
       '--force',
       '--exclude-path',
-      'foo,bar',
+      '{a,b}/**',
     )
     expect(runIsolatedGraphIndex).toHaveBeenCalledTimes(1)
     expect(runIsolatedGraphIndex).toHaveBeenCalledWith(
@@ -108,7 +108,7 @@ describe('graph index', () => {
         taskModule: expect.any(URL),
         taskInput: {
           context: { mode: 'forced', configPath: '/project/specd.yaml' },
-          index: { force: true, excludePaths: ['foo', 'bar'] },
+          index: { force: true, excludePaths: ['{a,b}/**'] },
         },
         onProgress: expect.any(Function),
       }),
@@ -281,6 +281,30 @@ describe('graph index', () => {
       expect.objectContaining({
         taskInput: expect.objectContaining({
           index: expect.objectContaining({ excludePaths: ['app/tmp/', 'app/cache/'] }),
+        }),
+      }),
+    )
+  })
+
+  it('accepts the listed --exclude-path form', async () => {
+    setup()
+    await run(makeIndexProgram(), '--exclude-path', 'a', 'b')
+    expect(runIsolatedGraphIndex).toHaveBeenCalledWith(
+      expect.objectContaining({
+        taskInput: expect.objectContaining({
+          index: expect.objectContaining({ excludePaths: ['a', 'b'] }),
+        }),
+      }),
+    )
+  })
+
+  it('keeps a brace glob as a single --exclude-path pattern', async () => {
+    setup()
+    await run(makeIndexProgram(), '--exclude-path', '{a,b}/**')
+    expect(runIsolatedGraphIndex).toHaveBeenCalledWith(
+      expect.objectContaining({
+        taskInput: expect.objectContaining({
+          index: expect.objectContaining({ excludePaths: ['{a,b}/**'] }),
         }),
       }),
     )

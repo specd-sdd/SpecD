@@ -9,5 +9,41 @@
     "core:delta-format",
     "core:selector-model"
   ],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Uniform ArtifactParser/Registry port for parse, delta apply, serialize, outline, and format-specific AST operations.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:2a86a157f7979f71b123609050e00b44de8c330071e6b7451508a54522300147",
+          "lastModified": "2026-05-25T06:02:58.412Z"
+        },
+        "verify.md": {
+          "hash": "sha256:416e355d6dfbe7c3a0e3c3ba156e8d91999c5c1103fe4ffcabd51a16f7a941ed",
+          "lastModified": "2026-05-25T06:02:58.412Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# ArtifactParser Port\n\n## Rules\n\n- Interface `ArtifactParser`: `fileExtensions: readonly string[]`; `parse(content: string): ArtifactAST`; `apply(ast, delta: readonly DeltaEntry[]): DeltaApplicationResult`; `serialize(ast): string`; `renderSubtree(node: ArtifactNode): string`; `nodeTypes(): readonly NodeTypeDescriptor[]`; `outline(ast): readonly OutlineEntry[]`; `deltaInstructions(): string`; `parseDelta(content: string): readonly DeltaEntry[]`.\n- `ArtifactParserRegistry` = `ReadonlyMap<string, ArtifactParser>` keyed by format. Standard: `'markdown'`, `'json'`, `'yaml'`, `'plaintext'`. Additive via kernel composition; missing format → clear error.\n- `parse` → normalised format-independent AST with single `root`.\n- `apply` resolves all selectors before any op; any selector fail (no match/ambiguous) → reject entire apply with `DeltaApplicationError`; no partial apply. Returns modified AST + semantic warnings; check `result.warnings` for hybrid ambiguity.\n- `serialize(parse(content))` round-trip → equivalent AST on reparse. Markdown MUST preserve inline formatting intent for untargeted nodes; support serializer style options from source (unordered list/emphasis/strong markers); ambiguous mixed markers → deterministic project markdown conventions.\n- `renderSubtree` → native format for node + descendants (`ValidateArtifacts` `contentMatches`, metadata extraction).\n- `nodeTypes()` → static `NodeTypeDescriptor[]` with `type`, `identifiedBy`, `description`, plus nature flags.\n- Structural flags: `isContainer` (can have `children`); `isLeaf` (scalar `value`); hybrid both true; void all false.\n- Collection flags: `isCollection` (homogeneous children); `isSequence` (ordered subset of collection; supports strategy); `isSequenceItem` (positional item). Shared `applyDelta` MUST use flags, not hardcoded type vectors.\n- Default outline compact subset: md `section`; json `property`/`array-item`; yaml `pair`; plaintext `paragraph`. Full coverage via full-detail retrieval at use-case/command level.\n- Selector-hint metadata for root-level outline: keyed by node type; placeholder values only; omit unless hint mode requested.\n- `deltaInstructions()` → format-specific static text when `delta: true`.\n- `parseDelta` → typed `DeltaEntry[]` from YAML delta; only YAML adapter expected non-empty. `no-op` mixed with other entries → `SchemaValidationError`.\n- `ArtifactAST`: `{ root: ArtifactNode }`. `ArtifactNode`: `type`, optional `label`/`value`/`children`/`level`/`ordered`, index signature for adapter metadata.\n- `DeltaEntry`: `op: 'added'|'modified'|'removed'|'no-op'`; optional `selector`/`position`/`rename`/`content`/`value`/`strategy`/`mergeKey` (not valid for `no-op`); optional `description` valid on all ops, ignored during apply.\n- `NodeTypeDescriptor`: `type`, `identifiedBy`, `description`, `isCollection`, `isSequence`, `isSequenceItem`, `isContainer`, `isLeaf`. `OutlineEntry`: `type`, `label`, `depth`, optional `children`.\n\n## Constraints\n\n- Lives in `application/ports/` per hexagonal rule.\n- No direct parsing-library dependency at port level.\n- Domain services reference only this port, never concrete parsers.\n- `Selector` and `DeltaPosition` are domain value objects from `domain/value-objects/`.\n",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:2a86a157f7979f71b123609050e00b44de8c330071e6b7451508a54522300147",
+          "lastModified": "2026-05-25T06:02:58.412Z"
+        },
+        "verify.md": {
+          "hash": "sha256:416e355d6dfbe7c3a0e3c3ba156e8d91999c5c1103fe4ffcabd51a16f7a941ed",
+          "lastModified": "2026-05-25T06:02:58.412Z"
+        }
+      }
+    }
+  }
 }

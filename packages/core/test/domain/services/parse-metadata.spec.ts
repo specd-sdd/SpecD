@@ -29,6 +29,16 @@ describe('parseMetadata (lenient read path)', () => {
     expect(result.keywords).toEqual(['lifecycle'])
     expect(result.dependsOn).toEqual(['core/storage'])
   })
+
+  it('still accepts bare dependsOn entries', () => {
+    const result = parseMetadata(
+      JSON.stringify({
+        title: 'Config',
+        dependsOn: ['auth/login', ''],
+      }),
+    )
+    expect(result.dependsOn).toEqual(['auth/login', ''])
+  })
 })
 
 describe('strictSpecMetadataSchema', () => {
@@ -50,7 +60,7 @@ describe('strictSpecMetadataSchema', () => {
     const result = strictSpecMetadataSchema.safeParse({
       ...VALID_BASE,
       keywords: ['lifecycle', 'approval'],
-      dependsOn: ['core:storage', 'core/delta-format'],
+      dependsOn: ['core:storage', 'core:delta-format'],
       contentHashes: {
         'spec.md': 'sha256:' + 'a'.repeat(64),
       },
@@ -104,12 +114,20 @@ describe('strictSpecMetadataSchema', () => {
     expect(result.success).toBe(true)
   })
 
-  it('accepts unqualified capability path', () => {
+  it('rejects bare (unqualified) dependsOn entries', () => {
     const result = strictSpecMetadataSchema.safeParse({
       ...VALID_BASE,
       dependsOn: ['core/storage'],
     })
-    expect(result.success).toBe(true)
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects empty dependsOn entries', () => {
+    const result = strictSpecMetadataSchema.safeParse({
+      ...VALID_BASE,
+      dependsOn: [''],
+    })
+    expect(result.success).toBe(false)
   })
 
   it('rejects invalid contentHashes format', () => {
@@ -180,11 +198,90 @@ describe('strictSpecMetadataSchema', () => {
     expect(result.success).toBe(false)
   })
 
-  it('accepts dependsOn with underscore-starting capability segment', () => {
+  it('accepts dependsOn with underscore-starting capability segment when qualified', () => {
     const result = strictSpecMetadataSchema.safeParse({
       ...VALID_BASE,
-      dependsOn: ['_global/architecture'],
+      dependsOn: ['default:_global/architecture'],
     })
     expect(result.success).toBe(true)
+  })
+
+  it('rejects bare implementation file specId', () => {
+    const result = strictSpecMetadataSchema.safeParse({
+      ...VALID_BASE,
+      implementation: {
+        files: [{ specId: '_global/architecture', file: 'core:src/foo.ts' }],
+      },
+    })
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('strictSpecMetadataSchema field formats', () => {
+  it('rejects keywords that are not lowercase-hyphen tokens', () => {
+    for (const keyword of ['Upper', '1abc', 'has space', 'under_score']) {
+      expect(
+        strictSpecMetadataSchema.safeParse({ ...VALID_BASE, keywords: [keyword] }).success,
+      ).toBe(false)
+    }
+    expect(
+      strictSpecMetadataSchema.safeParse({ ...VALID_BASE, keywords: ['ok-keyword2'] }).success,
+    ).toBe(true)
+  })
+
+  it('requires sha256 content hashes and at least one entry', () => {
+    expect(strictSpecMetadataSchema.safeParse({ ...VALID_BASE, contentHashes: {} }).success).toBe(
+      false,
+    )
+    expect(
+      strictSpecMetadataSchema.safeParse({
+        ...VALID_BASE,
+        contentHashes: { 'spec.md': 'sha256:' + 'A'.repeat(64) },
+      }).success,
+    ).toBe(false)
+  })
+
+  it('treats scenarios as optional', () => {
+    expect(strictSpecMetadataSchema.safeParse(VALID_BASE).success).toBe(true)
+  })
+
+  it('validates context entries as non-empty strings', () => {
+    expect(strictSpecMetadataSchema.safeParse({ ...VALID_BASE, context: ['a'] }).success).toBe(true)
+    expect(strictSpecMetadataSchema.safeParse({ ...VALID_BASE, context: [''] }).success).toBe(false)
+  })
+
+  it('accepts generatedBy core|agent and rejects other values', () => {
+    expect(strictSpecMetadataSchema.safeParse({ ...VALID_BASE, generatedBy: 'core' }).success).toBe(
+      true,
+    )
+    expect(
+      strictSpecMetadataSchema.safeParse({ ...VALID_BASE, generatedBy: 'agent' }).success,
+    ).toBe(true)
+    expect(
+      strictSpecMetadataSchema.safeParse({ ...VALID_BASE, generatedBy: 'human' }).success,
+    ).toBe(false)
+  })
+
+  it('requires fully-qualified specIds in implementation entries', () => {
+    expect(
+      strictSpecMetadataSchema.safeParse({
+        ...VALID_BASE,
+        implementation: { files: [{ specId: 'auth/login', file: 'default:src/a.ts' }] },
+      }).success,
+    ).toBe(false)
+    expect(
+      strictSpecMetadataSchema.safeParse({
+        ...VALID_BASE,
+        implementation: {
+          files: [{ specId: 'default:auth/login', file: 'default:src/a.ts' }],
+          symbols: [{ specId: 'default:auth/login', file: 'default:src/a.ts', symbol: 'A' }],
+        },
+      }).success,
+    ).toBe(true)
+  })
+
+  it('preserves unknown fields (passthrough)', () => {
+    const parsed = strictSpecMetadataSchema.parse({ ...VALID_BASE, custom: 1 })
+    expect((parsed as Record<string, unknown>).custom).toBe(1)
   })
 })

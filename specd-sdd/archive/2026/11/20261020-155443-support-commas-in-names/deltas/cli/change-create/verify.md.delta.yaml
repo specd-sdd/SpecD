@@ -1,0 +1,82 @@
+- op: added
+  description: Raw value scenarios
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Command signature'
+  content: |
+    #### Scenario: Values are forwarded unchanged
+
+    - **WHEN** `specd change create my-change --spec auth/login` is run
+    - **THEN** the command forwards `auth/login` and the manifest stores `default:auth/login`
+
+    #### Scenario: A value with a comma is one ID
+
+    - **WHEN** `specd change create my-change --spec "auth/a,b"` is run
+    - **THEN** the command exits with code 1 with the `InvalidSpecIdError` message quoting `auth/a,b`, and no change is created
+
+    #### Scenario: Invalid ID rejected
+
+    - **WHEN** `specd change create my-change --spec "Bad Id"` is run
+    - **THEN** the command exits with code 1 with the `InvalidSpecIdError` message quoting `Bad Id`, and no change is created
+
+    #### Scenario: Invalid change name rejected by the core
+
+    - **WHEN** `specd change create "Bad Name"` is run
+    - **THEN** the command exits with code 1 with the core's invalid-name error on stderr
+    - **AND** the command source declares no name-format rule
+
+- op: added
+  description: Command resolves no workspace itself
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Workspace resolution'
+  content: |
+    #### Scenario: Workspace derived by the use case
+
+    - **WHEN** the command source is inspected
+    - **THEN** it does not parse `--spec` values or derive workspaces; `CreateChange` does
+
+- op: added
+  description: ReadOnly rejection delegated
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: ReadOnly workspace rejection'
+  content: |
+    #### Scenario: Command checks no ownership itself
+
+    - **WHEN** the command source is inspected
+    - **THEN** it does not read workspace ownership; it maps `ReadOnlyWorkspaceError` from `CreateChange` to exit code 1
+
+    #### Scenario: Mixed owned and readOnly specs
+
+    - **GIVEN** workspace `platform` is `readOnly`
+    - **WHEN** `specd change create my-change --spec default:auth/login --spec platform:auth/tokens` is run
+    - **THEN** the command exits with code 1 with one `Cannot add spec "platform:auth/tokens" ...` line on stderr
+    - **AND** no change is created
+
+    #### Scenario: Several readOnly specs each produce a line
+
+    - **WHEN** two `--spec` values target `readOnly` workspaces
+    - **THEN** stderr has one line per offending spec and no remediation
+
+- op: removed
+  description: Duplicate of the JSON output requirement that includes changePath
+  selector:
+    type: section
+    matches: 'Requirement: JSON output on success'
+
+- op: added
+  description: Invalid invalidation policy
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Duplicate name error'
+  content: |
+    #### Scenario: Invalid invalidation policy
+
+    - **WHEN** `specd change create my-change --invalidation-policy sugical` is run
+    - **THEN** the command exits with code 1 with the `InvalidInputError` message from `CreateChange`
+    - **AND** no change is created

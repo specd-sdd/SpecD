@@ -103,6 +103,42 @@ function createLoader(options: FsConfigLoaderOptions): FsConfigLoader {
 // ---------------------------------------------------------------------------
 
 describe('FsConfigLoader', () => {
+  it.each(['a', 'Core', 'nul'])('rejects invalid workspace name %s', async (name) => {
+    const configPath = await writeConfig(`
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+  ${name}:
+    specs:
+      adapter: fs
+      fs:
+        path: ${name}-specs
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`)
+    const loader = createLoader({ configPath })
+    await expect(loader.load()).rejects.toThrow(ConfigValidationError)
+  })
+
   it('rejects a workspace named like a Windows device', async () => {
     const configPath = await writeConfig(`
 schema: "@specd/schema-std"
@@ -136,7 +172,7 @@ storage:
       path: .specd/archive
 `)
     const loader = createLoader({ configPath })
-    await expect(loader.load()).rejects.toThrow(/Windows device name/)
+    await expect(loader.load()).rejects.toThrow(/not a valid workspace name/)
   })
 
   it('rejects workspaces named prn and aux', async () => {
@@ -173,7 +209,7 @@ storage:
       path: .specd/archive
 `)
       const loader = createLoader({ configPath })
-      await expect(loader.load()).rejects.toThrow(/Windows device name/)
+      await expect(loader.load()).rejects.toThrow(/not a valid workspace name/)
     }
   })
 
@@ -192,6 +228,43 @@ workspaces:
       adapter: fs
       fs:
         path: con-foo-specs
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`)
+    const loader = createLoader({ configPath })
+    await expect(loader.load()).resolves.toBeDefined()
+  })
+
+  it('accepts a two-character workspace name', async () => {
+    const configPath = await writeConfig(`
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+  ab:
+    codeRoot: .
+    specs:
+      adapter: fs
+      fs:
+        path: ab-specs
 storage:
   changes:
     adapter: fs
@@ -713,6 +786,41 @@ storage:
 
       const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow()
+    })
+
+    it('rejects Team as a prefix segment', async () => {
+      const configPath = await writeConfig(
+        `
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    prefix: Team
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`.trim(),
+      )
+
+      const loader = createLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow(ConfigValidationError)
     })
 
     it('rejects empty string prefix', async () => {
@@ -1286,6 +1394,29 @@ contextExcludeSpecs:
       expect(config.contextExcludeSpecs).toEqual(['auth/login'])
     })
 
+    it('accepts a leading-digit capability segment in patterns', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+contextIncludeSpecs:
+  - 'auth/2fa'
+`),
+      )
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+      expect(config.contextIncludeSpecs).toEqual(['auth/2fa'])
+    })
+
+    it('rejects a one-letter workspace qualifier in patterns', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+contextIncludeSpecs:
+  - 'a:*'
+`),
+      )
+      const loader = createLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow(ConfigValidationError)
+    })
+
     it('rejects wildcard in middle of path segment', async () => {
       const configPath = await writeConfig(
         minimalYaml(`
@@ -1294,7 +1425,7 @@ contextIncludeSpecs:
 `),
       )
       const loader = createLoader({ configPath })
-      await expect(loader.load()).rejects.toThrow(/disallowed position/)
+      await expect(loader.load()).rejects.toThrow(/'\*' is only allowed/)
     })
 
     it('rejects wildcard not preceded by /', async () => {
@@ -1305,7 +1436,7 @@ contextIncludeSpecs:
 `),
       )
       const loader = createLoader({ configPath })
-      await expect(loader.load()).rejects.toThrow(/disallowed position/)
+      await expect(loader.load()).rejects.toThrow(/'\*' is only allowed/)
     })
 
     it('rejects multiple wildcards', async () => {
@@ -1316,7 +1447,7 @@ contextIncludeSpecs:
 `),
       )
       const loader = createLoader({ configPath })
-      await expect(loader.load()).rejects.toThrow(/disallowed position/)
+      await expect(loader.load()).rejects.toThrow(/'\*' is only allowed/)
     })
 
     it('rejects empty pattern', async () => {
@@ -1327,7 +1458,7 @@ contextIncludeSpecs:
 `),
       )
       const loader = createLoader({ configPath })
-      await expect(loader.load()).rejects.toThrow(/invalid pattern/)
+      await expect(loader.load()).rejects.toThrow(/capability path must not be empty/)
     })
 
     it('validates workspace-level patterns too', async () => {
@@ -1362,7 +1493,7 @@ storage:
 `.trim(),
       )
       const loader = createLoader({ configPath })
-      await expect(loader.load()).rejects.toThrow(/disallowed position/)
+      await expect(loader.load()).rejects.toThrow(/'\*' is only allowed/)
     })
   })
 

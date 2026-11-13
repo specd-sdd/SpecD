@@ -1,0 +1,127 @@
+change:      support-commas-in-names
+state:       verifying
+description: CLI list options split their values on commas, so a file path or spec id containing a comma becomes two names that do not exist. Names must survive intact: lists carry whole names and every host passes arrays to the use cases. Also hardens spec ID handling in dependency commands: IDs are really validated (empty or malformed values are rejected), changes deps gains --clear, and an invalid persisted spec-lock fails with an actionable error that the CLI can repair.
+
+artifacts (DAG):
+  [✓] complete  [ ] missing  [!] drifted  [~] needs review  [?] in-progress
+
+  [✓] proposal [scope: change]
+  ├── [✓] specs [scope: spec]
+  │   ├── [✓] verify [scope: spec]
+  │   │   ├── [✓] design [scope: change]
+  │   │   │   └── [✓] tasks [scope: change] [hasTasks - 167/167 done]
+
+specs and dependencies:
+  core:update-implementation-tracking: core:change, core:refresh-implementation-tracking, core:composition-resolver
+  cli:change-implementation: core:change, sdk:build-implementation-review, core:update-implementation-tracking, core:get-implementation-review, core:refresh-implementation-tracking
+  core:edit-change: core:change, core:composition, core:composition-resolver, core:spec-id-format, core:workspace
+  cli:change-edit: cli:entrypoint, core:change, cli:change-create, core:spec-id-format, core:edit-change
+  core:spec-id-format: core:change, core:change-manifest, core:spec-metadata, core:compile-context, core:workspace
+  core:update-spec-deps: core:change, core:spec-id-format, core:compile-context, core:composition, default:_global/error-handling-conventions, core:composition-resolver
+  cli:change-deps: core:change, core:change-manifest, core:compile-context
+  core:update-persisted-spec-deps: core:spec-repository-port, core:spec-id-format, core:update-spec-deps, core:initialize-persisted-spec-state
+  cli:spec-deps: core:get-persisted-spec-deps, core:update-persisted-spec-deps, cli:entrypoint
+  core:spec-lock: core:spec-id-format, core:storage
+  core:workspace: core:config, core:spec-id-format
+  core:create-change: core:change, default:_global/architecture, core:get-active-schema, core:spec-overlap, core:composition-resolver, core:spec-id-format, core:workspace
+  cli:graph-index: cli:entrypoint, core:config, core:list-workspaces, sdk:run-index-project-graph, sdk:host-context, code-graph:isolated-index-worker, core:config-loader
+  skills:workflow-automation: cli:command-resource-naming, skills:agents, cli:spec-context, cli:spec-metadata
+  core:generate-metadata: core:spec-metadata, core:content-extraction, core:schema-format, core:spec-id-format, core:spec-repository-port, core:composition-resolver, core:spec-optimization
+  core:validate-specs: core:validate-artifacts, core:schema-format, core:storage, core:workspace, core:spec-id-format, core:composition-resolver, core:validation-result-cache-port, core:spec-lock, core:spec-repository-port, core:spec-optimization, core:get-spec-metadata
+  core:preview-spec: core:delta-format, core:artifact-parser-port, core:change-layout, core:file-reader-port, core:composition-resolver, core:diff-generator, core:spec-id-format
+  core:config: core:vcs-adapter-port, default:_global/architecture, core:spec-id-format
+  core:get-persisted-spec-deps: core:spec-repository-port, core:spec-id-format
+  core:get-persisted-spec-implementation: core:spec-repository-port, core:spec-id-format
+  core:get-persisted-spec-optimizations: core:spec-optimization, core:spec-repository-port, core:spec-id-format
+  core:get-persisted-spec-schema: core:spec-repository-port, core:spec-id-format
+  core:update-persisted-spec-implementation: core:spec-repository-port, core:spec-id-format, core:update-implementation-tracking, core:storage, core:workspace, core:initialize-persisted-spec-state
+  core:update-persisted-spec-optimizations: core:spec-optimization, core:spec-repository-port, core:spec-id-format, core:initialize-persisted-spec-state
+  core:update-persisted-spec-schema: core:spec-repository-port, core:spec-lock, core:schema-format, core:get-active-schema, core:content-extraction, core:spec-optimization, core:spec-id-format, core:composition-resolver
+  core:spec-metadata: core:config, core:change, core:schema-format, core:content-extraction, core:spec-repository-port, core:spec-lock, core:spec-optimization, core:spec-id-format
+  core:config-loader: core:config, core:composition, core:schema-merge, default:_global/architecture, core:vcs-adapter-port, core:vcs-adapter, core:spec-id-format
+  cli:change-create: cli:entrypoint, core:change, core:spec-id-format, core:create-change
+  cli:project-init: cli:entrypoint, cli:plugins-install, core:composition, core:config-writer-port, core:spec-id-format
+  core:spec-repository-port: core:repository-port, default:_global/architecture, core:change, core:storage, core:workspace, core:spec-id-format, core:spec-metadata, core:content-extraction, core:search-specs, default:_global/logging, core:spec-lock
+  core:archived-change-index-entry: core:change, core:storage, core:repository-port, core:spec-id-format
+
+next action:
+  target:  verifying
+  command: /specd-verify
+  reason:  Verifying implementation against scenarios
+
+lifecycle:
+  transitions:  implementing, done, designing
+  approvals:     spec=off  signoff=off
+  path:          /Users/monki/Documents/Proyectos/specd/specd-sdd/changes/20261020-155443-support-commas-in-names
+
+artifacts (details):
+  proposal  complete  (effective: complete)
+    - proposal  complete  proposal.md  sha256:ac1e10fa4bb27119bcd3a5e8dc3e3cee2e79cdd21cb2f007dccfc934b13cc0da
+  specs  complete  (effective: complete)
+    - core:update-implementation-tracking  complete  deltas/core/update-implementation-tracking/spec.md.delta.yaml  sha256:70adc25ce1fab0332c90f398bb770ac0389cd2b00ffa8dff36d7f22752dfc03a
+    - cli:change-implementation  complete  deltas/cli/change-implementation/spec.md.delta.yaml  sha256:b080e38ebdc49f71e921d1aee70d676dc1ad3775cf1e4b164bd109c55eace096
+    - core:edit-change  complete  deltas/core/edit-change/spec.md.delta.yaml  sha256:e4a08ac05a7c3fac3e1b52671a4bfeb0f2d1f672fda45f5e02cfb0f1a9900c03
+    - cli:change-edit  complete  deltas/cli/change-edit/spec.md.delta.yaml  sha256:7602d1ecf65fc4949be34e83bb036f0c60ca4b00bce701b15ed54083c74765f4
+    - core:spec-id-format  complete  deltas/core/spec-id-format/spec.md.delta.yaml  sha256:ce1d349024cb101292e0175a332ee3376d108c15032b3f11167cf2a627b2af81
+    - core:update-spec-deps  complete  deltas/core/update-spec-deps/spec.md.delta.yaml  sha256:52695069cc1d53c3802add50d1e78d918b5a41dceb98099727d27c1d6918f0d6
+    - cli:change-deps  complete  deltas/cli/change-deps/spec.md.delta.yaml  sha256:be643d1016c3f0dde81847d938f21a81008ec6001f8d373f313b3ffe0c02b04a
+    - core:update-persisted-spec-deps  complete  deltas/core/update-persisted-spec-deps/spec.md.delta.yaml  sha256:f5235db0cde82cf60495ebccc0464c8e83558d58d4ea111e777419c74bcd60d4
+    - cli:spec-deps  complete  deltas/cli/spec-deps/spec.md.delta.yaml  sha256:58a16517cf55f89ed129d7536091cedbf9d151ae368c0b5e96f177a64c10e407
+    - core:spec-lock  complete  deltas/core/spec-lock/spec.md.delta.yaml  sha256:be5a2950b128c21300cfbcb7f3c4b0095d4c07b0954b46158297f75384924972
+    - core:workspace  complete  deltas/core/workspace/spec.md.delta.yaml  sha256:a9f539c60ec40cf95316a439d9e0c73f6862e996465d346cebad56a3c0c00327
+    - core:create-change  complete  deltas/core/create-change/spec.md.delta.yaml  sha256:e5dcf11d0f40809c293bc75aaa31ba98f0f8915985f3e39fa55eef3ca796b4a1
+    - cli:graph-index  complete  deltas/cli/graph-index/spec.md.delta.yaml  sha256:953ba5a766babc956f326d0b7938a897787c7bb796ed9e7daddb16966d522526
+    - skills:workflow-automation  complete  deltas/skills/workflow-automation/spec.md.delta.yaml  sha256:bd9289c4bf82083c4dd8dc9302f759ee90b9197892481206dfd4265a258a715d
+    - core:generate-metadata  complete  deltas/core/generate-metadata/spec.md.delta.yaml  sha256:12858dd42b22cc418d6af3c5f3ae8b567ef7fec30c740f50236f4eee15cfe1b6
+    - core:validate-specs  complete  deltas/core/validate-specs/spec.md.delta.yaml  sha256:9f17df779ad3768a3ae7540d1d88995c85e3413ed5b6c4f90bd83098b5af790a
+    - core:preview-spec  complete  deltas/core/preview-spec/spec.md.delta.yaml  sha256:18e21332c1a820ea7b44396a140a018abd10358789b7a05da2ff7738fcc93b12
+    - core:config  complete  deltas/core/config/spec.md.delta.yaml  sha256:f11d657bab333422a18cd79669a33b668ea4a0076d00206547599d7835bcc8cc
+    - core:get-persisted-spec-deps  complete  deltas/core/get-persisted-spec-deps/spec.md.delta.yaml  sha256:6a3ac763fb45cafad38b552c845f3b2185f13ee8a2d964d56f165525a8514a7c
+    - core:get-persisted-spec-implementation  complete  deltas/core/get-persisted-spec-implementation/spec.md.delta.yaml  sha256:6a3ac763fb45cafad38b552c845f3b2185f13ee8a2d964d56f165525a8514a7c
+    - core:get-persisted-spec-optimizations  complete  deltas/core/get-persisted-spec-optimizations/spec.md.delta.yaml  sha256:f2116f0293225b0642fc88eb95d50ecb597b75ea97772344b610e547119a8264
+    - core:get-persisted-spec-schema  complete  deltas/core/get-persisted-spec-schema/spec.md.delta.yaml  sha256:6a3ac763fb45cafad38b552c845f3b2185f13ee8a2d964d56f165525a8514a7c
+    - core:update-persisted-spec-implementation  complete  deltas/core/update-persisted-spec-implementation/spec.md.delta.yaml  sha256:abc828ba7c0f2eece717e4da934a538eb5ebaa8087af512f2541e005be049a4d
+    - core:update-persisted-spec-optimizations  complete  deltas/core/update-persisted-spec-optimizations/spec.md.delta.yaml  sha256:2137499d606163ee14aaec3688aa6781a1b6bd5f022ddad8f23bed5778328f84
+    - core:update-persisted-spec-schema  complete  deltas/core/update-persisted-spec-schema/spec.md.delta.yaml  sha256:30eb59b4c5c481770e07c83d71f14dfd68fb981f32aa55dc5cbd8ebe63ec5787
+    - core:spec-metadata  complete  deltas/core/spec-metadata/spec.md.delta.yaml  sha256:6b08945632fa2b55e0cc77bd7517b987516e065c8531f1867f3d580046f2660c
+    - core:config-loader  complete  deltas/core/config-loader/spec.md.delta.yaml  sha256:8d0083bad93cbb2f87bd3cd8521ce653d561898f4431bc16a62d4e1b03450f49
+    - cli:change-create  complete  deltas/cli/change-create/spec.md.delta.yaml  sha256:795b7c94a07f26f428910d5fc29b319b7580e351f09406e0a49c436d7c0316a1
+    - cli:project-init  complete  deltas/cli/project-init/spec.md.delta.yaml  sha256:f22c9413801c8b20531adbcbd305a8b33e7aa5e84df3977390173eec3ee8d1e2
+    - core:spec-repository-port  complete  deltas/core/spec-repository-port/spec.md.delta.yaml  sha256:ab86db879ab3949dded89cbe08067427d99bf53f8592fa0dafc1171ba5504652
+    - core:archived-change-index-entry  complete  deltas/core/archived-change-index-entry/spec.md.delta.yaml  sha256:a4171b709044199d2938806364c1ef7600abd229be70a77969be11362a997fd7
+  verify  complete  (effective: complete)
+    - core:update-implementation-tracking  complete  deltas/core/update-implementation-tracking/verify.md.delta.yaml  sha256:cf50be23b10f604eb3194be0f16406c39a3633d18258acf5e02982b4fa55ef87
+    - cli:change-implementation  complete  deltas/cli/change-implementation/verify.md.delta.yaml  sha256:ee5720393add22b5ac7c48c493daf0ef7b01c3e3eafb0e70d295bf70f86b10a6
+    - core:edit-change  complete  deltas/core/edit-change/verify.md.delta.yaml  sha256:7133c32be25eafb0128229b37c58d518d9f8b487f3c4911489c119b0b7651965
+    - cli:change-edit  complete  deltas/cli/change-edit/verify.md.delta.yaml  sha256:16366deb1c2989373cb2f67163e1c11a26def53edb267ed5d1bff769354a1aa5
+    - core:spec-id-format  complete  deltas/core/spec-id-format/verify.md.delta.yaml  sha256:fc407375172a54abaa8ec00dc8df5cbe81e78611365ba4959aa36afb9482a569
+    - core:update-spec-deps  complete  deltas/core/update-spec-deps/verify.md.delta.yaml  sha256:e3f2dc8a8e03940f955c35a3a6b7880a27b2fdf7f974312376e0f0f7706524e3
+    - cli:change-deps  complete  deltas/cli/change-deps/verify.md.delta.yaml  sha256:b2694e61d9a1f21682f6dbfa3c45ee03b4df467c3bfd281a138059a2c36d8de3
+    - core:update-persisted-spec-deps  complete  deltas/core/update-persisted-spec-deps/verify.md.delta.yaml  sha256:0d002506f4934dd0e66fd4e5ce7fbd92bbff1a40007427f742ee36e005da8955
+    - cli:spec-deps  complete  deltas/cli/spec-deps/verify.md.delta.yaml  sha256:87f5e55b4f8247c267d334c2ed2768bef9dc238bc9a61f81af4a9e523b8d886e
+    - core:spec-lock  complete  deltas/core/spec-lock/verify.md.delta.yaml  sha256:cef98f9ec4e2e085df090257c9cb9aa030541b4093d0c266b6ef92adca88756c
+    - core:workspace  complete  deltas/core/workspace/verify.md.delta.yaml  sha256:10e20358a7f1117885bbccabf8182c1a8834c96a505f8a508fd67c90c78f0e33
+    - core:create-change  complete  deltas/core/create-change/verify.md.delta.yaml  sha256:354d044892fe4b11235952480cefcf8a3bcfe2cf85507e0b968f793213b30401
+    - cli:graph-index  complete  deltas/cli/graph-index/verify.md.delta.yaml  sha256:882c2b80022648bb4c7bbc5e56e321c7993786037a103d34f7bfd9a8c9300636
+    - skills:workflow-automation  complete  deltas/skills/workflow-automation/verify.md.delta.yaml  sha256:7a60a6c8bf785037cf3289d4dbf6547dded850fef51c77f2e5e8dd30bf0b714b
+    - core:generate-metadata  complete  deltas/core/generate-metadata/verify.md.delta.yaml  sha256:8a9ead0990a1e4295bedffa73c70efc167ac50a096a1bc370a05d4fdaef23c2d
+    - core:validate-specs  complete  deltas/core/validate-specs/verify.md.delta.yaml  sha256:9666681cf7182affe58e427847b0df5cf1bfd3645b30dbc7e6c318f726b88fac
+    - core:preview-spec  complete  deltas/core/preview-spec/verify.md.delta.yaml  sha256:6a4d83dc5f3d9774177d9be2f7748490bcea39e036c3b68e7515d42ab4502c24
+    - core:config  complete  deltas/core/config/verify.md.delta.yaml  sha256:9fcf97bd37278ff8dafea947a41bcf57c21dd2f4bed4fe944e91b337b5294456
+    - core:get-persisted-spec-deps  complete  deltas/core/get-persisted-spec-deps/verify.md.delta.yaml  sha256:86f169832070555137e13bb6e53c3ae636b3e5e6168fd5424fa26784030f70d9
+    - core:get-persisted-spec-implementation  complete  deltas/core/get-persisted-spec-implementation/verify.md.delta.yaml  sha256:83eacdf7a8b982d64d300bcc849bbdc0562bfcf885af514422d3e08da8d42dca
+    - core:get-persisted-spec-optimizations  complete  deltas/core/get-persisted-spec-optimizations/verify.md.delta.yaml  sha256:ebfa52ed5c02ca2931e9cd292724b937b847e9337a7cca8f48528879bc540222
+    - core:get-persisted-spec-schema  complete  deltas/core/get-persisted-spec-schema/verify.md.delta.yaml  sha256:37870ec5a512bc77448d288236f51e7f35928b2bbfbd11f810b630428ce0f7bc
+    - core:update-persisted-spec-implementation  complete  deltas/core/update-persisted-spec-implementation/verify.md.delta.yaml  sha256:446b1a9a80ffb25b1523521ea08ecca35baeb9e657e171e316e5c35bf7e4b27c
+    - core:update-persisted-spec-optimizations  complete  deltas/core/update-persisted-spec-optimizations/verify.md.delta.yaml  sha256:f475cdc18ce39454d3df6690dcea2cca13646c87d9695a3c54220524f01e9a3d
+    - core:update-persisted-spec-schema  complete  deltas/core/update-persisted-spec-schema/verify.md.delta.yaml  sha256:2df950d8ad4d705a590d7577f352689569b3bf25124feba63651c7199b374f29
+    - core:spec-metadata  complete  deltas/core/spec-metadata/verify.md.delta.yaml  sha256:2a771eafa92e29522d4f7f1b4d8f071dbd69301570eedfa997c616753d0e9297
+    - core:config-loader  complete  deltas/core/config-loader/verify.md.delta.yaml  sha256:2cc0e2a2139912ab7e113d22650f92219aa925e9945f797878c0383ddce62e33
+    - cli:change-create  complete  deltas/cli/change-create/verify.md.delta.yaml  sha256:6da35e2bf7781e6f7ea20f928cfb1e29e950c3dd27ec7e0caeb1659c6f97ef53
+    - cli:project-init  complete  deltas/cli/project-init/verify.md.delta.yaml  sha256:31a21e56a308a1e53cf925bea8712241327f9f977cc1e783b04a179287439a3f
+    - core:spec-repository-port  complete  deltas/core/spec-repository-port/verify.md.delta.yaml  sha256:33e4dd081ab6c5ea14db09a99bfb21c8e2db54aa07ac00eb6ffd4a76cad899a7
+    - core:archived-change-index-entry  complete  deltas/core/archived-change-index-entry/verify.md.delta.yaml  sha256:8057532c959b0a01167a8ce10333bcdf8e243f6207585759d58ccb1e9490c90c
+  design  complete  (effective: complete)
+    - design  complete  design.md  sha256:3a0aa782e2014a89cb54bbe85d2fac2862b5df85eed7b66acf9c310b9904aa7f
+  tasks  complete  (effective: complete)  tasks: 167/167
+    - tasks  complete  tasks.md  sha256:b07252c27b5d70bffa176c26b1dcdd7731f743af6e6ab76307d54962b4ba0530

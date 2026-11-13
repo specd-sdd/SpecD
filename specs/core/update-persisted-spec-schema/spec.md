@@ -15,6 +15,10 @@ Repositories occasionally need to rebind a spec's persisted state to a different
 
 Unlike [`core:initialize-persisted-spec-state`](../initialize-persisted-spec-state/spec.md), `schemaRef` has no effective-project-schema fallback: reassignment is always explicit.
 
+### Requirement: Spec ID validation
+
+Before workspace resolution, schema resolution, artifact reads, or persisted-state I/O, the use case MUST validate and normalize `specId` with `parseSpecId` and the configured workspaces (see `core:spec-id-format`). A bare path is resolved to the `default` workspace, so the input accepts a bare or fully-qualified valid ID, and every `specId` in the result is the fully-qualified form. An invalid ID fails with `InvalidSpecIdError` and an unknown workspace with `WorkspaceNotFoundError`, quoting the full original value, and nothing is written. Delivery adapters pass the raw string and perform no validation of their own.
+
 ### Requirement: Requires an existing lock; never creates one
 
 The use case MUST call `SpecRepository.readPersistedState(spec)` before doing anything else. When it returns `null`, `execute` SHALL throw `SpecNotInitializedError` identifying `specId`. This use case MUST NOT create persisted state and MUST NOT delegate to `InitializePersistedSpecState` or any initial-base construction path.
@@ -29,7 +33,7 @@ The use case MUST resolve `schemaRef` to a `Schema` through `GetActiveSchema` in
 
 ### Requirement: Loading and parsing declared artifacts under the target schema
 
-The use case MUST load the spec's current schema-declared canonical artifacts and verify that they parse successfully under the resolved target schema, using the same parsing and content-extraction infrastructure used by deterministic metadata projection. A parse failure under the target schema MUST abort the reassignment with a typed error and MUST NOT mutate persisted state.
+The use case MUST load the spec's current schema-declared canonical artifacts and verify that every one of them parses successfully under the resolved target schema, using the same parsing and content-extraction infrastructure used by deterministic metadata projection. This verification runs for every target schema that differs from the schema already persisted, whether or not it declares dependency extraction; selecting the already-persisted schema is a no-op that returns before any parsing (see "Selecting the already-persisted schema is a no-op"). An artifact whose format has no registered parser has nothing to verify and is the only case that is skipped. A parse failure under the target schema MUST abort the reassignment with a typed error and MUST NOT mutate persisted state.
 
 ### Requirement: Selecting the already-persisted schema is a no-op
 
@@ -78,8 +82,11 @@ The config-based `createUpdatePersistedSpecSchema(config, options?)` form MUST d
 
 `resolveUpdatePersistedSpecSchemaDeps(resolver)` MUST resolve:
 
-- `specs: ReadonlyMap<string, SpecRepository>` — one repository instance per workspace
+- `specRepositories: ReadonlyMap<string, SpecRepository>` — one repository instance per workspace
 - `getActiveSchema: GetActiveSchema`
+- `parsers: ArtifactParserRegistry`
+- `extractorTransforms: ExtractorTransformRegistry`
+- `contentHasher: ContentHasher`
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
 

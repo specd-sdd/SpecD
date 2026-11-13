@@ -103,6 +103,10 @@ Before validation, the loader MUST merge supported environment variables into th
 
 The loader MUST verify that `workspaces.default` exists in the parsed config. If the `default` workspace is absent, `load()` MUST throw `ConfigValidationError` with a message indicating that `workspaces.default` is required.
 
+### Requirement: Workspace names use the shared rule
+
+The loader MUST validate every declared workspace name with `isValidWorkspaceName` from `core:spec-id-format` (`^[a-z][a-z0-9-]+$`, two or more characters, never a Windows device name) and MUST reject an invalid name with a `ConfigValidationError`. The loader MUST NOT keep its own copy of the expression, so that a workspace declared in `specd.yaml` can always be referenced by a valid spec ID.
+
 ### Requirement: Path resolution relative to config directory
 
 All relative paths in the parsed config — `specs.fs.path`, `specs.fs.metadataPath`, `schemas.fs.path`, `codeRoot`, and all `storage.*.fs.path` values — MUST be resolved relative to the directory containing the active config file. The resolved `SpecdConfig.projectRoot` MUST be set to the config file's parent directory.
@@ -143,7 +147,7 @@ The loader MUST reject a `maxFileBytes` that is not a non-negative integer with 
 
 ### Requirement: contextIncludeSpecs and contextExcludeSpecs pattern validation
 
-The loader MUST validate all `contextIncludeSpecs` and `contextExcludeSpecs` patterns at both project level and workspace level. Valid pattern forms are:
+The loader MUST validate all `contextIncludeSpecs` and `contextExcludeSpecs` patterns at both project level and workspace level, using `parseSpecPattern` from `core:spec-id-format`, the same parser later used to match specs. Valid pattern forms are:
 
 - `*` — bare wildcard
 - `workspace:*` — wildcard qualified by workspace name
@@ -154,7 +158,7 @@ The loader MUST validate all `contextIncludeSpecs` and `contextExcludeSpecs` pat
 
 `*` SHALL only appear alone, after `workspace:`, or after a path prefix ending in `/`. Any other position MUST produce `ConfigValidationError`.
 
-Workspace qualifiers MUST match `/^[a-z][a-z0-9-]*$/`. Path segments MUST match `/^[a-z_][a-z0-9_-]*$/`. Invalid qualifiers or segments MUST produce `ConfigValidationError`.
+Workspace qualifiers MUST satisfy the workspace name rule (`^[a-z][a-z0-9-]+$`) and every path segment MUST satisfy the capability path segment rule (`^[a-z0-9_][a-z0-9_-]*$`, never a Windows device name), both defined once by `core:spec-id-format`. The loader MUST NOT keep its own copy of these expressions. Invalid qualifiers or segments MUST produce `ConfigValidationError`.
 
 ### Requirement: Schema plugins, schema overrides, and context entry mapping
 
@@ -191,3 +195,4 @@ No generic YAML/runtime exception SHALL escape for configuration validation fail
 - [`core:vcs-adapter-port`](../vcs-adapter-port/spec.md) — default factory resolves the repository root from the VCS adapter contract
 - [`core:vcs-adapter`](../vcs-adapter/spec.md) — built-in adapters normalize the repository root before it is used as `rootPath`
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — port and adapter design
+- [`core:spec-id-format`](../spec-id-format/spec.md) — workspace name rule, capability path segment rule, and `parseSpecPattern` used for validation

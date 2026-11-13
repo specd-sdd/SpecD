@@ -3,8 +3,6 @@ import { resolveCliContext } from '../../helpers/cli-context.js'
 import { collect } from '../../helpers/collect.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
-import { parseSpecId } from '../../helpers/spec-path.js'
-
 /**
  * Registers the `spec init` subcommand on the given parent command.
  *
@@ -41,7 +39,7 @@ export function registerSpecInit(parent: Command): void {
             cliError('either <specPath> or --all is required', opts.format)
           }
 
-          const { config, kernel } = await resolveCliContext({ configPath: opts.config })
+          const { kernel } = await resolveCliContext({ configPath: opts.config })
           const fmt = parseFormat(opts.format)
 
           const target =
@@ -52,7 +50,7 @@ export function registerSpecInit(parent: Command): void {
                 }
               : {
                   kind: 'spec' as const,
-                  specId: parseSpecId(specPath!, config).specId,
+                  specId: specPath!,
                 }
 
           const result = await kernel.specs.initializePersistedState.execute({

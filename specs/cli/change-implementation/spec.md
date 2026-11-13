@@ -8,7 +8,9 @@ Implementation traceability needs an explicit workflow surface during an active 
 
 ### Requirement: Command signature
 
-Implementation tracking features SHALL be exposed under the `specd changes implementation` command group.
+Implementation tracking features SHALL be exposed under the `specd changes implementation` command group, with the subcommands `list`, `add`, `resolve`, `unresolve`, `ignore`, `remove`, `review`, and `start`.
+
+Repeatable and variadic options (`--file`, `--symbol`) collect each value as one whole string; the command MUST NOT define a second accumulator that splits or trims, and shares the CLI's single repeatable-option helper.
 
 ### Requirement: List subcommand
 
@@ -42,8 +44,8 @@ The command MUST:
 
 The command MUST:
 
-- support a comma-separated list of paths for the `--file` option
-- validate that EVERY file exists on disk; throw `ImplementationFileNotFoundError` if any file is missing and abort the operation
+- accept one or more whole file names, either repeating the option (`--file a --file b`) or listing them after one option (`--file a b`); every value is one whole name, passed to `UpdateImplementationTracking` as an entry of `files` unchanged, and is never split on commas or trimmed
+- rely on `UpdateImplementationTracking` to validate that EVERY file exists on disk and to throw `ImplementationFileNotFoundError` quoting the full name if any is missing, aborting the whole operation
 - accept only files that are already tracked by the change; it MUST NOT create a new tracked entry or move an untracked file directly to `resolved`
 
 Resolving a file means:
@@ -61,8 +63,8 @@ Files in the `removed` state MUST NOT be resolved unless they are first resurrec
 
 The command MUST:
 
-- support a comma-separated list of paths for the `--file` option
-- validate that EVERY file exists on disk; throw `ImplementationFileNotFoundError` if any file is missing and abort the operation
+- accept one or more whole file names (`--file a --file b` or `--file a b`); every value is one whole name, passed unchanged, never split on commas or trimmed
+- rely on `UpdateImplementationTracking` to validate that EVERY file exists on disk and to throw `ImplementationFileNotFoundError` if any file is missing, aborting the operation
 - accept only files that are already tracked by the change
 - accept tracked files currently in `resolved` or `ignored` state
 - reject files currently in `removed` state until a refresh confirms their physical existence and returns them to `open`
@@ -76,9 +78,9 @@ Unresolving a file means the implementation review for that file is reopened exp
 
 The command MUST:
 
-- support a comma-separated list of paths for the `--file` option
+- accept one or more whole file names (`--file a --file b` or `--file a b`); every value is one whole name, passed unchanged, never split on commas or trimmed, so a file such as `Análisis, dependencias.md` can be ignored
 - permit ignoring a file even if it is physically missing from disk, provided the file is already tracked by the change (including those in the `removed` state)
-- for files NOT currently tracked, the command MUST validate their physical existence on disk before adding them as `ignored`; if a new file is missing, throw `ImplementationFileNotFoundError`
+- for files NOT currently tracked, rely on `UpdateImplementationTracking` to validate their physical existence on disk before adding them as `ignored`; if a new file is missing, `ImplementationFileNotFoundError` is thrown quoting the full name
 - preserve confirmed implementation links for the file; the command MUST NOT reject the state transition solely because links still exist
 
 Ignoring a file means that file remains part of tracked review history for the change but is excluded from unresolved tracked-file review. `ignore` MUST operate on tracked-file state, not by deleting the tracked entry outright.
@@ -122,6 +124,12 @@ The command MUST:
 Manual implementation management and autodetection MUST use the same raw project-relative file-path semantics during the active change.
 
 The CLI MUST NOT require users to enter canonical `workspace:path` identities during change-time authoring. That normalization belongs to archive-time materialization.
+
+### Requirement: Raw values and unambiguous listings
+
+Every subcommand MUST pass `--file` values, `--symbol` values, and `--spec <specId>` to the use case exactly as typed. The command MUST NOT split any of them on commas, trim them, or validate, qualify, or normalize a spec ID; `UpdateImplementationTracking` applies the rules of `core:spec-id-format`.
+
+Text output that lists file names or other names MUST print one name per line, never joined by a separator that a name can contain. JSON and TOON output keep names as arrays.
 
 ## Spec Dependencies
 

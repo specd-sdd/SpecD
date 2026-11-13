@@ -33,6 +33,7 @@ function setup() {
 afterEach(() => vi.restoreAllMocks())
 
 const mockSpecResult = {
+  specId: 'default:auth/login',
   artifacts: new Map([
     ['spec.md', { content: '# Auth Spec\n\nContent here.' }],
     ['verify.md', { content: '## Scenarios' }],
@@ -116,7 +117,9 @@ describe('spec show', () => {
   })
 
   it('exits 1 when workspace is unknown', async () => {
-    const { stderr } = setup()
+    const { kernel, stderr } = setup()
+    const { WorkspaceNotFoundError } = await import('@specd/sdk')
+    kernel.specs.get.execute.mockRejectedValue(new WorkspaceNotFoundError('unknown-ws'))
 
     const program = makeProgram()
     registerSpecShow(program.command('spec'))

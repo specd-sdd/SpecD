@@ -37,6 +37,40 @@
 - **WHEN** `PreviewSpec.execute` is called with `specId: "core:other"`
 - **THEN** the use case throws a `SpecNotInChangeError` (or equivalent)
 
+#### Scenario: Invalid specId rejected before membership check
+
+- **WHEN** `PreviewSpec.execute` receives `specId: 'Bad Id'`
+- **THEN** it throws `InvalidSpecIdError` quoting `Bad Id`
+- **AND** the change is not loaded
+
+#### Scenario: Empty and comma specIds rejected
+
+- **WHEN** `specId` is `''` or `'auth/a,b'`
+- **THEN** it throws `InvalidSpecIdError`, and for the comma case the error quotes `auth/a,b`
+
+#### Scenario: Bare specId normalized then checked against the change
+
+- **GIVEN** the change contains `default:auth/login`
+- **WHEN** `specId: 'auth/login'` is provided
+- **THEN** the preview is produced for `default:auth/login`
+- **AND** the result `specId` is `default:auth/login`
+
+#### Scenario: Unknown workspace rejected
+
+- **WHEN** `specId: 'nope:auth/login'` is provided
+- **THEN** it throws `WorkspaceNotFoundError` quoting `nope:auth/login`
+- **AND** the change is not loaded
+
+#### Scenario: Valid specId outside the change rejected
+
+- **WHEN** `specId` is valid but not in `change.specIds`
+- **THEN** it throws `SpecNotInChangeError`
+
+#### Scenario: Documented errors
+
+- **WHEN** the `execute` contract is read
+- **THEN** it documents `InvalidSpecIdError` and `WorkspaceNotFoundError` among the errors it throws
+
 ### Requirement: File discovery via change artifacts
 
 #### Scenario: Delta files discovered from change artifacts

@@ -1,0 +1,68 @@
+- op: modified
+  description: dependsOn uses the shared fully-qualified spec ID rule
+  selector:
+    type: section
+    matches: 'Requirement: Structural validation before persistence'
+  content: |
+    The internal metadata-persistence guard (`PersistSpecMetadata`) validates
+    generated JSON content against the `strictSpecMetadataSchema` Zod schema before
+    writing. The content must be a JSON object. `title` and `description` are
+    required; other fields are optional but when present must conform to their
+    declared types and formats:
+
+    - `title` (required) must be a non-empty string
+    - `description` (required) must be a non-empty string
+    - `keywords` must be an array of non-empty strings, each matching
+      `^[a-z][a-z0-9-]*$` (lowercase, digits and hyphens, starting with a letter)
+    - `dependsOn` must be an array of fully-qualified spec IDs, each satisfying the
+      rules of `core:spec-id-format` (a bare, empty, or malformed entry is
+      rejected; the schema does not keep its own copy of the expressions)
+    - `implementation.files[]` and `implementation.symbols[]` entries must have a
+      fully-qualified `specId` under the same rules, a non-empty `file`, and (for
+      symbols) a non-empty `symbol`
+    - `contentHashes` (required) must be a non-empty record of filename to hash,
+      each hash matching `sha256:<64 lowercase hex characters>`
+    - `rules` must be an array of objects with a non-empty `requirement` and a
+      non-empty array `rules` of non-empty strings
+    - `constraints` must be a non-empty array of non-empty strings
+    - `scenarios` must be an array of objects with a non-empty `requirement` and
+      `name`, a non-empty array `then` of strings, and optional `given` and `when`
+      arrays of strings
+    - `context` must be an array of non-empty strings
+    - `generatedBy` must be `core` or `agent`
+    - `optimizedDescription` must be a non-empty string
+    - `optimizedContext` must be a non-empty string
+    - `provenance` and other keys not listed here are carried through
+      (`.passthrough()`) and are not validated by this guard
+
+    If validation fails, persistence is rejected with a typed validation error and
+    the file is not written. This guard is not a public editor: it is invoked only
+    internally by materialization, never by an external caller supplying arbitrary
+    content.
+
+    Unknown top-level keys are allowed (`.passthrough()`) to support
+    forward-compatible extensions.
+
+- op: modified
+  description: Declare the dependency on spec-id-format
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:config`](../config/spec.md) — context spec selection and resolution
+      order
+    - [`core:change`](../change/spec.md) — `specDependsOn` in the change manifest,
+      per-spec declared dependencies
+    - [`core:schema-format`](../schema-format/spec.md) — `requiredSpecArtifacts`,
+      used to determine which files to hash for staleness detection
+    - [`core:content-extraction`](../content-extraction/spec.md) — the extraction
+      engine used as CompileContext fallback when metadata is stale
+    - [`core:spec-repository-port`](../spec-repository-port/spec.md) —
+      `readMetadataSnapshot()` and `writeMetadataSnapshot()` methods used for all
+      metadata access
+    - [`core:spec-lock`](../spec-lock/spec.md) — durable archived dependency,
+      implementation, and optimization source of truth
+    - [`core:spec-optimization`](../spec-optimization/spec.md) — the per-field
+      optimization record and freshness reasons projected into
+      `optimizedDescription` / `optimizedContext`
+    - [`core:spec-id-format`](../spec-id-format/spec.md) — `dependsOn` entries follow the fully-qualified spec ID rules

@@ -11,8 +11,22 @@ import { type SchemaRepository } from '../../application/ports/schema-repository
 import { type Schema } from '../../domain/value-objects/schema.js'
 import { parseSchemaYaml } from '../schema-yaml-parser.js'
 import { buildSchema } from '../../domain/services/build-schema.js'
-import { parseSpecId } from '../../domain/services/parse-spec-id.js'
+import { isValidWorkspaceName } from '../../domain/services/spec-id-rules.js'
 import { SchemaValidationError } from '../../domain/errors/schema-validation-error.js'
+
+/**
+ * Splits a `#`-style schema reference body into an optional workspace qualifier and name.
+ *
+ * @param inner - Reference body after the leading `#`
+ * @returns Workspace and schema name, or `null` when the workspace qualifier is invalid
+ */
+function splitSchemaReference(inner: string): { workspace: string; name: string } | null {
+  const colon = inner.indexOf(':')
+  if (colon < 0) return { workspace: 'default', name: inner }
+  const workspace = inner.slice(0, colon)
+  if (!isValidWorkspaceName(workspace)) return null
+  return { workspace, name: inner.slice(colon + 1) }
+}
 
 /** Construction configuration for {@link FsSchemaRegistry}. */
 export interface FsSchemaRegistryConfig {
@@ -93,10 +107,11 @@ export class FsSchemaRegistry implements SchemaRegistry {
     // Workspace-qualified references (#workspace:name or #name)
     if (ref.startsWith('#')) {
       const inner = ref.slice(1)
-      const { workspace, capPath: name } = parseSpecId(inner)
-      const repo = this._schemaRepositories.get(workspace)
+      const split = splitSchemaReference(inner)
+      if (split === null) return null
+      const repo = this._schemaRepositories.get(split.workspace)
       if (repo === undefined) return null
-      return repo.resolveRaw(name)
+      return repo.resolveRaw(split.name)
     }
 
     // Direct path references (absolute or relative)

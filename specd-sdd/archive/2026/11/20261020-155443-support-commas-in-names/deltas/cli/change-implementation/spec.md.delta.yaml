@@ -1,0 +1,84 @@
+- op: modified
+  description: resolve takes whole file names, no comma list
+  selector:
+    type: section
+    matches: 'Requirement: Resolve subcommand'
+  content: |
+    `specd changes implementation resolve <name> --file <paths...>` SHALL mark one or more tracked implementation files as fully reviewed for the current change.
+
+    The command MUST:
+
+    - accept one or more whole file names, either repeating the option (`--file a --file b`) or listing them after one option (`--file a b`); every value is one whole name, passed to `UpdateImplementationTracking` as an entry of `files` unchanged, and is never split on commas or trimmed
+    - rely on `UpdateImplementationTracking` to validate that EVERY file exists on disk and to throw `ImplementationFileNotFoundError` quoting the full name if any is missing, aborting the whole operation
+    - accept only files that are already tracked by the change; it MUST NOT create a new tracked entry or move an untracked file directly to `resolved`
+
+    Resolving a file means:
+
+    - all relevant spec/file/symbol links for that file have been captured for this change
+    - there is no remaining implementation classification work for that tracked file
+
+    `resolve` MUST update tracked-file review state only. It MUST NOT add, remove, or rewrite implementation links.
+
+    Files in the `removed` state MUST NOT be resolved unless they are first resurrected to `open` via a refresh that confirms their physical existence.
+
+- op: modified
+  description: unresolve takes whole file names, no comma list
+  selector:
+    type: section
+    matches: 'Requirement: Unresolve subcommand'
+  content: |
+    `specd changes implementation unresolve <name> --file <paths...>` SHALL move one or more tracked implementation files back to `open`.
+
+    The command MUST:
+
+    - accept one or more whole file names (`--file a --file b` or `--file a b`); every value is one whole name, passed unchanged, never split on commas or trimmed
+    - rely on `UpdateImplementationTracking` to validate that EVERY file exists on disk and to throw `ImplementationFileNotFoundError` if any file is missing, aborting the operation
+    - accept only files that are already tracked by the change
+    - accept tracked files currently in `resolved` or `ignored` state
+    - reject files currently in `removed` state until a refresh confirms their physical existence and returns them to `open`
+    - update tracked-file review state only; it MUST NOT add, remove, or rewrite implementation links
+
+    Unresolving a file means the implementation review for that file is reopened explicitly by the operator or agent, provided the file still exists on disk.
+
+- op: modified
+  description: ignore takes whole file names, no comma list
+  selector:
+    type: section
+    matches: 'Requirement: Ignore subcommand'
+  content: |
+    `specd changes implementation ignore <name> --file <paths...>` SHALL mark one or more tracked implementation files as `ignored`.
+
+    The command MUST:
+
+    - accept one or more whole file names (`--file a --file b` or `--file a b`); every value is one whole name, passed unchanged, never split on commas or trimmed, so a file such as `Análisis, dependencias.md` can be ignored
+    - permit ignoring a file even if it is physically missing from disk, provided the file is already tracked by the change (including those in the `removed` state)
+    - for files NOT currently tracked, rely on `UpdateImplementationTracking` to validate their physical existence on disk before adding them as `ignored`; if a new file is missing, `ImplementationFileNotFoundError` is thrown quoting the full name
+    - preserve confirmed implementation links for the file; the command MUST NOT reject the state transition solely because links still exist
+
+    Ignoring a file means that file remains part of tracked review history for the change but is excluded from unresolved tracked-file review. `ignore` MUST operate on tracked-file state, not by deleting the tracked entry outright.
+
+- op: added
+  description: Names and spec IDs are passed raw; one name per line in text output
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Shared path semantics'
+  content: |
+    ### Requirement: Raw values and unambiguous listings
+
+    Every subcommand MUST pass `--file` values, `--symbol` values, and `--spec <specId>` to the use case exactly as typed. The command MUST NOT split any of them on commas, trim them, or validate, qualify, or normalize a spec ID; `UpdateImplementationTracking` applies the rules of `core:spec-id-format`.
+
+    Text output that lists file names or other names MUST print one name per line, never joined by a separator that a name can contain. JSON and TOON output keep names as arrays.
+
+- op: modified
+  description: Command signature lists every subcommand
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    Implementation tracking features SHALL be exposed under the `specd changes implementation` command group, with the subcommands `list`, `add`, `resolve`, `unresolve`, `ignore`, `remove`, `review`, and `start`.
+
+    Repeatable and variadic options (`--file`, `--symbol`) collect each value as one whole string; the command MUST NOT define a second accumulator that splits or trims, and shares the CLI's single repeatable-option helper.

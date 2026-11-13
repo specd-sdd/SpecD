@@ -84,7 +84,7 @@ Specifically:
 - agents MUST use `specd changes implementation add` to confirm relevant spec-to-file or spec-to-symbol links
 - agents MUST treat tracked implementation files as a review surface distinct from confirmed links
 - agents MUST explicitly resolve or ignore tracked implementation files before archive
-- when resolving or ignoring multiple files, agents SHOULD use comma-separated lists in the `--file` option for better efficiency
+- when resolving or ignoring multiple files, agents SHOULD pass one whole file name per value, repeating the option (`--file <path1> --file <path2>`) or listing the names after it (`--file <path1> <path2>`); agents MUST NOT join file names with commas, because a file name can contain a comma and no value is split
 - agents SHALL use implementation integrity review when stale symbol links or sidecar maintenance issues are present
 
 ### Requirement: Context optimization policy

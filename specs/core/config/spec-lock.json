@@ -3,11 +3,11 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:vcs-adapter-port", "default:_global/architecture"],
+  "dependsOn": ["core:vcs-adapter-port", "default:_global/architecture", "core:spec-id-format"],
   "implementation": [
     {
-      "file": "core:src/application/specd-config.ts",
-      "symbols": ["SpecdWorkspaceGraphConfig"]
+      "file": "core:src/application/ports/config-schema.ts",
+      "symbols": ["SpecdYamlZodSchema"]
     }
   ],
   "optimizations": {

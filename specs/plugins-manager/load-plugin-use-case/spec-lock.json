@@ -4,5 +4,41 @@
     "version": 1
   },
   "dependsOn": ["plugin-manager:plugin-loader"],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "LoadPlugin loads and validates one plugin, returning SpecdPlugin or typed error without modifying state.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:8ccc0f8a7e6dba34e3cc42979e3936ccd8c45f29dfb39784183f75a7f3c08396",
+          "lastModified": "2026-05-25T06:02:58.503Z"
+        },
+        "verify.md": {
+          "hash": "sha256:945bbe97932c4134b8d46ba357420b0bce237185832d6a777f11e641059a821b",
+          "lastModified": "2026-05-25T06:02:58.503Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# LoadPlugin\n\n## Rules\n- `LoadPluginInput`: readonly `pluginName: string`.\n- `LoadPluginOutput = { plugin: SpecdPlugin } | { error: PluginNotFoundError | PluginValidationError }`.\n- Load via `PluginLoader`; validate expected interface; return plugin or error.\n\n## Constraints\n- Read-only; no state mutation.\n- Typed errors support catchable handling.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:8ccc0f8a7e6dba34e3cc42979e3936ccd8c45f29dfb39784183f75a7f3c08396",
+          "lastModified": "2026-05-25T06:02:58.503Z"
+        },
+        "verify.md": {
+          "hash": "sha256:945bbe97932c4134b8d46ba357420b0bce237185832d6a777f11e641059a821b",
+          "lastModified": "2026-05-25T06:02:58.503Z"
+        }
+      }
+    }
+  }
 }

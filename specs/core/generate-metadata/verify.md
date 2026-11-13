@@ -28,6 +28,28 @@
 - **WHEN** `GenerateSpecMetadata` is executed
 - **THEN** it throws `SpecNotFoundError`
 
+#### Scenario: Invalid spec ID rejected
+
+- **WHEN** `GenerateSpecMetadata.execute` receives `specId: 'Bad Id'`
+- **THEN** it throws `InvalidSpecIdError` before any repository lookup
+- **AND** the error quotes `Bad Id`
+
+#### Scenario: Empty spec ID rejected
+
+- **WHEN** it receives `specId: ''`
+- **THEN** it throws `InvalidSpecIdError` before any repository lookup
+
+#### Scenario: Bare spec ID normalized
+
+- **WHEN** it receives `specId: '_global/architecture'`
+- **THEN** it resolves workspace `default` and capability path `_global/architecture`
+- **AND** the result and the written metadata name the spec `default:_global/architecture`
+
+#### Scenario: Unknown workspace rejected
+
+- **WHEN** it receives `specId: 'nope:auth/login'`
+- **THEN** it throws `WorkspaceNotFoundError` before any repository lookup
+
 ### Requirement: Artifact loading and parsing
 
 #### Scenario: Artifact with unknown parser format skipped

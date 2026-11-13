@@ -72,7 +72,7 @@ export function registerGraphIndex(parent: Command): void {
       new Option(
         '--exclude-path <glob...>',
         'one or more gitignore-syntax patterns, relative to the project root, added to the global exclusion layer',
-      ).argParser((val, prev: string[]) => (prev ?? []).concat(val.split(','))),
+      ).argParser((val, prev: string[]) => (prev ?? []).concat(val)),
     )
     .option('--config <path>', 'path to specd.yaml')
     .option('--path <path>', 'repository root for bootstrap mode')

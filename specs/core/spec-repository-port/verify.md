@@ -108,6 +108,7 @@
 #### Scenario: includeMeta omitted leaves Meta fields absent
 
 - **GIVEN** `list()` is called without `includeMeta`
+- **WHEN** the repository returns the list entries
 - **THEN** `artifacts`, `persistedStateMeta`, and `generatedMetadataMeta` are omitted from each entry
 
 #### Scenario: Resolution errors still return an entry with title fallback
@@ -425,3 +426,29 @@
 - **GIVEN** a repository implementation not backed by a directly addressable filesystem
 - **WHEN** it implements the `SpecRepository` contract
 - **THEN** it is not required to expose `specsPath`
+
+### Requirement: readPersistedState lenient dependsOn option
+
+#### Scenario: Strict read rejects an invalid dependsOn entry
+
+- **GIVEN** a sidecar whose `dependsOn` contains `""`
+- **WHEN** `readPersistedState(spec)` is called
+- **THEN** `InvalidSpecLockError` is thrown
+
+#### Scenario: Lenient read returns invalid dependsOn entries as stored
+
+- **GIVEN** a sidecar whose `dependsOn` contains `""`
+- **WHEN** `readPersistedState(spec, { lenientDependsOn: true })` is called
+- **THEN** the snapshot's `dependsOn` contains `""` and the file is not rewritten
+
+#### Scenario: Lenient read still validates other fields
+
+- **GIVEN** a sidecar whose `implementation.0.file` is empty
+- **WHEN** `readPersistedState(spec, { lenientDependsOn: true })` is called
+- **THEN** `InvalidSpecLockError` naming `implementation.0.file` is thrown
+
+#### Scenario: Revision check reads leniently
+
+- **GIVEN** a sidecar with invalid `dependsOn` entries and `expectedRevision` equal to its current hash
+- **WHEN** `writePersistedState(spec, validState, { expectedRevision })` is called
+- **THEN** the write succeeds

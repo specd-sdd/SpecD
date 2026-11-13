@@ -53,6 +53,7 @@ describe('change validate', () => {
   it('prints success message when no failures or warnings', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.validate.execute.mockResolvedValue({
+      specId: 'default:auth/login',
       failures: [],
       warnings: [],
       files: [
@@ -81,6 +82,7 @@ describe('change validate', () => {
   it('prints failures and exits 1 when validation fails', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.validate.execute.mockResolvedValue({
+      specId: 'default:auth/login',
       failures: [{ artifactId: 'spec', description: 'missing required section' }],
       warnings: [],
       files: [
@@ -170,6 +172,7 @@ describe('change validate', () => {
       ]),
     )
     kernel.changes.validate.execute.mockResolvedValue({
+      specId: 'default:auth/login',
       failures: [],
       notes: [],
       files: [
@@ -204,6 +207,7 @@ describe('change validate', () => {
     const { kernel, stdout } = setup()
     kernel.specs.getActiveSchema.execute.mockResolvedValue(mockBatchSchema())
     kernel.changes.validate.execute.mockResolvedValue({
+      specId: 'default:auth/login',
       failures: [],
       notes: [],
       files: [
@@ -256,6 +260,7 @@ describe('change validate', () => {
     const { kernel, stdout } = setup()
     kernel.specs.getActiveSchema.execute.mockResolvedValue(mockBatchSchema())
     kernel.changes.validate.execute.mockResolvedValue({
+      specId: 'default:auth/login',
       failures: [],
       notes: [],
       files: [
@@ -306,6 +311,7 @@ describe('change validate', () => {
     const { kernel, stdout } = setup()
     kernel.specs.getActiveSchema.execute.mockResolvedValue(mockBatchSchema())
     kernel.changes.validate.execute.mockResolvedValue({
+      specId: 'default:auth/login',
       failures: [{ artifactId: 'specs', description: 'missing section' }],
       notes: [],
       files: [

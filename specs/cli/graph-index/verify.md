@@ -17,6 +17,22 @@
 - **THEN** `app/tmp/` is excluded for `backend` and in project-global discovery
 - **AND** a workspace `!app/tmp/` does not re-include it
 
+#### Scenario: --exclude-path value with a comma is one pattern
+
+- **WHEN** `specd graph index --exclude-path '{a,b}/**'` is run
+- **THEN** the task input contains the single pattern `{a,b}/**`
+- **AND** it is not split into `{a` and `b}/**`
+
+#### Scenario: Several patterns by repeating the option
+
+- **WHEN** `specd graph index --exclude-path 'app/tmp/' --exclude-path 'dist/'` is run
+- **THEN** the task input contains the two patterns `app/tmp/` and `dist/`
+
+#### Scenario: Several patterns listed after one option
+
+- **WHEN** `specd graph index --exclude-path 'app/tmp/' 'dist/'` is run
+- **THEN** the task input contains the two patterns
+
 ### Requirement: Output format
 
 #### Scenario: Text output shows summary including documents

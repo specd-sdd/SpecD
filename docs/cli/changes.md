@@ -22,11 +22,11 @@ specd changes approve <name> <spec|signoff> [options]
 specd changes context <name> [options]
 specd changes artifacts <name> [options]
 specd changes skip-artifact <name> <artifact> [options]
-specd changes deps <name> [options]
+specd changes deps <name> [specId] [options]
 specd changes check-overlap <name> [options]
 specd changes spec-preview <name> [options]
 specd changes invalidate <name> [options]
-specd changes implementation <name> [options]
+specd changes implementation <subcommand> <name> [options]
 specd changes run-hooks <name> <state> [options]
 specd changes hook-instruction <name> <state> [options]
 specd changes artifact-instruction <name> <artifact> [options]
@@ -46,13 +46,15 @@ specd changes create <name> [options]
 
 ### Options
 
-| Option                        | Description                                                                              |
-| ----------------------------- | ---------------------------------------------------------------------------------------- |
-| `--spec <id>`                 | Associate a spec with this change. Repeatable flag.                                      |
-| `--description <text>`        | Summary of the change intent.                                                            |
-| `--invalidation-policy <p>`   | Invalidation policy (`none`, `surgical`, `downstream`, `global`). Default: `downstream`. |
-| `--format <text\|json\|toon>` | Output format.                                                                           |
-| `--config <path>`             | Path to configuration file.                                                              |
+| Option                        | Description                                                                                  |
+| ----------------------------- | -------------------------------------------------------------------------------------------- |
+| `--spec <id>`                 | Spec ID (repeatable). Each value is one raw ID — never comma-split. Bare IDs mean `default`. |
+| `--description <text>`        | Summary of the change intent.                                                                |
+| `--invalidation-policy <p>`   | Invalidation policy (`none`, `surgical`, `downstream`, `global`). Default: `downstream`.     |
+| `--format <text\|json\|toon>` | Output format.                                                                               |
+| `--config <path>`             | Path to configuration file.                                                                  |
+
+Invalid `--spec` syntax fails with `INVALID_SPEC_ID`; an unknown workspace fails with `WORKSPACE_NOT_FOUND`.
 
 ---
 
@@ -137,11 +139,16 @@ specd changes edit <name> [options]
 
 ### Options
 
-| Option                 | Description                            |
-| ---------------------- | -------------------------------------- |
-| `--add-spec <id>`      | Add a spec association. Repeatable.    |
-| `--remove-spec <id>`   | Remove a spec association. Repeatable. |
-| `--description <text>` | Update change description.             |
+| Option                        | Description                                                                          |
+| ----------------------------- | ------------------------------------------------------------------------------------ |
+| `--add-spec <id>`             | Add a spec ID (repeatable). Raw ID — never comma-split. Bare means `default`.        |
+| `--remove-spec <id>`          | Remove a spec ID (repeatable). Raw ID — never comma-split (syntax not re-validated). |
+| `--description <text>`        | Update change description.                                                           |
+| `--invalidation-policy <p>`   | Invalidation policy (`none`, `surgical`, `downstream`, `global`).                    |
+| `--format <text\|json\|toon>` | Output format.                                                                       |
+| `--config <path>`             | Path to configuration file.                                                          |
+
+`--add-spec` validates like `changes create --spec` (`INVALID_SPEC_ID` / `WORKSPACE_NOT_FOUND`).
 
 ---
 
@@ -207,11 +214,27 @@ specd changes skip-artifact <name> <artifact> [options]
 
 ## changes deps
 
-Inspect spec and workspace dependencies for the active change.
+Add, remove, replace, or clear declared spec dependencies for a change, or list current dependencies when no modification flags are provided. Modification flags require `<specId>`.
 
 ```bash
-specd changes deps <name> [options]
+specd changes deps <name> [specId] [options]
 ```
+
+### Options
+
+| Option                        | Description                                                                                      |
+| ----------------------------- | ------------------------------------------------------------------------------------------------ |
+| `--add <id>`                  | Add a dependency spec ID (repeatable). Raw ID — never comma-split. Bare IDs mean `default`.      |
+| `--remove <id>`               | Remove a dependency spec ID (repeatable). Raw ID — never comma-split.                            |
+| `--set <id>`                  | Replace all dependencies (repeatable; mutually exclusive with `--add` / `--remove` / `--clear`). |
+| `--clear`                     | Clear all dependencies for the spec (mutually exclusive with `--add` / `--remove` / `--set`).    |
+| `--force`                     | Skip confirmation for `--clear`.                                                                 |
+| `--format <text\|json\|toon>` | Output format.                                                                                   |
+| `--config <path>`             | Path to configuration file.                                                                      |
+
+With `<specId>` and no modification flags, the command shows that spec's dependencies using the normalized fully-qualified ID (e.g. `changes deps my-change auth/login` prints `default:auth/login`). An invalid ID fails with `INVALID_SPEC_ID`; an unknown workspace fails with `WORKSPACE_NOT_FOUND`. The ID is validated by core (`kernel.changes.getSpecDeps`), not by the CLI.
+
+Mutation output also uses fully-qualified IDs. For example, `changes deps my-change auth/login --add auth/shared` prints `dependsOn: default:auth/shared`. JSON/TOON output keeps the same canonical IDs in `specId` and `dependsOn`.
 
 ---
 
@@ -250,8 +273,12 @@ specd changes invalidate <name> [options]
 Track and register implementation files and code references associated with this change.
 
 ```bash
-specd changes implementation <name> [options]
+specd changes implementation <subcommand> <name> [options]
 ```
+
+Subcommands: `start`, `list`, `review`, `add`, `remove`, `ignore`, `resolve`, `unresolve`.
+
+`--file` takes raw project-relative path(s). Use a listed form (`--file a.ts b.ts`) or repeat the flag. Commas are **not** separators. `add` / `remove` take a single `--file <path>`; `ignore` / `resolve` / `unresolve` take `--file <paths...>`.
 
 ---
 

@@ -5,6 +5,7 @@ import {
   SchemaValidationError,
   HookFailedError,
   HistoricalImplementationGuardError,
+  InvalidSpecLockError,
 } from '@specd/sdk'
 import { output } from './formatter.js'
 
@@ -16,7 +17,22 @@ interface CliErrorOptions {
   detail?: string | undefined
   /** Additional error metadata for structured output. */
   metadata?: Record<string, unknown> | undefined
+  /** Repair hint written on a line after the error line; never folded into `message`. */
+  hint?: string | undefined
 }
+
+/** Options accepted by {@link handleError}. */
+export interface HandleErrorOptions {
+  /**
+   * Adds the `specs deps` repair hint to an invalid-lock error whose failing field is under
+   * `dependsOn`. Only the `specs deps` commands set this; other commands print the typed message
+   * without a hint (core errors stay host-neutral, see `core:spec-lock`).
+   */
+  readonly lockRepairHint?: boolean
+}
+
+const LOCK_REPAIR_HINT =
+  'Repair with: specd specs deps remove <spec-id>, specd specs deps set <spec-id>, or specd specs deps clear <spec-id>'
 
 /**
  * Exits with a CLI-level error. Writes a prefixed message to stderr and,
@@ -43,8 +59,14 @@ export function cliError(
   }
   const prefix = exitCode === 3 ? 'fatal' : 'error'
   process.stderr.write(`${prefix}: ${message}\n`)
+  if (options?.hint !== undefined) {
+    process.stderr.write(`${options.hint}\n`)
+  }
   if (format === 'json' || format === 'toon') {
     const payload: Record<string, unknown> = { result: 'error', code, message, exitCode }
+    if (options?.hint !== undefined) {
+      payload.hint = options.hint
+    }
     if (options?.metadata !== undefined && Object.keys(options.metadata).length > 0) {
       payload.metadata = options.metadata
     }
@@ -160,9 +182,10 @@ function isSpecdErrorLike(err: unknown): err is SpecdErrorLike {
  *
  * @param err - The caught error
  * @param format - Optional output format; when `json` or `toon`, a structured error is also written to stdout
+ * @param options - Optional per-command behaviour (see {@link HandleErrorOptions})
  * @returns Never. Always terminates the process with the mapped exit code.
  */
-export function handleError(err: unknown, format?: string): never {
+export function handleError(err: unknown, format?: string, options?: HandleErrorOptions): never {
   // Known domain/application errors — all extend SpecdError with a machine-readable code
   if (isSpecdErrorLike(err)) {
     const code = err.code
@@ -190,6 +213,20 @@ export function handleError(err: unknown, format?: string): never {
 
     if (code === 'GRAPH_BUSY' || code === 'GRAPH_PROVIDER_STALE') {
       return cliError(err.message, format, 3, code, { metadata })
+    }
+
+    if (err instanceof InvalidSpecLockError || code === 'INVALID_SPEC_LOCK') {
+      const fieldPath =
+        err instanceof InvalidSpecLockError
+          ? err.fieldPath
+          : typeof metadata.fieldPath === 'string'
+            ? metadata.fieldPath
+            : ''
+      const underDependsOn = fieldPath === 'dependsOn' || fieldPath.startsWith('dependsOn.')
+      return cliError(err.message, format, 1, code, {
+        metadata,
+        ...(options?.lockRepairHint === true && underDependsOn ? { hint: LOCK_REPAIR_HINT } : {}),
+      })
     }
 
     // All other SpecdError subtypes → exit 1

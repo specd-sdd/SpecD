@@ -152,6 +152,17 @@
 - **WHEN** the workflow approaches archive
 - **THEN** the agent explicitly resolves or ignores those tracked files instead of assuming link creation alone closed review
 
+#### Scenario: Agent resolves several files with repeated options
+
+- **GIVEN** an agent must resolve `a.ts` and `b.ts`
+- **WHEN** it writes the command
+- **THEN** it uses `specd changes implementation resolve <name> --file a.ts --file b.ts` or `--file a.ts b.ts`
+
+#### Scenario: Agent never joins file names with commas
+
+- **WHEN** an agent writes a resolve or ignore command for several files
+- **THEN** it does not write `--file a.ts,b.ts`
+
 ### Requirement: Context optimization policy
 
 #### Scenario: Agent delegates to optimizer subagent

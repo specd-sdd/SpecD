@@ -29,12 +29,16 @@ All are injected at kernel composition time, not passed per invocation.
 `PreviewSpec.execute` receives:
 
 - `name` — the change name
-- `specId` — the fully-qualified spec ID to preview (e.g. `core:compile-context`); MUST be one of the change's `specIds`
+- `specId` — the spec ID to preview (e.g. `core:compile-context`, or a bare path resolved to the `default` workspace); validated and normalized per "Spec ID validation", and MUST be one of the change's `specIds`
 - `includeDiff` — optional boolean flag; when `true`, `PreviewSpec` SHALL generate unified diff output for preview entries whose status is `merged`. When omitted or `false`, `PreviewSpec` SHALL NOT generate diff output.
 
 ### Requirement: Spec ID validation
 
-`PreviewSpec` MUST verify that `specId` is present in `change.specIds`. If it is not, it MUST throw a `SpecNotInChangeError` (or equivalent) — previewing a spec that the change does not target is not valid.
+`PreviewSpec` MUST validate and normalize `specId` with `parseSpecId` and the configured workspaces (see `core:spec-id-format`) before any other work, failing with `InvalidSpecIdError` for an invalid ID and `WorkspaceNotFoundError` for an unknown workspace, quoting the full original value.
+
+The public contract of `execute` (its `@throws` documentation) MUST list `InvalidSpecIdError` and `WorkspaceNotFoundError` alongside `ChangeNotFoundError`, `SchemaMismatchError`, and `SpecNotInChangeError`.
+
+It MUST then verify that the normalized `specId` is present in `change.specIds`. If it is not, it MUST throw a `SpecNotInChangeError` (or equivalent) — previewing a spec that the change does not target is not valid.
 
 ### Requirement: File discovery via change artifacts
 
@@ -173,3 +177,4 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:file-reader-port`](../file-reader-port/spec.md) — preview-oriented workflows consume preview content as read-only text
 - [`core:composition-resolver`](../composition-resolver/spec.md) — config-based factory wiring resolves `PreviewSpec` dependencies through shared composition
 - [`core:diff-generator`](../diff-generator/spec.md) — unified diff generation is delegated to this internal capability
+- [`core:spec-id-format`](../spec-id-format/spec.md) — spec ID validation and normalization of `specId`

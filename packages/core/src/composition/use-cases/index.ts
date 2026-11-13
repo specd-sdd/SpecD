@@ -37,6 +37,7 @@ export { createGetSpecContext, type GetSpecContextDeps } from './get-spec-contex
 export { createDetectOverlap, type DetectOverlapDeps } from './detect-overlap.js'
 export { createPreviewSpec, type PreviewSpecDeps } from './preview-spec.js'
 export { createResolveSchema, type ResolveSchemaDeps } from './resolve-schema.js'
+export { createGetChangeSpecDeps, type GetChangeSpecDepsDeps } from './get-change-spec-deps.js'
 export { createUpdateSpecDeps, type UpdateSpecDepsDeps } from './update-spec-deps.js'
 export { createInvalidateChange, type InvalidateChangeDeps } from './invalidate-change.js'
 export { createRunStepHooks, type RunStepHooksDeps } from './run-step-hooks.js'

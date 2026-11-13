@@ -10,32 +10,43 @@ Without a single canonical format for referencing specs, workspace prefixes and 
 
 The canonical spec ID format SHALL be `workspace:capabilityPath`, where:
 
-- `workspace` is the workspace name (e.g. `default`, `billing`)
-- `capabilityPath` is the slash-separated path to the spec within the workspace (e.g. `auth/login`, `_global/architecture`)
+- `workspace` is the workspace name (e.g. `default`, `billing`) and MUST satisfy the rule in "Workspace name rule"
+- `capabilityPath` is the slash-separated path to the spec within the workspace (e.g. `auth/login`, `_global/architecture`), made of one or more folder segments that each satisfy "Capability path segment rule"
 
-The workspace and capability path are separated by `:` (colon). All `/` characters belong to the capability path.
+The workspace and capability path are separated by `:` (colon). All `/` characters belong to the capability path. A capability path MAY have any depth: `workspace:section/other-section/id` is valid.
 
 This format is used everywhere: internal storage (`change.specIds`, manifest), domain-layer references, CLI input, metadata `dependsOn`, and user-facing output. There is a single format — no internal vs external distinction.
 
 ### Requirement: Bare path shorthand
 
-When no `:` is present, the spec ID SHALL be interpreted as a capability path in the `default` workspace.
+When no `:` is present, the spec ID SHALL be interpreted as a capability path in the `default` workspace at every input boundary (any use case that receives a spec ID from a user, the CLI, MCP, or the SDK).
 
-For example, `auth/login` with no colon resolves to workspace `default`, capability path `auth/login`. Its fully-qualified form is `default:auth/login`.
+For example, `auth/login` with no colon resolves to workspace `default`, capability path `auth/login`. Its fully-qualified form is `default:auth/login`. The core, not the delivery adapter, performs this normalization.
+
+Where a bare path means "the same workspace as the surrounding context" (a spec's own `dependsOn` entries during dependency traversal, and context include/exclude patterns), the caller SHALL pass its own `defaultWorkspace` explicitly. Code MUST NOT assume `default` silently in those contexts.
 
 ### Requirement: Unknown workspace rejection
 
-When a colon-qualified spec ID specifies a workspace name that does not exist in the project configuration, the parser SHALL reject the input with an error.
+When the caller supplies the set of configured workspaces and a spec ID names a workspace that is not in that set, the parser SHALL reject the input with a `WorkspaceNotFoundError` (`SpecdError`, code `WORKSPACE_NOT_FOUND`), the existing error for an unknown workspace, which is declared in the domain layer so the parser can raise it. The message SHALL quote the full original ID and list the known workspace names.
+
+When a bare ID is given, the `defaultWorkspace` in use SHALL be checked the same way. Without a workspace set the parser checks syntax only.
+
+`WorkspaceNotFoundError` SHALL be one class: the application-layer module that exposes it SHALL re-export the domain class unchanged, so `instanceof` and `code` checks behave identically whichever import path a caller uses.
+
+A context pattern that names an unknown workspace is not an error: it keeps producing an `unknown-workspace` warning and matches no specs.
 
 ### Requirement: Parsing rules
 
-Parsing a spec ID string SHALL follow these steps:
+Parsing a spec ID string with `parseSpecId` SHALL follow these steps:
 
-1. Find the first `:` in the string.
-2. If found: everything before `:` is the workspace, everything after is the capability path. Validate the workspace exists.
-3. If not found: workspace is `default`, the entire string is the capability path.
+1. Reject an empty or blank string.
+2. Find the first `:` in the string.
+3. If found: everything before `:` is the workspace, everything after is the capability path. Validate the workspace name and, when a workspace set is supplied, that the workspace exists.
+4. If not found: the workspace is the `defaultWorkspace` (default `default`), and the entire string is the capability path. Validate this resolved workspace name with the shared workspace-name rule, then check configured membership when a workspace set is supplied.
+5. Validate every capability path segment.
+6. Return `{ workspace, capPath, specId }`, where `specId` is always the fully-qualified `workspace:capPath`.
 
-There is no slash-based workspace detection. The `/` character is never used as a workspace separator.
+There is no slash-based workspace detection. The `/` character is never used as a workspace separator. Invalid input fails with the typed errors defined in "Syntax validation" and "Unknown workspace rejection".
 
 ### Requirement: Capability segments reject Windows device names
 
@@ -43,7 +54,54 @@ A capability-path segment that is a Windows device name MUST be rejected on ever
 
 ### Requirement: Normalization
 
-Functions that accept spec IDs SHOULD normalize bare paths to fully-qualified form (`default:capPath`) at the system boundary. Domain-layer code MAY assume spec IDs are already qualified.
+Every function that accepts a spec ID at a system boundary MUST validate it and normalize bare paths to fully-qualified form (`default:capPath`) before using or storing it. Domain-layer code MAY assume spec IDs it receives from those functions are already qualified and valid.
+
+### Requirement: Workspace name rule
+
+A workspace name SHALL match `^[a-z][a-z0-9-]+$`: it starts with a lowercase letter, contains only lowercase letters, digits, and `-`, and is at least two characters long. A one-character workspace name is invalid so that `c:foo` can never be read as a Windows drive path. A workspace name MUST NOT be a Windows device name.
+
+The rule SHALL be exposed once as `isValidWorkspaceName` and used by `parseSpecId`, `parseSpecPattern`, the schema reference parser, the pattern validation of project configuration, and the workspace-name check of `ConfigLoader`. No consumer SHALL keep its own copy of the expression. This includes delivery adapters that accept a workspace id from a user: `specd project init` SHALL validate the default workspace id with `isValidWorkspaceName` so that it can never write a `specd.yaml` that `ConfigLoader` then rejects.
+
+### Requirement: Capability path segment rule
+
+Each segment of a capability path (each folder between `/` separators) SHALL match `^[a-z0-9_][a-z0-9_-]*$` and SHALL NOT be a Windows device name. Segments are therefore lowercase only, contain no `.`, spaces, commas, quotes, backslashes, or `:`, and are never empty. The same rule SHALL apply to a workspace `prefix`, whose segments are also folders.
+
+These restrictions keep every spec ID valid as a folder name on Windows, Linux, and macOS and free of case collisions. The rule SHALL be implemented once and used by `parseSpecId`, `SpecPath`, the persisted `spec-lock.json` and `metadata.json` readers, and `parseSpecPattern`.
+
+### Requirement: Syntax validation
+
+A spec ID that violates the rules above SHALL be rejected with an `InvalidSpecIdError` (`SpecdError`, code `INVALID_SPEC_ID`). The message SHALL quote the full original value and name the violated rule (and the offending segment when a segment is invalid).
+
+The following inputs SHALL be rejected: the empty string, a blank string, `:`, `workspace:` (empty path), `:path` (empty workspace), a path with an empty segment (`a//b`, `/a`, `a/`), a segment of `.` or `..`, a path containing `:`, a segment with uppercase letters, spaces, or commas, a segment that is a Windows device name, and a one-character workspace. Commas are not valid anywhere in a spec ID. A backslash is never a path separator in a spec ID, on any operating system: `auth\login` and `ws:auth\login` are rejected, and the error message SHALL say that `/` is the only separator. Spec IDs are logical identifiers, not filesystem paths, so a Windows-style path is never converted into one silently.
+
+Operations that remove an entry from a persisted spec-lock `dependsOn` list SHALL NOT validate its syntax, so that an invalid stored dependency can always be removed. The same applies to removing a dependency from a change's draft spec dependencies. This guarantee does not extend to a change's own `specIds`: a change manifest that holds an invalid or bare spec ID is rejected as corrupted when it is loaded, so such a manifest is repaired outside this operation.
+
+### Requirement: Single validator
+
+The core SHALL provide exactly one spec ID validator: `parseSpecId(id, options?)` in the domain layer, with no I/O. `options.workspaces` is an optional `Iterable<string | { readonly name: string }>` of the configured workspaces, so name arrays, sets, `Map.keys()`, and workspace objects are accepted unchanged. `options.defaultWorkspace` is the workspace used for a bare path (default `default`).
+
+Without `options.workspaces` the validator SHALL check syntax only, including the resolved `defaultWorkspace` name. With it, the validator SHALL also check that the workspace exists. The result SHALL always include the fully-qualified `specId`. The domain service SHALL NOT depend on application types.
+
+### Requirement: Use cases validate and normalize
+
+Every use case that accepts a spec ID SHALL validate and normalize it with `parseSpecId` and the configured workspaces before using it, and SHALL return and store the fully-qualified ID. Delivery adapters (CLI, MCP, SDK hosts) SHALL pass the raw string unchanged and SHALL NOT validate, qualify, or normalize spec IDs themselves. An adapter MAY reject a malformed command line for its own syntax, but never as a replacement for the use case rule.
+
+The prohibition covers read-only display paths too: an adapter that prints a spec ID MUST print the value it received from a use case result (or the raw argument it was given), and MUST NOT call `parseSpecId` or any other qualifying function to obtain the displayed form. When a display path needs a qualified ID and no use case result carries it, the use case result is extended instead.
+
+### Requirement: Patterns and schema references
+
+Strings that look like spec IDs but follow another grammar SHALL be parsed by dedicated parsers, never by `parseSpecId`, and no lenient generic splitter SHALL exist.
+
+- Context include/exclude patterns SHALL be parsed by `parseSpecPattern(pattern)`: an optional `workspace:` qualifier (validated with the workspace name rule), then `*`, a prefix followed by `/*`, or an exact path whose segments follow the segment rule. `*` is valid only alone, directly after `workspace:`, or at the end after `/`.
+- Schema references (`#workspace:name`, `#name`) SHALL be split by the schema registry into an optional workspace (validated with the workspace name rule) and a schema name validated by the schema repository, not by the spec ID segment rule.
+
+The validation applied to patterns when configuration is loaded and the interpretation applied when specs are matched SHALL use the same parser.
+
+Helpers that derive part of a persisted, already-qualified spec ID (for example the workspace of each spec in an archive index entry) SHALL obtain it through `parseSpecId`; they SHALL NOT split the string on the first `:` without validating it. This does not assign a singular workspace to a change.
+
+### Requirement: Persisted IDs are fully qualified
+
+A spec ID written to any persisted artifact (manifest `specIds`, `specDependsOn`, `spec-lock.json` `dependsOn` and implementation links, `metadata.json` `dependsOn`) SHALL be fully qualified and valid. The readers of the manifest and of `spec-lock.json` SHALL reject a bare or invalid persisted ID with the typed error of their artifact, quoting the value and its field path, and SHALL NOT accept a bare form as a legacy variant. `metadata.json` is a regenerable cache: it is written strictly (see `core:spec-metadata`) but its read path stays lenient and self-healing.
 
 ### Requirement: specDependsOn format
 
@@ -51,22 +109,30 @@ The `specDependsOn` map in the change manifest MUST use fully-qualified spec IDs
 
 ## Constraints
 
-- Workspace names MUST NOT contain `/` or `:` characters
-- Capability paths MUST NOT contain `:` characters
+- Workspace names MUST match `^[a-z][a-z0-9-]+$` (two or more characters) and MUST NOT contain `/` or `:`
+- Capability paths MUST NOT contain `:`, and each segment MUST match `^[a-z0-9_][a-z0-9_-]*$`
+- Spec IDs MUST NOT contain commas, spaces, uppercase letters, or empty segments
 - The separator is always `:` (colon) — `/` is never a workspace separator
-- The `default` workspace is implicit when no colon is present
+- The `default` workspace is implicit when no colon is present at an input boundary
+- There is one validator (`parseSpecId`); patterns and schema references use their own parsers
 
 ## Examples
 
-| Input                        | Workspace | Capability path        | Fully-qualified                |
-| ---------------------------- | --------- | ---------------------- | ------------------------------ |
-| `auth/login`                 | `default` | `auth/login`           | `default:auth/login`           |
-| `default:auth/login`         | `default` | `auth/login`           | `default:auth/login`           |
-| `default:common/conventions` | `default` | `common/conventions`   | `default:common/conventions`   |
-| `billing:auth/login`         | `billing` | `auth/login`           | `billing:auth/login`           |
-| `billing:invoices/create`    | `billing` | `invoices/create`      | `billing:invoices/create`      |
-| `_global/architecture`       | `default` | `_global/architecture` | `default:_global/architecture` |
-| `unknown:some/path`          | _(error)_ | —                      | _(rejected)_                   |
+| Input                             | Workspace | Capability path        | Fully-qualified                    |
+| --------------------------------- | --------- | ---------------------- | ---------------------------------- |
+| `auth/login`                      | `default` | `auth/login`           | `default:auth/login`               |
+| `default:auth/login`              | `default` | `auth/login`           | `default:auth/login`               |
+| `default:common/conventions`      | `default` | `common/conventions`   | `default:common/conventions`       |
+| `billing:auth/login`              | `billing` | `auth/login`           | `billing:auth/login`               |
+| `billing:invoices/create`         | `billing` | `invoices/create`      | `billing:invoices/create`          |
+| `billing:section/other/id`        | `billing` | `section/other/id`     | `billing:section/other/id`         |
+| `_global/architecture`            | `default` | `_global/architecture` | `default:_global/architecture`     |
+| `unknown:some/path`               | _(error)_ | —                      | _(rejected: unknown workspace)_    |
+| \`\` (empty), `:`, `ws:`, `:path` | _(error)_ | —                      | _(rejected: invalid)_              |
+| `Auth/Login`, `auth/log in`       | _(error)_ | —                      | _(rejected: segment rule)_         |
+| `auth/a,b`                        | _(error)_ | —                      | _(rejected: comma)_                |
+| `a:foo/bar`                       | _(error)_ | —                      | _(rejected: one-letter workspace)_ |
+| `ws:section/nul/id`               | _(error)_ | —                      | _(rejected: device name)_          |
 
 ## Spec Dependencies
 

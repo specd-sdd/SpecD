@@ -75,7 +75,10 @@ class FakeSpecRepository extends SpecRepository {
     return 'sha256:test-spec-fingerprint'
   }
 
-  override async readPersistedState(_spec: Spec): Promise<PersistedSpecStateSnapshot | null> {
+  override async readPersistedState(
+    _spec: Spec,
+    _options?: { readonly lenientDependsOn?: boolean },
+  ): Promise<PersistedSpecStateSnapshot | null> {
     return null
   }
 

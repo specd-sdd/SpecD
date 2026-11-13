@@ -3,13 +3,15 @@ import { type ChangeRepository } from '../ports/change-repository.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
 import { ChangeAlreadyExistsError } from '../errors/change-already-exists-error.js'
 import { InvalidCreateChangeInputError } from '../errors/invalid-create-change-input-error.js'
+import { InvalidInputError } from '../../domain/errors/invalid-input-error.js'
 import { IncompatibleSchemaError } from '../../domain/errors/incompatible-schema-error.js'
-import { type InvalidationPolicy } from '../../domain/value-objects/invalidation-policy.js'
+import { ReadOnlyWorkspaceError } from '../../domain/errors/read-only-workspace-error.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { OverlapReport } from '../../domain/value-objects/overlap-report.js'
 import { loadPersistedSpecDependsOn } from './_shared/load-persisted-spec-depends-on.js'
 import { loadPersistedSpecSchema } from './_shared/load-persisted-spec-schema.js'
+import { assertInvalidationPolicy } from './_shared/assert-invalidation-policy.js'
 import { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
 import { type GetActiveSchema } from './get-active-schema.js'
 import { type DetectOverlap } from './detect-overlap.js'
@@ -37,7 +39,7 @@ export interface CreateChangeInput {
   /** Explicit schema version override. When omitted, resolved via {@link GetActiveSchema}. */
   readonly schemaVersion?: number
   /** Invalidation policy to seed on the new change. Defaults to `'downstream'`. */
-  readonly invalidationPolicy?: InvalidationPolicy
+  readonly invalidationPolicy?: string
   /** When `true` and `specIds` is non-empty, run overlap detection after persistence. */
   readonly includeOverlapCheck?: boolean
 }
@@ -94,6 +96,11 @@ export class CreateChange {
    * @returns The newly created change and its filesystem path
    * @throws {ChangeAlreadyExistsError} If a change with the given name already exists
    * @throws {InvalidCreateChangeInputError} When only one of `schemaName` or `schemaVersion` is provided
+   * @throws {InvalidInputError} If `invalidationPolicy` is not one of the allowed values
+   * @throws {InvalidSpecIdError} If a spec ID is empty, blank, or malformed
+   * @throws {WorkspaceNotFoundError} If a spec ID names an unknown workspace
+   * @throws {ReadOnlyWorkspaceError} If a spec belongs to a readOnly workspace
+   * @throws {IncompatibleSchemaError} If a target spec uses an incompatible schema
    */
   async execute(input: CreateChangeInput): Promise<CreateChangeResult> {
     const existingActive = await this._changes.get(input.name)
@@ -111,22 +118,39 @@ export class CreateChange {
 
     const { schemaName, schemaVersion } = await this._resolveSchemaIdentity(input)
 
+    const invalidationPolicy = assertInvalidationPolicy(input.invalidationPolicy)
+
     const actor = await this._actor.identity()
     const now = new Date()
+
+    const workspaces = await this._listWorkspaces.execute()
+    const workspaceMap = new Map(workspaces.map((ws) => [ws.name, ws]))
+
+    const parsedSpecIds = input.specIds.map((id) => parseSpecId(id, { workspaces }))
+    const readOnlyOffenders = parsedSpecIds.filter(
+      (parsed) => workspaceMap.get(parsed.workspace)?.ownership === 'readOnly',
+    )
+    if (readOnlyOffenders.length > 0) {
+      const lines = readOnlyOffenders.map(
+        (parsed) =>
+          `Cannot add spec "${parsed.specId}" to change — workspace "${parsed.workspace}" is readOnly.`,
+      )
+      throw new ReadOnlyWorkspaceError(
+        `${lines.join('\n')}\n\nReadOnly workspaces are protected: their specs and code cannot be modified by changes.`,
+      )
+    }
+    const specIds = [...new Set(parsedSpecIds.map((parsed) => parsed.specId))]
 
     const created: CreatedEvent = {
       type: 'created',
       at: now,
       by: actor,
-      specIds: input.specIds,
+      specIds,
       schemaName,
       schemaVersion,
     }
 
-    const workspaces = await this._listWorkspaces.execute()
-    const workspaceMap = new Map(workspaces.map((ws) => [ws.name, ws]))
-
-    for (const specId of input.specIds) {
+    for (const specId of specIds) {
       const persisted = await loadPersistedSpecSchema(workspaceMap, specId)
       if (persisted.schema !== null) {
         const specSchemaName = persisted.schema.name
@@ -154,7 +178,7 @@ export class CreateChange {
     }
 
     const specDependsOn = new Map<string, readonly string[]>()
-    for (const specId of input.specIds) {
+    for (const specId of specIds) {
       const persisted = await loadPersistedSpecDependsOn(workspaceMap, specId)
       if (persisted.source !== 'empty') {
         specDependsOn.set(specId, persisted.dependsOn)
@@ -165,14 +189,12 @@ export class CreateChange {
       name: input.name,
       createdAt: now,
       ...(input.description !== undefined ? { description: input.description } : {}),
-      specIds: [...input.specIds],
+      specIds: [...specIds],
       schemaName,
       schemaVersion,
       history: [created],
       specDependsOn,
-      ...(input.invalidationPolicy !== undefined
-        ? { invalidationPolicy: input.invalidationPolicy }
-        : {}),
+      ...(invalidationPolicy !== undefined ? { invalidationPolicy } : {}),
     })
 
     await this._changes.create(change)
@@ -180,7 +202,7 @@ export class CreateChange {
     const changePath = this._changes.changePath(change)
 
     let overlapReport: OverlapReport | undefined
-    if (input.includeOverlapCheck === true && input.specIds.length > 0) {
+    if (input.includeOverlapCheck === true && specIds.length > 0) {
       try {
         overlapReport = await this._detectOverlap.execute({ name: input.name })
       } catch {
@@ -214,7 +236,7 @@ export class CreateChange {
 
     const result = await this._getActiveSchema.execute()
     if (result.raw) {
-      throw new Error('Unexpected raw schema result from GetActiveSchema')
+      throw new InvalidInputError('Unexpected raw schema result from GetActiveSchema')
     }
 
     return {
@@ -234,7 +256,7 @@ export class CreateChange {
     workspaces: ReadonlyMap<string, ProjectWorkspace>,
     specId: string,
   ): Promise<boolean> {
-    const { workspace, capPath } = parseSpecId(specId)
+    const { workspace, capPath } = parseSpecId(specId, { workspaces: workspaces.keys() })
     const ws = workspaces.get(workspace)
     if (ws === undefined) return false
     const spec = await ws.specRepo.get(SpecPath.parse(capPath))

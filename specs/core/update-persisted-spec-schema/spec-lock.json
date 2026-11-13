@@ -13,5 +13,10 @@
     "core:spec-id-format",
     "core:composition-resolver"
   ],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/update-persisted-spec-schema.ts",
+      "symbols": ["UpdatePersistedSpecSchema"]
+    }
+  ]
 }

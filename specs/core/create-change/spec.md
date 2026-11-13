@@ -12,7 +12,7 @@ Every spec workflow begins with a named change, so the system needs a single ent
 
 - `name` (string, required) — unique slug name for the change (kebab-case)
 - `description` (string, optional) — free-text description of the change's purpose
-- `specIds` (readonly string\[], required) — spec paths being created or modified
+- `specIds` (readonly string\[], required) — spec paths being created or modified; each entry is one whole spec ID, validated and normalized per "Spec ID validation"
 - `schemaName` (string, optional) — explicit schema name override
 - `schemaVersion` (number, optional) — explicit schema version override
 - `invalidationPolicy` (optional) — initial invalidation policy for the new change
@@ -23,6 +23,16 @@ When `schemaName` and `schemaVersion` are both absent, the use case MUST resolve
 When both `schemaName` and `schemaVersion` are provided, the use case MUST use them directly without calling `GetActiveSchema`.
 
 Providing only one of `schemaName` or `schemaVersion` MUST be rejected before persistence (the use case throws a validation error).
+
+### Requirement: Spec ID validation
+
+Before persistence, the use case MUST validate and normalize every entry of `specIds` with `parseSpecId` and the configured workspaces (see `core:spec-id-format`) and store the fully-qualified IDs. An invalid ID fails with `InvalidSpecIdError` and an unknown workspace with `WorkspaceNotFoundError`, quoting the full original value, and no change is created when any entry is invalid. A spec that does not exist yet is accepted; only syntax and workspace are checked.
+
+Duplicate entries (after normalization) collapse to one, keeping first-occurrence order. Validation runs after the change name and schema identity have been checked: a request that fails on an already-existing name reports `ChangeAlreadyExistsError` even when its spec IDs are also invalid.
+
+### Requirement: ReadOnly workspace rejection
+
+After normalizing `specIds` and before persistence, the use case MUST check the `ownership` of the workspace of every spec (from `ListWorkspaces`). When one or more specs belong to a `readOnly` workspace, the use case MUST throw `ReadOnlyWorkspaceError` and create nothing. The message MUST contain one line per offending spec in the form `Cannot add spec "<specId>" to change — workspace "<workspace>" is readOnly.`, followed by the sentence `ReadOnly workspaces are protected: their specs and code cannot be modified by changes.`, and MUST NOT suggest remediation steps (see `core:workspace`). This rule lives in the use case so that every delivery mechanism (CLI, MCP, SDK) enforces it.
 
 ### Requirement: Active schema resolution
 
@@ -54,6 +64,8 @@ The persisted initial value MUST be one of:
 - `surgical`
 - `downstream`
 - `global`
+
+Before persistence the use case MUST reject any other value with `InvalidInputError`, quoting the full original value and listing the allowed values, and it MUST create nothing. The check lives in the use case so that every delivery mechanism (CLI, MCP, SDK) enforces it; a host's type cast is not validation.
 
 This value becomes the change's default invalidation policy until a later EditChange operation overrides it.
 
@@ -140,6 +152,8 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:get-active-schema`](../get-active-schema/spec.md)
 - [`core:spec-overlap`](../spec-overlap/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)
+- [`core:spec-id-format`](../spec-id-format/spec.md) — spec ID validation and normalization of the input IDs
+- [`core:workspace`](../workspace/spec.md) — workspace ownership (`readOnly` rejection) and workspace names
 
 ### Requirement: Schema compatibility guardrail
 

@@ -1,9 +1,8 @@
 import { type Command } from 'commander'
-import { SpecPath, type SpecContextEntry } from '@specd/sdk'
+import { type SpecContextEntry } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
-import { parseSpecId } from '../../helpers/spec-path.js'
 
 /**
  * Renders a SpecContextEntry as text.
@@ -115,7 +114,6 @@ JSON/TOON output schema:
           }
 
           const { config, kernel } = await resolveCliContext({ configPath: opts.config })
-          const parsed = parseSpecId(specPath, config)
 
           // Build section filter
           const sectionFlags: Array<'rules' | 'constraints' | 'scenarios'> = []
@@ -130,8 +128,7 @@ JSON/TOON output schema:
           })()
 
           const result = await kernel.specs.getContext.execute({
-            workspace: parsed.workspace,
-            specPath: SpecPath.parse(parsed.capabilityPath),
+            specId: specPath,
             ...(opts.followDeps === true ? { followDeps: true } : {}),
             ...(opts.depth !== undefined ? { depth: parseInt(opts.depth, 10) } : {}),
             contextMode: opts.mode,

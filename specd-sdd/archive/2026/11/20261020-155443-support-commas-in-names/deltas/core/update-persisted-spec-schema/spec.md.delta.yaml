@@ -1,0 +1,39 @@
+- op: added
+  description: specId is validated and normalized by the use case
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Input contract'
+  content: |
+    ### Requirement: Spec ID validation
+
+    Before workspace resolution, schema resolution, artifact reads, or persisted-state I/O, the use case MUST validate and normalize `specId` with `parseSpecId` and the configured workspaces (see `core:spec-id-format`). A bare path is resolved to the `default` workspace, so the input accepts a bare or fully-qualified valid ID, and every `specId` in the result is the fully-qualified form. An invalid ID fails with `InvalidSpecIdError` and an unknown workspace with `WorkspaceNotFoundError`, quoting the full original value, and nothing is written. Delivery adapters pass the raw string and perform no validation of their own.
+
+- op: modified
+  description: Artifact parse verification is unconditional
+  selector:
+    type: section
+    matches: 'Requirement: Loading and parsing declared artifacts under the target schema'
+  content: |
+    The use case MUST load the spec's current schema-declared canonical artifacts and verify that every one of them parses successfully under the resolved target schema, using the same parsing and content-extraction infrastructure used by deterministic metadata projection. This verification runs for every target schema that differs from the schema already persisted, whether or not it declares dependency extraction; selecting the already-persisted schema is a no-op that returns before any parsing (see "Selecting the already-persisted schema is a no-op"). An artifact whose format has no registered parser has nothing to verify and is the only case that is skipped. A parse failure under the target schema MUST abort the reassignment with a typed error and MUST NOT mutate persisted state.
+
+- op: modified
+  description: Align resolveUpdatePersistedSpecSchemaDeps with specRepositories and lower-level collaborators
+  selector:
+    type: section
+    matches: 'Requirement: Config-based factory delegates through resolveUpdatePersistedSpecSchemaDeps'
+  content: |
+    The config-based `createUpdatePersistedSpecSchema(config, options?)` form MUST derive `UpdatePersistedSpecSchemaDeps` through `resolveUpdatePersistedSpecSchemaDeps(resolver)` and then delegate to canonical `createUpdatePersistedSpecSchema(deps)`.
+
+    `resolveUpdatePersistedSpecSchemaDeps(resolver)` MUST resolve:
+
+    - `specRepositories: ReadonlyMap<string, SpecRepository>` — one repository instance per workspace
+    - `getActiveSchema: GetActiveSchema`
+    - `parsers: ArtifactParserRegistry`
+    - `extractorTransforms: ExtractorTransformRegistry`
+    - `contentHasher: ContentHasher`
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.

@@ -109,6 +109,9 @@ Everything exported is a domain type (entity, value object, error, service), an 
 | `ArtifactConflictError`        | `ARTIFACT_CONFLICT`         |
 | `DeltaApplicationError`        | `DELTA_APPLICATION`         |
 | `InvalidSpecPathError`         | `INVALID_SPEC_PATH`         |
+| `InvalidSpecIdError`           | `INVALID_SPEC_ID`           |
+| `InvalidSpecPatternError`      | `INVALID_SPEC_PATTERN`      |
+| `InvalidSpecLockError`         | `INVALID_SPEC_LOCK`         |
 | `InvalidChangeError`           | `INVALID_CHANGE`            |
 | `ArtifactNotOptionalError`     | `ARTIFACT_NOT_OPTIONAL`     |
 | `SchemaValidationError`        | `SCHEMA_VALIDATION_ERROR`   |
@@ -125,29 +128,32 @@ Everything exported is a domain type (entity, value object, error, service), an 
 
 **From the domain layer — services:**
 
-| Export                     | Kind     | Description                                                                |
-| -------------------------- | -------- | -------------------------------------------------------------------------- |
-| `hashFiles`                | function | Applies a hash function to each entry in a file-content map.               |
-| `applyPreHashCleanup`      | function | Applies schema-declared pre-hash substitutions to artifact content.        |
-| `buildSchema`              | function | Constructs a typed `Schema` from validated YAML data and templates.        |
-| `buildSelector`            | function | Converts a raw selector shape into the domain `Selector` type.             |
-| `mergeSchemaLayers`        | function | Applies ordered customisation layers to a base schema's intermediate data. |
-| `parseSpecId`              | function | Splits a spec ID into workspace and capability path.                       |
-| `extractSpecSummary`       | function | Extracts a short summary from `spec.md` content.                           |
-| `extractMetadata`          | function | Async metadata extraction orchestration across multiple artifact ASTs.     |
-| `extractContent`           | function | Async extractor runtime for one AST root (supports promise transforms).    |
-| `evaluateRules`            | function | Evaluates validation rules against an AST, returning failures/warnings.    |
-| `findNodes`                | function | Finds all nodes matching a selector in an AST.                             |
-| `nodeMatches`              | function | Tests whether a single AST node matches a selector.                        |
-| `selectBySelector`         | function | Selects nodes using a selector with parent-scope and index support.        |
-| `collectAllNodes`          | function | Recursively collects all nodes in an AST.                                  |
-| `safeRegex`                | function | Compiles a user-supplied pattern, returning `null` if invalid or unsafe.   |
-| `inferFormat`              | function | Infers artifact format from a filename extension.                          |
-| `shiftHeadings`            | function | Shifts Markdown heading levels by a given delta.                           |
-| `selectByJsonPath`         | function | Navigates an AST using a simplified JSONPath expression.                   |
-| `tokenizeJsonPath`         | function | Tokenises a JSONPath expression into segments.                             |
-| `specMetadataSchema`       | const    | Lenient Zod schema for reading `metadata.json`.                            |
-| `strictSpecMetadataSchema` | const    | Strict Zod schema for writing `metadata.json`.                             |
+| Export                     | Kind     | Description                                                                   |
+| -------------------------- | -------- | ----------------------------------------------------------------------------- |
+| `hashFiles`                | function | Applies a hash function to each entry in a file-content map.                  |
+| `applyPreHashCleanup`      | function | Applies schema-declared pre-hash substitutions to artifact content.           |
+| `buildSchema`              | function | Constructs a typed `Schema` from validated YAML data and templates.           |
+| `buildSelector`            | function | Converts a raw selector shape into the domain `Selector` type.                |
+| `mergeSchemaLayers`        | function | Applies ordered customisation layers to a base schema's intermediate data.    |
+| `parseSpecId`              | function | Validates and normalizes a spec ID (`workspace:capPath` or bare → `default`). |
+| `isValidWorkspaceName`     | function | True when a name matches the ≥2-character workspace rule.                     |
+| `isValidCapabilitySegment` | function | True when a capability-path segment is valid.                                 |
+| `isFullyQualifiedSpecId`   | function | True when a string is a fully-qualified, syntactically valid spec ID.         |
+| `extractSpecSummary`       | function | Extracts a short summary from `spec.md` content.                              |
+| `extractMetadata`          | function | Async metadata extraction orchestration across multiple artifact ASTs.        |
+| `extractContent`           | function | Async extractor runtime for one AST root (supports promise transforms).       |
+| `evaluateRules`            | function | Evaluates validation rules against an AST, returning failures/warnings.       |
+| `findNodes`                | function | Finds all nodes matching a selector in an AST.                                |
+| `nodeMatches`              | function | Tests whether a single AST node matches a selector.                           |
+| `selectBySelector`         | function | Selects nodes using a selector with parent-scope and index support.           |
+| `collectAllNodes`          | function | Recursively collects all nodes in an AST.                                     |
+| `safeRegex`                | function | Compiles a user-supplied pattern, returning `null` if invalid or unsafe.      |
+| `inferFormat`              | function | Infers artifact format from a filename extension.                             |
+| `shiftHeadings`            | function | Shifts Markdown heading levels by a given delta.                              |
+| `selectByJsonPath`         | function | Navigates an AST using a simplified JSONPath expression.                      |
+| `tokenizeJsonPath`         | function | Tokenises a JSONPath expression into segments.                                |
+| `specMetadataSchema`       | const    | Lenient Zod schema for reading `metadata.json`.                               |
+| `strictSpecMetadataSchema` | const    | Strict Zod schema for writing `metadata.json`.                                |
 
 **From the application layer — ports:**
 

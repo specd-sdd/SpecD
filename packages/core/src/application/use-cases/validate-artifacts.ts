@@ -101,6 +101,8 @@ export interface ValidateArtifactsResult {
   readonly warnings: ValidationWarning[]
   /** One entry per expected file considered during validation. */
   readonly files: ValidationFileResult[]
+  /** Fully-qualified normalized spec ID when a `specPath` was provided. */
+  readonly specId?: string
 }
 
 /**
@@ -177,10 +179,30 @@ export class ValidateArtifacts {
         : undefined
     const isChangeScopedTarget = targetArtifactType?.scope === 'change'
 
+    const workspaces = await this._listWorkspaces.execute()
+    const workspaceMap = new Map(workspaces.map((ws) => [ws.name, ws]))
+
+    let workspace = ''
+    let capabilityPath = ''
+    let normalizedSpecId: string | undefined
+    let specRepo: SpecRepository | undefined
+    let existingSpec: Spec | null = null
+    let specExists = false
     if (input.specPath !== undefined) {
-      if (!isChangeScopedTarget && !change.specIds.includes(input.specPath)) {
-        throw new SpecNotInChangeError(input.specPath, input.name)
+      const parsed = parseSpecId(input.specPath, { workspaces })
+      workspace = parsed.workspace
+      capabilityPath = parsed.capPath
+      normalizedSpecId = parsed.specId
+      if (!isChangeScopedTarget && !change.specIds.includes(parsed.specId)) {
+        throw new SpecNotInChangeError(parsed.specId, input.name)
       }
+      const ws = workspaceMap.get(workspace)
+      specRepo = ws?.specRepo
+      existingSpec =
+        specRepo !== undefined && capabilityPath.length > 0
+          ? await specRepo.get(SpecPath.parse(capabilityPath))
+          : null
+      specExists = existingSpec !== null
     } else if (input.artifactId !== undefined) {
       if (targetArtifactType?.scope === 'spec') {
         throw new SpecNotInChangeError('<specPath required>', input.name)
@@ -206,6 +228,7 @@ export class ValidateArtifacts {
           ],
           warnings: [],
           files: [],
+          ...(normalizedSpecId !== undefined ? { specId: normalizedSpecId } : {}),
         }
       }
     }
@@ -257,27 +280,6 @@ export class ValidateArtifacts {
       artifactId: input.artifactId ?? null,
       blockerCodes: lifecycle.blockers.map((blocker) => blocker.code),
     })
-
-    const workspaces = await this._listWorkspaces.execute()
-    const workspaceMap = new Map(workspaces.map((ws) => [ws.name, ws]))
-
-    let workspace = ''
-    let capabilityPath = ''
-    let specRepo: SpecRepository | undefined
-    let existingSpec: Spec | null = null
-    let specExists = false
-    if (input.specPath !== undefined) {
-      const parsed = parseSpecId(input.specPath)
-      workspace = parsed.workspace
-      capabilityPath = parsed.capPath
-      const ws = workspaceMap.get(workspace)
-      specRepo = ws?.specRepo
-      existingSpec =
-        specRepo !== undefined && capabilityPath.length > 0
-          ? await specRepo.get(SpecPath.parse(capabilityPath))
-          : null
-      specExists = existingSpec !== null
-    }
     const crossRules = schema.crossArtifactValidations()
 
     // --- Required artifacts check (skipped when artifactId is provided) ---
@@ -750,7 +752,13 @@ export class ValidateArtifacts {
       })
     }
 
-    return { passed: failures.length === 0, failures, warnings, files }
+    return {
+      passed: failures.length === 0,
+      failures,
+      warnings,
+      files,
+      ...(normalizedSpecId !== undefined ? { specId: normalizedSpecId } : {}),
+    }
   }
 
   /**

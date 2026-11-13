@@ -20,6 +20,24 @@
 - **WHEN** the entry is projected without `includeArchivedBy`
 - **THEN** `archivedBy` is not present on the returned entry
 
+#### Scenario: Spec workspaces are derived through the validator
+
+- **GIVEN** the spec IDs `core:auth/login`, `core:auth/session`, and `default:_global/x`
+- **WHEN** `workspacesFromSpecIds` is called
+- **THEN** it returns `core` then `default`, unique and in encounter order
+
+#### Scenario: Invalid ID in the input is rejected
+
+- **GIVEN** the spec IDs `core:auth/login` and `auth/a,b`
+- **WHEN** `workspacesFromSpecIds` is called
+- **THEN** it throws `InvalidSpecIdError` quoting `auth/a,b`
+
+#### Scenario: List rows do not claim a change workspace
+
+- **WHEN** an archive listing is produced
+- **THEN** list rows carry no `workspaces` field
+- **AND** no singular or primary workspace is assigned to the archived change
+
 ### Requirement: No manifest-only data
 
 #### Scenario: ArchiveListEntry is sufficient for listing without manifest reads

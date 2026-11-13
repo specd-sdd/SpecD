@@ -1,0 +1,41 @@
+- op: added
+  description: Lenient dependsOn read scenarios (audit)
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: readPersistedState lenient dependsOn option
+
+    #### Scenario: Strict read rejects an invalid dependsOn entry
+
+    - **GIVEN** a sidecar whose `dependsOn` contains `""`
+    - **WHEN** `readPersistedState(spec)` is called
+    - **THEN** `InvalidSpecLockError` is thrown
+
+    #### Scenario: Lenient read returns invalid dependsOn entries as stored
+
+    - **GIVEN** a sidecar whose `dependsOn` contains `""`
+    - **WHEN** `readPersistedState(spec, { lenientDependsOn: true })` is called
+    - **THEN** the snapshot's `dependsOn` contains `""` and the file is not rewritten
+
+    #### Scenario: Lenient read still validates other fields
+
+    - **GIVEN** a sidecar whose `implementation.0.file` is empty
+    - **WHEN** `readPersistedState(spec, { lenientDependsOn: true })` is called
+    - **THEN** `InvalidSpecLockError` naming `implementation.0.file` is thrown
+
+    #### Scenario: Revision check reads leniently
+
+    - **GIVEN** a sidecar with invalid `dependsOn` entries and `expectedRevision` equal to its current hash
+    - **WHEN** `writePersistedState(spec, validState, { expectedRevision })` is called
+    - **THEN** the write succeeds
+- op: modified
+  description: Supply an explicit trigger for the existing omitted includeMeta scenario
+  selector:
+    type: section
+    matches: '^Scenario: includeMeta omitted leaves Meta fields absent$'
+  content: |
+    - **GIVEN** `list()` is called without `includeMeta`
+    - **WHEN** the repository returns the list entries
+    - **THEN** `artifacts`, `persistedStateMeta`, and `generatedMetadataMeta` are omitted from each entry

@@ -2123,10 +2123,11 @@ describe('FsChangeRepository', () => {
       await persistChange(ctx.repo, change)
 
       const dir = path.join(ctx.changesPath, '20240115-100000-remove-test')
-      await fs.mkdir(path.join(dir, 'specs', 'default'), { recursive: true })
+      await fs.mkdir(path.join(dir, 'specs', 'default', 'auth'), { recursive: true })
 
-      await ctx.repo.unscaffold(change, ['default:'])
+      await ctx.repo.unscaffold(change, ['default:auth'])
 
+      await expect(fs.access(path.join(dir, 'specs', 'default', 'auth'))).rejects.toThrow()
       await expect(fs.access(dir)).resolves.toBeUndefined()
     })
   })

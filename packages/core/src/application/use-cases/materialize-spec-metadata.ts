@@ -88,7 +88,9 @@ export class MaterializeSpecMetadata {
    * @returns Spec entity and owning repository
    */
   private async _resolveSpec(specId: string): Promise<{ spec: Spec; repo: SpecRepository }> {
-    const { workspace, capPath } = parseSpecId(specId)
+    const { workspace, capPath } = parseSpecId(specId, {
+      workspaces: this.specRepositories.keys(),
+    })
     const repo = this.specRepositories.get(workspace)
     if (repo === undefined) {
       throw new WorkspaceNotFoundError(workspace)

@@ -29,6 +29,7 @@ import {
   makeParsers,
   testActor,
   makeContentHasher,
+  makeDefaultWorkspaceRepos,
   makeListWorkspaces,
 } from './helpers.js'
 
@@ -84,7 +85,7 @@ describe('ValidateArtifacts', () => {
     it('throws ChangeNotFoundError when change does not exist', async () => {
       const uc = new ValidateArtifacts(
         makeChangeRepository(),
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(makeSchema([])),
         makeParsers(),
         makeActorResolver(),
@@ -104,7 +105,7 @@ describe('ValidateArtifacts', () => {
       const change = makeChangeWithArtifacts('c', [], { specIds: ['default:auth/login'] })
       const uc = new ValidateArtifacts(
         makeChangeRepository([change]),
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(makeSchema([])),
         makeParsers(),
         makeActorResolver(),
@@ -124,7 +125,7 @@ describe('ValidateArtifacts', () => {
       const change = makeChangeWithArtifacts('c', [])
       const uc = new ValidateArtifacts(
         makeChangeRepository([change]),
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(null),
         makeParsers(),
         makeActorResolver(),
@@ -144,7 +145,7 @@ describe('ValidateArtifacts', () => {
       const change = makeChangeWithArtifacts('c', [], { schemaName: 'schema-a' })
       const uc = new ValidateArtifacts(
         makeChangeRepository([change]),
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(makeSchema({ name: 'schema-b' })),
         makeParsers(),
         makeActorResolver(),
@@ -167,7 +168,7 @@ describe('ValidateArtifacts', () => {
       const repo = makeChangeRepository([change])
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -205,7 +206,7 @@ describe('ValidateArtifacts', () => {
       const repo = makeChangeRepository([change])
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -227,7 +228,7 @@ describe('ValidateArtifacts', () => {
       const repo = makeChangeRepository([change])
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -287,7 +288,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -351,7 +352,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -417,7 +418,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -477,7 +478,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -536,7 +537,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -598,7 +599,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -704,7 +705,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -768,7 +769,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -833,7 +834,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -888,7 +889,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -933,7 +934,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -977,7 +978,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -1027,7 +1028,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(parser),
         makeActorResolver(),
@@ -1080,7 +1081,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(parser),
         makeActorResolver(),
@@ -1126,7 +1127,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(parser),
         makeActorResolver(),
@@ -1326,7 +1327,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -1658,7 +1659,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -1699,7 +1700,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -1721,7 +1722,7 @@ describe('ValidateArtifacts', () => {
       const change = makeChangeWithArtifacts('c', [])
       const uc = new ValidateArtifacts(
         makeChangeRepository([change]),
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -1744,7 +1745,7 @@ describe('ValidateArtifacts', () => {
       const change = makeChangeWithArtifacts('c', [])
       const uc = new ValidateArtifacts(
         makeChangeRepository([change]),
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -1792,7 +1793,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -1836,7 +1837,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -1892,7 +1893,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -1948,7 +1949,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -2015,7 +2016,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -2063,7 +2064,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -2099,7 +2100,7 @@ describe('ValidateArtifacts', () => {
       const repo = makeChangeRepository([change])
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -2134,7 +2135,7 @@ describe('ValidateArtifacts', () => {
       const repo = makeChangeRepository([change])
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -2254,7 +2255,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(markdownParser),
         makeActorResolver(),
@@ -2602,7 +2603,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(markdownParser),
         makeActorResolver(),
@@ -3656,7 +3657,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(makeParser()),
         makeActorResolver(),
@@ -3675,7 +3676,7 @@ describe('ValidateArtifacts', () => {
       const change = makeChangeWithArtifacts('c', [], { specIds: ['default:auth'] })
       const uc = new ValidateArtifacts(
         makeChangeRepository([change]),
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
@@ -3737,7 +3738,7 @@ describe('ValidateArtifacts', () => {
 
       const uc = new ValidateArtifacts(
         repo,
-        makeListWorkspaces(new Map()),
+        makeListWorkspaces(makeDefaultWorkspaceRepos()),
         makeSchemaProvider(schema),
         makeParsers(makeParser()),
         makeActorResolver(),

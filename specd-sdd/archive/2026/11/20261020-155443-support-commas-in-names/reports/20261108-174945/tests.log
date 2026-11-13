@@ -1,0 +1,911 @@
+• turbo 2.9.6
+
+   • Packages in scope: @specd/cli, @specd/core, @specd/guide, @specd/sdk, @specd/skills
+   • Running test in 5 packages
+   • Remote caching disabled
+
+@specd/guide:build: cache bypass, force executing 0f68a352cc148bc8
+@specd/core:build: cache bypass, force executing 9d77ff468b0a09cd
+@specd/core:build: 
+@specd/core:build: > @specd/core@0.2.0 build /Users/monki/Documents/Proyectos/specd/packages/core
+@specd/core:build: > tsup src/public.ts src/ports.ts src/extensions.ts src/index.ts --format esm --dts --clean
+@specd/core:build: 
+@specd/guide:build: 
+@specd/guide:build: > @specd/guide@0.3.0 build /Users/monki/Documents/Proyectos/specd/packages/guide
+@specd/guide:build: > tsx scripts/bundle-guides.ts && tsup src/public.ts src/index.ts src/sdk.ts --format esm --dts --clean
+@specd/guide:build: 
+@specd/core:build: CLI Building entry: src/extensions.ts, src/index.ts, src/ports.ts, src/public.ts
+@specd/core:build: CLI Using tsconfig: tsconfig.json
+@specd/core:build: CLI tsup v8.5.1
+@specd/core:build: CLI Target: es2022
+@specd/core:build: CLI Cleaning output folder
+@specd/core:build: ESM Build start
+@specd/core:build: ESM dist/index.js                   12.21 KB
+@specd/core:build: ESM dist/ports.js                   1.13 KB
+@specd/core:build: ESM dist/chunk-OLYL6X4N.js          55.14 KB
+@specd/core:build: ESM dist/public.js                  10.16 KB
+@specd/core:build: ESM dist/chunk-VMC7YAWF.js          11.58 KB
+@specd/core:build: ESM dist/chunk-DEJJJJR2.js          7.19 KB
+@specd/core:build: ESM dist/parse-metadata-4M5Y7BE5.js 243.00 B
+@specd/core:build: ESM dist/chunk-QCVTRFGR.js          1.05 KB
+@specd/core:build: ESM dist/chunk-5E43THEP.js          8.52 KB
+@specd/core:build: ESM dist/extensions.js              273.00 B
+@specd/core:build: ESM dist/chunk-CDQ47AG6.js          997.05 KB
+@specd/core:build: ESM dist/chunk-UE24OY3T.js          5.57 KB
+@specd/core:build: ESM ⚡️ Build success in 145ms
+@specd/guide:build: Bundling guide collections: guide, sdk, core, code-graph, skills, schemas (+ API: sdk, core, code-graph)
+@specd/core:build: DTS Build start
+@specd/guide:build: [info] Loaded plugin typedoc-plugin-markdown
+@specd/guide:build: [info] Loaded plugin typedoc-plugin-markdown
+@specd/guide:build: [info] Loaded plugin typedoc-plugin-markdown
+@specd/core:build: DTS ⚡️ Build success in 8182ms
+@specd/core:build: DTS dist/public.d.ts                  21.17 KB
+@specd/core:build: DTS dist/index.d.ts                   33.01 KB
+@specd/core:build: DTS dist/extensions.d.ts              6.24 KB
+@specd/core:build: DTS dist/ports.d.ts                   55.74 KB
+@specd/core:build: DTS dist/config-writer-BD9sKLP7.d.ts  5.99 KB
+@specd/core:build: DTS dist/logger.port-BAjWiCwg.d.ts    205.05 KB
+@specd/core:build: DTS dist/kernel-CM8VFFIy.d.ts         221.56 KB
+@specd/core:build: DTS dist/content-hasher-B4QBjBRg.d.ts 142.67 KB
+@specd/code-graph:build: cache bypass, force executing 88eaff785591dedb
+@specd/skills:build: cache bypass, force executing 4171915f676cb4f7
+@specd/code-graph:build: 
+@specd/code-graph:build: > @specd/code-graph@0.3.0 build /Users/monki/Documents/Proyectos/specd/packages/code-graph
+@specd/code-graph:build: > tsup src/public.ts src/index.ts src/infrastructure/sqlite/sqlite-worker.ts src/infrastructure/isolated-index-worker/isolated-index-worker-child.ts --format esm --dts --clean
+@specd/code-graph:build: 
+@specd/skills:build: 
+@specd/skills:build: > @specd/skills@0.2.0 build /Users/monki/Documents/Proyectos/specd/packages/skills
+@specd/skills:build: > tsup src/index.ts --format esm --dts --clean
+@specd/skills:build: 
+@specd/code-graph:build: CLI Building entry: src/index.ts, src/public.ts, src/infrastructure/isolated-index-worker/isolated-index-worker-child.ts, src/infrastructure/sqlite/sqlite-worker.ts
+@specd/code-graph:build: CLI Using tsconfig: tsconfig.json
+@specd/code-graph:build: CLI tsup v8.5.1
+@specd/skills:build: CLI Building entry: src/index.ts
+@specd/code-graph:build: CLI Target: es2022
+@specd/skills:build: CLI Using tsconfig: tsconfig.json
+@specd/skills:build: CLI tsup v8.5.1
+@specd/skills:build: CLI Target: es2022
+@specd/code-graph:build: CLI Cleaning output folder
+@specd/skills:build: CLI Cleaning output folder
+@specd/code-graph:build: ESM Build start
+@specd/skills:build: ESM Build start
+@specd/skills:build: ESM dist/index.js 33.92 KB
+@specd/skills:build: ESM ⚡️ Build success in 47ms
+@specd/code-graph:build: ESM dist/public.js                                                           4.92 KB
+@specd/code-graph:build: ESM dist/index.js                                                            5.65 KB
+@specd/code-graph:build: ESM dist/infrastructure/isolated-index-worker/isolated-index-worker-child.js 5.16 KB
+@specd/code-graph:build: ESM dist/chunk-IWKCRJI7.js                                                   3.90 KB
+@specd/code-graph:build: ESM dist/chunk-LLOU6AK6.js                                                   23.56 KB
+@specd/code-graph:build: ESM dist/infrastructure/sqlite/sqlite-worker.js                              147.78 KB
+@specd/code-graph:build: ESM dist/chunk-K7ZJUNXN.js                                                   842.56 KB
+@specd/code-graph:build: ESM ⚡️ Build success in 150ms
+@specd/skills:build: DTS Build start
+@specd/code-graph:build: DTS Build start
+@specd/skills:build: DTS ⚡️ Build success in 1362ms
+@specd/skills:build: DTS dist/index.d.ts 15.96 KB
+@specd/core:test: cache bypass, force executing 059f5e8c2ac34eee
+@specd/guide:build: Successfully bundled guide catalogs.
+@specd/core:test: 
+@specd/core:test: > @specd/core@0.2.0 test /Users/monki/Documents/Proyectos/specd/packages/core
+@specd/core:test: > vitest run
+@specd/core:test: 
+@specd/guide:build: CLI Building entry: src/index.ts, src/public.ts, src/sdk.ts
+@specd/guide:build: CLI Using tsconfig: tsconfig.json
+@specd/guide:build: CLI tsup v8.5.1
+@specd/guide:build: CLI Target: es2022
+@specd/guide:build: CLI Cleaning output folder
+@specd/guide:build: ESM Build start
+@specd/guide:build: ESM dist/index.js          1.02 KB
+@specd/guide:build: ESM dist/sdk.js            503.00 B
+@specd/guide:build: ESM dist/chunk-ZGOOOVGW.js 40.79 KB
+@specd/guide:build: ESM dist/public.js         595.00 B
+@specd/guide:build: ESM ⚡️ Build success in 36ms
+@specd/guide:build: DTS Build start
+@specd/core:test: 
+@specd/core:test:  RUN  v4.1.10 /Users/monki/Documents/Proyectos/specd/packages/core
+@specd/core:test: 
+@specd/guide:build: DTS ⚡️ Build success in 1500ms
+@specd/guide:build: DTS dist/sdk.d.ts                   636.00 B
+@specd/guide:build: DTS dist/index.d.ts                 11.22 KB
+@specd/guide:build: DTS dist/public.d.ts                883.00 B
+@specd/guide:build: DTS dist/guide-engine-zw7Q6PXe.d.ts 18.79 KB
+@specd/guide:build: DTS dist/public-T37SEQsM.d.ts       9.79 KB
+@specd/plugin-manager:build: cache bypass, force executing 66439019ada752e0
+@specd/plugin-manager:build: 
+@specd/plugin-manager:build: > @specd/plugin-manager@0.2.0 build /Users/monki/Documents/Proyectos/specd/packages/plugin-manager
+@specd/plugin-manager:build: > tsup src/index.ts --format esm --dts --clean
+@specd/plugin-manager:build: 
+@specd/plugin-manager:build: CLI Building entry: src/index.ts
+@specd/plugin-manager:build: CLI Using tsconfig: tsconfig.json
+@specd/plugin-manager:build: CLI tsup v8.5.1
+@specd/plugin-manager:build: CLI Target: es2022
+@specd/plugin-manager:build: CLI Cleaning output folder
+@specd/plugin-manager:build: ESM Build start
+@specd/plugin-manager:build: ESM dist/index.js 11.67 KB
+@specd/plugin-manager:build: ESM ⚡️ Build success in 80ms
+@specd/plugin-manager:build: DTS Build start
+@specd/plugin-manager:build: DTS ⚡️ Build success in 1385ms
+@specd/plugin-manager:build: DTS dist/index.d.ts 13.57 KB
+@specd/skills:test: cache bypass, force executing d3509a08b86f41a9
+@specd/code-graph:build: DTS ⚡️ Build success in 7909ms
+@specd/code-graph:build: DTS dist/infrastructure/isolated-index-worker/isolated-index-worker-child.d.ts 13.00 B
+@specd/code-graph:build: DTS dist/public.d.ts                                                           10.87 KB
+@specd/code-graph:build: DTS dist/infrastructure/sqlite/sqlite-worker.d.ts                              53.13 KB
+@specd/code-graph:build: DTS dist/index.d.ts                                                            109.85 KB
+@specd/code-graph:build: DTS dist/sqlite-runtime-descriptor-CF7Xr8Mu.d.ts                               85.38 KB
+@specd/code-graph:build: DTS dist/resolve-effective-graph-config-DMoBWXzd.d.ts                          114.25 KB
+@specd/skills:test: 
+@specd/skills:test: > @specd/skills@0.2.0 test /Users/monki/Documents/Proyectos/specd/packages/skills
+@specd/skills:test: > vitest run
+@specd/skills:test: 
+@specd/guide:test: cache bypass, force executing 35e8c86fa8dd71d9
+@specd/guide:test: 
+@specd/guide:test: > @specd/guide@0.3.0 test /Users/monki/Documents/Proyectos/specd/packages/guide
+@specd/guide:test: > vitest run
+@specd/guide:test: 
+@specd/skills:test: 
+@specd/skills:test:  RUN  v4.1.10 /Users/monki/Documents/Proyectos/specd/packages/skills
+@specd/skills:test: 
+@specd/guide:test: 
+@specd/guide:test:  RUN  v4.1.10 /Users/monki/Documents/Proyectos/specd/packages/guide
+@specd/guide:test: 
+@specd/skills:test:  ✓ test/template-workflow.spec.ts (10 tests) 17ms
+@specd/skills:test:  ✓ test/application/render-base-agent-instruction.spec.ts (3 tests) 13ms
+@specd/skills:test:  ✓ test/application/json-config-manager.spec.ts (4 tests) 164ms
+@specd/skills:test:  ✓ test/application/specd-block-manager.spec.ts (10 tests) 490ms
+@specd/guide:test:  ✓ test/unit/domain/expand-guide-terms.test.ts (12 tests) 7ms
+@specd/guide:test:  ✓ test/unit/infrastructure/search.test.ts (17 tests) 9ms
+@specd/guide:test:  ✓ test/unit/domain/errors.spec.ts (9 tests) 6ms
+@specd/guide:test:  ✓ test/unit/application/queries.spec.ts (31 tests) 10ms
+@specd/guide:test:  ✓ test/unit/scripts/typedoc-entrypoints.spec.ts (1 test) 22ms
+@specd/guide:test:  ✓ test/unit/scripts/path-normalization.spec.ts (18 tests) 5ms
+@specd/guide:test:  ✓ test/unit/scripts/workspace-package-roots.test.ts (5 tests) 158ms
+@specd/guide:test:  ✓ test/unit/application/slicing.test.ts (11 tests) 3ms
+@specd/guide:test:  ✓ test/integration/guide-engine.test.ts (9 tests) 164ms
+@specd/guide:test:  ✓ test/unit/domain/models.test.ts (4 tests) 3ms
+@specd/guide:test:  ✓ test/unit/infrastructure/bundle.test.ts (12 tests) 203ms
+@specd/skills:test:  ✓ test/resolve-bundle.spec.ts (7 tests) 11ms
+@specd/skills:test:  ✓ test/infrastructure/skill-repository.spec.ts (14 tests) 89ms
+@specd/skills:test:  ✓ test/domain/skill-bundle.spec.ts (2 tests) 104ms
+@specd/skills:test:  ✓ test/domain/skill.spec.ts (2 tests) 107ms
+@specd/skills:test: 
+@specd/skills:test:  Test Files  8 passed (8)
+@specd/skills:test:       Tests  52 passed (52)
+@specd/skills:test:    Start at  17:48:12
+@specd/skills:test:    Duration  2.17s (transform 2.07s, setup 0ms, import 6.96s, tests 994ms, environment 1ms)
+@specd/skills:test: 
+@specd/plugin-agent-standard:build: cache bypass, force executing 69f3cefcfc7fb778
+@specd/plugin-agent-standard:build: 
+@specd/plugin-agent-standard:build: > @specd/plugin-agent-standard@0.1.0 build /Users/monki/Documents/Proyectos/specd/packages/plugin-agent-standard
+@specd/plugin-agent-standard:build: > node --import tsx ../../dev/scripts/sync-plugin-manifests.ts packages/plugin-agent-standard && tsup src/index.ts --format esm --dts --clean
+@specd/plugin-agent-standard:build: 
+@specd/plugin-agent-standard:build: synced packages/plugin-agent-standard/specd-plugin.json → v0.1.0
+@specd/core:test:  ✓ test/infrastructure/node/hook-runner.spec.ts (14 tests) 7952ms
+@specd/core:test:        ✓ runs a shell command and returns exit code 0 on success  408ms
+@specd/core:test:        ✓ captures stderr  335ms
+@specd/core:test:        ✓ emits stdout and stderr progress before completion  553ms
+@specd/core:test:        ✓ emits a heartbeat for a quiet but still-running process  5847ms
+@specd/plugin-agent-standard:build: CLI Building entry: src/index.ts
+@specd/plugin-agent-standard:build: CLI Using tsconfig: tsconfig.json
+@specd/plugin-agent-standard:build: CLI tsup v8.5.1
+@specd/plugin-agent-standard:build: CLI Target: es2022
+@specd/plugin-agent-standard:build: CLI Cleaning output folder
+@specd/plugin-agent-standard:build: ESM Build start
+@specd/plugin-agent-standard:build: ESM dist/index.js 13.70 KB
+@specd/plugin-agent-standard:build: ESM ⚡️ Build success in 24ms
+@specd/plugin-agent-standard:build: DTS Build start
+@specd/plugin-agent-standard:build: DTS ⚡️ Build success in 778ms
+@specd/plugin-agent-standard:build: DTS dist/index.d.ts 336.00 B
+@specd/plugin-agent-codex:build: cache bypass, force executing 6d95d915b781eb7a
+@specd/plugin-agent-codex:build: 
+@specd/plugin-agent-codex:build: > @specd/plugin-agent-codex@0.2.0 build /Users/monki/Documents/Proyectos/specd/packages/plugin-agent-codex
+@specd/plugin-agent-codex:build: > node --import tsx ../../dev/scripts/sync-plugin-manifests.ts packages/plugin-agent-codex && tsup src/index.ts --format esm --dts --clean
+@specd/plugin-agent-codex:build: 
+@specd/plugin-agent-codex:build: synced packages/plugin-agent-codex/specd-plugin.json → v0.2.0
+@specd/plugin-agent-codex:build: CLI Building entry: src/index.ts
+@specd/plugin-agent-codex:build: CLI Using tsconfig: tsconfig.json
+@specd/plugin-agent-codex:build: CLI tsup v8.5.1
+@specd/plugin-agent-codex:build: CLI Target: es2022
+@specd/plugin-agent-codex:build: CLI Cleaning output folder
+@specd/plugin-agent-codex:build: ESM Build start
+@specd/plugin-agent-codex:build: ESM dist/index.js 13.42 KB
+@specd/plugin-agent-codex:build: ESM ⚡️ Build success in 25ms
+@specd/plugin-agent-codex:build: DTS Build start
+@specd/plugin-agent-codex:build: DTS ⚡️ Build success in 755ms
+@specd/plugin-agent-codex:build: DTS dist/index.d.ts 313.00 B
+@specd/plugin-agent-opencode:build: cache bypass, force executing 6a5b4d35208bacf1
+@specd/plugin-agent-opencode:build: 
+@specd/plugin-agent-opencode:build: > @specd/plugin-agent-opencode@0.0.3 build /Users/monki/Documents/Proyectos/specd/packages/plugin-agent-opencode
+@specd/plugin-agent-opencode:build: > node --import tsx ../../dev/scripts/sync-plugin-manifests.ts packages/plugin-agent-opencode && tsup src/index.ts --format esm --dts --clean
+@specd/plugin-agent-opencode:build: 
+@specd/core:test:  ✓ test/infrastructure/fs/spec-repository.spec.ts (95 tests) 2363ms
+@specd/core:test:        ✓ rethrows the original EBUSY when the spec directory stays locked  1029ms
+@specd/plugin-agent-opencode:build: synced packages/plugin-agent-opencode/specd-plugin.json → v0.0.3
+@specd/plugin-agent-opencode:build: CLI Building entry: src/index.ts
+@specd/plugin-agent-opencode:build: CLI Using tsconfig: tsconfig.json
+@specd/plugin-agent-opencode:build: CLI tsup v8.5.1
+@specd/plugin-agent-opencode:build: CLI Target: es2022
+@specd/plugin-agent-opencode:build: CLI Cleaning output folder
+@specd/plugin-agent-opencode:build: ESM Build start
+@specd/plugin-agent-opencode:build: ESM dist/index.js 14.12 KB
+@specd/plugin-agent-opencode:build: ESM ⚡️ Build success in 28ms
+@specd/plugin-agent-opencode:build: DTS Build start
+@specd/plugin-agent-opencode:build: DTS ⚡️ Build success in 648ms
+@specd/plugin-agent-opencode:build: DTS dist/index.d.ts 321.00 B
+@specd/plugin-agent-copilot:build: cache bypass, force executing e604aae67a907815
+@specd/plugin-agent-copilot:build: 
+@specd/plugin-agent-copilot:build: > @specd/plugin-agent-copilot@0.2.0 build /Users/monki/Documents/Proyectos/specd/packages/plugin-agent-copilot
+@specd/plugin-agent-copilot:build: > node --import tsx ../../dev/scripts/sync-plugin-manifests.ts packages/plugin-agent-copilot && tsup src/index.ts --format esm --dts --clean
+@specd/plugin-agent-copilot:build: 
+@specd/plugin-agent-copilot:build: synced packages/plugin-agent-copilot/specd-plugin.json → v0.2.0
+@specd/core:test:  ✓ test/infrastructure/fs/config-loader.spec.ts (152 tests) 10037ms
+@specd/core:test:      ✓ rejects invalid workspace name Core  307ms
+@specd/plugin-agent-copilot:build: CLI Building entry: src/index.ts
+@specd/plugin-agent-copilot:build: CLI Using tsconfig: tsconfig.json
+@specd/plugin-agent-copilot:build: CLI tsup v8.5.1
+@specd/plugin-agent-copilot:build: CLI Target: es2022
+@specd/plugin-agent-copilot:build: CLI Cleaning output folder
+@specd/plugin-agent-copilot:build: ESM Build start
+@specd/plugin-agent-copilot:build: ESM dist/index.js 13.83 KB
+@specd/plugin-agent-copilot:build: ESM ⚡️ Build success in 26ms
+@specd/plugin-agent-copilot:build: DTS Build start
+@specd/core:test:  ✓ test/infrastructure/fs/change-repository.spec.ts (104 tests) 2249ms
+@specd/plugin-agent-copilot:build: DTS ⚡️ Build success in 728ms
+@specd/plugin-agent-copilot:build: DTS dist/index.d.ts 317.00 B
+@specd/plugin-agent-claude:build: cache bypass, force executing 3b5a224adac244ac
+@specd/core:test:  ✓ test/spec-id-guards.spec.ts (2 tests) 1053ms
+@specd/core:test:      ✓ parses every specs/**/spec-lock.json without InvalidSpecLockError  610ms
+@specd/core:test:      ✓ keeps workspace and segment regex literals only in spec-id-rules.ts  442ms
+@specd/plugin-agent-claude:build: 
+@specd/plugin-agent-claude:build: > @specd/plugin-agent-claude@0.2.0 build /Users/monki/Documents/Proyectos/specd/packages/plugin-agent-claude
+@specd/plugin-agent-claude:build: > node --import tsx ../../dev/scripts/sync-plugin-manifests.ts packages/plugin-agent-claude && tsup src/index.ts --format esm --dts --clean
+@specd/plugin-agent-claude:build: 
+@specd/plugin-agent-claude:build: synced packages/plugin-agent-claude/specd-plugin.json → v0.2.0
+@specd/plugin-agent-claude:build: CLI Building entry: src/index.ts
+@specd/plugin-agent-claude:build: CLI Using tsconfig: tsconfig.json
+@specd/plugin-agent-claude:build: CLI tsup v8.5.1
+@specd/plugin-agent-claude:build: CLI Target: es2022
+@specd/plugin-agent-claude:build: CLI Cleaning output folder
+@specd/plugin-agent-claude:build: ESM Build start
+@specd/plugin-agent-claude:build: ESM dist/index.js 14.85 KB
+@specd/plugin-agent-claude:build: ESM ⚡️ Build success in 22ms
+@specd/plugin-agent-claude:build: DTS Build start
+@specd/core:test:  ✓ test/infrastructure/fs/write-atomic.spec.ts (6 tests) 583ms
+@specd/core:test:      ✓ throws the original error after five EBUSY failures  505ms
+@specd/core:test:  ✓ test/infrastructure/fs/archive-repository.spec.ts (31 tests) 666ms
+@specd/core:test:  ✓ test/infrastructure/fs/config-writer.spec.ts (16 tests) 334ms
+@specd/plugin-agent-claude:build: DTS ⚡️ Build success in 809ms
+@specd/plugin-agent-claude:build: DTS dist/index.d.ts 315.00 B
+@specd/sdk:build: cache bypass, force executing ede8c40a6f66acb5
+@specd/core:test:  ✓ test/infrastructure/fs/schema-registry.spec.ts (30 tests) 497ms
+@specd/sdk:build: 
+@specd/sdk:build: > @specd/sdk@0.1.0 build /Users/monki/Documents/Proyectos/specd/packages/sdk
+@specd/sdk:build: > tsup src/index.ts src/ports.ts src/extensions.ts --format esm --dts --clean
+@specd/sdk:build: 
+@specd/sdk:build: CLI Building entry: src/extensions.ts, src/index.ts, src/ports.ts
+@specd/sdk:build: CLI Using tsconfig: tsconfig.json
+@specd/sdk:build: CLI tsup v8.5.1
+@specd/sdk:build: CLI Target: es2022
+@specd/sdk:build: CLI Cleaning output folder
+@specd/sdk:build: ESM Build start
+@specd/sdk:build: ESM dist/extensions.js 61.00 B
+@specd/sdk:build: ESM dist/ports.js      51.00 B
+@specd/sdk:build: ESM dist/index.js      59.65 KB
+@specd/sdk:build: ESM ⚡️ Build success in 29ms
+@specd/core:test:  ✓ test/infrastructure/fs/fs-validation-result-cache.spec.ts (8 tests) 162ms
+@specd/sdk:build: DTS Build start
+@specd/core:test:  ✓ test/infrastructure/fs/schema-repository.spec.ts (16 tests) 102ms
+@specd/core:test:  ✓ test/application/use-cases/archive-change-batch-restore.spec.ts (8 tests) 370ms
+@specd/core:test:  ✓ test/infrastructure/fs/fs-index-cache-base.spec.ts (7 tests) 130ms
+@specd/core:test:  ✓ test/infrastructure/fs/fs-change-index-cache.spec.ts (4 tests) 89ms
+@specd/sdk:build: DTS ⚡️ Build success in 1379ms
+@specd/sdk:build: DTS dist/extensions.d.ts 68.00 B
+@specd/sdk:build: DTS dist/index.d.ts      53.84 KB
+@specd/sdk:build: DTS dist/ports.d.ts      35.00 B
+@specd/core:test:  ✓ test/application/use-cases/get-project-summary.spec.ts (15 tests) 68ms
+@specd/sdk:test: cache bypass, force executing 3da8fc7dfb4fcf75
+@specd/sdk:test: 
+@specd/sdk:test: > @specd/sdk@0.1.0 test /Users/monki/Documents/Proyectos/specd/packages/sdk
+@specd/sdk:test: > vitest run
+@specd/sdk:test: 
+@specd/sdk:test: 
+@specd/sdk:test:  RUN  v4.1.10 /Users/monki/Documents/Proyectos/specd/packages/sdk
+@specd/sdk:test: 
+@specd/guide:test:  ✓ test/integration/sdk-catalog.spec.ts (26 tests) 12876ms
+@specd/guide:test:      ✓ loads both engines from an extracted package without repository docs  12098ms
+@specd/guide:test:      ✓ searches within a single collection  574ms
+@specd/guide:test: 
+@specd/guide:test:  Test Files  12 passed (12)
+@specd/guide:test:       Tests  155 passed (155)
+@specd/guide:test:    Start at  17:48:12
+@specd/guide:test:    Duration  13.74s (transform 1.17s, setup 0ms, import 3.39s, tests 13.47s, environment 1ms)
+@specd/guide:test: 
+@specd/sdk:test:  ✓ test/composition/with-open-graph-provider.spec.ts (13 tests) 7ms
+@specd/sdk:test:  ✓ test/composition/host-context.spec.ts (11 tests) 6ms
+@specd/sdk:test:  ✓ test/orchestration/build-implementation-review.spec.ts (7 tests) 6ms
+@specd/cli:build: cache bypass, force executing 175cc1a802c21db4
+@specd/sdk:test:  ✓ test/orchestration/run-graph-search.spec.ts (6 tests) 11ms
+@specd/cli:build: 
+@specd/cli:build: > @specd/cli@0.2.0 build /Users/monki/Documents/Proyectos/specd/packages/cli
+@specd/cli:build: > tsup src/index.ts src/graph-index-task.ts --format esm --clean
+@specd/cli:build: 
+@specd/sdk:test:  ✓ test/composition/package-boundary.spec.ts (1 test) 3ms
+@specd/sdk:test:  ✓ test/orchestration/project-relative-path.spec.ts (10 tests) 4ms
+@specd/sdk:test:  ✓ test/presentation/project-context-to-markdown.spec.ts (4 tests) 3ms
+@specd/cli:build: CLI Building entry: src/graph-index-task.ts, src/index.ts
+@specd/cli:build: CLI Using tsconfig: tsconfig.json
+@specd/cli:build: CLI tsup v8.5.1
+@specd/cli:build: CLI Target: es2022
+@specd/sdk:test:  ✓ test/presentation/change-context-to-markdown.spec.ts (5 tests) 3ms
+@specd/cli:build: CLI Cleaning output folder
+@specd/cli:build: ESM Build start
+@specd/cli:build: ESM dist/graph-index-task.js 1.30 KB
+@specd/cli:build: ESM dist/chunk-L7GJUM47.js   1.88 KB
+@specd/cli:build: ESM dist/index.js            383.89 KB
+@specd/cli:build: ESM ⚡️ Build success in 78ms
+@specd/cli:test: cache bypass, force executing dc392c0019a7fba1
+@specd/cli:test: 
+@specd/cli:test: > @specd/cli@0.2.0 test /Users/monki/Documents/Proyectos/specd/packages/cli
+@specd/cli:test: > vitest run
+@specd/cli:test: 
+@specd/sdk:test:  ✓ test/orchestration/run-graph-hotspots.spec.ts (5 tests) 5ms
+@specd/sdk:test:  ✓ test/orchestration/build-project-status-snapshot.spec.ts (10 tests) 7ms
+@specd/sdk:test:  ✓ test/orchestration/run-graph-impact.spec.ts (20 tests) 18ms
+@specd/core:test:  ✓ test/composition/kernel.spec.ts (8 tests) 45ms
+@specd/core:test:  ✓ test/composition/kernel-get-config.spec.ts (9 tests) 49ms
+@specd/sdk:test:  ✓ test/orchestration/run-index-project-graph.spec.ts (23 tests) 103ms
+@specd/sdk:test:  ✓ test/orchestration/run-graph-why.spec.ts (5 tests) 5ms
+@specd/cli:test: 
+@specd/cli:test:  RUN  v4.1.10 /Users/monki/Documents/Proyectos/specd/packages/cli
+@specd/cli:test: 
+@specd/core:test:  ✓ test/composition/vcs-adapter.spec.ts (5 tests) 67ms
+@specd/core:test:  ✓ test/composition/kernel-builder.spec.ts (5 tests) 27ms
+@specd/core:test:  ✓ test/composition/shared-repository-wiring.spec.ts (2 tests) 57ms
+@specd/core:test:  ✓ test/infrastructure/artifact-parser/markdown-parser.spec.ts (70 tests) 58ms
+@specd/core:test:  ✓ test/application/use-cases/archive-change.spec.ts (63 tests) 66ms
+@specd/core:test:  ✓ test/application/use-cases/compile-context.spec.ts (82 tests) 49ms
+@specd/core:test:  ✓ test/infrastructure/fs/move-dir.spec.ts (6 tests) 131ms
+@specd/core:test:  ✓ test/infrastructure/fs/archive-batch-snapshot.spec.ts (3 tests) 116ms
+@specd/core:test: {"level":30,"time":1794156510242,"pid":71224,"hostname":"MLG-MacBook-Pro-M1-815.local","scope":"child","msg":"ok"}
+@specd/core:test:  ✓ test/infrastructure/logging/pino-logger.spec.ts (3 tests) 36ms
+@specd/cli:test: error: invalid scope 'core' — must be one of: docs, api, all; to restrict to a single collection use --collection <collection>
+@specd/cli:test: error: invalid collection 'nope' — must be one of: code-graph, core, schemas, sdk, skills
+@specd/core:test:  ✓ test/composition/use-cases/get-project-summary.spec.ts (6 tests) 43ms
+@specd/core:test:  ✓ test/infrastructure/schema-yaml-parser.spec.ts (51 tests) 48ms
+@specd/core:test:  ✓ test/composition/repository-factories.spec.ts (17 tests) 68ms
+@specd/sdk:test:  ✓ test/barrel.spec.ts (14 tests) 4079ms
+@specd/sdk:test:      ✓ compiles every documented worker contract and failure from the built package entrypoint  4067ms
+@specd/sdk:test: 
+@specd/sdk:test:  Test Files  14 passed (14)
+@specd/sdk:test:       Tests  134 passed (134)
+@specd/sdk:test:    Start at  17:48:25
+@specd/sdk:test:    Duration  6.03s (transform 2.10s, setup 0ms, import 9.37s, tests 4.26s, environment 1ms)
+@specd/sdk:test: 
+@specd/core:test:  ✓ test/infrastructure/artifact-parser/markdown-parser-real-merge.spec.ts (2 tests) 35ms
+@specd/core:test: stdout | test/application/use-cases/validate-artifacts.spec.ts > ValidateArtifacts > transform-backed metadata extraction > stores transform-normalized specDependsOn values during validation
+@specd/core:test: FAILURES: []
+@specd/core:test: WARNINGS: []
+@specd/core:test: 
+@specd/core:test: stdout | test/application/use-cases/validate-artifacts.spec.ts > ValidateArtifacts > transform-backed metadata extraction > tolerates divergence from canonical spec-lock while updating in-change specDependsOn
+@specd/core:test: FAILURES: []
+@specd/core:test: WARNINGS: []
+@specd/core:test: 
+@specd/core:test:  ✓ test/application/use-cases/validate-artifacts.spec.ts (60 tests) 33ms
+@specd/cli:test: {"result":"error","code":"MISSING_GUIDE_TOPIC","message":"--section requires a <topic> argument — pass the topic to retrieve, or drop the flag to list the catalog","exitCode":1}
+@specd/cli:test: {"result":"error","code":"MISSING_GUIDE_TOPIC","message":"--start-line requires a <topic> argument — pass the topic to retrieve, or drop the flag to list the catalog","exitCode":1}
+@specd/cli:test: {"result":"error","code":"MISSING_GUIDE_TOPIC","message":"--lines requires a <topic> argument — pass the topic to retrieve, or drop the flag to list the catalog","exitCode":1}
+@specd/core:test:  ✓ test/infrastructure/artifact-parser/yaml-parser.spec.ts (55 tests) 32ms
+@specd/core:test:  ✓ test/application/use-cases/validate-specs.spec.ts (32 tests) 48ms
+@specd/core:test:  ✓ test/application/use-cases/create-change.spec.ts (44 tests) 27ms
+@specd/core:test:  ✓ test/application/use-cases/configured-context-parity.spec.ts (1 test) 18ms
+@specd/core:test:  ✓ test/application/use-cases/get-project-context.spec.ts (17 tests) 31ms
+@specd/cli:test: 575 topics are registered; browse or search them:
+@specd/cli:test:   specd guide-sdk --scope api
+@specd/cli:test:   specd guide-sdk --meta
+@specd/cli:test:   specd guide-sdk search "<query>"
+@specd/cli:test: error: [UNKNOWN_GUIDE_TOPIC] Guide topic 'core:prot' not found.
+@specd/core:test:  ✓ test/application/use-cases/transition-change.spec.ts (66 tests) 26ms
+@specd/cli:test: 1512 topics are registered; browse or search them:
+@specd/cli:test:   specd guide-sdk --scope api
+@specd/cli:test:   specd guide-sdk --meta
+@specd/cli:test:   specd guide-sdk search "<query>"
+@specd/cli:test: error: [UNKNOWN_GUIDE_TOPIC] Guide topic 'GetGraphHealth' not found. A topic titled 'GetGraphHealth' exists: code-graph:classes/GetGraphHealth.
+@specd/cli:test: 575 topics are registered; browse or search them:
+@specd/cli:test:   specd guide-sdk --scope api
+@specd/cli:test:   specd guide-sdk --meta
+@specd/cli:test:   specd guide-sdk search "<query>"
+@specd/cli:test: error: [UNKNOWN_GUIDE_TOPIC] Guide topic 'core:prot' not found.
+@specd/core:test:  ✓ test/application/use-cases/preview-spec.spec.ts (23 tests) 26ms
+@specd/cli:test: 686 topics are registered; browse or search them:
+@specd/cli:test:   specd guide-sdk --scope api
+@specd/cli:test:   specd guide-sdk --meta
+@specd/cli:test:   specd guide-sdk search "<query>"
+@specd/cli:test: error: [UNKNOWN_GUIDE_TOPIC] Guide topic 'sdk:classes/BulkSessionStateError' not found. That title exists in another collection: code-graph:classes/BulkSessionStateError.
+@specd/cli:test: 1512 topics are registered; browse or search them:
+@specd/cli:test:   specd guide-sdk --scope api
+@specd/cli:test:   specd guide-sdk --meta
+@specd/cli:test:   specd guide-sdk search "<query>"
+@specd/cli:test: error: [UNKNOWN_GUIDE_TOPIC] Guide topic 'BulkSessionStateError' not found. A topic titled 'BulkSessionStateError' exists: code-graph:classes/BulkSessionStateError.
+@specd/core:test:  ✓ test/infrastructure/fs/fs-spec-index-cache.spec.ts (1 test) 36ms
+@specd/core:test:  ✓ test/application/use-cases/update-persisted-spec-deps.spec.ts (25 tests) 13ms
+@specd/core:test:  ✓ test/composition/use-cases/approve-spec.spec.ts (3 tests) 8ms
+@specd/core:test:  ✓ test/composition/use-cases/archive-change.spec.ts (3 tests) 12ms
+@specd/core:test:  ✓ test/application/use-cases/edit-change.spec.ts (41 tests) 19ms
+@specd/core:test:  ✓ test/application/use-cases/update-persisted-spec-optimizations.spec.ts (26 tests) 16ms
+@specd/core:test:  ✓ test/composition/composition-resolver.spec.ts (4 tests) 21ms
+@specd/core:test:  ✓ test/composition/use-cases/validate-change-batch.spec.ts (4 tests) 19ms
+@specd/core:test:  ✓ test/domain/entities/change.spec.ts (112 tests) 17ms
+@specd/core:test:  ✓ test/application/use-cases/resolve-schema.spec.ts (53 tests) 16ms
+@specd/core:test:  ✓ test/domain/services/detect-spec-overlap.spec.ts (8 tests) 20ms
+@specd/core:test:  ✓ test/application/use-cases/detect-overlap.spec.ts (6 tests) 20ms
+@specd/core:test:  ✓ test/composition/use-cases/get-persisted-spec-implementation.spec.ts (4 tests) 12ms
+@specd/core:test:  ✓ test/application/use-cases/_shared/spec-pattern-matching.spec.ts (9 tests) 14ms
+@specd/core:test:  ✓ test/application/use-cases/list-changes.spec.ts (5 tests) 14ms
+@specd/core:test:  ✓ test/application/use-cases/update-implementation-tracking.spec.ts (52 tests) 15ms
+@specd/core:test:  ✓ test/composition/use-cases/get-implementation-review.spec.ts (3 tests) 8ms
+@specd/core:test:  ✓ test/application/use-cases/generate-spec-metadata.spec.ts (16 tests) 13ms
+@specd/core:test:  ✓ test/infrastructure/artifact-parser/delta-validation-real.spec.ts (7 tests) 12ms
+@specd/core:test:  ✓ test/application/use-cases/get-status.spec.ts (25 tests) 15ms
+@specd/core:test:  ✓ test/application/use-cases/get-persisted-spec-optimizations.spec.ts (17 tests) 13ms
+@specd/cli:test:  ✓ test/commands/guide-sdk/guide-sdk.spec.ts (72 tests) 8152ms
+@specd/cli:test:        ✓ returns ranked hits with a guide-sdk read command  622ms
+@specd/cli:test:        ✓ restricts hits to one collection  701ms
+@specd/cli:test:        ✓ emits structured hits under json  567ms
+@specd/cli:test:        ✓ withholds the declaration path on generated hits and keeps it on written ones  576ms
+@specd/core:test:  ✓ test/composition/use-cases/compile-context.spec.ts (4 tests) 14ms
+@specd/core:test:  ✓ test/composition/use-cases/update-implementation-tracking.spec.ts (3 tests) 22ms
+@specd/core:test:  ✓ test/application/use-cases/run-step-hooks.spec.ts (33 tests) 13ms
+@specd/cli:test:  ✓ test/commands/graph-index-integration.spec.ts (4 tests) 10887ms
+@specd/cli:test:      ✓ runs the publish-shaped CLI task in a real isolated child  2389ms
+@specd/cli:test:      ✓ keeps repeated forced structured indexes bounded, clean, and unlockable  3768ms
+@specd/cli:test:      ✓ repairs typed corrupted storage only for a forced run without leaving a lock  4041ms
+@specd/cli:test:      ✓ returns busy before a second same-root task starts  687ms
+@specd/cli:test: warning: change was created with schema @specd/schema-std@1 but active schema is schema-std@1
+@specd/core:test:  ✓ test/composition/archive-batch-snapshot-port.spec.ts (2 tests) 20ms
+@specd/core:test:  ✓ test/composition/use-cases/get-persisted-spec-optimizations.spec.ts (4 tests) 12ms
+@specd/core:test:  ✓ test/infrastructure/fs/config-loader-root-containment.spec.ts (2 tests) 13ms
+@specd/core:test:  ✓ test/application/use-cases/refresh-implementation-tracking.spec.ts (20 tests) 13ms
+@specd/core:test:  ✓ test/composition/use-cases/get-persisted-spec-schema.spec.ts (4 tests) 11ms
+@specd/cli:test:  ✓ test/commands/guide/guide.test.ts (33 tests) 609ms
+@specd/core:test:  ✓ test/composition/use-cases/preview-spec.spec.ts (6 tests) 15ms
+@specd/cli:test: warning: change was created with schema @specd/schema-std@1 but active schema is schema-std@1
+@specd/cli:test:  ✓ test/commands/change-implementation-review-integration.spec.ts (1 test) 1522ms
+@specd/cli:test:      ✓ returns one immutable SDK-reviewed projection from list, review, and status  1521ms
+@specd/core:test:  ✓ test/composition/use-cases/create-change.spec.ts (4 tests) 18ms
+@specd/core:test:  ✓ test/composition/use-cases/get-persisted-spec-deps.spec.ts (4 tests) 16ms
+@specd/core:test:  ✓ test/composition/use-cases/get-change-spec-deps.spec.ts (3 tests) 15ms
+@specd/cli:test: fatal: already exists
+@specd/cli:test: error: too many arguments for 'init'. Expected 0 arguments but got 1.
+@specd/cli:test:  ✓ test/commands/project-init.spec.ts (16 tests) 55ms
+@specd/core:test:  ✓ test/infrastructure/artifact-parser/json-parser.spec.ts (41 tests) 10ms
+@specd/core:test:  ✓ test/application/use-cases/update-persisted-spec-schema.spec.ts (17 tests) 11ms
+@specd/cli:test:  ✓ test/commands/change-create.spec.ts (20 tests) 485ms
+@specd/core:test:  ✓ test/composition/use-cases/get-status.spec.ts (3 tests) 9ms
+@specd/core:test:  ✓ test/application/use-cases/update-persisted-spec-implementation.spec.ts (22 tests) 11ms
+@specd/core:test:  ✓ test/application/use-cases/invalidate-change.spec.ts (19 tests) 11ms
+@specd/cli:test:  ✓ test/commands/graph-impact.spec.ts (57 tests) 144ms
+@specd/core:test:  ✓ test/infrastructure/vcs/vcs-implementation-detector.spec.ts (8 tests) 8ms
+@specd/core:test:  ✓ test/application/use-cases/search-specs.spec.ts (8 tests) 8ms
+@specd/cli:test:  ✓ test/commands/spec-optimizations.spec.ts (26 tests) 73ms
+@specd/core:test:  ✓ test/application/use-cases/get-draft.spec.ts (2 tests) 4ms
+@specd/core:test:  ✓ test/composition/use-cases/update-spec-deps.spec.ts (3 tests) 18ms
+@specd/cli:test:  ✓ test/commands/project-dashboard.spec.ts (12 tests) 70ms
+@specd/core:test:  ✓ test/application/use-cases/update-spec-deps.spec.ts (30 tests) 10ms
+@specd/core:test:  ✓ test/composition/use-cases/regenerate-spec-metadata.spec.ts (3 tests) 9ms
+@specd/core:test:  ✓ test/composition/use-cases/list-specs.spec.ts (2 tests) 10ms
+@specd/cli:test:  ✓ test/commands/graph-search.spec.ts (20 tests) 32ms
+@specd/core:test:  ✓ test/application/use-cases/get-spec-context.spec.ts (9 tests) 9ms
+@specd/cli:test:  ✓ test/documentation-coverage.spec.ts (33 tests) 15ms
+@specd/core:test:  ✓ test/composition/use-cases/update-persisted-spec-optimizations.spec.ts (4 tests) 11ms
+@specd/core:test:  ✓ test/composition/use-cases/update-persisted-spec-deps.spec.ts (3 tests) 12ms
+@specd/cli:test:  ✓ test/commands/change.spec.ts (51 tests) 39ms
+@specd/core:test:  ✓ test/domain/services/lifecycle-engine.spec.ts (11 tests) 10ms
+@specd/cli:test:  ✓ test/commands/graph-stats.spec.ts (28 tests) 42ms
+@specd/core:test:  ✓ test/application/use-cases/get-artifact-instruction.spec.ts (13 tests) 9ms
+@specd/core:test:  ✓ test/composition/use-cases/transition-change.spec.ts (3 tests) 9ms
+@specd/cli:test:  ✓ test/commands/project/status.spec.ts (22 tests) 33ms
+@specd/core:test:  ✓ test/application/use-cases/approve-signoff.spec.ts (10 tests) 9ms
+@specd/cli:test:  ✓ test/commands/list-commands.spec.ts (37 tests) 32ms
+@specd/core:test:  ✓ test/composition/use-cases/initialize-persisted-spec-state.spec.ts (3 tests) 9ms
+@specd/core:test:  ✓ test/application/use-cases/get-spec-outline.spec.ts (18 tests) 9ms
+@specd/core:test:  ✓ test/domain/services/build-schema.spec.ts (36 tests) 9ms
+@specd/cli:test:  ✓ test/commands/change/spec-preview.spec.ts (19 tests) 34ms
+@specd/core:test:  ✓ test/application/use-cases/validate-change-batch.spec.ts (7 tests) 9ms
+@specd/cli:test:  ✓ test/commands/change-deps.spec.ts (32 tests) 29ms
+@specd/core:test:  ✓ test/composition/use-cases/update-persisted-spec-implementation.spec.ts (3 tests) 12ms
+@specd/core:test:  ✓ test/domain/services/extract-metadata.spec.ts (25 tests) 9ms
+@specd/cli:test:  ✓ test/commands/graph-hotspots.spec.ts (22 tests) 26ms
+@specd/cli:test:  ✓ test/commands/change-context.spec.ts (21 tests) 22ms
+@specd/core:test:  ✓ test/composition/use-cases/get-config.spec.ts (3 tests) 8ms
+@specd/core:test:  ✓ test/composition/use-cases/get-project-context.spec.ts (3 tests) 10ms
+@specd/cli:test:  ✓ test/entrypoint.spec.ts (11 tests) 22ms
+@specd/core:test:  ✓ test/composition/use-cases/list-discarded.spec.ts (3 tests) 10ms
+@specd/cli:test:  ✓ test/commands/change/change-invalidate.spec.ts (13 tests) 19ms
+@specd/core:test:  ✓ test/composition/use-cases/materialize-spec-metadata.spec.ts (3 tests) 10ms
+@specd/cli:test: updated implementation tracking for my-change (resolve)
+@specd/cli:test: updated implementation tracking for my-change (ignore)
+@specd/cli:test: updated implementation tracking for my-change (add)
+@specd/cli:test: updated implementation tracking for my-change (unresolve)
+@specd/cli:test: updated implementation tracking for my-change (resolve)
+@specd/cli:test: updated implementation tracking for my-change (resolve)
+@specd/cli:test: updated implementation tracking for my-change (resolve)
+@specd/cli:test: updated implementation tracking for my-change (unresolve)
+@specd/cli:test: updated implementation tracking for my-change (ignore)
+@specd/cli:test: updated implementation tracking for my-change (remove)
+@specd/cli:test:  ✓ test/commands/change-implementation.spec.ts (20 tests) 24ms
+@specd/core:test:  ✓ test/composition/use-cases/count-tasks.spec.ts (3 tests) 9ms
+@specd/core:test:  ✓ test/composition/use-cases/approve-signoff.spec.ts (3 tests) 8ms
+@specd/cli:test:  ✓ test/commands/change-transition.spec.ts (22 tests) 25ms
+@specd/core:test:  ✓ test/composition/use-cases/resolve-schema.spec.ts (3 tests) 10ms
+@specd/cli:test:  ✓ test/commands/change-status.spec.ts (22 tests) 21ms
+@specd/core:test:  ✓ test/composition/use-cases/update-persisted-spec-schema.spec.ts (3 tests) 8ms
+@specd/cli:test:  ✓ test/commands/change-validate.spec.ts (22 tests) 22ms
+@specd/core:test:  ✓ test/application/use-cases/approve-spec.spec.ts (10 tests) 8ms
+@specd/core:test:  ✓ test/composition/use-cases/list-changes.spec.ts (3 tests) 8ms
+@specd/core:test:  ✓ test/application/use-cases/materialize-spec-metadata.spec.ts (5 tests) 8ms
+@specd/cli:test:   workspace: alpha (root: /project)  
+@specd/cli:test: 
+@specd/cli:test:   (none)
+@specd/cli:test:   workspace: alpha (root: /project)  
+@specd/cli:test: 
+@specd/cli:test:   (none)
+@specd/cli:test: 
+@specd/cli:test:   workspace: beta (root: /project)  
+@specd/cli:test: 
+@specd/cli:test:   (none)
+@specd/cli:test:  ✓ test/commands/spec-list.spec.ts (22 tests) 24ms
+@specd/cli:test:  ✓ test/commands/change-list.spec.ts (18 tests) 21ms
+@specd/core:test:  ✓ test/domain/services/parse-metadata.spec.ts (33 tests) 7ms
+@specd/core:test:  ✓ test/application/use-cases/discard-change.spec.ts (9 tests) 7ms
+@specd/core:test:  ✓ test/domain/services/rule-evaluator.spec.ts (29 tests) 7ms
+@specd/cli:test:  ✓ test/commands/schema-validate.spec.ts (17 tests) 17ms
+@specd/core:test:  ✓ test/composition/use-cases/get-spec-metadata.spec.ts (3 tests) 9ms
+@specd/cli:test:  ✓ test/commands/project-context.spec.ts (18 tests) 21ms
+@specd/core:test:  ✓ test/composition/use-cases/get-project-metadata.spec.ts (3 tests) 8ms
+@specd/core:test:  ✓ test/application/use-cases/_shared/depends-on-traversal.spec.ts (11 tests) 8ms
+@specd/cli:test:  ✓ test/commands/config-schema-project.spec.ts (18 tests) 20ms
+@specd/core:test:  ✓ test/infrastructure/diff/diff-generator.spec.ts (4 tests) 8ms
+@specd/cli:test:  ✓ test/commands/spec-deps.spec.ts (18 tests) 21ms
+@specd/core:test:  ✓ test/composition/use-cases/list-drafts.spec.ts (3 tests) 8ms
+@specd/cli:test:  ✓ test/commands/change-edit.spec.ts (17 tests) 21ms
+@specd/core:test:  ✓ test/composition/use-cases/list-workspaces.spec.ts (1 test) 8ms
+@specd/cli:test:  ✓ test/commands/change-run-hooks.spec.ts (4 tests) 11ms
+@specd/core:test:  ✓ test/application/use-cases/list-drafts.spec.ts (3 tests) 6ms
+@specd/core:test:  ✓ test/barrel.spec.ts (7 tests) 6ms
+@specd/cli:test:  ✓ test/commands/graph-why.spec.ts (22 tests) 24ms
+@specd/core:test:  ✓ test/application/use-cases/draft-change.spec.ts (9 tests) 8ms
+@specd/cli:test:  ✓ test/commands/drafts-list.spec.ts (13 tests) 19ms
+@specd/core:test:  ✓ test/infrastructure/artifact-parser/apply-delta.spec.ts (25 tests) 7ms
+@specd/core:test:  ✓ test/application/use-cases/skip-artifact.spec.ts (8 tests) 8ms
+@specd/core:test:  ✓ test/infrastructure/artifact-parser/plaintext-parser.spec.ts (19 tests) 7ms
+@specd/core:test:  ✓ test/application/use-cases/get-persisted-spec-deps.spec.ts (10 tests) 8ms
+@specd/cli:test: 
+@specd/cli:test: Indexed 10 file(s) in 1234ms
+@specd/cli:test:   discovered: 12
+@specd/cli:test:   documents:  3
+@specd/cli:test:   skipped:    2
+@specd/cli:test:   removed:    1
+@specd/cli:test:   specs:      3
+@specd/cli:test:   errors:     1
+@specd/cli:test:   phases:
+@specd/cli:test:     importResolution: 0 item(s), 0ms
+@specd/cli:test:   full rebuild: no
+@specd/cli:test:   coverage:   12 input(s)
+@specd/cli:test:     indexed: 10
+@specd/cli:test:     excluded: 0
+@specd/cli:test:     unsupported: 2
+@specd/cli:test:     parse-failed: 0
+@specd/cli:test:     partial: 0
+@specd/cli:test:     reason: no-language-adapter
+@specd/cli:test:   coverage diagnostics:
+@specd/cli:test:     code-graph:indexer: code-graph:src/index.ts#missingSymbol (SYMBOL_NOT_FOUND)
+@specd/cli:test:     bad.ts: parse error
+@specd/cli:test: 
+@specd/cli:test: Indexed 10 file(s) in 1234ms
+@specd/cli:test:   discovered: 12
+@specd/cli:test:   documents:  3
+@specd/cli:test:   skipped:    2
+@specd/cli:test:   removed:    1
+@specd/cli:test:   specs:      3
+@specd/cli:test:   errors:     1
+@specd/cli:test:   phases:
+@specd/cli:test:     importResolution: 0 item(s), 0ms
+@specd/cli:test:   full rebuild: no
+@specd/cli:test:   coverage:   12 input(s)
+@specd/cli:test:     indexed: 10
+@specd/cli:test:     excluded: 0
+@specd/cli:test:     unsupported: 2
+@specd/cli:test:     parse-failed: 0
+@specd/cli:test:     partial: 0
+@specd/cli:test:     reason: no-language-adapter
+@specd/cli:test:   coverage diagnostics:
+@specd/cli:test:     code-graph:indexer: code-graph:src/index.ts#missingSymbol (SYMBOL_NOT_FOUND)
+@specd/cli:test:     bad.ts: parse error
+@specd/cli:test: {"filesIndexed":10,"filesDiscovered":12,"documentsIndexed":3,"filesRemoved":1,"filesSkipped":2,"filesSkippedForSize":0,"largestSkippedForSize":[],"sizeExemptAnalysed":[],"workspaceOverlaps":[],"workspaceOverlapCount":0,"specsDiscovered":3,"specsIndexed":3,"errors":[{"filePath":"bad.ts","message":"parse error"}],"diagnostics":[],"duration":1234,"vcsRef":"abc1234","graphFingerprint":"fp-test","workspaces":[],"fullRebuild":false,"fullRebuildReason":null,"phaseMetrics":{"importResolution":{"count":0,"durationMs":0}},"coverage":{"total":12,"byStatus":{"indexed":10,"excluded":0,"unsupported":2,"parse-failed":0,"partial":0},"reasons":["no-language-adapter"]},"coverageDiagnostics":[{"specId":"code-graph:indexer","filePath":"code-graph:src/index.ts","symbolName":"missingSymbol","reason":"SYMBOL_NOT_FOUND"}]}
+@specd/cli:test: error: --config and --path are mutually exclusive
+@specd/cli:test: fatal: GRAPH_INDEX_WORKER_PROTOCOL
+@specd/cli:test: fatal: config disappeared
+@specd/cli:test: 
+@specd/cli:test: Indexed 10 file(s) in 1234ms
+@specd/cli:test:   discovered: 12
+@specd/cli:test:   documents:  3
+@specd/cli:test:   skipped:    2
+@specd/cli:test:   removed:    1
+@specd/cli:test:   specs:      3
+@specd/cli:test:   errors:     1
+@specd/cli:test:   phases:
+@specd/cli:test:     importResolution: 0 item(s), 0ms
+@specd/cli:test:   full rebuild: no
+@specd/cli:test:   coverage:   12 input(s)
+@specd/cli:test:     indexed: 10
+@specd/cli:test:     excluded: 0
+@specd/cli:test:     unsupported: 2
+@specd/cli:test:     parse-failed: 0
+@specd/cli:test:     partial: 0
+@specd/cli:test:     reason: no-language-adapter
+@specd/cli:test:   coverage diagnostics:
+@specd/cli:test:     code-graph:indexer: code-graph:src/index.ts#missingSymbol (SYMBOL_NOT_FOUND)
+@specd/cli:test:     bad.ts: parse error
+@specd/cli:test: 
+@specd/cli:test: Indexed 10 file(s) in 1234ms
+@specd/cli:test:   discovered: 12
+@specd/cli:test:   documents:  3
+@specd/cli:test:   skipped:    2
+@specd/cli:test:   removed:    1
+@specd/cli:test:   specs:      3
+@specd/cli:test:   errors:     1
+@specd/cli:test:   phases:
+@specd/cli:test:     importResolution: 0 item(s), 0ms
+@specd/cli:test:   full rebuild: no
+@specd/cli:test:   coverage:   12 input(s)
+@specd/cli:test:     indexed: 10
+@specd/cli:test:     excluded: 0
+@specd/cli:test:     unsupported: 2
+@specd/cli:test:     parse-failed: 0
+@specd/cli:test:     partial: 0
+@specd/cli:test:     reason: no-language-adapter
+@specd/cli:test:   coverage diagnostics:
+@specd/cli:test:     code-graph:indexer: code-graph:src/index.ts#missingSymbol (SYMBOL_NOT_FOUND)
+@specd/cli:test:     bad.ts: parse error
+@specd/cli:test: 
+@specd/cli:test: Indexed 10 file(s) in 1234ms
+@specd/cli:test:   discovered: 12
+@specd/cli:test:   documents:  3
+@specd/cli:test:   skipped:    2
+@specd/cli:test:   removed:    1
+@specd/cli:test:   specs:      3
+@specd/cli:test:   errors:     1
+@specd/cli:test:   phases:
+@specd/cli:test:     importResolution: 0 item(s), 0ms
+@specd/cli:test:   full rebuild: no
+@specd/cli:test:   coverage:   12 input(s)
+@specd/cli:test:     indexed: 10
+@specd/cli:test:     excluded: 0
+@specd/cli:test:     unsupported: 2
+@specd/cli:test:     parse-failed: 0
+@specd/cli:test:     partial: 0
+@specd/cli:test:     reason: no-language-adapter
+@specd/cli:test:   coverage diagnostics:
+@specd/cli:test:     code-graph:indexer: code-graph:src/index.ts#missingSymbol (SYMBOL_NOT_FOUND)
+@specd/cli:test:     bad.ts: parse error
+@specd/cli:test: 
+@specd/cli:test: Indexed 10 file(s) in 1234ms
+@specd/cli:test:   discovered: 12
+@specd/cli:test:   documents:  3
+@specd/cli:test:   skipped:    2
+@specd/cli:test:   removed:    1
+@specd/cli:test:   specs:      3
+@specd/cli:test:   errors:     1
+@specd/cli:test:   phases:
+@specd/cli:test:     importResolution: 0 item(s), 0ms
+@specd/cli:test:   full rebuild: no
+@specd/cli:test:   coverage:   12 input(s)
+@specd/cli:test:     indexed: 10
+@specd/cli:test:     excluded: 0
+@specd/cli:test:     unsupported: 2
+@specd/cli:test:     parse-failed: 0
+@specd/cli:test:     partial: 0
+@specd/cli:test:     reason: no-language-adapter
+@specd/cli:test:   coverage diagnostics:
+@specd/cli:test:     code-graph:indexer: code-graph:src/index.ts#missingSymbol (SYMBOL_NOT_FOUND)
+@specd/cli:test:     bad.ts: parse error
+@specd/cli:test: 
+@specd/cli:test: Indexed 10 file(s) in 1234ms
+@specd/cli:test:   discovered: 12
+@specd/cli:test:   documents:  3
+@specd/cli:test:   skipped:    2
+@specd/cli:test:   removed:    1
+@specd/cli:test:   specs:      3
+@specd/cli:test:   errors:     1
+@specd/cli:test:   phases:
+@specd/cli:test:     importResolution: 0 item(s), 0ms
+@specd/cli:test:   full rebuild: no
+@specd/cli:test:   coverage:   12 input(s)
+@specd/cli:test:     indexed: 10
+@specd/cli:test:     excluded: 0
+@specd/cli:test:     unsupported: 2
+@specd/cli:test:     parse-failed: 0
+@specd/cli:test:     partial: 0
+@specd/cli:test:     reason: no-language-adapter
+@specd/cli:test:   coverage diagnostics:
+@specd/cli:test:     code-graph:indexer: code-graph:src/index.ts#missingSymbol (SYMBOL_NOT_FOUND)
+@specd/cli:test:     bad.ts: parse error
+@specd/cli:test: fatal: Worker crashed
+@specd/cli:test:  ✓ test/commands/graph-index.spec.ts (29 tests) 19ms
+@specd/core:test:  ✓ test/domain/services/parse-spec-lock.spec.ts (14 tests) 7ms
+@specd/cli:test:  ✓ test/commands/plugins.spec.ts (9 tests) 17ms
+@specd/core:test:  ✓ test/domain/services/parse-spec-id.spec.ts (33 tests) 7ms
+@specd/core:test:  ✓ test/application/use-cases/get-hook-instructions.spec.ts (6 tests) 6ms
+@specd/core:test:  ✓ test/application/use-cases/get-change-spec-deps.spec.ts (9 tests) 5ms
+@specd/cli:test:  ✓ test/commands/change-draft.spec.ts (9 tests) 22ms
+@specd/core:test:  ✓ test/infrastructure/svn/vcs-adapter.spec.ts (8 tests) 5ms
+@specd/core:test:  ✓ test/infrastructure/fs/ensure-tmp-gitignore.spec.ts (1 test) 76ms
+@specd/cli:test:  ✓ test/commands/schema-show.spec.ts (16 tests) 19ms
+@specd/core:test:  ✓ test/application/use-cases/get-persisted-spec-implementation.spec.ts (8 tests) 5ms
+@specd/core:test:  ✓ test/application/use-cases/restore-change.spec.ts (5 tests) 7ms
+@specd/cli:test:  ✓ test/commands/schema-fork.spec.ts (4 tests) 22ms
+@specd/core:test:  ✓ test/application/use-cases/list-discarded.spec.ts (3 tests) 5ms
+@specd/core:test:  ✓ test/application/use-cases/count-tasks.spec.ts (5 tests) 6ms
+@specd/core:test:  ✓ test/domain/services/merge-schema-layers.spec.ts (15 tests) 6ms
+@specd/cli:test:  ✓ test/commands/spec-show.spec.ts (12 tests) 20ms
+@specd/core:test:  ✓ test/application/use-cases/list-specs.spec.ts (9 tests) 7ms
+@specd/core:test:  ✓ test/application/use-cases/persist-spec-metadata.spec.ts (6 tests) 7ms
+@specd/core:test:  ✓ test/infrastructure/hg/vcs-adapter.spec.ts (9 tests) 5ms
+@specd/cli:test:  ✓ test/commands/storage-reindex.spec.ts (11 tests) 17ms
+@specd/core:test:  ✓ test/application/use-cases/get-active-schema.spec.ts (8 tests) 5ms
+@specd/cli:test:  ✓ test/commands/change-archive.spec.ts (11 tests) 18ms
+@specd/core:test:  ✓ test/application/use-cases/resolve-context-specs.spec.ts (9 tests) 6ms
+@specd/core:test:  ✓ test/application/use-cases/update-project-metadata.spec.ts (1 test) 20ms
+@specd/core:test:  ✓ test/application/use-cases/get-persisted-spec-schema.spec.ts (7 tests) 6ms
+@specd/cli:test:  ✓ test/commands/schema-extend.spec.ts (5 tests) 26ms
+@specd/core:test:  ✓ test/domain/entities/change-artifact.spec.ts (38 tests) 6ms
+@specd/core:test:  ✓ test/infrastructure/fs/path-platform.spec.ts (5 tests) 6ms
+@specd/cli:test:  ✓ test/commands/archive-list.spec.ts (11 tests) 17ms
+@specd/core:test:  ✓ test/domain/value-objects/spec-path.spec.ts (37 tests) 5ms
+@specd/core:test:  ✓ test/application/use-cases/validate-schema.spec.ts (20 tests) 7ms
+@specd/core:test:  ✓ test/infrastructure/fs/list-pagination.spec.ts (10 tests) 4ms
+@specd/core:test:  ✓ test/infrastructure/git/vcs-adapter.spec.ts (8 tests) 6ms
+@specd/cli:test:  ✓ test/commands/discarded-list.spec.ts (12 tests) 18ms
+@specd/core:test:  ✓ test/domain/services/apply-persisted-spec-state-patch.spec.ts (7 tests) 3ms
+@specd/cli:test:  ✓ test/commands/spec-outline.spec.ts (10 tests) 16ms
+@specd/core:test:  ✓ test/application/use-cases/list-archived.spec.ts (3 tests) 5ms
+@specd/core:test:  ✓ test/domain/services/cross-artifact-rule-evaluator.spec.ts (12 tests) 5ms
+@specd/core:test:  ✓ test/domain/value-objects/change-state.spec.ts (36 tests) 5ms
+@specd/core:test:  ✓ test/infrastructure/node/hook-runner-spawn.spec.ts (4 tests) 5ms
+@specd/cli:test:  ✓ test/commands/spec-search.spec.ts (10 tests) 18ms
+@specd/core:test:  ✓ test/application/use-cases/get-archived-change.spec.ts (2 tests) 5ms
+@specd/core:test:  ✓ test/domain/services/hash-files.spec.ts (9 tests) 5ms
+@specd/cli:test:  ✓ test/handle-error.spec.ts (45 tests) 14ms
+@specd/core:test:  ✓ test/application/use-cases/get-config.spec.ts (4 tests) 5ms
+@specd/cli:test:  ✓ test/commands/change-discard.spec.ts (9 tests) 14ms
+@specd/cli:test:  ✓ test/commands/change/change-artifacts.spec.ts (5 tests) 11ms
+@specd/core:test:  ✓ test/barrel-kernel-coverage.spec.ts (3 tests) 5ms
+@specd/core:test:  ✓ test/application/use-cases/initialize-persisted-spec-state.spec.ts (4 tests) 5ms
+@specd/core:test:  ✓ test/application/use-cases/list-workspaces.spec.ts (2 tests) 4ms
+@specd/core:test:  ✓ test/application/use-cases/save-change-artifact.spec.ts (1 test) 4ms
+@specd/cli:test:  ✓ test/commands/change-skip-artifact.spec.ts (8 tests) 13ms
+@specd/cli:test:  ✓ test/commands/spec-validate.spec.ts (9 tests) 14ms
+@specd/core:test:  ✓ test/composition/privacy-actor-resolver.spec.ts (13 tests) 5ms
+@specd/core:test:  ✓ test/domain/services/spec-id-rules.spec.ts (19 tests) 4ms
+@specd/core:test:  ✓ test/application/logger-port.spec.ts (2 tests) 4ms
+@specd/core:test:  ✓ test/application/use-cases/metadata-freshness.spec.ts (7 tests) 5ms
+@specd/core:test:  ✓ test/infrastructure/fs/dir-name.spec.ts (6 tests) 4ms
+@specd/cli:test:  ✓ test/commands/change-approve.spec.ts (8 tests) 15ms
+@specd/core:test:  ✓ test/application/template-expander.spec.ts (12 tests) 4ms
+@specd/cli:test:  ✓ test/commands/project-context-specs.spec.ts (6 tests) 14ms
+@specd/core:test:  ✓ test/domain/services/parse-spec-pattern.spec.ts (11 tests) 4ms
+@specd/core:test:  ✓ test/application/use-cases/regenerate-spec-metadata.spec.ts (1 test) 5ms
+@specd/core:test:  ✓ test/domain/services/format-inference.spec.ts (8 tests) 3ms
+@specd/core:test:  ✓ test/infrastructure/fs/manifest-change-loader.spec.ts (2 tests) 4ms
+@specd/cli:test:  ✓ test/commands/spec-context.spec.ts (9 tests) 16ms
+@specd/cli:test: error: missing required argument 'specPath'
+@specd/cli:test:  ✓ test/commands/spec-metadata.spec.ts (4 tests) 12ms
+@specd/core:test:  ✓ test/domain/read-only-change-view.spec.ts (3 tests) 6ms
+@specd/core:test:  ✓ test/application/use-cases/get-spec.spec.ts (4 tests) 4ms
+@specd/core:test:  ✓ test/domain/services/spec-optimization-freshness.spec.ts (7 tests) 3ms
+@specd/core:test:  ✓ test/application/use-cases/_shared/selector-matching.spec.ts (18 tests) 4ms
+@specd/cli:test:  ✓ test/commands/drafts-show.spec.ts (5 tests) 15ms
+@specd/core:test:  ✓ test/infrastructure/null/vcs-adapter.spec.ts (6 tests) 4ms
+@specd/cli:test:  ✓ test/commands/change-artifacts.spec.ts (6 tests) 19ms
+@specd/core:test:  ✓ test/application/use-cases/get-discarded.spec.ts (2 tests) 4ms
+@specd/core:test:  ✓ test/composition/lazy-schema-provider.spec.ts (4 tests) 4ms
+@specd/core:test:  ✓ test/application/use-cases/resolve-configured-context-specs.spec.ts (3 tests) 4ms
+@specd/core:test:  ✓ test/application/use-cases/get-specs-health.spec.ts (6 tests) 5ms
+@specd/core:test:  ✓ test/application/use-cases/get-project-metadata.spec.ts (3 tests) 5ms
+@specd/cli:test:  ✓ test/commands/drafts-restore.spec.ts (6 tests) 12ms
+@specd/cli:test:  ✓ test/commands/change/change-status.spec.ts (7 tests) 12ms
+@specd/core:test:  ✓ test/infrastructure/vcs-actor-resolver.spec.ts (2 tests) 5ms
+@specd/core:test:  ✓ test/domain/value-objects/artifact-file.spec.ts (18 tests) 4ms
+@specd/core:test:  ✓ test/infrastructure/fs/windows-containment.spec.ts (3 tests) 4ms
+@specd/core:test:  ✓ test/domain/services/spec-optimization.spec.ts (4 tests) 4ms
+@specd/core:test:  ✓ test/application/use-cases/_shared/spec-reference-resolver.spec.ts (5 tests) 3ms
+@specd/core:test:  ✓ test/domain/entities/spec.spec.ts (9 tests) 4ms
+@specd/cli:test:  ✓ test/commands/spec-generate-metadata.spec.ts (6 tests) 11ms
+@specd/cli:test:  ✓ test/commands/spec-resolve-path.spec.ts (7 tests) 14ms
+@specd/core:test:  ✓ test/application/use-cases/resolve-extends-chain.spec.ts (5 tests) 4ms
+@specd/core:test:  ✓ test/domain/value-objects/spec-artifact.spec.ts (16 tests) 4ms
+@specd/core:test:  ✓ test/infrastructure/node/translate-hook-command.spec.ts (14 tests) 3ms
+@specd/core:test:  ✓ test/domain/services/safe-regex.spec.ts (11 tests) 3ms
+@specd/core:test:  ✓ test/domain/archived-change-index-entry.spec.ts (5 tests) 4ms
+@specd/core:test:  ✓ test/infrastructure/null/actor-resolver.spec.ts (5 tests) 5ms
+@specd/cli:test:  ✓ test/commands/archive-show.spec.ts (5 tests) 12ms
+@specd/cli:test:  ✓ test/commands/change-check-overlap.spec.ts (6 tests) 14ms
+@specd/core:test:  ✓ test/domain/entities/delta.spec.ts (12 tests) 3ms
+@specd/core:test:  ✓ test/application/ports/config-schema.spec.ts (3 tests) 3ms
+@specd/core:test:  ✓ test/application/use-cases/_shared/apply-persisted-implementation-mutation.spec.ts (4 tests) 3ms
+@specd/core:test:  ✓ test/domain/entities/archived-change.spec.ts (2 tests) 3ms
+@specd/core:test:  ✓ test/domain/services/pre-hash-cleanup.spec.ts (10 tests) 3ms
+@specd/core:test:  ✓ test/domain/value-objects/artifact-dag.spec.ts (5 tests) 3ms
+@specd/cli:test:  ✓ test/commands/plugins-update.spec.ts (2 tests) 8ms
+@specd/cli:test: error: either <specPath> or --all is required
+@specd/cli:test: fatal: process.exit(1)
+@specd/cli:test:  ✓ test/commands/spec-init.spec.ts (2 tests) 10ms
+@specd/core:test:  ✓ test/application/use-cases/get-spec-metadata.spec.ts (1 test) 4ms
+@specd/core:test:  ✓ test/domain/services/assess-metadata-freshness.spec.ts (5 tests) 3ms
+@specd/core:test:  ✓ test/domain/services/shift-headings.spec.ts (9 tests) 3ms
+@specd/core:test:  ✓ test/domain/entities/change-device-name.spec.ts (1 test) 5ms
+@specd/core:test:  ✓ test/domain/errors/invalid-state-transition-error.spec.ts (6 tests) 4ms
+@specd/core:test:  ✓ test/domain/services/spec-summary.spec.ts (10 tests) 4ms
+@specd/cli:test:  ✓ test/commands/discarded-show.spec.ts (4 tests) 12ms
+@specd/cli:test:  ✓ test/commands/change-artifact-instruction.spec.ts (3 tests) 10ms
+@specd/core:test:  ✓ test/application/use-cases/_shared/validate-specs-cache-fingerprints.spec.ts (4 tests) 3ms
+@specd/core:test:  ✓ test/infrastructure/fs/hash-newlines.spec.ts (2 tests) 3ms
+@specd/core:test:  ✓ test/composition/composition-registries.spec.ts (2 tests) 3ms
+@specd/core:test:  ✓ test/infrastructure/fs/is-enoent.spec.ts (8 tests) 3ms
+@specd/cli:test:  ✓ test/commands/project-update.spec.ts (4 tests) 8ms
+@specd/cli:test:  ✓ test/commands/spec-schema.spec.ts (2 tests) 8ms
+@specd/core:test:  ✓ test/composition/actor-resolver.spec.ts (5 tests) 3ms
+@specd/core:test:  ✓ test/domain/errors/specd-error.spec.ts (3 tests) 2ms
+@specd/core:test:  ✓ test/infrastructure/vcs-spawn-options.spec.ts (2 tests) 2ms
+@specd/core:test:  ✓ test/application/use-cases/_shared/merge-compile-context-config.spec.ts (2 tests) 2ms
+@specd/core:test:  ✓ test/composition/build-compile-context-config.spec.ts (1 test) 3ms
+@specd/core:test:  ✓ test/domain/services/artifact-filename.spec.ts (3 tests) 3ms
+@specd/cli:test:  ✓ test/commands/graph-why-errors.spec.ts (3 tests) 9ms
+@specd/cli:test:  ✓ test/helpers/cli-context.spec.ts (5 tests) 8ms
+@specd/core:test:  ✓ test/domain/errors/read-only-workspace-error.spec.ts (4 tests) 3ms
+@specd/core:test:  ✓ test/composition/config-writer.spec.ts (2 tests) 2ms
+@specd/core:test:  ✓ test/domain/services/to-logical-file-path.spec.ts (5 tests) 2ms
+@specd/core:test:  ✓ test/application/use-cases/kernel-input-boundary.spec.ts (2 tests) 2ms
+@specd/cli:test:  ✓ test/commands/spec-implementation.spec.ts (2 tests) 9ms
+@specd/cli:test:  ✓ test/commands/config-show.spec.ts (8 tests) 9ms
+@specd/core:test:  ✓ test/domain/services/same-tracked-file.spec.ts (4 tests) 3ms
+@specd/core:test:  ✓ test/domain/services/windows-device-name.spec.ts (2 tests) 2ms
+@specd/core:test:  ✓ test/composition/diff-generator.spec.ts (1 test) 2ms
+@specd/cli:test:  ✓ test/graph-index-task.spec.ts (8 tests) 7ms
+@specd/cli:test:  ✓ test/commands/graph-cli-context.spec.ts (5 tests) 6ms
+@specd/core:test:  ✓ test/composition/config-mutation-exports.spec.ts (1 test) 2ms
+@specd/core:test: 
+@specd/core:test:  Test Files  221 passed (221)
+@specd/core:test:       Tests  2889 passed (2889)
+@specd/core:test:    Start at  17:48:06
+@specd/core:test:    Duration  59.58s (transform 7.41s, setup 0ms, import 43.42s, tests 29.26s, environment 17ms)
+@specd/core:test: 
+@specd/cli:test:  ✓ test/configuration-coverage.spec.ts (60 tests) 6ms
+@specd/cli:test:  ✓ test/formatter.spec.ts (11 tests) 5ms
+@specd/cli:test:  ✓ test/commands/_hook-progress-presenter.spec.ts (5 tests) 4ms
+@specd/cli:test:  ✓ test/helpers/table.spec.ts (8 tests) 4ms
+@specd/cli:test:  ✓ test/helpers/parse-comma-values.spec.ts (9 tests) 3ms
+@specd/cli:test:  ✓ test/version.spec.ts (4 tests) 3ms
+@specd/cli:test:  ✓ test/commands/change-implementation-tracking.spec.ts (3 tests) 3ms
+@specd/cli:test:  ✓ test/commands/plugins/get-declared-plugins.spec.ts (3 tests) 2ms
+@specd/cli:test:  ✓ test/commands/graph/parse-graph-kinds.spec.ts (4 tests) 3ms
+@specd/cli:test:  ✓ test/commands/graph/escape-gitignore-pattern.spec.ts (10 tests) 3ms
+@specd/cli:test:  ✓ test/commands/graph/normalize-snippet.spec.ts (8 tests) 3ms
+@specd/cli:test:  ✓ test/commands/graph/resolve-impact-file-selectors.spec.ts (6 tests) 3ms
+@specd/cli:test:  ✓ test/commands/graph/format-size.spec.ts (3 tests) 2ms
+@specd/cli:test: 
+@specd/cli:test:  Test Files  90 passed (90)
+@specd/cli:test:       Tests  1285 passed (1285)
+@specd/cli:test:    Start at  17:48:27
+@specd/cli:test:    Duration  40.90s (transform 2.37s, setup 0ms, import 40.01s, tests 23.26s, environment 6ms)
+@specd/cli:test: 
+
+ Tasks:    17 successful, 17 total
+Cached:    0 cached, 17 total
+  Time:    1m15.246s 
+
+ WARNING  no output files found for task @specd/cli#test. Please check your `outputs` key in `turbo.json`
+ WARNING  no output files found for task @specd/core#test. Please check your `outputs` key in `turbo.json`
+ WARNING  no output files found for task @specd/guide#test. Please check your `outputs` key in `turbo.json`
+ WARNING  no output files found for task @specd/sdk#test. Please check your `outputs` key in `turbo.json`
+ WARNING  no output files found for task @specd/skills#test. Please check your `outputs` key in `turbo.json`

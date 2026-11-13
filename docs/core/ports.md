@@ -158,6 +158,8 @@ Cheap physical observations use a shared `*Meta` family. Every Meta type exposes
 | `persistedStateMeta(spec, options?)`     | `PersistedStateMeta \| null`    | `spec-lock.json` sidecar        |
 | `generatedMetadataMeta(spec, options?)`  | `GeneratedMetadataMeta \| null` | Generated `metadata.json` cache |
 
+`readPersistedState(spec, options?)` reads `spec-lock.json`. Pass `{ lenientDependsOn: true }` to tolerate invalid `dependsOn` entries so repair commands (`specs deps remove` / `set` / `clear`) can still load a corrupted lock; the default is strict and throws `InvalidSpecLockError`.
+
 The removed `persistedStateHash(spec)` method is replaced by `persistedStateMeta(spec, { includeHash: true })?.hash ?? null`. The provenance field `persistedStateHash` inside generated metadata is unrelated and remains.
 
 `list(prefix?, options?)` accepts `includeMeta?: boolean`. When set, each `SpecListEntry` projects lastModified-only Meta (`artifacts`, `persistedStateMeta`, `generatedMetadataMeta`). List never returns content hashes — use the Meta methods with `includeHash: true` when a digest is required.

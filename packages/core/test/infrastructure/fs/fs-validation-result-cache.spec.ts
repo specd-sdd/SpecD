@@ -10,7 +10,10 @@ import {
   stampsFromSpec,
 } from '../../../src/infrastructure/fs/fs-validation-result-cache.js'
 import { sha256 } from '../../../src/infrastructure/fs/hash.js'
-import { computeCacheFingerprint } from '../../../src/application/use-cases/_shared/validate-specs-cache-fingerprints.js'
+import {
+  computeCacheFingerprint,
+  VALIDATE_SPECS_ENGINE_VERSION,
+} from '../../../src/application/use-cases/_shared/validate-specs-cache-fingerprints.js'
 
 describe('FsValidationResultCache', () => {
   let tmpDir: string
@@ -79,6 +82,43 @@ describe('FsValidationResultCache', () => {
     expect(meta.schemaFingerprint).toBe(schemaFingerprint)
     expect(meta.engineVersion).toBe(1)
     expect(meta.totalCount).toBe(1)
+  })
+
+  it('rejects pre-delegation engine results and preserves current materialization warnings', async () => {
+    await writeSpec('auth/login', '# Login')
+    const spec = (await repo.get(SpecPath.parse('auth/login')))!
+    const schemaFingerprint = sha256('schema-surface')
+    await cache.upsert({
+      spec,
+      schemaFingerprint,
+      engineVersion: 2,
+      entry: { spec: 'default:auth/login', passed: true, failures: [], warnings: [] },
+    })
+
+    expect(
+      await cache.lookup({ spec, schemaFingerprint, engineVersion: VALIDATE_SPECS_ENGINE_VERSION }),
+    ).toEqual({ kind: 'miss' })
+
+    const entry = {
+      spec: 'default:auth/login',
+      passed: true,
+      failures: [],
+      warnings: [
+        {
+          artifactId: 'metadata',
+          description: "metadata-cache-write-failed for 'default:auth/login': disk full",
+        },
+      ],
+    }
+    await cache.upsert({
+      spec,
+      schemaFingerprint,
+      engineVersion: VALIDATE_SPECS_ENGINE_VERSION,
+      entry,
+    })
+    expect(
+      await cache.lookup({ spec, schemaFingerprint, engineVersion: VALIDATE_SPECS_ENGINE_VERSION }),
+    ).toEqual({ kind: 'hit', entry })
   })
 
   it('ensures configPath tmp gitignore on upsert', async () => {

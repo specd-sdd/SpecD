@@ -11,5 +11,10 @@
     "core:workspace",
     "core:initialize-persisted-spec-state"
   ],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/update-persisted-spec-implementation.ts",
+      "symbols": ["UpdatePersistedSpecImplementation"]
+    }
+  ]
 }

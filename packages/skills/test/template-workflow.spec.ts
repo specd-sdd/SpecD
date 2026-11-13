@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -107,5 +107,41 @@ describe('workflow skill templates', () => {
     expect(content).toContain('contains top-level `llmOptimizedContext`')
     expect(content).toContain('If top-level `llmOptimizedContext` is `true`')
     expect(content).not.toContain('approvals.llmOptimized')
+  })
+
+  it('does not teach comma-joined --file lists for implementation tracking', () => {
+    const templates = [
+      readTemplate('skills', 'specd-implement', 'SKILL.md.tpl'),
+      readTemplate('skills', 'specd-archive', 'SKILL.md.tpl'),
+      readTemplate('skills', 'specd-fasttrack', 'SKILL.md.tpl'),
+    ]
+    for (const content of templates) {
+      expect(content).not.toMatch(/--file\s+[^\n]*\w,\w/)
+      expect(content).not.toMatch(/--file\s+<path1>,<path2>/)
+      expect(content).not.toMatch(/comma-separated/i)
+    }
+  })
+
+  it('does not teach comma-joined --file, --spec or --add lists in any template', () => {
+    const files = (readdirSync(templatesRoot, { recursive: true }) as string[]).filter(
+      (entry) => entry.endsWith('.tpl') || entry.endsWith('.md'),
+    )
+    expect(files.length).toBeGreaterThan(0)
+    for (const entry of files) {
+      const content = readTemplate(entry)
+      for (const flag of ['--file', '--spec', '--add', '--add-spec']) {
+        const pattern = new RegExp(`${flag}\\s+(?!<)[^\\s,\\n]+,[^\\s,\\n]+`)
+        expect(content, `${entry} (${flag})`).not.toMatch(pattern)
+      }
+      expect(content, entry).not.toMatch(/--(file|spec|add)\s+<[^>\n]*>,\s*<[^>\n]*>/)
+    }
+  })
+
+  it('does not claim confirmed links block ignore', () => {
+    for (const skill of ['specd-implement', 'specd-archive'] as const) {
+      const content = readTemplate('skills', skill, 'SKILL.md.tpl')
+      expect(content).not.toMatch(/cannot\s*\n?\s*be ignored/i)
+      expect(content).toMatch(/preserves any confirmed links/i)
+    }
   })
 })

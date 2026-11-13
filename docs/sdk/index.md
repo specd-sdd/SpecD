@@ -459,6 +459,7 @@ them in the SDK or CLI.
 | `graph why`                       | `runGraphWhy`                                                    |
 | `graph impact`                    | `runGraphImpact`                                                 |
 | `changes implementation` / status | `buildImplementationReview`                                      |
+| `changes deps <name> <specId>`    | `kernel.changes.getSpecDeps` (normalized `default:...` ID)       |
 
 ## Re-exports
 
@@ -470,6 +471,7 @@ The SDK root exports explicit symbols from the curated `@specd/core` and `@specd
 - Isolated worker contracts, diagnostics, and typed failures: `GraphIndexJsonValue`, `GraphIndexTask`, `RunIsolatedGraphIndexInput`, `GraphIndexWorkerStartError`, `GraphIndexTaskContractError`, `GraphIndexTaskExecutionError`, `GraphIndexWorkerProtocolError`, `GraphIndexWorkerExitError`, `GraphIndexWorkerSignalError`, `GraphIndexProgressHandlerError`, `GraphIndexWorkerError`, `GraphIndexWorkerEvent`, `GraphIndexFailureCause`, `GraphIndexWorkerDiagnostics`
 - Index events and size gating: `IndexEvent`, `FileActivityEvent`, `FileSkippedEvent`, `ResourceDisposalFailedEvent`, `IndexEventReceiver`, `SizeSkippedFile`, `SizeExemptFile`, `DEFAULT_MAX_FILE_BYTES`
 - Graph helpers: `createGetGraphHealth`, `GetGraphHealthResult`, `IndexResult`, `HotspotResult`, `GraphProviderStaleError`, `GraphStorageRecoveryRequiredError`, `GraphStoreRecreateRequiresClosedError`
+- Spec ID helpers: `parseSpecId` (strict; accepts `{ workspaces }` and resolves bare IDs to `default:`), `isFullyQualifiedSpecId`, `isValidWorkspaceName`, and `kernel.changes.getSpecDeps` / `createGetChangeSpecDeps` for reading a change spec's declared dependencies with a normalized ID
 - `SDK_VERSION`, `CORE_VERSION`, `CODE_GRAPH_VERSION`
 
 For package-level semantics (domain model, graph indexing, plugin ports), see the **Core** and **Code graph** package reference sections.

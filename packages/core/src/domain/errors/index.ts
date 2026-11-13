@@ -5,6 +5,13 @@ export {
 } from './invalid-state-transition-error.js'
 export { ApprovalRequiredError } from './approval-required-error.js'
 export { InvalidSpecPathError } from './invalid-spec-path-error.js'
+export { InvalidSpecIdError } from './invalid-spec-id-error.js'
+export { InvalidSpecLockError } from './invalid-spec-lock-error.js'
+export { InvalidSpecPatternError } from './invalid-spec-pattern-error.js'
+export {
+  WorkspaceNotFoundError,
+  type WorkspaceNotFoundContext,
+} from './workspace-not-found-error.js'
 export { ArtifactConflictError } from './artifact-conflict-error.js'
 export { ArtifactNotOptionalError } from './artifact-not-optional-error.js'
 export { HookFailedError } from './hook-failed-error.js'

@@ -4,6 +4,10 @@ import { ChangeAlreadyExistsError } from '../../../src/application/errors/change
 import { InvalidCreateChangeInputError } from '../../../src/application/errors/invalid-create-change-input-error.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
 import { IncompatibleSchemaError } from '../../../src/domain/errors/incompatible-schema-error.js'
+import { InvalidInputError } from '../../../src/domain/errors/invalid-input-error.js'
+import { InvalidSpecIdError } from '../../../src/domain/errors/invalid-spec-id-error.js'
+import { ReadOnlyWorkspaceError } from '../../../src/domain/errors/read-only-workspace-error.js'
+import { WorkspaceNotFoundError } from '../../../src/domain/errors/workspace-not-found-error.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { OverlapEntry } from '../../../src/domain/value-objects/overlap-entry.js'
@@ -21,12 +25,58 @@ import {
 } from './helpers.js'
 
 describe('CreateChange', () => {
+  describe('invalidation policy validation', () => {
+    it('rejects an unknown policy with InvalidInputError and creates nothing', async () => {
+      const repo = makeChangeRepository()
+      const createSpy = vi.spyOn(repo, 'create')
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+      )
+
+      const error = await uc
+        .execute({
+          name: 'add-oauth',
+          specIds: [],
+          schemaName: 'specd-std',
+          schemaVersion: 1,
+          invalidationPolicy: 'sugical',
+        })
+        .catch((e: unknown) => e)
+
+      expect(error).toBeInstanceOf(InvalidInputError)
+      expect((error as Error).message).toContain('sugical')
+      expect((error as Error).message).toContain('none, surgical, downstream, global')
+      expect(createSpy).not.toHaveBeenCalled()
+    })
+
+    it.each(['none', 'surgical', 'downstream', 'global'])('accepts %s', async (policy) => {
+      const uc = makeCreateChange(
+        makeChangeRepository(),
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+      )
+
+      const result = await uc.execute({
+        name: 'add-oauth',
+        specIds: [],
+        schemaName: 'specd-std',
+        schemaVersion: 1,
+        invalidationPolicy: policy,
+      })
+
+      expect(result.change.invalidationPolicy).toBe(policy)
+    })
+  })
+
   describe('given no existing change with that name', () => {
     it('creates a change via repository create then scaffold', async () => {
       const repo = makeChangeRepository()
       const createSpy = vi.spyOn(repo, 'create')
       const scaffoldSpy = vi.spyOn(repo, 'scaffold')
-      const uc = makeCreateChange(repo, makeListWorkspaces(new Map()))
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+      )
 
       const result = await uc.execute({
         name: 'add-oauth',
@@ -49,7 +99,10 @@ describe('CreateChange', () => {
 
     it('scaffolds the change directory', async () => {
       const repo = makeChangeRepository()
-      const uc = makeCreateChange(repo, makeListWorkspaces(new Map()))
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+      )
 
       const result = await uc.execute({
         name: 'add-oauth',
@@ -63,7 +116,10 @@ describe('CreateChange', () => {
 
     it('seeds the creation history event', async () => {
       const repo = makeChangeRepository()
-      const uc = makeCreateChange(repo, makeListWorkspaces(new Map()))
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+      )
 
       const result = await uc.execute({
         name: 'add-oauth',
@@ -76,13 +132,16 @@ describe('CreateChange', () => {
       expect(result.change.history[0]).toMatchObject({
         type: 'created',
         by: testActor,
-        specIds: ['auth/login'],
+        specIds: ['default:auth/login'],
       })
     })
 
     it('records all specIds on the created event', async () => {
       const repo = makeChangeRepository()
-      const uc = makeCreateChange(repo, makeListWorkspaces(new Map()))
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+      )
 
       const result = await uc.execute({
         name: 'add-oauth',
@@ -93,13 +152,16 @@ describe('CreateChange', () => {
 
       expect(result.change.history[0]).toMatchObject({
         type: 'created',
-        specIds: ['auth/login', 'auth/register'],
+        specIds: ['default:auth/login', 'default:auth/register'],
       })
     })
 
     it('sets optional description when provided', async () => {
       const repo = makeChangeRepository()
-      const uc = makeCreateChange(repo, makeListWorkspaces(new Map()))
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+      )
 
       const result = await uc.execute({
         name: 'add-oauth',
@@ -114,7 +176,10 @@ describe('CreateChange', () => {
 
     it('seeds invalidation policy when provided', async () => {
       const repo = makeChangeRepository()
-      const uc = makeCreateChange(repo, makeListWorkspaces(new Map()))
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+      )
 
       const result = await uc.execute({
         name: 'add-oauth',
@@ -129,7 +194,10 @@ describe('CreateChange', () => {
 
     it('defaults invalidation policy to downstream', async () => {
       const repo = makeChangeRepository()
-      const uc = makeCreateChange(repo, makeListWorkspaces(new Map()))
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+      )
 
       const result = await uc.execute({
         name: 'add-oauth',
@@ -147,7 +215,9 @@ describe('CreateChange', () => {
         specs: [makeSpec({ workspace: 'default', name: 'auth/login', filenames: [] })],
         artifacts: {
           'auth/login/spec-lock.json': JSON.stringify({
+            schema: { name: 'specd-std', version: 1 },
             dependsOn: ['default:shared/auth'],
+            implementation: [],
           }),
         },
       })
@@ -230,7 +300,9 @@ describe('CreateChange', () => {
         specs: [makeSpec({ workspace: 'default', name: 'auth/login', filenames: [] })],
         artifacts: {
           'auth/login/spec-lock.json': JSON.stringify({
+            schema: { name: 'specd-std', version: 1 },
             dependsOn: ['default:shared/persisted'],
+            implementation: [],
           }),
           'auth/login/metadata.json': JSON.stringify({
             dependsOn: ['default:shared/metadata'],
@@ -272,7 +344,11 @@ describe('CreateChange', () => {
       const repo = makeChangeRepository()
       const getActiveSchema = makeGetActiveSchema(makeSchema({ name: 'spec-driven' }))
       const executeSpy = vi.spyOn(getActiveSchema, 'execute')
-      const uc = makeCreateChange(repo, makeListWorkspaces(new Map()), { getActiveSchema })
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+        { getActiveSchema },
+      )
 
       const result = await uc.execute({
         name: 'add-oauth',
@@ -290,7 +366,11 @@ describe('CreateChange', () => {
       const repo = makeChangeRepository()
       const getActiveSchema = makeGetActiveSchema()
       const executeSpy = vi.spyOn(getActiveSchema, 'execute')
-      const uc = makeCreateChange(repo, makeListWorkspaces(new Map()), { getActiveSchema })
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+        { getActiveSchema },
+      )
 
       await uc.execute({
         name: 'add-oauth',
@@ -309,7 +389,11 @@ describe('CreateChange', () => {
           throw new SchemaNotFoundError('missing-schema')
         },
       } as unknown as ReturnType<typeof makeGetActiveSchema>
-      const uc = makeCreateChange(repo, makeListWorkspaces(new Map()), { getActiveSchema })
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+        { getActiveSchema },
+      )
 
       await expect(
         uc.execute({
@@ -331,7 +415,11 @@ describe('CreateChange', () => {
       ])
       const detectOverlap = makeDetectOverlap(report)
       const executeSpy = vi.spyOn(detectOverlap, 'execute')
-      const uc = makeCreateChange(repo, makeListWorkspaces(new Map()), { detectOverlap })
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+        { detectOverlap },
+      )
 
       const result = await uc.execute({
         name: 'add-oauth',
@@ -352,7 +440,11 @@ describe('CreateChange', () => {
           throw new Error('detect failed')
         },
       } as unknown as ReturnType<typeof makeDetectOverlap>
-      const uc = makeCreateChange(repo, makeListWorkspaces(new Map()), { detectOverlap })
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+        { detectOverlap },
+      )
 
       const result = await uc.execute({
         name: 'add-oauth',
@@ -370,7 +462,11 @@ describe('CreateChange', () => {
       const repo = makeChangeRepository()
       const detectOverlap = makeDetectOverlap()
       const executeSpy = vi.spyOn(detectOverlap, 'execute')
-      const uc = makeCreateChange(repo, makeListWorkspaces(new Map()), { detectOverlap })
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+        { detectOverlap },
+      )
 
       await uc.execute({
         name: 'add-oauth',
@@ -386,7 +482,11 @@ describe('CreateChange', () => {
       const repo = makeChangeRepository()
       const detectOverlap = makeDetectOverlap()
       const executeSpy = vi.spyOn(detectOverlap, 'execute')
-      const uc = makeCreateChange(repo, makeListWorkspaces(new Map()), { detectOverlap })
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+        { detectOverlap },
+      )
 
       await uc.execute({
         name: 'add-oauth',
@@ -403,7 +503,10 @@ describe('CreateChange', () => {
   describe('given invalid schema input', () => {
     it('throws when only schemaName is provided', async () => {
       const repo = makeChangeRepository()
-      const uc = makeCreateChange(repo, makeListWorkspaces(new Map()))
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+      )
 
       await expect(
         uc.execute({
@@ -416,7 +519,10 @@ describe('CreateChange', () => {
 
     it('throws when only schemaVersion is provided', async () => {
       const repo = makeChangeRepository()
-      const uc = makeCreateChange(repo, makeListWorkspaces(new Map()))
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+      )
 
       await expect(
         uc.execute({
@@ -432,7 +538,10 @@ describe('CreateChange', () => {
     it('throws ChangeAlreadyExistsError', async () => {
       const existing = makeChange('add-oauth')
       const repo = makeChangeRepository([existing])
-      const uc = makeCreateChange(repo, makeListWorkspaces(new Map()))
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+      )
 
       await expect(
         uc.execute({
@@ -457,7 +566,10 @@ describe('CreateChange', () => {
         return c
       })
 
-      const uc = makeCreateChange(repo, makeListWorkspaces(new Map()))
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+      )
 
       await expect(
         uc.execute({
@@ -479,7 +591,10 @@ describe('CreateChange', () => {
         return c
       })
 
-      const uc = makeCreateChange(repo, makeListWorkspaces(new Map()))
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+      )
 
       await expect(
         uc.execute({
@@ -610,6 +725,213 @@ describe('CreateChange', () => {
       ).rejects.toThrow(IncompatibleSchemaError)
 
       expect(repo.store.get('new-change')).toBeUndefined()
+    })
+  })
+
+  describe('spec ID validation', () => {
+    it('rejects an invalid segment and creates nothing', async () => {
+      const repo = makeChangeRepository()
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+      )
+
+      await expect(
+        uc.execute({
+          name: 'bad',
+          specIds: ['Core/Foo'],
+          schemaName: 'specd-std',
+          schemaVersion: 1,
+        }),
+      ).rejects.toThrow(InvalidSpecIdError)
+      expect(repo.store.get('bad')).toBeUndefined()
+    })
+
+    it('rejects a comma in a capability segment', async () => {
+      const repo = makeChangeRepository()
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+      )
+
+      await expect(
+        uc.execute({
+          name: 'bad',
+          specIds: ['auth/a,b'],
+          schemaName: 'specd-std',
+          schemaVersion: 1,
+        }),
+      ).rejects.toThrow(InvalidSpecIdError)
+    })
+
+    it('rejects an unknown workspace', async () => {
+      const repo = makeChangeRepository()
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+      )
+
+      await expect(
+        uc.execute({
+          name: 'bad',
+          specIds: ['missing:auth/login'],
+          schemaName: 'specd-std',
+          schemaVersion: 1,
+        }),
+      ).rejects.toThrow(WorkspaceNotFoundError)
+    })
+
+    it('normalizes bare specIds to fully qualified IDs', async () => {
+      const repo = makeChangeRepository()
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+      )
+
+      const result = await uc.execute({
+        name: 'add-oauth',
+        specIds: ['auth/login'],
+        schemaName: 'specd-std',
+        schemaVersion: 1,
+      })
+      expect(result.change.specIds).toEqual(['default:auth/login'])
+    })
+
+    it('creates nothing when one of several specIds is invalid', async () => {
+      const repo = makeChangeRepository()
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+      )
+
+      await expect(
+        uc.execute({
+          name: 'partial',
+          specIds: ['auth/login', 'Auth/Bad'],
+          schemaName: 'specd-std',
+          schemaVersion: 1,
+        }),
+      ).rejects.toThrow(InvalidSpecIdError)
+      expect(repo.store.get('partial')).toBeUndefined()
+    })
+
+    it('accepts a non-existent spec ID', async () => {
+      const repo = makeChangeRepository()
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+      )
+
+      const result = await uc.execute({
+        name: 'new-spec',
+        specIds: ['default:brand-new'],
+        schemaName: 'specd-std',
+        schemaVersion: 1,
+      })
+      expect(result.change.specIds).toEqual(['default:brand-new'])
+    })
+
+    it('rejects readOnly specs with one line per offender and creates nothing', async () => {
+      const repo = makeChangeRepository()
+      const specs = new Map([
+        ['default', makeSpecRepository()],
+        ['platform', makeSpecRepository({ ownership: 'readOnly' })],
+      ])
+      const ownership = new Map([['platform', 'readOnly' as const]])
+      const uc = makeCreateChange(repo, makeListWorkspaces(specs, ownership))
+
+      await expect(
+        uc.execute({
+          name: 'ro',
+          specIds: ['platform:tokens', 'platform:sessions'],
+          schemaName: 'specd-std',
+          schemaVersion: 1,
+        }),
+      ).rejects.toThrow(ReadOnlyWorkspaceError)
+
+      try {
+        await uc.execute({
+          name: 'ro',
+          specIds: ['platform:tokens', 'platform:sessions'],
+          schemaName: 'specd-std',
+          schemaVersion: 1,
+        })
+      } catch (err) {
+        const message = (err as Error).message
+        expect(message).toContain(
+          'Cannot add spec "platform:tokens" to change — workspace "platform" is readOnly.',
+        )
+        expect(message).toContain(
+          'Cannot add spec "platform:sessions" to change — workspace "platform" is readOnly.',
+        )
+      }
+      expect(repo.store.get('ro')).toBeUndefined()
+    })
+  })
+
+  describe('audit hardening', () => {
+    const base = { schemaName: 'specd-std', schemaVersion: 1 } as const
+
+    it('reports ChangeAlreadyExistsError before InvalidSpecIdError', async () => {
+      const repo = makeChangeRepository([makeChange('dup')])
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+      )
+
+      await expect(uc.execute({ name: 'dup', specIds: ['Bad Id'], ...base })).rejects.toThrow(
+        ChangeAlreadyExistsError,
+      )
+    })
+
+    it('rejects an empty spec ID', async () => {
+      const repo = makeChangeRepository()
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+      )
+
+      await expect(uc.execute({ name: 'x', specIds: [''], ...base })).rejects.toThrow(
+        InvalidSpecIdError,
+      )
+      expect(repo.store.get('x')).toBeUndefined()
+    })
+
+    it('collapses duplicate IDs after normalization', async () => {
+      const repo = makeChangeRepository()
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+      )
+
+      const result = await uc.execute({
+        name: 'dedupe',
+        specIds: ['auth/login', 'default:auth/login'],
+        ...base,
+      })
+
+      expect(result.change.specIds).toEqual(['default:auth/login'])
+    })
+
+    it('lists only the readOnly specs when owned and readOnly specs are mixed', async () => {
+      const repo = makeChangeRepository()
+      const specs = new Map([
+        ['default', makeSpecRepository()],
+        ['platform', makeSpecRepository({ ownership: 'readOnly' })],
+      ])
+      const ownership = new Map([['platform', 'readOnly' as const]])
+      const uc = makeCreateChange(repo, makeListWorkspaces(specs, ownership))
+
+      const err = await uc
+        .execute({ name: 'mixed', specIds: ['default:auth/new', 'platform:tokens'], ...base })
+        .catch((e: unknown) => e)
+
+      expect(err).toBeInstanceOf(ReadOnlyWorkspaceError)
+      const lines = (err as Error).message.split('\n').filter((l) => l.startsWith('Cannot add'))
+      expect(lines).toEqual([
+        'Cannot add spec "platform:tokens" to change — workspace "platform" is readOnly.',
+      ])
+      expect(repo.store.get('mixed')).toBeUndefined()
     })
   })
 })

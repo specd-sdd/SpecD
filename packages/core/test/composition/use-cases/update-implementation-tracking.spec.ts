@@ -85,6 +85,7 @@ describe('createUpdateImplementationTracking', () => {
     const deps: UpdateImplementationTrackingDeps = {
       changes: {} as never,
       files: {} as never,
+      specRepositories: new Map(),
       projectRoot: '/tmp/project',
     }
 
@@ -95,6 +96,7 @@ describe('createUpdateImplementationTracking', () => {
     const deps: UpdateImplementationTrackingDeps = {
       changes: {} as never,
       files: {} as never,
+      specRepositories: new Map(),
       projectRoot: '/tmp/project',
     }
 

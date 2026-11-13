@@ -18,10 +18,26 @@ export {
 export {
   parseSpecLock,
   specLockSchema,
+  type SpecLockContext,
   type SpecLockData,
   type SpecLockImplementationEntry,
 } from './parse-spec-lock.js'
-export { parseSpecId } from './parse-spec-id.js'
+export {
+  parseSpecId,
+  isFullyQualifiedSpecId,
+  type ParseSpecIdOptions,
+  type ParsedSpecId,
+} from './parse-spec-id.js'
+export {
+  parseSpecPattern,
+  type ParseSpecPatternOptions,
+  type ParsedSpecPattern,
+  type SpecPatternKind,
+} from './parse-spec-pattern.js'
+export { isValidWorkspaceName, isValidCapabilitySegment } from './spec-id-rules.js'
+export { toLogicalFilePath } from './to-logical-file-path.js'
+export { sameTrackedFile } from './same-tracked-file.js'
+export { isWindowsDeviceName } from './windows-device-name.js'
 export { extractSpecSummary } from './spec-summary.js'
 export { inferFormat } from './format-inference.js'
 export { safeRegex } from './safe-regex.js'

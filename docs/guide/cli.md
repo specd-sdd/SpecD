@@ -188,7 +188,7 @@ Direct inspection, searching, and validation of specifications in workspaces.
 - **`specd specs resolve-path <specId>`**: Prints the exact filesystem path on disk.
 - **`specd specs validate [specId]`**: Validates Markdown AST and schema conformance.
 - **`specd specs init <specId>`**: Scaffolds a new spec directory with `spec.md` and `verify.md`.
-- **`specd specs deps <specId>`**: Adds, removes, or lists dependencies between specifications.
+- **`specd specs deps <list|add|remove|set|clear> <specId>`**: Lists or updates persisted dependencies between specifications.
 - **`specd specs implementation <specId>`**: Maps source files and symbols to specification capabilities.
 - **`specd specs optimizations`**: Diagnostics for spec authoring and token usage optimization.
 

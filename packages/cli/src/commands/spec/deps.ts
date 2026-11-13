@@ -3,18 +3,19 @@ import { resolveCliContext } from '../../helpers/cli-context.js'
 import { collect } from '../../helpers/collect.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
-import { parseSpecId } from '../../helpers/spec-path.js'
+import { confirmOrExit } from '../../helpers/confirm.js'
 
-/**
- * Resolves a CLI spec path to a canonical spec ID.
- *
- * @param specPath - User-supplied spec path
- * @param config - Loaded project configuration
- * @returns Canonical spec ID
- */
-function resolveSpecId(specPath: string, config: import('@specd/sdk').SpecdConfig): string {
-  return parseSpecId(specPath, config).specId
-}
+const depsOutputSchema = `\nJSON/TOON output schema:
+  {
+    result: "ok"
+    specId: string
+    dependsOn: string[]
+    initialized?: boolean
+  }\n`
+
+const clearOutputSchema = `${depsOutputSchema}
+  When cancelled:
+  { result: "cancelled" }\n`
 
 /**
  * Renders a persisted dependency query or mutation result.
@@ -24,14 +25,16 @@ function resolveSpecId(specPath: string, config: import('@specd/sdk').SpecdConfi
  * @param result.dependsOn - Persisted dependency list
  * @param result.initialized - Whether durable spec state exists
  * @param fmt - Output format
+ * @param notInitializedText - Text printed when the spec has no durable state
  */
 function renderDepsResult(
   result: { specId: string; dependsOn: readonly string[]; initialized?: boolean },
   fmt: ReturnType<typeof parseFormat>,
+  notInitializedText: string = `spec ${result.specId} is not initialized — run specs init first`,
 ): void {
   if (fmt === 'text') {
     if (result.initialized === false) {
-      output(`spec ${result.specId} is not initialized — run specs init first`, 'text')
+      output(notInitializedText, 'text')
       return
     }
     if (result.dependsOn.length === 0) {
@@ -72,15 +75,16 @@ export function registerSpecDeps(parent: Command): void {
     .description('List persisted dependencies for a spec.')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText('after', depsOutputSchema)
     .action(async (specPath: string, opts: { format: string; config?: string }) => {
       try {
-        const { config, kernel } = await resolveCliContext({ configPath: opts.config })
+        const { kernel } = await resolveCliContext({ configPath: opts.config })
         const result = await kernel.specs.getPersistedDeps.execute({
-          specId: resolveSpecId(specPath, config),
+          specId: specPath,
         })
         renderDepsResult(result, parseFormat(opts.format))
       } catch (err) {
-        handleError(err, opts.format)
+        handleError(err, opts.format, { lockRepairHint: true })
       }
     })
 
@@ -91,19 +95,20 @@ export function registerSpecDeps(parent: Command): void {
     .requiredOption('--dep <id>', 'dependency spec id (repeatable)', collect, [])
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText('after', depsOutputSchema)
     .action(async (specPath: string, opts: { dep: string[]; format: string; config?: string }) => {
       try {
         if (opts.dep.length === 0) {
           cliError('--dep requires at least one value', opts.format)
         }
-        const { config, kernel } = await resolveCliContext({ configPath: opts.config })
+        const { kernel } = await resolveCliContext({ configPath: opts.config })
         const result = await kernel.specs.updatePersistedDeps.execute({
-          specId: resolveSpecId(specPath, config),
+          specId: specPath,
           add: opts.dep,
         })
-        renderDepsResult({ ...result, initialized: true }, parseFormat(opts.format))
+        renderDepsResult(result, parseFormat(opts.format))
       } catch (err) {
-        handleError(err, opts.format)
+        handleError(err, opts.format, { lockRepairHint: true })
       }
     })
 
@@ -114,19 +119,24 @@ export function registerSpecDeps(parent: Command): void {
     .requiredOption('--dep <id>', 'dependency spec id (repeatable)', collect, [])
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText('after', depsOutputSchema)
     .action(async (specPath: string, opts: { dep: string[]; format: string; config?: string }) => {
       try {
         if (opts.dep.length === 0) {
           cliError('--dep requires at least one value', opts.format)
         }
-        const { config, kernel } = await resolveCliContext({ configPath: opts.config })
+        const { kernel } = await resolveCliContext({ configPath: opts.config })
         const result = await kernel.specs.updatePersistedDeps.execute({
-          specId: resolveSpecId(specPath, config),
+          specId: specPath,
           remove: opts.dep,
         })
-        renderDepsResult({ ...result, initialized: true }, parseFormat(opts.format))
+        renderDepsResult(
+          result,
+          parseFormat(opts.format),
+          `spec ${result.specId} is not initialized — nothing was removed`,
+        )
       } catch (err) {
-        handleError(err, opts.format)
+        handleError(err, opts.format, { lockRepairHint: true })
       }
     })
 
@@ -137,16 +147,17 @@ export function registerSpecDeps(parent: Command): void {
     .option('--dep <id>', 'dependency spec id (repeatable)', collect, [])
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText('after', depsOutputSchema)
     .action(async (specPath: string, opts: { dep: string[]; format: string; config?: string }) => {
       try {
-        const { config, kernel } = await resolveCliContext({ configPath: opts.config })
+        const { kernel } = await resolveCliContext({ configPath: opts.config })
         const result = await kernel.specs.updatePersistedDeps.execute({
-          specId: resolveSpecId(specPath, config),
+          specId: specPath,
           set: opts.dep,
         })
-        renderDepsResult({ ...result, initialized: true }, parseFormat(opts.format))
+        renderDepsResult(result, parseFormat(opts.format))
       } catch (err) {
-        handleError(err, opts.format)
+        handleError(err, opts.format, { lockRepairHint: true })
       }
     })
 
@@ -154,18 +165,38 @@ export function registerSpecDeps(parent: Command): void {
     .command('clear <specPath>')
     .allowExcessArguments(false)
     .description('Clear all persisted dependencies.')
+    .option('--force', 'skip confirmation')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
-    .action(async (specPath: string, opts: { format: string; config?: string }) => {
-      try {
-        const { config, kernel } = await resolveCliContext({ configPath: opts.config })
-        const result = await kernel.specs.updatePersistedDeps.execute({
-          specId: resolveSpecId(specPath, config),
-          clear: true,
-        })
-        renderDepsResult({ ...result, initialized: true }, parseFormat(opts.format))
-      } catch (err) {
-        handleError(err, opts.format)
-      }
-    })
+    .addHelpText('after', clearOutputSchema)
+    .action(
+      async (specPath: string, opts: { force?: boolean; format: string; config?: string }) => {
+        try {
+          const fmt = parseFormat(opts.format)
+          const confirmed = await confirmOrExit({
+            message: `Clear all dependencies of ${specPath}?`,
+            nonInteractiveMessage: 'clearing requires confirmation; pass --force to skip it',
+            format: opts.format,
+            ...(opts.force !== undefined ? { force: opts.force } : {}),
+          })
+          if (!confirmed) {
+            if (fmt === 'text') {
+              output('cancelled', 'text')
+            } else {
+              output({ result: 'cancelled' }, fmt)
+            }
+            return
+          }
+
+          const { kernel } = await resolveCliContext({ configPath: opts.config })
+          const result = await kernel.specs.updatePersistedDeps.execute({
+            specId: specPath,
+            clear: true,
+          })
+          renderDepsResult(result, parseFormat(opts.format))
+        } catch (err) {
+          handleError(err, opts.format, { lockRepairHint: true })
+        }
+      },
+    )
 }

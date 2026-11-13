@@ -21,4 +21,17 @@ export class ReadOnlyWorkspaceError extends SpecdError {
   constructor(message: string) {
     super(message)
   }
+
+  /**
+   * Creates an error for persisted-state mutations blocked by workspace ownership.
+   *
+   * @param specId - Fully-qualified spec ID being modified
+   * @param workspace - Read-only workspace name
+   * @returns A typed error naming the spec and workspace
+   */
+  static forSpec(specId: string, workspace: string): ReadOnlyWorkspaceError {
+    return new ReadOnlyWorkspaceError(
+      `Cannot modify spec "${specId}" — workspace "${workspace}" is readOnly.`,
+    )
+  }
 }

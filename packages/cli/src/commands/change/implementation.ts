@@ -3,8 +3,29 @@ import { type UpdateImplementationTrackingResult } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
+import { collect } from '../../helpers/collect.js'
 import { enrichImplementationTracking } from './_implementation-tracking.js'
 import { resolveSdkHostContext } from '../../helpers/sdk-host.js'
+
+const reviewOutputSchema = `\nJSON/TOON output schema:
+  {
+    name: string
+    trackedFiles: TrackedFile[]
+    links: ImplementationLink[]
+    graphHealth: GraphHealth
+    graphHint: GraphHint
+    outOfScopeSpecIds: string[]
+  }\n`
+
+const mutationOutputSchema = `\nJSON/TOON output schema:
+  {
+    result: "ok"
+    name: string
+    action: "add" | "remove" | "ignore" | "resolve" | "unresolve" | "start"
+    trackingActive?: true
+    startedAt?: string | null
+    implementationTracking: ImplementationTracking
+  }\n`
 
 /**
  * Registers the `change implementation` command group.
@@ -23,6 +44,7 @@ export function registerChangeImplementation(parent: Command): void {
     .description('List tracked implementation files and confirmed links for a change.')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText('after', reviewOutputSchema)
     .action(async (name: string, opts: { format: string; config?: string }) => {
       await renderImplementationState(name, opts)
     })
@@ -34,6 +56,7 @@ export function registerChangeImplementation(parent: Command): void {
     )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText('after', reviewOutputSchema)
     .action(async (name: string, opts: { format: string; config?: string }) => {
       await renderImplementationState(name, opts)
     })
@@ -43,6 +66,7 @@ export function registerChangeImplementation(parent: Command): void {
     .description('Explicitly activate implementation tracking for a change.')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText('after', mutationOutputSchema)
     .action(async (name: string, opts: { format: string; config?: string }) => {
       await mutateImplementationTracking(name, {
         action: 'start',
@@ -56,9 +80,10 @@ export function registerChangeImplementation(parent: Command): void {
     .description('Add or enrich a confirmed implementation link. Validates file existence on disk.')
     .requiredOption('--spec <id>', 'target spec id')
     .requiredOption('--file <path>', 'raw project-relative file path')
-    .option('--symbol <name>', 'implementation symbol name (repeatable)', collectString, [])
+    .option('--symbol <name>', 'implementation symbol name (repeatable)', collect, [])
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText('after', mutationOutputSchema)
     .action(
       async (
         name: string,
@@ -80,9 +105,10 @@ export function registerChangeImplementation(parent: Command): void {
     .description('Remove a confirmed implementation link or specific symbols from a link.')
     .requiredOption('--spec <id>', 'target spec id')
     .requiredOption('--file <path>', 'raw project-relative file path')
-    .option('--symbol <name>', 'symbol name to remove (repeatable)', collectString, [])
+    .option('--symbol <name>', 'symbol name to remove (repeatable)', collect, [])
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText('after', mutationOutputSchema)
     .action(
       async (
         name: string,
@@ -106,10 +132,11 @@ export function registerChangeImplementation(parent: Command): void {
     )
     .requiredOption(
       '--file <paths...>',
-      'raw project-relative file paths (comma-separated list supported)',
+      'raw project-relative file path(s); list or repeat --file (commas are not separators)',
     )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText('after', mutationOutputSchema)
     .action(async (name: string, opts: { file: string[]; format: string; config?: string }) => {
       await mutateImplementationTracking(name, {
         action: 'ignore',
@@ -126,10 +153,11 @@ export function registerChangeImplementation(parent: Command): void {
     )
     .requiredOption(
       '--file <paths...>',
-      'raw project-relative file paths (comma-separated list supported)',
+      'raw project-relative file path(s); list or repeat --file (commas are not separators)',
     )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText('after', mutationOutputSchema)
     .action(async (name: string, opts: { file: string[]; format: string; config?: string }) => {
       await mutateImplementationTracking(name, {
         action: 'resolve',
@@ -146,10 +174,11 @@ export function registerChangeImplementation(parent: Command): void {
     )
     .requiredOption(
       '--file <paths...>',
-      'raw project-relative file paths (comma-separated list supported)',
+      'raw project-relative file path(s); list or repeat --file (commas are not separators)',
     )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText('after', mutationOutputSchema)
     .action(async (name: string, opts: { file: string[]; format: string; config?: string }) => {
       await mutateImplementationTracking(name, {
         action: 'unresolve',
@@ -191,24 +220,39 @@ async function renderImplementationState(
       ]
       for (const state of ['open', 'resolved', 'ignored', 'removed'] as const) {
         const files = enriched.trackedFiles.filter((entry) => entry.state === state)
-        lines.push(
-          `  ${state}: ${files.length > 0 ? files.map((entry) => entry.file).join(', ') : '(none)'}`,
-        )
+        lines.push(`  ${state}:`)
+        if (files.length === 0) {
+          lines.push('    (none)')
+        } else {
+          for (const entry of files) {
+            lines.push(`    ${entry.file}`)
+          }
+        }
       }
       lines.push('')
       lines.push('out-of-scope sidecars:')
-      lines.push(`  ${outOfScopeSpecIds.length > 0 ? outOfScopeSpecIds.join(', ') : '(none)'}`)
+      if (outOfScopeSpecIds.length === 0) {
+        lines.push('  (none)')
+      } else {
+        for (const id of outOfScopeSpecIds) {
+          lines.push(`  ${id}`)
+        }
+      }
       lines.push('')
       lines.push('links:')
       if (enriched.links.length === 0) {
         lines.push('  (none)')
       } else {
         for (const link of enriched.links) {
-          const symbols =
-            link.symbols !== undefined && link.symbols.length > 0
-              ? link.symbols.join(', ')
-              : '(file-level)'
-          lines.push(`  - ${link.specId} -> ${link.file}  symbols=${symbols}`)
+          lines.push(`  - ${link.specId} -> ${link.file}`)
+          if (link.symbols !== undefined && link.symbols.length > 0) {
+            lines.push('    symbols:')
+            for (const symbol of link.symbols) {
+              lines.push(`      ${symbol}`)
+            }
+          } else {
+            lines.push('    symbols: (file-level)')
+          }
           for (const reviewed of link.symbolResolutions ?? []) {
             const { resolution } = reviewed
             lines.push(
@@ -218,9 +262,10 @@ async function renderImplementationState(
               lines.push(`        target: ${resolution.target.id}`)
             }
             if (resolution.candidates.length > 0) {
-              lines.push(
-                `        candidates: ${resolution.candidates.map((candidate) => candidate.target.id).join(', ')}`,
-              )
+              lines.push('        candidates:')
+              for (const candidate of resolution.candidates) {
+                lines.push(`          ${candidate.target.id}`)
+              }
             }
             if (resolution.path.length > 0) {
               lines.push(
@@ -287,14 +332,14 @@ async function mutateImplementationTracking(
         action: 'start',
       })
     } else {
-      const expandedFiles = (input.files ?? []).flatMap((f) => f.split(',').map((p) => p.trim()))
-      const primaryFile = expandedFiles[0]
+      const files = input.files ?? []
+      const primaryFile = files[0]
       if (primaryFile === undefined) return
       lastResult = await kernel.changes.updateImplementationTracking.execute({
         name,
         action: input.action,
         file: primaryFile,
-        files: expandedFiles,
+        files,
         ...(input.specId !== undefined ? { specId: input.specId } : {}),
         ...(input.symbols !== undefined && input.symbols.length > 0
           ? { symbols: input.symbols }
@@ -305,7 +350,13 @@ async function mutateImplementationTracking(
     const fmt = parseFormat(input.format)
     if (fmt === 'text') {
       if (input.action === 'start') {
-        output(`✓ Implementation tracking is active for '${name}'.`, 'text')
+        const startedAt = lastResult?.trackingStartedAt?.toISOString()
+        output(
+          `✓ Implementation tracking is active for '${name}'${
+            startedAt !== undefined ? ` (started ${startedAt})` : ''
+          }.`,
+          'text',
+        )
       } else {
         output(`updated implementation tracking for ${name} (${input.action})`, 'text')
       }
@@ -316,6 +367,12 @@ async function mutateImplementationTracking(
         result: 'ok',
         name,
         action: input.action,
+        ...(input.action === 'start'
+          ? {
+              trackingActive: true,
+              startedAt: lastResult?.trackingStartedAt?.toISOString() ?? null,
+            }
+          : {}),
         implementationTracking: lastResult?.implementationTracking,
       },
       fmt,
@@ -323,15 +380,4 @@ async function mutateImplementationTracking(
   } catch (error) {
     handleError(error, input.format)
   }
-}
-
-/**
- * Collects repeatable commander string options into an array.
- *
- * @param value - Newly parsed option value
- * @param previous - Accumulated option values
- * @returns Updated accumulated array
- */
-function collectString(value: string, previous: string[]): string[] {
-  return [...previous, value]
 }

@@ -211,6 +211,37 @@
 - **WHEN** validated against `strictSpecMetadataSchema`
 - **THEN** validation passes
 
+#### Scenario: Bare dependsOn entry rejected on persistence
+
+- **WHEN** generated metadata with `dependsOn: ['auth/login']` is persisted
+- **THEN** persistence is rejected with a typed validation error and no file is written
+
+#### Scenario: Empty dependsOn entry rejected on persistence
+
+- **WHEN** generated metadata with `dependsOn: ['']` is persisted through `PersistSpecMetadata`
+- **THEN** persistence is rejected with a typed validation error and no file is written
+
+#### Scenario: Malformed dependsOn entry rejected and quoted
+
+- **WHEN** generated metadata with `dependsOn: ['core:auth/a,b']` is persisted
+- **THEN** persistence is rejected and the validation message names the offending value
+
+#### Scenario: Bare implementation symbol specId rejected on persistence
+
+- **WHEN** generated metadata has `implementation.symbols[0].specId` equal to `auth/login`
+- **THEN** persistence is rejected with a typed validation error and no file is written
+
+#### Scenario: Keywords, hashes, and scenarios follow the documented formats
+
+- **WHEN** metadata has a keyword `Bad_Word`, or a `contentHashes` value that is not `sha256:` followed by 64 hex characters, or a scenario without a non-empty `then`
+- **THEN** persistence is rejected with a typed validation error
+
+#### Scenario: Existing metadata with a bare entry still reads
+
+- **GIVEN** an existing `metadata.json` with a bare `dependsOn` entry
+- **WHEN** it is read through the lenient read path
+- **THEN** the read does not fail and the file is treated as regenerable
+
 ### Requirement: Deterministic generation at archive time
 
 #### Scenario: Metadata generated after archive

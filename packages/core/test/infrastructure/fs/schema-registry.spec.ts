@@ -584,6 +584,55 @@ describe('resolve — workspace-qualified ref with unknown workspace', () => {
   })
 })
 
+describe('resolve — #billing:x and #x split', () => {
+  it('resolves #billing:x via the billing workspace and #x via default', async () => {
+    const billingPath = path.join(ctx.tmpDir, 'schemas', 'billing')
+    await writeSchemaFile(billingPath, 'x', MINIMAL_SCHEMA)
+    await writeSchemaFile(ctx.defaultSchemasPath, 'x', MINIMAL_SCHEMA)
+
+    const schemaRepositories: Map<string, SchemaRepository> = new Map([
+      [
+        'default',
+        new FsSchemaRepository({
+          workspace: 'default',
+          ownership: 'owned',
+          isExternal: false,
+          configPath: '/test',
+          schemasPath: ctx.defaultSchemasPath,
+        }),
+      ],
+      [
+        'billing',
+        new FsSchemaRepository({
+          workspace: 'billing',
+          ownership: 'owned',
+          isExternal: false,
+          configPath: '/test',
+          schemasPath: billingPath,
+        }),
+      ],
+    ])
+    const registry = new FsSchemaRegistry({
+      nodeModulesPaths: [ctx.nodeModulesPath],
+      configDir: ctx.tmpDir,
+      schemaRepositories,
+    })
+
+    const qualified = await registry.resolve('#billing:x')
+    expect(qualified).not.toBeNull()
+    expect(qualified?.name()).toBe('minimal')
+
+    const bare = await registry.resolve('#x')
+    expect(bare).not.toBeNull()
+    expect(bare?.name()).toBe('minimal')
+  })
+
+  it('returns null for a one-letter workspace qualifier', async () => {
+    const schema = await ctx.registry.resolve('#a:my-schema')
+    expect(schema).toBeNull()
+  })
+})
+
 describe('resolve — relative path resolves from configDir', () => {
   it('resolves ./ paths relative to configDir, not cwd', async () => {
     const schemaContent = `

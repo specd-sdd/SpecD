@@ -31,6 +31,7 @@ const KERNEL_ASSEMBLY_EXPORTS: Record<string, string> = {
   'changes.invalidate': 'createInvalidateChange',
   'changes.skipArtifact': 'createSkipArtifact',
   'changes.updateSpecDeps': 'createUpdateSpecDeps',
+  'changes.getSpecDeps': 'createGetChangeSpecDeps',
   'changes.listArchived': 'createListArchived',
   'changes.getArchived': 'createGetArchivedChange',
   'changes.runStepHooks': 'createRunStepHooks',

@@ -3,8 +3,6 @@ import { resolveCliContext } from '../../helpers/cli-context.js'
 import { collect } from '../../helpers/collect.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
-import { parseSpecId } from '../../helpers/spec-path.js'
-
 /**
  * Renders persisted implementation links for a spec.
  *
@@ -63,9 +61,10 @@ export function registerSpecImplementation(parent: Command): void {
     .option('--config <path>', 'path to specd.yaml')
     .action(async (specPath: string, opts: { format: string; config?: string }) => {
       try {
-        const { config, kernel } = await resolveCliContext({ configPath: opts.config })
-        const specId = parseSpecId(specPath, config).specId
-        const result = await kernel.specs.getPersistedImplementation.execute({ specId })
+        const { kernel } = await resolveCliContext({ configPath: opts.config })
+        const result = await kernel.specs.getPersistedImplementation.execute({
+          specId: specPath,
+        })
         renderImplementationLinks(
           result.specId,
           result.implementation,
@@ -91,10 +90,9 @@ export function registerSpecImplementation(parent: Command): void {
         opts: { file: string; symbol: string[]; format: string; config?: string },
       ) => {
         try {
-          const { config, kernel } = await resolveCliContext({ configPath: opts.config })
-          const specId = parseSpecId(specPath, config).specId
+          const { kernel } = await resolveCliContext({ configPath: opts.config })
           const result = await kernel.specs.updatePersistedImplementation.execute({
-            specId,
+            specId: specPath,
             action: 'add',
             file: opts.file,
             ...(opts.symbol.length > 0 ? { symbols: opts.symbol } : {}),
@@ -125,10 +123,9 @@ export function registerSpecImplementation(parent: Command): void {
         opts: { file: string; symbol: string[]; format: string; config?: string },
       ) => {
         try {
-          const { config, kernel } = await resolveCliContext({ configPath: opts.config })
-          const specId = parseSpecId(specPath, config).specId
+          const { kernel } = await resolveCliContext({ configPath: opts.config })
           const result = await kernel.specs.updatePersistedImplementation.execute({
-            specId,
+            specId: specPath,
             action: 'remove',
             file: opts.file,
             ...(opts.symbol.length > 0 ? { symbols: opts.symbol } : {}),

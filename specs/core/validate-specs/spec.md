@@ -16,12 +16,14 @@ The use case SHALL call `schema.artifacts()` and retain only those artifact type
 
 ### Requirement: Single spec validation mode
 
-When `input.specPath` is provided (format: `workspace:capabilityPath`), the use case SHALL:
+When `input.specPath` is provided (format: `workspace:capabilityPath`, or a bare path resolved to the `default` workspace), the use case SHALL:
 
-1. Parse the spec identifier via `parseSpecId`.
+1. Validate and normalize the spec identifier with `parseSpecId` and the configured workspaces (see `core:spec-id-format`); an invalid ID fails with `InvalidSpecIdError`.
 2. Look up the workspace's `SpecRepository`. If not found, throw `WorkspaceNotFoundError`.
 3. Load the spec via `repo.get(specPath)`. If not found, throw `SpecNotFoundError`.
 4. Validate only that single spec.
+
+Delivery adapters pass the raw string and perform no validation of their own.
 
 ### Requirement: Workspace validation mode
 
@@ -88,39 +90,36 @@ When an artifact type does not specify an explicit `format`, the use case SHALL 
 
 ### Requirement: Metadata materialization and validation
 
-After per-artifact and cross-artifact validation for one spec, `ValidateSpecs`
-SHALL obtain that spec's metadata through `GetSpecMetadata.execute({ specId })`
-before validating its normalized content. `ValidateSpecs` MUST NOT read
-`SpecRepository.readMetadataSnapshot()` directly to decide pass/fail on its own.
+After per-artifact and cross-artifact validation for one spec on a full validation
+path, `ValidateSpecs` SHALL obtain usable metadata through
+`GetSpecMetadata.execute({ specId })` using the fully-qualified spec ID.
+A transparent validation-result-cache hit MAY reuse the previously completed
+outcome as specified by Requirement: Transparent validation result cache.
 
-Validation rules:
+`GetSpecMetadata` is the authority for the normalized metadata projection.
+`ValidateSpecs` MUST accept a successful result without deriving another
+dependency baseline. It MUST NOT re-extract `dependsOn`, compare the returned
+dependencies against a separate persisted-state read, or assume `dependsOn: []`
+when a spec has no lock. This applies whether dependencies were obtained from
+persisted semantic state or from the schema's metadata extraction rules.
 
-1. Missing, invalid, or stale persisted metadata is NOT itself a validation
-   failure as long as materialization successfully produces a valid in-memory
-   projection — self-healing on read is expected behaviour, not a defect being
-   reported.
-2. If materialization cannot produce a valid metadata projection at all (for
-   example, a source read failure or a projection that fails structural
-   validation even after regeneration), record a `ValidationFailure` indicating
-   that metadata could not be materialized for the spec.
-3. Once metadata is materialized, validate its normalized `dependsOn` against
-   the spec's current persisted dependency state
-   (`SpecRepository.readPersistedState(spec).dependsOn`, or `[]` for a
-   lock-less spec). A mismatch after materialization indicates an internal
-   inconsistency and MUST be recorded as a `ValidationFailure`.
-4. If the active schema declares `metadataExtraction.dependsOn` for the spec and
-   extraction yields a dependency set that differs from the persisted
-   dependency state, record a `ValidationFailure`.
-5. If the schema omits dependency extraction, validation MUST accept the
-   materialized `dependsOn` when it matches the persisted dependency state.
+Missing, invalid, or stale metadata cache files MUST NOT themselves cause a
+validation failure when `GetSpecMetadata` successfully produces usable metadata.
+`ValidateSpecs` MUST NOT read `SpecRepository.readMetadataSnapshot()` directly
+to decide metadata validity, or implement its own metadata freshness,
+regeneration, persistence, or dependency-consistency policy.
 
-A `metadata-cache-write-failed` warning returned by materialization MUST be
-surfaced as a `ValidationWarning` on the spec's entry rather than a
-`ValidationFailure` — a cache-write failure does not mean the normalized
-projection used for validation was invalid.
+If `GetSpecMetadata` fails, `ValidateSpecs` MUST record a `ValidationFailure`
+indicating that metadata could not be materialized for the spec and preserving
+the failure reason in the diagnostic. This includes dependency conflicts that
+`GetSpecMetadata` rejects; the consumer MUST NOT perform a second conflict check.
 
-These checks validate canonical metadata as a self-healing cache of persisted
-spec semantics without treating `spec-lock.json` as a normal schema artifact.
+Warnings returned by `GetSpecMetadata`, including `metadata-cache-write-failed`,
+MUST be surfaced as `ValidationWarning` entries for the spec, preserving the
+warning kind, spec identity and error diagnostics in their descriptions.
+`ValidateSpecs` MUST NOT log those warnings again or turn them into failures.
+A successful metadata result MUST NOT erase failures already recorded by
+artifact or cross-artifact validation.
 
 ### Requirement: Persisted optimization staleness is an independent failure
 
@@ -211,11 +210,9 @@ delegate to canonical `createValidateSpecs(deps)`.
 - `contentHasher: ContentHasher`
 - `extractorTransforms: ExtractorTransformRegistry`
 - `workspaceRoutes: readonly SpecWorkspaceRoute[]`
-- `validationResultCaches: ReadonlyMap<string, ValidationResultCache>` (one port
-  instance per workspace, wired with that workspace's `SpecRepository`)
-- `getMetadata: ReadonlyMap<string, GetSpecMetadata>` (one
-  instance per workspace, used to self-heal metadata before normalized-content
-  validation)
+- `validationResultCaches: ReadonlyMap<string, ValidationResultCache>`
+- `getMetadata: GetSpecMetadata` (shared metadata materialization use case
+  handling all configured workspaces)
 
 The helper is the only use-case-specific composition entry for config-based
 bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline, including

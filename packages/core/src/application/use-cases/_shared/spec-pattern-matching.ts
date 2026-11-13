@@ -1,6 +1,6 @@
 import { type SpecRepository } from '../../ports/spec-repository.js'
 import { SpecPath } from '../../../domain/value-objects/spec-path.js'
-import { parseSpecId } from '../../../domain/services/parse-spec-id.js'
+import { parseSpecPattern } from '../../../domain/services/parse-spec-pattern.js'
 import { type ContextWarning } from './context-warning.js'
 import { type ProjectWorkspace } from '../list-workspaces.js'
 
@@ -42,9 +42,10 @@ export async function listMatchingSpecs(
     wsName = 'ALL'
     pathPat = '*'
   } else {
-    const parsed = parseSpecId(pattern, defaultWorkspace)
-    wsName = parsed.workspace
-    pathPat = parsed.capPath
+    const parsed = parseSpecPattern(pattern, { defaultWorkspace })
+    wsName = parsed.workspace ?? defaultWorkspace
+    pathPat =
+      parsed.kind === 'all' ? '*' : parsed.kind === 'prefix' ? `${parsed.path}/*` : parsed.path
   }
 
   const workspacesToSearch: Array<{ name: string; repo: SpecRepository }> = []

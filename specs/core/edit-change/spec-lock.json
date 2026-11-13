@@ -3,19 +3,21 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:change", "core:composition", "core:composition-resolver"],
+  "dependsOn": [
+    "core:change",
+    "core:composition",
+    "core:composition-resolver",
+    "core:spec-id-format",
+    "core:workspace"
+  ],
   "implementation": [
-    {
-      "file": "core:src/domain/errors/incompatible-schema-error.ts",
-      "symbols": ["IncompatibleSchemaError"]
-    },
-    {
-      "file": "core:src/application/use-cases/_shared/load-persisted-spec-schema.ts",
-      "symbols": ["loadPersistedSpecSchema"]
-    },
     {
       "file": "core:src/application/use-cases/edit-change.ts",
       "symbols": ["EditChange"]
+    },
+    {
+      "file": "core:src/application/use-cases/_shared/assert-invalidation-policy.ts",
+      "symbols": ["assertInvalidationPolicy"]
     }
   ]
 }

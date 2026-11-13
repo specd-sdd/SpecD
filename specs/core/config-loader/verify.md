@@ -437,6 +437,30 @@
 - **WHEN** `load()` is called
 - **THEN** `load()` throws `ConfigValidationError` identifying the workspace and field
 
+#### Scenario: Pattern with an uppercase segment rejected
+
+- **GIVEN** `contextIncludeSpecs: ['core:Auth/*']`
+- **WHEN** the configuration is loaded
+- **THEN** loading fails with `ConfigValidationError` because `Auth` violates the segment rule
+
+#### Scenario: Segment with a leading digit accepted
+
+- **GIVEN** `contextIncludeSpecs: ['core:2fa/*']`
+- **WHEN** the configuration is loaded
+- **THEN** the pattern is accepted, because the loader uses the canonical segment rule
+
+#### Scenario: One-character workspace qualifier rejected
+
+- **GIVEN** `contextIncludeSpecs: ['a:*']`
+- **WHEN** the configuration is loaded
+- **THEN** loading fails with `ConfigValidationError`
+
+#### Scenario: Loader keeps no private copy of the expressions
+
+- **WHEN** the loader source is inspected
+- **THEN** workspace names are checked with `isValidWorkspaceName` and patterns are checked through the shared pattern validation that delegates to `parseSpecPattern`
+- **AND** neither the loader nor the helpers it consumes declare a workspace or segment regex of their own
+
 ### Requirement: Schema plugins, schema overrides, and context entry mapping
 
 #### Scenario: Context entry with id is preserved
@@ -495,3 +519,23 @@
 - **AND** the config file resolves to `C:/other/specd.yaml`
 - **WHEN** `load()` checks the config path
 - **THEN** it throws `ConfigValidationError`
+
+### Requirement: Workspace names use the shared rule
+
+#### Scenario: Invalid workspace name rejected
+
+- **GIVEN** `specd.yaml` declares a workspace named `Core`
+- **WHEN** the configuration is loaded
+- **THEN** loading fails with `ConfigValidationError`
+
+#### Scenario: Two-character workspace name accepted
+
+- **GIVEN** `specd.yaml` declares a workspace named `ab` with a valid `codeRoot`
+- **WHEN** the configuration is loaded
+- **THEN** the workspace is accepted
+
+#### Scenario: Device name rejected
+
+- **GIVEN** `specd.yaml` declares a workspace named `nul`
+- **WHEN** the configuration is loaded
+- **THEN** loading fails with `ConfigValidationError`

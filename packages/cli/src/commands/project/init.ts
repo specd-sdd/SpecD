@@ -1,7 +1,7 @@
 import { type Command } from 'commander'
-import { createConfigWriter, createVcsAdapter } from '@specd/sdk'
+import { createConfigWriter, createVcsAdapter, isValidWorkspaceName } from '@specd/sdk'
 import { output, parseFormat, type OutputFormat } from '../../formatter.js'
-import { handleError } from '../../handle-error.js'
+import { cliError, handleError } from '../../handle-error.js'
 import { renderBanner } from '../../banner.js'
 import { CLI_VERSION, CODE_GRAPH_VERSION, CORE_VERSION, SDK_VERSION } from '../../version.js'
 import * as path from 'node:path'
@@ -49,6 +49,18 @@ export function registerProjectInit(parent: Command): void {
     .option('--plugin <name>', 'plugin to install after init (repeatable)', collect, [])
     .option('--force', 'overwrite existing specd.yaml')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
+    .addHelpText(
+      'after',
+      `\nJSON/TOON output schema:
+  {
+    result: "ok"
+    configPath: string
+    schema: string
+    workspaces: WorkspaceConfig[]
+    metadataCachePath: string
+    plugins: PluginInstallResult[]
+  }\n`,
+    )
     .action(
       async (opts: {
         schema?: string
@@ -60,6 +72,9 @@ export function registerProjectInit(parent: Command): void {
       }) => {
         try {
           const fmt = parseFormat(opts.format)
+          if (!isValidWorkspaceName(opts.workspace)) {
+            cliError(invalidWorkspaceMessage(opts.workspace), opts.format)
+          }
           if (fmt === 'text') {
             process.stdout.write(
               renderBanner({
@@ -132,6 +147,16 @@ export function registerProjectInit(parent: Command): void {
 }
 
 /**
+ * Builds the error message for an invalid workspace id.
+ *
+ * @param value - Workspace id exactly as typed
+ * @returns Human-readable message quoting the value and naming the rule
+ */
+function invalidWorkspaceMessage(value: string): string {
+  return `Invalid workspace id '${value}': use two or more of a-z, 0-9 and "-", starting with a letter, and not a Windows device name`
+}
+
+/**
  * Installs selected plugins after successful initialization.
  *
  * @param input - Install input values.
@@ -185,9 +210,7 @@ async function runInteractiveInit(options: {
     message: 'Default workspace ID',
     initialValue: 'default',
     validate: (value) =>
-      /^[a-z][a-z0-9-]*$/.test(value.trim())
-        ? undefined
-        : 'Use lowercase letters, numbers, and hyphens only.',
+      isValidWorkspaceName(value ?? '') ? undefined : invalidWorkspaceMessage(value ?? ''),
   })
   if (isCancel(workspace)) {
     outro('Cancelled.')

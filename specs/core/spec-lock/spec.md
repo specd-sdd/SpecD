@@ -58,9 +58,15 @@ be treated as a failure.
 
 ### Requirement: Persistent dependencies
 
-`spec-lock.json` MUST store the final persisted `dependsOn` list for the archived spec as canonical spec IDs.
+`spec-lock.json` MUST store the final persisted `dependsOn` list for the archived spec as canonical, fully-qualified spec IDs (`workspace:capabilityPath`). Each entry MUST satisfy the rules of `core:spec-id-format`; a bare, empty, or malformed entry is invalid and the sidecar MUST NOT accept it as a legacy form.
 
 This sidecar list is the durable archived dependency record. Archive-time metadata generation and later metadata regeneration flows SHALL treat it as the authoritative persisted dependency state when projecting canonical `metadata.json.dependsOn`, including schemas that do not declare dependency extraction in their spec artifacts.
+
+### Requirement: Invalid lock fails with a typed error
+
+Reading a `spec-lock.json` that fails structural validation SHALL raise an `InvalidSpecLockError` (`SpecdError`, code `INVALID_SPEC_LOCK`) and never a raw schema-library error. The error message SHALL name the spec ID, the lock file location (when the error comes from reading a lock file; an error raised for a computed `dependsOn` list before any write names the spec ID and the offending entry instead), the failing field path (for example `dependsOn.0`) when there is one, the rejected value when the field holds an invalid spec ID, and the violated rule. The message SHALL NOT prescribe a repair command or tell the user to edit the file by hand; repair guidance belongs to the delivery mechanism that surfaces the error (for example the CLI), so a single consistent instruction reaches the user.
+
+Reads are strict by default for every consumer: invalid entries SHALL NOT be dropped silently, and a lock SHALL NOT be rewritten as a side effect of reading it. The only exception is the explicit lenient `dependsOn` read (`readPersistedState` option `lenientDependsOn: true`), which tolerates invalid `dependsOn` entries as given and still validates every other field strictly. Only dependency-repair mutations (`remove`, `set`, and `clear` of `core:update-persisted-spec-deps`) use it, and the optimistic-concurrency check of `writePersistedState` reads leniently too since it only needs the revision. A lock holding invalid `dependsOn` entries is therefore repairable by removing, replacing, or clearing them.
 
 ### Requirement: Archived implementation links
 
@@ -178,8 +184,10 @@ Presence and last-modified of the lock sidecar for cheap freshness MUST surface 
 
 - `spec-lock.json` MUST be valid JSON.
 - Canonical implementation file identities MUST use forward-slash-normalized `workspace:path` values.
+- `dependsOn` entries MUST be fully-qualified valid spec IDs.
 - `symbols`, when present, MUST be non-empty.
 - Sidecar maintenance MUST preserve file-level and symbol-level links as distinct archived traceability forms.
+- A lock that fails validation MUST surface as `InvalidSpecLockError`, never as a raw validation-library error.
 
 ## Spec Dependencies
 

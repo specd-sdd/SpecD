@@ -182,19 +182,18 @@ After finishing each task, before marking its checkbox done:
 ```bash
 specd changes implementation list <name>     # current tracking state
 specd changes implementation review <name>   # + stale symbol diagnostics from code graph
-specd changes implementation resolve <name> --file <path1>,<path2> # mark files fully reviewed
+specd changes implementation resolve <name> --file <path1> --file <path2> ... # mark files fully reviewed
 ```
 
 - `list` shows all tracked files (grouped by state) and confirmed links.
 - `review` adds graph-based diagnostics: symbols that no longer exist in the code
   are flagged as stale.
-- `resolve` marks one or more tracked files as fully reviewed. It supports a
-  comma-separated list of paths for efficient bulk resolution.
+- `resolve` marks one or more tracked files as fully reviewed. Pass each path as
+  its own `--file` value (repeat the option or list paths after it).
 - `ignore` is for files that do **not** belong to the change's implementation surface.
-  It also supports comma-separated lists. Files with active confirmed links **cannot**
-  be ignored.
+  Pass each path as its own `--file` value. Ignoring a file preserves any confirmed links on it.
   ```bash
-  specd changes implementation ignore <name> --file <path1>,<path2>
+  specd changes implementation ignore <name> --file <path1> --file <path2> ...
   ```
 
 **Security & Integrity Guard:** All implementation management commands (`add`, `resolve`,

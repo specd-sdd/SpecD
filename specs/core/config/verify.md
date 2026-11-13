@@ -36,8 +36,8 @@
 
 - **GIVEN** a `privacy` section is present
 - **AND** `excludeActors` is omitted
-- `WHEN` config is loaded
-- `THEN` `excludeActors` contains `["specd", "system@getspecd.dev"]`
+- **WHEN** config is loaded
+- **THEN** `excludeActors` contains `["specd", "system@getspecd.dev"]`
 
 ### Requirement: Environment variable overrides
 
@@ -608,6 +608,7 @@
 #### Scenario: Agent plugin entry
 
 - **GIVEN** `plugins.agents` has an entry
+- **WHEN** config is loaded
 - **THEN** each entry has `name` (required) and optional `config`
 
 #### Scenario: Invalid plugin structure rejected at startup
@@ -1014,3 +1015,42 @@
 
 - **WHEN** `ConfigWriter` interface is inspected
 - **THEN** it declares `listPlugins(configPath, type?): Promise<Array<{ name: string; config?: Record<string, unknown> }>>`
+
+### Requirement: Workspace names and context patterns use the shared rules
+
+#### Scenario: Workspace name with one character rejected
+
+- **GIVEN** `workspaces` declares a workspace `x`
+- **WHEN** the configuration is loaded
+- **THEN** loading fails with `ConfigValidationError`
+
+#### Scenario: Qualifier-less pattern keeps its contextual workspace
+
+- **GIVEN** workspace `billing` declares `contextIncludeSpecs: ['auth/*']`
+- **WHEN** specs are matched for that workspace
+- **THEN** the pattern means `billing:auth/*` because the caller supplies `billing` as the default workspace
+
+#### Scenario: Unknown workspace in a pattern stays a warning
+
+- **GIVEN** a pattern `nope:*`
+- **WHEN** specs are matched
+- **THEN** an `unknown-workspace` warning is produced and no specs match
+
+#### Scenario: Programmatic malformed pattern fails loudly
+
+- **GIVEN** a pattern `a*b` passed directly to spec matching
+- **WHEN** specs are matched
+- **THEN** `InvalidSpecPatternError` is thrown quoting `a*b`
+- **AND** no `unknown-workspace` warning is produced
+
+#### Scenario: Context compilation supplies the contextual default
+
+- **GIVEN** workspace `billing` declares `contextIncludeSpecs: ['auth/*']`
+- **WHEN** context is compiled for a change in `billing`
+- **THEN** the pattern is interpreted as `billing:auth/*`
+
+#### Scenario: Prefix segment violating the rule rejected
+
+- **GIVEN** a workspace declares `prefix: Team`
+- **WHEN** the configuration is loaded
+- **THEN** loading fails with `ConfigValidationError`

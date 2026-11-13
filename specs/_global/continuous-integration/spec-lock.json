@@ -14,36 +14,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "GitHub Actions CI runs identical build/typecheck/test on macOS, Linux, Windows; gate for _global/cross-platform.",
+      "value": "GitHub Actions runs identical build/typecheck/test on macOS, Linux, Windows; enforces cross-platform contract.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:3f8b038711000471072323f4911f869abcdf1241ae5013ed3adb49a551cada5f",
-          "lastModified": "2026-11-03T12:19:19.851Z"
+          "hash": "sha256:dc1f68c49026706aa4a595ae9c4032ebe0ee8343de914dbff2ce7e6c42682917",
+          "lastModified": "2026-11-13T15:23:50.151Z"
         },
         "verify.md": {
-          "hash": "sha256:8010d2c3d3f5d542f215cb81dbe6c135b19794b8952ebd8dc48b5b141f23e00f",
-          "lastModified": "2026-11-03T12:19:19.851Z"
+          "hash": "sha256:90ce4cfc783d2184e3482da76a3a66e0936894f7eea6a14a835f42cbba12c9ca",
+          "lastModified": "2026-11-13T15:23:50.152Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Continuous Integration\n\n## Rules\n- Repo MUST track `.github/workflows/ci.yml`. Tracking that directory MUST NOT require tracking rest of `.github/`. Agent files, skill copies, `copilot-instructions.md` MUST stay ignored.\n- `ci.yml` MUST run same job on `macos-latest`, `ubuntu-latest`, `windows-latest`. Failure on any runner MUST fail check.\n- 3-OS job gates `_global/cross-platform`: PR MUST NOT merge while any runner fails; OS-only failure MUST be fixed under `_global/cross-platform` rules — MUST NOT exclude runner, skip affected tests, or add platform-specific workflow steps that mask it.\n- Workflow MUST run on pull requests and pushes to `main`. MUST NOT call Gemini workflows.\n- Each job MUST check out repo, install pnpm `10.6.5` binary, install Node 22, run `pnpm install --frozen-lockfile`.\n- That install MUST build native modules: `better-sqlite3`, `@ast-grep/lang-go`, `@ast-grep/lang-php`, `@ast-grep/lang-python`, `esbuild`. Workflow MUST NOT install extra apt, brew, or Chocolatey packages for them.\n- Each job MUST run `pnpm build`, `pnpm typecheck`, `pnpm test`, in that order.\n- `typecheck` and `build` MUST skip `@specd/public-web`.\n- `pnpm test` MUST run Vitest for `@specd/core`, `@specd/cli`, `@specd/code-graph`, `@specd/guide`, `@specd/sdk`, `@specd/skills`, `@specd/plugin-manager`, `@specd/plugin-agent-claude`, `@specd/plugin-agent-codex`, `@specd/plugin-agent-copilot`, `@specd/plugin-agent-opencode`, `@specd/plugin-agent-standard`.\n- `pnpm test` MUST NOT include `@specd/mcp` or `@specd/public-web`.\n- Workflow MUST NOT run changeset status or publish.\n\n## Constraints\n- Workflow is GitHub Actions file. Does not add new test runner.\n- Gemini workflow files may be tracked because they share `.github/workflows/`. This spec does not define their behavior.",
+      "value": "# Continuous Integration\n\n## Rules\n- Track `.github/workflows/ci.yml`; remaining `.github/` agent files, skill copies, `copilot-instructions.md` stay ignored.\n- Same job on `macos-latest`, `ubuntu-latest`, `windows-latest`; any failure fails check and blocks PR merge. OS-only failures require code fixes under `_global/cross-platform`; MUST NOT exclude runners, skip affected tests, or mask failures with platform-specific workflow steps.\n- Trigger: pull requests and pushes to `main`; MUST NOT call Gemini workflows.\n- Each job: checkout → pnpm `10.6.5` binary → Node 22 → `pnpm install --frozen-lockfile`. Install builds `better-sqlite3`, `@ast-grep/lang-go`, `@ast-grep/lang-php`, `@ast-grep/lang-python`, `esbuild`; no extra apt/brew/Chocolatey packages.\n- Checks in order: `pnpm build` → `pnpm typecheck` → `pnpm test`. Build/typecheck exclude `@specd/public-web`.\n- `pnpm test`: Vitest for `@specd/core`, `@specd/cli`, `@specd/code-graph`, `@specd/guide`, `@specd/sdk`, `@specd/skills`, `@specd/schema-std`, `@specd/plugin-manager`, `@specd/plugin-agent-claude`, `@specd/plugin-agent-codex`, `@specd/plugin-agent-copilot`, `@specd/plugin-agent-opencode`, `@specd/plugin-agent-standard`. Exclude `@specd/mcp`, `@specd/public-web`.\n- MUST NOT run changeset status or publish.\n\n## Constraints\n- GitHub Actions workflow; no new test runner.\n- Gemini workflow files MAY be tracked within `.github/workflows/`; behavior outside this spec.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:3f8b038711000471072323f4911f869abcdf1241ae5013ed3adb49a551cada5f",
-          "lastModified": "2026-11-03T12:19:19.851Z"
+          "hash": "sha256:dc1f68c49026706aa4a595ae9c4032ebe0ee8343de914dbff2ce7e6c42682917",
+          "lastModified": "2026-11-13T15:23:50.151Z"
         },
         "verify.md": {
-          "hash": "sha256:8010d2c3d3f5d542f215cb81dbe6c135b19794b8952ebd8dc48b5b141f23e00f",
-          "lastModified": "2026-11-03T12:19:19.851Z"
+          "hash": "sha256:90ce4cfc783d2184e3482da76a3a66e0936894f7eea6a14a835f42cbba12c9ca",
+          "lastModified": "2026-11-13T15:23:50.152Z"
         }
       }
     }

@@ -1,0 +1,268 @@
+• turbo 2.9.6
+
+   • Packages in scope: @specd/cli, @specd/code-graph, @specd/core, @specd/guide, @specd/mcp, @specd/plugin-agent-claude, @specd/plugin-agent-codex, @specd/plugin-agent-copilot, @specd/plugin-agent-opencode, @specd/plugin-agent-standard, @specd/plugin-manager, @specd/schema-std, @specd/sdk, @specd/skills, @specd/specd
+   • Running build in 15 packages
+   • Remote caching disabled
+
+@specd/guide:build: cache bypass, force executing 0f68a352cc148bc8
+@specd/core:build: cache bypass, force executing 9d77ff468b0a09cd
+@specd/guide:build: 
+@specd/guide:build: > @specd/guide@0.3.0 build /Users/monki/Documents/Proyectos/specd/packages/guide
+@specd/guide:build: > tsx scripts/bundle-guides.ts && tsup src/public.ts src/index.ts src/sdk.ts --format esm --dts --clean
+@specd/guide:build: 
+@specd/core:build: 
+@specd/core:build: > @specd/core@0.2.0 build /Users/monki/Documents/Proyectos/specd/packages/core
+@specd/core:build: > tsup src/public.ts src/ports.ts src/extensions.ts src/index.ts --format esm --dts --clean
+@specd/core:build: 
+@specd/core:build: CLI Building entry: src/extensions.ts, src/index.ts, src/ports.ts, src/public.ts
+@specd/core:build: CLI Using tsconfig: tsconfig.json
+@specd/core:build: CLI tsup v8.5.1
+@specd/core:build: CLI Target: es2022
+@specd/core:build: CLI Cleaning output folder
+@specd/core:build: ESM Build start
+@specd/core:build: DTS Build start
+@specd/guide:build: Bundling guide collections: guide, sdk, core, code-graph, skills, schemas (+ API: sdk, core, code-graph)
+@specd/core:build: ESM dist/index.js                   12.21 KB
+@specd/core:build: ESM dist/ports.js                   1.13 KB
+@specd/core:build: ESM dist/public.js                  10.16 KB
+@specd/core:build: ESM dist/chunk-DEJJJJR2.js          7.19 KB
+@specd/core:build: ESM dist/chunk-OLYL6X4N.js          55.14 KB
+@specd/core:build: ESM dist/chunk-VMC7YAWF.js          11.58 KB
+@specd/core:build: ESM dist/parse-metadata-4M5Y7BE5.js 243.00 B
+@specd/core:build: ESM dist/chunk-5E43THEP.js          8.52 KB
+@specd/core:build: ESM dist/extensions.js              273.00 B
+@specd/core:build: ESM dist/chunk-UE24OY3T.js          5.57 KB
+@specd/core:build: ESM dist/chunk-QCVTRFGR.js          1.05 KB
+@specd/core:build: ESM dist/chunk-CDQ47AG6.js          997.05 KB
+@specd/core:build: ESM ⚡️ Build success in 553ms
+@specd/guide:build: [info] Loaded plugin typedoc-plugin-markdown
+@specd/core:build: DTS ⚡️ Build success in 8840ms
+@specd/core:build: DTS dist/public.d.ts                  21.17 KB
+@specd/core:build: DTS dist/index.d.ts                   33.01 KB
+@specd/core:build: DTS dist/extensions.d.ts              6.24 KB
+@specd/core:build: DTS dist/ports.d.ts                   55.74 KB
+@specd/core:build: DTS dist/config-writer-BD9sKLP7.d.ts  5.99 KB
+@specd/core:build: DTS dist/logger.port-BAjWiCwg.d.ts    205.05 KB
+@specd/core:build: DTS dist/kernel-CM8VFFIy.d.ts         221.56 KB
+@specd/core:build: DTS dist/content-hasher-B4QBjBRg.d.ts 142.67 KB
+@specd/plugin-manager:build: cache bypass, force executing 66439019ada752e0
+@specd/code-graph:build: cache bypass, force executing 88eaff785591dedb
+@specd/skills:build: cache bypass, force executing 4171915f676cb4f7
+@specd/code-graph:build: 
+@specd/code-graph:build: > @specd/code-graph@0.3.0 build /Users/monki/Documents/Proyectos/specd/packages/code-graph
+@specd/code-graph:build: > tsup src/public.ts src/index.ts src/infrastructure/sqlite/sqlite-worker.ts src/infrastructure/isolated-index-worker/isolated-index-worker-child.ts --format esm --dts --clean
+@specd/code-graph:build: 
+@specd/plugin-manager:build: 
+@specd/plugin-manager:build: > @specd/plugin-manager@0.2.0 build /Users/monki/Documents/Proyectos/specd/packages/plugin-manager
+@specd/plugin-manager:build: > tsup src/index.ts --format esm --dts --clean
+@specd/plugin-manager:build: 
+@specd/skills:build: 
+@specd/skills:build: > @specd/skills@0.2.0 build /Users/monki/Documents/Proyectos/specd/packages/skills
+@specd/skills:build: > tsup src/index.ts --format esm --dts --clean
+@specd/skills:build: 
+@specd/guide:build: [info] Loaded plugin typedoc-plugin-markdown
+@specd/code-graph:build: CLI Building entry: src/index.ts, src/public.ts, src/infrastructure/isolated-index-worker/isolated-index-worker-child.ts, src/infrastructure/sqlite/sqlite-worker.ts
+@specd/skills:build: CLI Building entry: src/index.ts
+@specd/skills:build: CLI Using tsconfig: tsconfig.json
+@specd/skills:build: CLI tsup v8.5.1
+@specd/plugin-manager:build: CLI Building entry: src/index.ts
+@specd/skills:build: CLI Target: es2022
+@specd/skills:build: CLI Cleaning output folder
+@specd/skills:build: ESM Build start
+@specd/plugin-manager:build: CLI Using tsconfig: tsconfig.json
+@specd/plugin-manager:build: CLI tsup v8.5.1
+@specd/plugin-manager:build: CLI Target: es2022
+@specd/plugin-manager:build: CLI Cleaning output folder
+@specd/code-graph:build: CLI Using tsconfig: tsconfig.json
+@specd/code-graph:build: CLI tsup v8.5.1
+@specd/plugin-manager:build: ESM Build start
+@specd/code-graph:build: CLI Target: es2022
+@specd/code-graph:build: CLI Cleaning output folder
+@specd/code-graph:build: ESM Build start
+@specd/skills:build: ESM dist/index.js 33.92 KB
+@specd/skills:build: ESM ⚡️ Build success in 57ms
+@specd/plugin-manager:build: ESM dist/index.js 11.67 KB
+@specd/plugin-manager:build: ESM ⚡️ Build success in 56ms
+@specd/code-graph:build: ESM dist/index.js                                                            5.65 KB
+@specd/code-graph:build: ESM dist/public.js                                                           4.92 KB
+@specd/code-graph:build: ESM dist/infrastructure/isolated-index-worker/isolated-index-worker-child.js 5.16 KB
+@specd/code-graph:build: ESM dist/chunk-LLOU6AK6.js                                                   23.56 KB
+@specd/code-graph:build: ESM dist/chunk-IWKCRJI7.js                                                   3.90 KB
+@specd/code-graph:build: ESM dist/infrastructure/sqlite/sqlite-worker.js                              147.78 KB
+@specd/code-graph:build: ESM dist/chunk-K7ZJUNXN.js                                                   842.56 KB
+@specd/code-graph:build: ESM ⚡️ Build success in 109ms
+@specd/plugin-manager:build: DTS Build start
+@specd/skills:build: DTS Build start
+@specd/code-graph:build: DTS Build start
+@specd/plugin-manager:build: DTS ⚡️ Build success in 1423ms
+@specd/plugin-manager:build: DTS dist/index.d.ts 13.57 KB
+@specd/skills:build: DTS ⚡️ Build success in 1582ms
+@specd/skills:build: DTS dist/index.d.ts 15.96 KB
+@specd/plugin-agent-standard:build: cache bypass, force executing 69f3cefcfc7fb778
+@specd/plugin-agent-copilot:build: cache bypass, force executing e604aae67a907815
+@specd/plugin-agent-claude:build: cache bypass, force executing 3b5a224adac244ac
+@specd/plugin-agent-codex:build: cache bypass, force executing 6d95d915b781eb7a
+@specd/plugin-agent-opencode:build: cache bypass, force executing 6a5b4d35208bacf1
+@specd/plugin-agent-standard:build: 
+@specd/plugin-agent-standard:build: > @specd/plugin-agent-standard@0.1.0 build /Users/monki/Documents/Proyectos/specd/packages/plugin-agent-standard
+@specd/plugin-agent-standard:build: > node --import tsx ../../dev/scripts/sync-plugin-manifests.ts packages/plugin-agent-standard && tsup src/index.ts --format esm --dts --clean
+@specd/plugin-agent-standard:build: 
+@specd/plugin-agent-claude:build: 
+@specd/plugin-agent-claude:build: > @specd/plugin-agent-claude@0.2.0 build /Users/monki/Documents/Proyectos/specd/packages/plugin-agent-claude
+@specd/plugin-agent-claude:build: > node --import tsx ../../dev/scripts/sync-plugin-manifests.ts packages/plugin-agent-claude && tsup src/index.ts --format esm --dts --clean
+@specd/plugin-agent-claude:build: 
+@specd/plugin-agent-copilot:build: 
+@specd/plugin-agent-copilot:build: > @specd/plugin-agent-copilot@0.2.0 build /Users/monki/Documents/Proyectos/specd/packages/plugin-agent-copilot
+@specd/plugin-agent-copilot:build: > node --import tsx ../../dev/scripts/sync-plugin-manifests.ts packages/plugin-agent-copilot && tsup src/index.ts --format esm --dts --clean
+@specd/plugin-agent-copilot:build: 
+@specd/plugin-agent-opencode:build: 
+@specd/plugin-agent-opencode:build: > @specd/plugin-agent-opencode@0.0.3 build /Users/monki/Documents/Proyectos/specd/packages/plugin-agent-opencode
+@specd/plugin-agent-opencode:build: > node --import tsx ../../dev/scripts/sync-plugin-manifests.ts packages/plugin-agent-opencode && tsup src/index.ts --format esm --dts --clean
+@specd/plugin-agent-opencode:build: 
+@specd/plugin-agent-codex:build: 
+@specd/plugin-agent-codex:build: > @specd/plugin-agent-codex@0.2.0 build /Users/monki/Documents/Proyectos/specd/packages/plugin-agent-codex
+@specd/plugin-agent-codex:build: > node --import tsx ../../dev/scripts/sync-plugin-manifests.ts packages/plugin-agent-codex && tsup src/index.ts --format esm --dts --clean
+@specd/plugin-agent-codex:build: 
+@specd/plugin-agent-copilot:build: synced packages/plugin-agent-copilot/specd-plugin.json → v0.2.0
+@specd/plugin-agent-standard:build: synced packages/plugin-agent-standard/specd-plugin.json → v0.1.0
+@specd/plugin-agent-claude:build: synced packages/plugin-agent-claude/specd-plugin.json → v0.2.0
+@specd/plugin-agent-opencode:build: synced packages/plugin-agent-opencode/specd-plugin.json → v0.0.3
+@specd/guide:build: [info] Loaded plugin typedoc-plugin-markdown
+@specd/plugin-agent-codex:build: synced packages/plugin-agent-codex/specd-plugin.json → v0.2.0
+@specd/plugin-agent-copilot:build: CLI Building entry: src/index.ts
+@specd/plugin-agent-copilot:build: CLI Using tsconfig: tsconfig.json
+@specd/plugin-agent-copilot:build: CLI tsup v8.5.1
+@specd/plugin-agent-copilot:build: CLI Target: es2022
+@specd/plugin-agent-copilot:build: CLI Cleaning output folder
+@specd/plugin-agent-copilot:build: ESM Build start
+@specd/plugin-agent-claude:build: CLI Building entry: src/index.ts
+@specd/plugin-agent-claude:build: CLI Using tsconfig: tsconfig.json
+@specd/plugin-agent-claude:build: CLI tsup v8.5.1
+@specd/plugin-agent-standard:build: CLI Building entry: src/index.ts
+@specd/plugin-agent-claude:build: CLI Target: es2022
+@specd/plugin-agent-standard:build: CLI Using tsconfig: tsconfig.json
+@specd/plugin-agent-standard:build: CLI tsup v8.5.1
+@specd/plugin-agent-claude:build: CLI Cleaning output folder
+@specd/plugin-agent-claude:build: ESM Build start
+@specd/plugin-agent-standard:build: CLI Target: es2022
+@specd/plugin-agent-standard:build: CLI Cleaning output folder
+@specd/plugin-agent-standard:build: ESM Build start
+@specd/plugin-agent-copilot:build: ESM dist/index.js 13.83 KB
+@specd/plugin-agent-copilot:build: ESM ⚡️ Build success in 70ms
+@specd/plugin-agent-claude:build: ESM dist/index.js 14.85 KB
+@specd/plugin-agent-claude:build: ESM ⚡️ Build success in 58ms
+@specd/plugin-agent-standard:build: ESM dist/index.js 13.70 KB
+@specd/plugin-agent-standard:build: ESM ⚡️ Build success in 49ms
+@specd/plugin-agent-opencode:build: CLI Building entry: src/index.ts
+@specd/plugin-agent-opencode:build: CLI Using tsconfig: tsconfig.json
+@specd/plugin-agent-opencode:build: CLI tsup v8.5.1
+@specd/plugin-agent-opencode:build: CLI Target: es2022
+@specd/plugin-agent-opencode:build: CLI Cleaning output folder
+@specd/plugin-agent-opencode:build: ESM Build start
+@specd/plugin-agent-opencode:build: ESM dist/index.js 14.12 KB
+@specd/plugin-agent-opencode:build: ESM ⚡️ Build success in 60ms
+@specd/plugin-agent-codex:build: CLI Building entry: src/index.ts
+@specd/plugin-agent-codex:build: CLI Using tsconfig: tsconfig.json
+@specd/plugin-agent-codex:build: CLI tsup v8.5.1
+@specd/plugin-agent-codex:build: CLI Target: es2022
+@specd/plugin-agent-codex:build: CLI Cleaning output folder
+@specd/plugin-agent-codex:build: ESM Build start
+@specd/plugin-agent-codex:build: ESM dist/index.js 13.42 KB
+@specd/plugin-agent-codex:build: ESM ⚡️ Build success in 43ms
+@specd/plugin-agent-copilot:build: DTS Build start
+@specd/plugin-agent-claude:build: DTS Build start
+@specd/plugin-agent-standard:build: DTS Build start
+@specd/plugin-agent-opencode:build: DTS Build start
+@specd/plugin-agent-codex:build: DTS Build start
+@specd/plugin-agent-standard:build: DTS ⚡️ Build success in 1388ms
+@specd/plugin-agent-standard:build: DTS dist/index.d.ts 336.00 B
+@specd/plugin-agent-claude:build: DTS ⚡️ Build success in 1423ms
+@specd/plugin-agent-claude:build: DTS dist/index.d.ts 315.00 B
+@specd/plugin-agent-copilot:build: DTS ⚡️ Build success in 1813ms
+@specd/plugin-agent-copilot:build: DTS dist/index.d.ts 317.00 B
+@specd/plugin-agent-opencode:build: DTS ⚡️ Build success in 1816ms
+@specd/plugin-agent-opencode:build: DTS dist/index.d.ts 321.00 B
+@specd/plugin-agent-codex:build: DTS ⚡️ Build success in 1762ms
+@specd/plugin-agent-codex:build: DTS dist/index.d.ts 313.00 B
+@specd/guide:build: Successfully bundled guide catalogs.
+@specd/code-graph:build: DTS ⚡️ Build success in 8208ms
+@specd/code-graph:build: DTS dist/infrastructure/isolated-index-worker/isolated-index-worker-child.d.ts 13.00 B
+@specd/code-graph:build: DTS dist/public.d.ts                                                           10.87 KB
+@specd/code-graph:build: DTS dist/infrastructure/sqlite/sqlite-worker.d.ts                              53.13 KB
+@specd/code-graph:build: DTS dist/index.d.ts                                                            109.85 KB
+@specd/code-graph:build: DTS dist/sqlite-runtime-descriptor-CF7Xr8Mu.d.ts                               85.38 KB
+@specd/code-graph:build: DTS dist/resolve-effective-graph-config-DMoBWXzd.d.ts                          114.25 KB
+@specd/sdk:build: cache bypass, force executing ede8c40a6f66acb5
+@specd/guide:build: CLI Building entry: src/index.ts, src/public.ts, src/sdk.ts
+@specd/guide:build: CLI Using tsconfig: tsconfig.json
+@specd/guide:build: CLI tsup v8.5.1
+@specd/guide:build: CLI Target: es2022
+@specd/guide:build: CLI Cleaning output folder
+@specd/guide:build: ESM Build start
+@specd/guide:build: ESM dist/public.js         595.00 B
+@specd/guide:build: ESM dist/sdk.js            503.00 B
+@specd/guide:build: ESM dist/index.js          1.02 KB
+@specd/guide:build: ESM dist/chunk-ZGOOOVGW.js 40.79 KB
+@specd/guide:build: ESM ⚡️ Build success in 41ms
+@specd/sdk:build: 
+@specd/sdk:build: > @specd/sdk@0.1.0 build /Users/monki/Documents/Proyectos/specd/packages/sdk
+@specd/sdk:build: > tsup src/index.ts src/ports.ts src/extensions.ts --format esm --dts --clean
+@specd/sdk:build: 
+@specd/guide:build: DTS Build start
+@specd/sdk:build: CLI Building entry: src/extensions.ts, src/index.ts, src/ports.ts
+@specd/sdk:build: CLI Using tsconfig: tsconfig.json
+@specd/sdk:build: CLI tsup v8.5.1
+@specd/sdk:build: CLI Target: es2022
+@specd/sdk:build: CLI Cleaning output folder
+@specd/sdk:build: ESM Build start
+@specd/sdk:build: ESM dist/extensions.js 61.00 B
+@specd/sdk:build: ESM dist/index.js      59.65 KB
+@specd/sdk:build: ESM dist/ports.js      51.00 B
+@specd/sdk:build: ESM ⚡️ Build success in 28ms
+@specd/sdk:build: DTS Build start
+@specd/guide:build: DTS ⚡️ Build success in 1282ms
+@specd/guide:build: DTS dist/sdk.d.ts                   636.00 B
+@specd/guide:build: DTS dist/index.d.ts                 11.22 KB
+@specd/guide:build: DTS dist/public.d.ts                883.00 B
+@specd/guide:build: DTS dist/guide-engine-zw7Q6PXe.d.ts 18.79 KB
+@specd/guide:build: DTS dist/public-T37SEQsM.d.ts       9.79 KB
+@specd/sdk:build: DTS ⚡️ Build success in 1511ms
+@specd/sdk:build: DTS dist/extensions.d.ts 68.00 B
+@specd/sdk:build: DTS dist/index.d.ts      53.84 KB
+@specd/sdk:build: DTS dist/ports.d.ts      35.00 B
+@specd/cli:build: cache bypass, force executing 175cc1a802c21db4
+@specd/mcp:build: cache bypass, force executing 6215065d0342cb85
+@specd/cli:build: 
+@specd/cli:build: > @specd/cli@0.2.0 build /Users/monki/Documents/Proyectos/specd/packages/cli
+@specd/cli:build: > tsup src/index.ts src/graph-index-task.ts --format esm --clean
+@specd/cli:build: 
+@specd/mcp:build: 
+@specd/mcp:build: > @specd/mcp@0.0.4 build /Users/monki/Documents/Proyectos/specd/packages/mcp
+@specd/mcp:build: > tsup src/index.ts --format esm --dts --clean
+@specd/mcp:build: 
+@specd/mcp:build: CLI Building entry: src/index.ts
+@specd/mcp:build: CLI Using tsconfig: tsconfig.json
+@specd/mcp:build: CLI tsup v8.5.1
+@specd/cli:build: CLI Building entry: src/graph-index-task.ts, src/index.ts
+@specd/mcp:build: CLI Target: es2022
+@specd/cli:build: CLI Using tsconfig: tsconfig.json
+@specd/cli:build: CLI tsup v8.5.1
+@specd/mcp:build: CLI Cleaning output folder
+@specd/mcp:build: ESM Build start
+@specd/cli:build: CLI Target: es2022
+@specd/cli:build: CLI Cleaning output folder
+@specd/cli:build: ESM Build start
+@specd/mcp:build: ESM dist/index.js 0 B
+@specd/mcp:build: ESM ⚡️ Build success in 16ms
+@specd/cli:build: ESM dist/chunk-L7GJUM47.js   1.88 KB
+@specd/cli:build: ESM dist/graph-index-task.js 1.30 KB
+@specd/cli:build: ESM dist/index.js            383.89 KB
+@specd/cli:build: ESM ⚡️ Build success in 58ms
+@specd/mcp:build: DTS Build start
+@specd/mcp:build: DTS ⚡️ Build success in 475ms
+@specd/mcp:build: DTS dist/index.d.ts 13.00 B
+
+ Tasks:    13 successful, 13 total
+Cached:    0 cached, 13 total
+  Time:    22.959s 
+

@@ -25,6 +25,7 @@ import {
   SchemaValidationError,
   ConfigValidationError,
   ArchiveDependencyMismatchError,
+  InvalidSpecLockError,
   type LoggerPort,
 } from '@specd/sdk'
 import { handleError } from '../src/handle-error.js'
@@ -36,9 +37,13 @@ function capturedStderr(): string {
   return (spy.mock.calls as [string][]).map(([s]) => s).join('')
 }
 
-function callHandleError(err: unknown, format?: string): void {
+function callHandleError(
+  err: unknown,
+  format?: string,
+  options?: { readonly lockRepairHint?: boolean },
+): void {
   try {
-    handleError(err, format)
+    handleError(err, format, options)
   } catch (e) {
     if (e instanceof ExitSentinel) return
     throw e
@@ -112,6 +117,79 @@ describe('handleError — exit code 2 (hook failure)', () => {
     expect(out).toContain('hook stderr output')
     expect(out).toMatch(/error:/)
     expect(out).toContain('my-hook')
+  })
+})
+
+describe('handleError — InvalidSpecLockError repair hint', () => {
+  const HINT =
+    'Repair with: specd specs deps remove <spec-id>, specd specs deps set <spec-id>, or specd specs deps clear <spec-id>'
+  const dependsOnError = (): InvalidSpecLockError =>
+    new InvalidSpecLockError(
+      'default:auth/login',
+      '.specd/spec-lock.json',
+      'dependsOn.0',
+      'must be a fully-qualified valid spec ID',
+    )
+
+  beforeEach(() => {
+    mockProcessExit()
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('adds the specs deps repair commands for dependsOn field paths when requested', () => {
+    callHandleError(dependsOnError(), undefined, { lockRepairHint: true })
+    expect(process.exit).toHaveBeenCalledWith(1)
+    const err = capturedStderr()
+    expect(err).toContain('specd specs deps remove')
+    expect(err).toContain('specd specs deps set')
+    expect(err).toContain('specd specs deps clear')
+    expect(err).not.toContain('Correct that field in the file')
+  })
+
+  it('prints no hint for commands that do not request it', () => {
+    callHandleError(dependsOnError())
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(capturedStderr()).not.toContain('Repair with')
+  })
+
+  it('does not reference --force in the repair hint', () => {
+    callHandleError(dependsOnError(), undefined, { lockRepairHint: true })
+    expect(capturedStderr()).not.toContain('--force')
+  })
+
+  it('emits the repair hint once on its own line after the error line', () => {
+    callHandleError(dependsOnError(), undefined, { lockRepairHint: true })
+    const err = capturedStderr()
+    expect(err).toContain(HINT)
+    expect(err.split(HINT).length - 1).toBe(1)
+    expect(err.indexOf('error:')).toBeLessThan(err.indexOf(HINT))
+    expect(HINT).not.toMatch(/[()]/)
+  })
+
+  it('keeps the hint out of the structured error message', () => {
+    callHandleError(dependsOnError(), 'json', { lockRepairHint: true })
+    const payload = JSON.parse(capturedStdout()) as { message: string; hint?: string }
+    expect(payload.message).not.toContain('Repair with')
+    expect(payload.hint).toBe(HINT)
+  })
+
+  it('omits the repair hint for non-dependsOn field paths', () => {
+    callHandleError(
+      new InvalidSpecLockError(
+        'default:auth/login',
+        '.specd/spec-lock.json',
+        'contentHash',
+        'must be a string',
+      ),
+      undefined,
+      { lockRepairHint: true },
+    )
+    expect(capturedStderr()).not.toContain('Repair with')
   })
 })
 

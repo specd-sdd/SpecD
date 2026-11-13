@@ -26,7 +26,7 @@ describe('GetSpec', () => {
       const specRepos = new Map([['default', repo]])
       const uc = new GetSpec(specRepos)
 
-      const result = await uc.execute({ workspace: 'default', specPath })
+      const result = await uc.execute({ specId: `default:${specPath.toString()}` })
 
       expect(result).not.toBeNull()
       expect(result!.spec).toBe(spec)
@@ -51,7 +51,7 @@ describe('GetSpec', () => {
       const specRepos = new Map([['default', repo]])
       const uc = new GetSpec(specRepos)
 
-      const result = await uc.execute({ workspace: 'default', specPath })
+      const result = await uc.execute({ specId: `default:${specPath.toString()}` })
 
       expect(result).not.toBeNull()
       expect(result!.artifacts.size).toBe(1)
@@ -65,12 +65,9 @@ describe('GetSpec', () => {
       const specRepos = new Map<string, ReturnType<typeof makeSpecRepository>>()
       const uc = new GetSpec(specRepos)
 
-      await expect(
-        uc.execute({
-          workspace: 'unknown',
-          specPath: SpecPath.parse('auth/oauth'),
-        }),
-      ).rejects.toThrow(WorkspaceNotFoundError)
+      await expect(uc.execute({ specId: 'unknown:auth/oauth' })).rejects.toThrow(
+        WorkspaceNotFoundError,
+      )
     })
   })
 
@@ -80,12 +77,9 @@ describe('GetSpec', () => {
       const specRepos = new Map([['default', repo]])
       const uc = new GetSpec(specRepos)
 
-      await expect(
-        uc.execute({
-          workspace: 'default',
-          specPath: SpecPath.parse('nonexistent/spec'),
-        }),
-      ).rejects.toThrow(SpecNotFoundError)
+      await expect(uc.execute({ specId: 'default:nonexistent/spec' })).rejects.toThrow(
+        SpecNotFoundError,
+      )
     })
   })
 })

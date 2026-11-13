@@ -13,5 +13,41 @@
       "file": "core:src/infrastructure/fs/fs-validation-result-cache.ts",
       "symbols": ["FsValidationResultCache"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "ValidateSpecs-specific port memoizing per-spec validation outcomes with workspace-scoped freshness cascade over SpecRepository.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:860adb764485498935f7e9b8f6e5f52d03713a40eeace54c532500ba977ebce3",
+          "lastModified": "2026-07-25T13:14:45.394Z"
+        },
+        "verify.md": {
+          "hash": "sha256:9360f53951dac16616927f6fcfc3f9955565e52b841600d86771c89e642da090",
+          "lastModified": "2026-07-25T11:53:31.850Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# ValidationResultCache Port\n\n## Rules\n\n- Abstract class `ValidationResultCache` in `application/ports/`. Concrete behaviour only in infrastructure adapters.\n- Each instance bound to one workspace identity for lifetime. Multi-workspace use cases get one instance per workspace (or workspace-keyed registry).\n- Receive workspace `SpecRepository` (same identity) at construction via composition; MUST NOT pass repository on every `lookup`/`upsert`. Injected `workspace()` MUST match cache workspace. Adapters MAY also receive storage/path deps. Use contractual `list({ includeMeta: true })` / `get()` / `specFingerprint()` / raw metadata bytes — MUST NOT invent `validationSourceStamps` / `readValidationSidecar` helpers.\n- Cached entry = `SpecValidationEntry`: `spec` (`workspace:capabilityPath`), `passed`, `failures`, `warnings`. Persist pass and fail alike; omit failures/warnings NOT permitted.\n- Bucket validity before any row: `schemaFingerprint`, `engineVersion`, invalidation flag equivalent to list-index `isInvalidated`. Failed validity → every lookup miss until bucket rebuilt/rewritten.\n- Stored row retains: stamps from `Spec` via `get()` — `SpecArtifactEntry.lastModified` per present artifact, `persistedStateStamp.{present,lastModified}`, `generatedMetadataStamp.{present,lastModified}`; plus `cacheFingerprint` opaque digest computed by this port.\n- `cacheFingerprint` = content hash of sorted-key JSON `{ specFingerprint, metadataContentHash }` where `specFingerprint` from `SpecRepository.specFingerprint(spec)` (artifacts + persisted-state hash via `persistedStateMeta({ includeHash: true })`; never metadata); `metadataContentHash` = hash of raw `metadata.json` bytes or literal `\"__absent__\"`. MUST NOT invent third flat fingerprint.\n- `lookup` owns freshness: (1) bucket invalid → miss; (2) use `input.stamps` if provided else `get()` stamps (no artifact content reads); (3) stamps match → hard hit without `cacheFingerprint`; (4) stamps differ → compute `cacheFingerprint`; match → soft hit: persist refreshed stamps without changing fingerprint/entry; (5) else miss. Soft-hit refresh NOT exposed to callers.\n- Methods: `workspace(): string`; `lookup({ spec, schemaFingerprint, engineVersion, stamps? })` → `{ kind: 'hit', entry } | { kind: 'miss' }`; `upsert({ entry, spec, schemaFingerprint, engineVersion })`. MUST NOT accept `cacheFingerprint`, `refreshStamps`, or repository arg.\n- After full validation miss, `ValidateSpecs` calls `upsert` with entry/spec/bucket inputs only; cache materializes stamps + fingerprint via injected repo.\n- Delivery hosts MUST NOT depend on this port. Composition MAY wire into `ValidateSpecs` only. Public host APIs MUST NOT expose cache controls/paths/flags.\n- MUST NOT implement as hidden concern inside `SpecRepository` list/count helpers or `FsSpecIndexCache`.\n\n## Constraints\n\n- Lives in `application/ports/` per hexagonal rules.\n- Export from curated `@specd/core/ports` barrel (`packages/core/src/ports.ts`).\n- Adapters treat cache storage as runtime state, not committed project content.\n- Methods MUST NOT perform schema rule evaluation; store/retrieve outcomes and evaluate freshness only.\n- ValidateSpecs-specific; MAY know ValidateSpecs freshness model.\n",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:860adb764485498935f7e9b8f6e5f52d03713a40eeace54c532500ba977ebce3",
+          "lastModified": "2026-07-25T13:14:45.394Z"
+        },
+        "verify.md": {
+          "hash": "sha256:9360f53951dac16616927f6fcfc3f9955565e52b841600d86771c89e642da090",
+          "lastModified": "2026-07-25T11:53:31.850Z"
+        }
+      }
+    }
+  }
 }

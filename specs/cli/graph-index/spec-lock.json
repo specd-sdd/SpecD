@@ -14,7 +14,8 @@
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/graph/index-graph.ts"
+      "file": "cli:src/commands/graph/index-graph.ts",
+      "symbols": ["registerGraphIndex"]
     }
   ],
   "optimizations": {

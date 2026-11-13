@@ -11,6 +11,11 @@ export {
   type SaveChangeArtifactResult,
 } from './save-change-artifact.js'
 export {
+  type GetChangeSpecDeps,
+  type GetChangeSpecDepsInput,
+  type GetChangeSpecDepsResult,
+} from './get-change-spec-deps.js'
+export {
   type UpdateSpecDeps,
   type UpdateSpecDepsInput,
   type UpdateSpecDepsResult,
@@ -281,6 +286,7 @@ export {
 export {
   type GetSpecOutline,
   type GetSpecOutlineInput,
+  type GetSpecOutlineResult,
   type SpecOutlineResult,
 } from './get-spec-outline.js'
 export { type GetProjectMetadata, type GetProjectMetadataResult } from './get-project-metadata.js'

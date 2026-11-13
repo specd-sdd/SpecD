@@ -1,0 +1,18 @@
+- op: modified
+  description: --exclude-path values are whole patterns
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    ```text
+    specd graph index [--force] [--exclude-path <pattern>...] [--config <path> | --path <path>] [--format text|json|toon]
+    ```
+
+    - `--force` is optional and requests a full logical reindex: indexed contents are
+      cleared and every selected input is reprocessed.
+    - If a typed recoverable storage-open failure occurs, `--force` also authorizes the
+      SDK use case to recreate closed storage and retry once; it does not authorize
+      deletion for ordinary open failures.
+    - `--exclude-path <pattern>` is optional and repeatable. Each pattern is gitignore-syntax and relative to the project root, like every path in `specd.yaml`; it is added to the global exclusion layer and cannot be negated by workspace `excludePaths`. Each value is one whole pattern and is never split on commas, because a gitignore pattern can contain commas (for example `{a,b}/**`); several patterns are given by repeating the option or listing them after it.
+    - `--config <path>` and `--path <path>` remain mutually exclusive.
+    - `--format text|json|toon` defaults to text.

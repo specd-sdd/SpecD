@@ -9,5 +9,10 @@
     "core:update-spec-deps",
     "core:initialize-persisted-spec-state"
   ],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/update-persisted-spec-deps.ts",
+      "symbols": ["UpdatePersistedSpecDeps", "tryNormalizeDepId"]
+    }
+  ]
 }
