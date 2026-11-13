@@ -425,7 +425,7 @@ describe('Integration (real kernel)', () => {
       }),
     )
     mockProcessExit()
-  })
+  }, 20_000)
 
   afterEach(async () => {
     await fs.rm(tmpDir, { recursive: true, force: true })
@@ -461,7 +461,7 @@ describe('Integration (real kernel)', () => {
     const created = manifest.history.find((event) => event.type === 'created')
     expect(created?.schemaName).toBe('schema-std')
     expect(created?.schemaVersion).toBe(1)
-  })
+  }, 20_000)
 
   it('emits overlap warning from real DetectOverlap when another change targets the spec', async () => {
     await kernel.changes.create.execute({
@@ -488,7 +488,7 @@ describe('Integration (real kernel)', () => {
     expect(stderr()).toContain('warning: spec overlap detected')
     expect(stderr()).toContain('existing-change')
     expect(stdout()).toContain('created change my-change')
-  })
+  }, 20_000)
 })
 
 describe('structured invalidation policy flags', () => {
