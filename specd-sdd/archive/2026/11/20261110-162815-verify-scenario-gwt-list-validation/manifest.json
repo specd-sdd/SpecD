@@ -1,0 +1,1510 @@
+{
+  "name": "verify-scenario-gwt-list-validation",
+  "createdAt": "2026-11-10T16:28:15.267Z",
+  "updatedAt": "2026-11-13T15:23:50.096Z",
+  "description": "Tightens @specd/schema-std verify scenario validation to require at least one WHEN and one THEN list item (with GIVEN optional) while keeping schema.yaml at version: 1 and clarifying that \"Never bullets\" applies only to scenario headings. Updates the guide documentation and @specd/guide catalog, and adds a dev-only Vitest suite in @specd/schema-std covering standard-schema, templates, and GWT validation without changing the published npm package files.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "schema-std:standard-schema",
+    "schema-std:templates",
+    "default:_global/continuous-integration"
+  ],
+  "specDependsOn": {
+    "schema-std:standard-schema": [],
+    "schema-std:templates": ["schema-std:standard-schema"],
+    "default:_global/continuous-integration": [
+      "default:_global/testing",
+      "default:_global/cross-platform"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "implementationTrackingStartedAt": "2026-11-13T13:20:00.830Z",
+  "trackedImplementationFiles": [
+    {
+      "file": "AGENTS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "CLAUDE.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_CODE_GRAPH_FLOWS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_GRAPH_CLI_OUTPUT_OPTIMIZATION.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_KERNEL_PLUGINS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_VERIFY_FOLLOWUPS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "SpecD — Análisis de identidad LogicalSymbol dependencias y casos de uso.md",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/graph-file-doc.js",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/spec-metadata-diff-poc/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/spec-metadata-diff-poc/vcs-spec-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/spec-metadata-diff-poc/working-copy-spec-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/symbol-inspect-poc.mjs",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/cli/changes.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/cli/spec-deps.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/core/errors.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/core/overview.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/core/ports.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/core/services.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/core/use-cases.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/cli.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/configuration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/specs.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/workspaces.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/sdk/index.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/create.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/deps.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/edit.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/implementation.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/validate.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/index-graph.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/project/init.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/context.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/deps.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/generate-metadata.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/implementation.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/init.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/metadata.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/optimizations.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/outline.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/schema.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/show.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/validate.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/handle-error.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/helpers/confirm.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/helpers/spec-path.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/cli/test/commands/change-create.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change-deps.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change-edit.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change-implementation.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change-validate.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-index.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/guide-sdk/guide-sdk.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/helpers.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/project-init.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-context.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-deps.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-generate-metadata.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-implementation.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-init.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-metadata.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-optimizations.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-outline.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-schema.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-show.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/handle-error.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/helpers/spec-path.spec.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/core/src/application/errors/workspace-not-found-error.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/ports/config-schema.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/ports/spec-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/_shared/assert-invalidation-policy.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/_shared/depends-on-traversal.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/_shared/spec-pattern-matching.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/compile-context.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/create-change.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/edit-change.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/generate-spec-metadata.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-artifact-instruction.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-change-spec-deps.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-persisted-spec-deps.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-persisted-spec-implementation.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-persisted-spec-optimizations.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-persisted-spec-schema.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-spec-context.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-spec-outline.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/initialize-persisted-spec-state.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/materialize-spec-metadata.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/preview-spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/update-implementation-tracking.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/update-persisted-spec-deps.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/update-persisted-spec-implementation.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/update-persisted-spec-optimizations.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/update-persisted-spec-schema.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/update-spec-deps.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/validate-artifacts.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/validate-specs.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/kernel.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-change-spec-deps.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/update-implementation-tracking.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/update-spec-deps.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/archived-change-index-entry.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/errors/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/errors/invalid-spec-id-error.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/errors/invalid-spec-lock-error.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/errors/invalid-spec-pattern-error.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/errors/read-only-workspace-error.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/errors/workspace-not-found-error.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/parse-metadata.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/parse-spec-id.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/parse-spec-lock.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/parse-spec-pattern.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/same-tracked-file.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/spec-id-rules.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/to-logical-file-path.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/value-objects/spec-path.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/config-loader.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/manifest-change-loader.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/schema-registry.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/spec-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/public.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/ports/config-schema.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/_shared/spec-pattern-matching.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/_shared/spec-reference-resolver.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/compile-context.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/create-change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/edit-change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/generate-spec-metadata.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-change-spec-deps.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-persisted-spec-deps.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-persisted-spec-implementation.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-persisted-spec-optimizations.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-persisted-spec-schema.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-spec-context.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-spec-outline.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-spec.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/helpers.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/persist-spec-metadata.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/preview-spec.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/update-implementation-tracking.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/update-persisted-spec-deps.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/update-persisted-spec-implementation.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/update-persisted-spec-optimizations.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/update-persisted-spec-schema.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/update-spec-deps.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/validate-artifacts.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/validate-specs.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/barrel-kernel-coverage.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/get-change-spec-deps.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/get-persisted-spec-deps.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/get-persisted-spec-implementation.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/get-persisted-spec-optimizations.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/get-persisted-spec-schema.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/update-implementation-tracking.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/update-spec-deps.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/archived-change-index-entry.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/errors/read-only-workspace-error.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/services/parse-metadata.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/services/parse-spec-id.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/services/parse-spec-lock.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/services/parse-spec-pattern.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/services/same-tracked-file.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/services/spec-id-rules.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/services/to-logical-file-path.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/value-objects/spec-path.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/change-repository.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/config-loader.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/manifest-change-loader.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/schema-registry.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/spec-repository.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/spec-id-guards.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/guide/generated/guides-sdk.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/generated/guides.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/test/integration/sdk-catalog.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/sdk/src/core-reexports.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-archive/SKILL.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-implement/SKILL.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/test/template-workflow.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/continuous-integration/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/cross-platform/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/testing/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/plugins-install/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/get-graph-health/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/index-project-graph/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/isolated-index-worker/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/resolve-symbol-reference/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/artifact-ast/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/artifact-parser-port/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/diff-generator/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/file-reader-port/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-config/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-spec-context/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/initialize-persisted-spec-state/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/validate-artifacts/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/validation-result-cache-port/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-manager/install-plugin-use-case/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-manager/load-plugin-use-case/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/schema-std/standard-schema/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/schema-std/templates/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/sdk/build-implementation-review/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/sdk/run-index-project-graph/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/schema-std/schema.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/selectors.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/standard-schema.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/schema-std/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/schema-std/test/standard-schema.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/schema-std/test/templates.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/schema-std/test/verify-gwt-validation.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/schema-std/tsconfig.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/schema-std/vitest.config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "schema-std:standard-schema",
+      "file": "packages/schema-std/schema.yaml",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "schema-std:standard-schema",
+      "file": "packages/schema-std/package.json",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/continuous-integration",
+      "file": "package.json",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "schema-std:standard-schema",
+      "file": "packages/schema-std/test/standard-schema.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "schema-std:templates",
+      "file": "packages/schema-std/test/templates.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "schema-std:standard-schema",
+      "file": "packages/schema-std/test/verify-gwt-validation.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "schema-std:standard-schema",
+      "file": "packages/schema-std/tsconfig.json",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "schema-std:standard-schema",
+      "file": "packages/schema-std/vitest.config.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/continuous-integration",
+      "file": "pnpm-lock.yaml",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:45adef232ae3a7567dc821c523f38972b3782aca99b22965d151ee5b7987a74f"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "schema-std:standard-schema",
+          "filename": "deltas/schema-std/standard-schema/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8e2e6f26dd4e9b7ea6d584179d99590382160465cf873289cf816716113b8bd3"
+        },
+        {
+          "key": "schema-std:templates",
+          "filename": "deltas/schema-std/templates/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6c8ca52d91d2fc843c197ed7d6be0e84b9bc7544d7c3f6d19cb1cfeefadf86fb"
+        },
+        {
+          "key": "default:_global/continuous-integration",
+          "filename": "deltas/default/_global/continuous-integration/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e3753e9dcd15c4d2d51dcba7bca228147aafe0ab0fbd49dd1a03ffb1398dbb40"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "schema-std:standard-schema",
+          "filename": "deltas/schema-std/standard-schema/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f979dbbcc6245d3e108c9ee78f870511dec33f17a3aad11cc7fcfa8ab9589c4e"
+        },
+        {
+          "key": "schema-std:templates",
+          "filename": "deltas/schema-std/templates/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a10c7b60f28c771d58bc8e74be61a6cc9998265026473f83c12ef4d4498e0ea2"
+        },
+        {
+          "key": "default:_global/continuous-integration",
+          "filename": "deltas/default/_global/continuous-integration/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ab15adb2c1254ae0bfd60f04d1dbdf7991ec3c37a00b80398354d346802a55dd"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:e78e3921cac51c6ca34810a36b8097e756a74c3938d66d30d965755f675959ad"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:7e66507f140f9572105be0a0587be13e6899fbafccafc2ed429c1be59262f907"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-11-10T16:28:15.267Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["schema-std:standard-schema", "schema-std:templates"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-10T16:28:15.284Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "schema-std:standard-schema"
+        },
+        {
+          "type": "specs",
+          "key": "schema-std:templates"
+        },
+        {
+          "type": "verify",
+          "key": "schema-std:standard-schema"
+        },
+        {
+          "type": "verify",
+          "key": "schema-std:templates"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-11T11:20:57.793Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-11T11:25:30.157Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-13T13:20:00.830Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-13T13:23:43.813Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["schema-std:standard-schema", "schema-std:templates"]
+        },
+        {
+          "type": "verify",
+          "files": ["schema-std:standard-schema", "schema-std:templates"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-13T13:23:43.813Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-13T13:27:21.925Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-13T13:29:35.170Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-13T13:36:45.225Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["schema-std:standard-schema", "schema-std:templates"]
+        },
+        {
+          "type": "verify",
+          "files": ["schema-std:standard-schema", "schema-std:templates"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-13T13:36:45.225Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-13T13:42:17.411Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-13T13:44:11.195Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["schema-std:standard-schema", "schema-std:templates"]
+        },
+        {
+          "type": "verify",
+          "files": ["schema-std:standard-schema", "schema-std:templates"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-13T13:44:11.195Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-13T13:44:16.950Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["schema-std:standard-schema", "schema-std:templates"]
+        },
+        {
+          "type": "verify",
+          "files": ["schema-std:standard-schema", "schema-std:templates"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-13T13:44:16.952Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "default:_global/continuous-integration"
+        },
+        {
+          "type": "verify",
+          "key": "default:_global/continuous-integration"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-13T13:45:18.449Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-13T13:48:24.782Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "schema-std:standard-schema",
+            "schema-std:templates",
+            "default:_global/continuous-integration"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "schema-std:standard-schema",
+            "schema-std:templates",
+            "default:_global/continuous-integration"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-13T13:48:24.782Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-13T13:49:03.652Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-13T13:50:08.815Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-13T15:16:26.458Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-13T15:18:19.394Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-13T15:18:36.278Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-11-13T15:22:02.247Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Tightens @specd/schema-std verify scenario validation to require at least one WHEN and one THEN list item (with GIVEN optional) while keeping schema.yaml at version: 1 and clarifying that \"Never bullets\" applies only to scenario headings. Updates the guide documentation and @specd/guide catalog, and adds a dev-only Vitest suite in @specd/schema-std covering standard-schema, templates, and GWT validation without changing the published npm package files."
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-11-13T15:22:16.318Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Tracked implementation files remain open for change \"verify-scenario-gwt-list-validation\". Resolve or ignore them first.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-11-13T15:23:35.417Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"schema-std:standard-schema\" points outside workspace \"schema-std\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-13T15:23:50.094Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-11-13T15:23:50.168Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

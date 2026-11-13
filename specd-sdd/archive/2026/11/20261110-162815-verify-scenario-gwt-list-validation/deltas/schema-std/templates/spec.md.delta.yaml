@@ -1,0 +1,5 @@
+- op: no-op
+  description: >-
+    Verify template already scaffolds Gherkin-style GIVEN/WHEN/THEN/AND-OR list
+    placeholders under Scenario headings; no template structure change required
+    for this validation hardening.

@@ -34,7 +34,7 @@ Each job MUST run `pnpm build`, `pnpm typecheck`, and `pnpm test`, in that order
 
 `typecheck` and `build` MUST skip `@specd/public-web`.
 
-`pnpm test` MUST run Vitest for `@specd/core`, `@specd/cli`, `@specd/code-graph`, `@specd/guide`, `@specd/sdk`, `@specd/skills`, `@specd/plugin-manager`, `@specd/plugin-agent-claude`, `@specd/plugin-agent-codex`, `@specd/plugin-agent-copilot`, `@specd/plugin-agent-opencode`, and `@specd/plugin-agent-standard`.
+`pnpm test` MUST run Vitest for `@specd/core`, `@specd/cli`, `@specd/code-graph`, `@specd/guide`, `@specd/sdk`, `@specd/skills`, `@specd/schema-std`, `@specd/plugin-manager`, `@specd/plugin-agent-claude`, `@specd/plugin-agent-codex`, `@specd/plugin-agent-copilot`, `@specd/plugin-agent-opencode`, and `@specd/plugin-agent-standard`.
 
 `pnpm test` MUST NOT include `@specd/mcp` or `@specd/public-web`.
 

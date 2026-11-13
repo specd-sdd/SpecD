@@ -1,6 +1,7 @@
 {
   "name": "@specd/schema-std",
   "version": "0.1.1",
+  "type": "module",
   "license": "MIT",
   "private": false,
   "repository": "https://github.com/specd-sdd/SpecD",
@@ -10,6 +11,12 @@
     "templates/"
   ],
   "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
     "release:publish": "npm publish --access public"
+  },
+  "devDependencies": {
+    "@specd/core": "workspace:^",
+    "vitest": "^4.1.10"
   }
 }

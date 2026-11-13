@@ -66,6 +66,6 @@
 #### Scenario: pnpm test includes guide, sdk, skills, and plugins
 
 - **WHEN** `pnpm test` runs
-- **THEN** Vitest runs for `@specd/guide`, `@specd/sdk`, `@specd/skills`, `@specd/plugin-manager`, and each `@specd/plugin-agent-*` package
+- **THEN** Vitest runs for `@specd/guide`, `@specd/sdk`, `@specd/skills`, `@specd/schema-std`, `@specd/plugin-manager`, and each `@specd/plugin-agent-*` package
 - **AND** it also runs for `@specd/core`, `@specd/cli`, and `@specd/code-graph`
 - **AND** it does not run `@specd/mcp` or `@specd/public-web`

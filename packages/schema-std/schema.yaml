@@ -251,10 +251,12 @@ artifacts:
       - Group scenarios under `### Requirement: <name>` headings.
         The heading text must match the corresponding requirement in spec.md exactly —
         same wording, same order.
-      - Each scenario: `#### Scenario: <name>` with optional GIVEN, then WHEN / THEN lines.
-        Use GIVEN when the precondition is not obvious from context. Each clause (GIVEN,
-        WHEN, THEN) can be followed by AND or OR lines for additional conditions or
-        assertions. Scenarios use exactly four hashtags. Never three, never bullets.
+      - Each scenario: `#### Scenario: <name>` whose body uses Markdown list items for
+        optional GIVEN, then WHEN / THEN (each clause MAY be followed by AND or OR list
+        items). Scenario headings MUST use exactly four hashtags — never three, and never
+        a bullet title for the scenario name. “Never bullets” applies only to scenario
+        titles; GWT clauses MUST be list items so metadata extraction and structural
+        validation can read them.
 
       Only write scenarios that add information beyond what the requirement prose already
       states. Do not restate the happy path if it is obvious from the requirement itself.
@@ -346,6 +348,23 @@ artifacts:
                     by:
                       from: label
                       strip: '^Scenario:\s*'
+                children:
+                  - id: has-when
+                    type: list-item
+                    matches: '^WHEN\b'
+                    required: true
+                    count:
+                      min: 1
+                  - id: has-then
+                    type: list-item
+                    matches: '^THEN\b'
+                    required: true
+                    count:
+                      min: 1
+                  - id: has-given
+                    type: list-item
+                    matches: '^GIVEN\b'
+                    required: false
 
   # ── design ─────────────────────────────────────────────────────────────────
   - id: design

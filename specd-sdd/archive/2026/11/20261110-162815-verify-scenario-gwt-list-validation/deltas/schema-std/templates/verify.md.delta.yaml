@@ -1,0 +1,4 @@
+- op: no-op
+  description: >-
+    Existing verify-template scenarios already cover Gherkin list scaffolding;
+    no verification updates needed for this schema validation change.
