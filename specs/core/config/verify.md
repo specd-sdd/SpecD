@@ -640,6 +640,7 @@ Scenarios:
 #### Scenario: Plugin entry shape
 
 - **GIVEN** `plugins` has an entry
+- **WHEN** the entry is validated against the plugin schema
 - **THEN** each entry has `name` (required) and optional `config` and `contributions`
 
 #### Scenario: Invalid plugin structure rejected at startup
