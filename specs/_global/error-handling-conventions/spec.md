@@ -33,6 +33,12 @@ Error codes SHALL be in `UPPER_SNAKE_CASE` (e.g., `CHANGE_NOT_FOUND`, `ARTIFACT_
 
 Error messages MUST be descriptive and, whenever possible, tell the user how to fix the problem. Avoid technical jargon or internal implementation details in user-facing messages.
 
+### Requirement: Host-Neutral Core Errors and Delivery Hints
+
+Domain and application errors, services, and use cases in `@specd/core` MUST NOT embed delivery-mechanism flags (such as `--force`, `--next`, `--target`, `--allow-out-of-scope`, `--set`, `--add`, `--remove`, `--clear`) or CLI command syntax (such as `specd ...`) inside `message`.
+
+Core errors SHALL describe the violated domain or application invariant in host-neutral terms and expose structured metadata properties (such as `specId`, `state`, `operation`, `gates`, `existingDeps`, `incomingDeps`, or `outOfScopeSpecIds`) so delivery mechanisms (`@specd/cli`, `@specd/mcp`, `@specd/sdk` callers) can translate typed error codes and metadata into delivery-appropriate hints using their active command context.
+
 ### Requirement: Metadata Extraction
 
 Errors MAY include additional metadata properties (e.g., `specId`, `filePath`, `expected`) to provide context for structured output formats (JSON/TOON). These properties SHOULD be documented in the error's JSDoc.

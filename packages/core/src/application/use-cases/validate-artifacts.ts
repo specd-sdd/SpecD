@@ -175,6 +175,10 @@ export class ValidateArtifacts {
    * @returns Validation result with passed flag, failures, and warnings
    * @throws {ChangeNotFoundError} If no change with the given name exists
    * @throws {SchemaNotFoundError} If the schema reference cannot be resolved
+   * @throws {SchemaProviderIdentityMismatchError} If the resolved schema provider identity does not match
+   * @throws {InvalidSpecIdError} If `specPath` is invalid
+   * @throws {WorkspaceNotFoundError} If `specPath` names an unknown workspace
+   * @throws {SpecNotInChangeError} If `specPath` is omitted for a spec-scoped artifact or not in `change.specIds`
    */
   async execute(input: ValidateArtifactsInput): Promise<ValidateArtifactsResult> {
     const change = await this._changes.get(input.name)

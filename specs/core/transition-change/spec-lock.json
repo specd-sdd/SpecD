@@ -20,15 +20,8 @@
   ],
   "implementation": [
     {
-      "file": "core:src/domain/checks/protocol-edge.ts",
-      "symbols": ["protocolEdge"]
-    },
-    {
-      "file": "core:src/application/use-cases/transition-change.ts",
-      "symbols": ["TransitionChange"]
-    },
-    {
-      "file": "core:test/application/use-cases/transition-change.spec.ts"
+      "file": "core:src/domain/errors/happy-path-next-unavailable-error.ts",
+      "symbols": ["HappyPathNextUnavailableError"]
     }
   ],
   "optimizations": {

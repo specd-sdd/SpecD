@@ -3,6 +3,7 @@ import { resolveCliContext } from '../../helpers/cli-context.js'
 import { collect } from '../../helpers/collect.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
+import { resolveCliErrorHint } from '../../error-hints.js'
 /**
  * Registers the `spec generate-metadata` subcommand on the given parent command.
  *
@@ -65,10 +66,20 @@ JSON/TOON output schema:
           if (result.kind === 'spec') {
             const entry = result.result
             if (!entry.ok) {
-              cliError(
-                entry.error ?? `failed to regenerate metadata for ${entry.specId}`,
-                opts.format,
-              )
+              const message = entry.error ?? `failed to regenerate metadata for ${entry.specId}`
+              if (entry.code !== undefined) {
+                const hint = resolveCliErrorHint(entry.code, {
+                  command: 'specs.generate-metadata',
+                })
+                cliError(
+                  message,
+                  opts.format,
+                  1,
+                  entry.code,
+                  hint !== undefined ? { hint } : undefined,
+                )
+              }
+              cliError(message, opts.format)
             }
             if (fmt === 'text') {
               output(`regenerated metadata for ${entry.specId}`, 'text')
@@ -123,7 +134,7 @@ JSON/TOON output schema:
             process.exitCode = 1
           }
         } catch (err) {
-          handleError(err, opts.format)
+          handleError(err, opts.format, { command: 'specs.generate-metadata' })
         }
       },
     )

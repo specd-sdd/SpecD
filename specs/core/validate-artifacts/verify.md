@@ -682,3 +682,11 @@ Scenarios:
 - **WHEN** `ValidateArtifacts.execute` is called with a change name that does not exist
 - **THEN** `ChangeNotFoundError` is thrown
 - **AND** no validation result object is returned
+
+### Requirement: Host-neutral SpecNotInChangeError
+
+#### Scenario: SpecNotInChangeError omits CLI command syntax
+
+- **WHEN** `ValidateArtifacts` throws `SpecNotInChangeError`
+- **THEN** `error.message` does not contain `specd specs show`
+- **AND** `error.specId` and `error.changeName` are exposed as metadata properties

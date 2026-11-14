@@ -82,10 +82,10 @@ export class UpdateSpecDeps {
       input.set !== undefined &&
       (input.add !== undefined || input.remove !== undefined || input.clear === true)
     ) {
-      throw new InvalidInputError('--set is mutually exclusive with --add, --remove, and --clear')
+      throw new InvalidInputError('set is mutually exclusive with add, remove, and clear')
     }
     if (input.clear === true && (input.add !== undefined || input.remove !== undefined)) {
-      throw new InvalidInputError('--clear is mutually exclusive with --add and --remove')
+      throw new InvalidInputError('clear is mutually exclusive with add and remove')
     }
     if (
       input.set === undefined &&
@@ -93,9 +93,7 @@ export class UpdateSpecDeps {
       input.remove === undefined &&
       input.clear !== true
     ) {
-      throw new InvalidInputError(
-        'at least one of --add, --remove, --set, or --clear must be provided',
-      )
+      throw new InvalidInputError('at least one of add, remove, set, or clear must be provided')
     }
 
     const workspaces = this._workspaces

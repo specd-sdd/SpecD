@@ -56,7 +56,7 @@ export class DependsOnOverwriteError extends SpecdError {
     if (removed.length > 0) parts.push(`removed: ${removed.join(', ')}`)
     if (added.length > 0) parts.push(`added: ${added.join(', ')}`)
     super(
-      `dependsOn would change (${parts.join('; ')}). Use --force to overwrite curated dependencies.`,
+      `dependsOn would change (${parts.join('; ')}). Pass force to overwrite curated dependencies.`,
     )
     this._existingDeps = existingDeps
     this._incomingDeps = incomingDeps

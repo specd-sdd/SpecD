@@ -227,6 +227,10 @@ Core MUST reject `'next'` when there is no subsequent active hop (such as from `
 
 Predicate `protocol.edge` fail-fast applies to this execute path. GetStatus MUST still collect every matching predicate for the same edge.
 
+### Requirement: Host-neutral HappyPathNextUnavailableError
+
+When `TransitionChange` rejects `to: 'next'` with `HappyPathNextUnavailableError` (`HAPPY_PATH_NEXT_UNAVAILABLE`), the error `message` MUST describe why the `next` transition is unavailable from the current state in host-neutral terms without embedding CLI flags such as `--next`. The error MUST expose `state` as a structured metadata property.
+
 ### Requirement: Bypassed step evaluation and hook suppression
 
 When a transition `from → to` bypasses one or more intermediate steps as identified by `listBypassedWorkflowSteps(from, to, schema, approvals)`, where `schema` is resolved through `ResolveChangeSchema`:

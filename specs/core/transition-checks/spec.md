@@ -264,6 +264,10 @@ Default **effect** bindings (`hook.pre` / `hook.post`, kind `effect`) for schema
 
 Predicates on both tables default to `phase = before-persist` and `onFailure = abort`.
 
+### Requirement: Host-neutral impl.linksInScope message
+
+When `detectImplLinksInScope` detects confirmed implementation links targeting specs outside `change.specIds`, its failure `message` MUST describe the out-of-scope spec count and compact summary in host-neutral terms without embedding CLI flags such as `--allow-out-of-scope`. The detection result MUST preserve `outOfScopeSpecIds`.
+
 ### Requirement: Generic check progress bus
 
 `TransitionChange` and `ArchiveChange` MUST expose a single progress bus for every matching check they execute (predicates and effects). Event kinds:

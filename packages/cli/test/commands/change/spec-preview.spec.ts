@@ -357,7 +357,7 @@ describe('change spec-preview', () => {
     const err = stderr()
     expect(err).toMatch(/error:/)
     expect(err).toContain(
-      'Suggestion: use specd specs show default:billing/invoices to view the canonical spec',
+      'Run: specd specs show default:billing/invoices to view the canonical spec',
     )
   })
 

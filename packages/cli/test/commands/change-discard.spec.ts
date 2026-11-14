@@ -188,6 +188,38 @@ describe('Error cases', () => {
 
     expect(stderr()).toMatch(/implementing/)
     expect(stderr()).toMatch(/out of sync/)
+    expect(stderr()).toContain('--force')
+  })
+
+  it('includes --force hint in JSON output when historical implementation guard triggers', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.discard.execute.mockRejectedValue(
+      new HistoricalImplementationGuardError('discard', 'my-change'),
+    )
+
+    const program = makeProgram()
+    registerChangeDiscard(program.command('change'))
+
+    try {
+      await program.parseAsync([
+        'node',
+        'specd',
+        'change',
+        'discard',
+        'my-change',
+        '--reason',
+        'abandoned',
+        '--format',
+        'json',
+      ])
+    } catch (err) {
+      expect(err).toBeInstanceOf(ExitSentinel)
+      expect((err as ExitSentinel).code).toBe(1)
+    }
+
+    const parsed = JSON.parse(stdout())
+    expect(parsed.code).toBe('IMPLEMENTATION_DETECTED')
+    expect(parsed.hint).toContain('--force')
   })
 
   it('Force flag is passed through to the use case', async () => {

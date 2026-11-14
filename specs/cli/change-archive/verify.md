@@ -276,3 +276,11 @@
 
 - **WHEN** an actor invokes the supported singular archive alias
 - **THEN** it follows the same archive behavior as the canonical plural command
+
+### Requirement: CLI-rendered out-of-scope implementation hint
+
+#### Scenario: impl.linksInScope failure renders CLI bypass hint
+
+- **GIVEN** `ArchiveChange` fails on `impl.linksInScope` as a skippable check
+- **WHEN** `specd changes archive` renders the failure
+- **THEN** the CLI renders `--skip-checks impl.linksInScope` (and `--allow-out-of-scope`) guidance via the centralized hint-resolution helper

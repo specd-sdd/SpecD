@@ -855,6 +855,43 @@ describe('--next failures', () => {
       expect.any(Function),
     )
     expect(stderr()).toMatch(/waiting for human spec approval/)
+    expect(stderr()).toContain('Specify an explicit target <step> instead of --next')
+    expect(stderr()).not.toContain('--to')
+  })
+
+  it('includes centralized hint in json mode for HappyPathNextUnavailableError', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'pending-spec-approval' }),
+      artifactStatuses: [],
+    })
+    kernel.changes.transition.execute.mockRejectedValue(
+      new HappyPathNextUnavailableError('pending-spec-approval'),
+    )
+
+    const program = makeProgram()
+    registerChangeTransition(program.command('change'))
+    await program
+      .parseAsync([
+        'node',
+        'specd',
+        'change',
+        'transition',
+        'my-change',
+        '--next',
+        '--format',
+        'json',
+      ])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    const lines = stdout().trim().split('\n')
+    const completeEvent = JSON.parse(lines[lines.length - 1]!) as {
+      event?: { result?: { hint?: string } }
+    }
+    expect(completeEvent.event?.result?.hint).toContain(
+      'Specify an explicit target <step> instead of --next',
+    )
   })
 
   it('fails clearly in pending-signoff state', async () => {
@@ -1538,7 +1575,9 @@ describe('validity-aware transition guidance', () => {
       expect(err).toContain('repair guide:')
       expect(err).toContain('check:   Checking implementation links (impl.linksInScope)')
       expect(err).toContain('command: /specd-implement my-change')
-      expect(err).toContain('bypass:  Retry with --skip-checks impl.linksInScope')
+      expect(err).toContain(
+        'bypass:  Re-run with --skip-checks impl.linksInScope (or --allow-out-of-scope) if intentional',
+      )
     })
 
     it('omits bypass guidance in Repair Guide when failed check is mandatory (skippable: false)', async () => {
@@ -1682,7 +1721,7 @@ describe('validity-aware transition guidance', () => {
       expect(process.exit).toHaveBeenCalledWith(1)
       const err = stderr()
       expect(err).toContain('repair guide:')
-      expect(err).toContain('cannot advance with --next: archiving is not a lifecycle transition')
+      expect(err).toContain('cannot advance to next state: archiving is not a lifecycle transition')
     })
 
     it('passes custom checks to transition execute when --skip-checks is provided', async () => {

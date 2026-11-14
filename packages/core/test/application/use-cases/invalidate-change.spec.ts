@@ -254,7 +254,7 @@ describe('InvalidateChange', () => {
         uc.execute({ name: 'c1', reason: 'test', policyOverride: { artifacts: 'surgical' } }),
       ).rejects.toMatchObject({
         code: 'INVALID_INVALIDATE_TARGET',
-        message: expect.stringContaining('At least one --target'),
+        message: expect.stringContaining('At least one target'),
       })
     })
 
@@ -266,7 +266,7 @@ describe('InvalidateChange', () => {
         uc.execute({ name: 'c1', reason: 'test', policyOverride: { artifacts: 'downstream' } }),
       ).rejects.toMatchObject({
         code: 'INVALID_INVALIDATE_TARGET',
-        message: expect.stringContaining('At least one --target'),
+        message: expect.stringContaining('At least one target'),
       })
     })
 

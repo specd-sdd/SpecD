@@ -16,6 +16,7 @@ import {
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat, serializeOutput, type OutputFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
+import { resolveCliErrorHint } from '../../error-hints.js'
 import { parseCommaSeparatedValues } from '../../helpers/parse-comma-values.js'
 import { createCheckProgressPresenter } from './_check-progress-presenter.js'
 import {
@@ -132,6 +133,17 @@ function repairValidityFields(status: TransitionFailureStatus): {
  */
 function writeTextRepairGuide(err: Error, status: TransitionFailureStatus): void {
   process.stderr.write(`error: ${err.message}\n`)
+  if (
+    err instanceof HappyPathNextUnavailableError ||
+    err.name === 'HappyPathNextUnavailableError'
+  ) {
+    const hint = resolveCliErrorHint('HAPPY_PATH_NEXT_UNAVAILABLE', {
+      command: 'change.transition',
+    })
+    if (hint !== undefined) {
+      process.stderr.write(`${hint}\n`)
+    }
+  }
   if (status.blockers) {
     for (const b of status.blockers) {
       process.stderr.write(
@@ -164,9 +176,13 @@ function writeTextRepairGuide(err: Error, status: TransitionFailureStatus): void
       process.stderr.write(`  command: ${status.nextAction.command}\n`)
     }
     if (cpErr.skippable) {
-      process.stderr.write(
-        `  bypass:  Retry with --skip-checks ${cpErr.checkId} if an exception is granted\n`,
-      )
+      const checkHint =
+        resolveCliErrorHint(
+          cpErr.checkId,
+          { command: 'change.transition' },
+          { isSkippable: true },
+        ) ?? `Retry with --skip-checks ${cpErr.checkId} if an exception is granted`
+      process.stderr.write(`  bypass:  ${checkHint}\n`)
     }
   } else {
     if (status.nextAction?.command) {
@@ -416,6 +432,19 @@ JSON/TOON output schema:
                 writeTextRepairGuide(err, status)
                 throw new CliExitError(1)
               } else {
+                const structuredHint =
+                  err instanceof HappyPathNextUnavailableError ||
+                  err.name === 'HappyPathNextUnavailableError'
+                    ? resolveCliErrorHint('HAPPY_PATH_NEXT_UNAVAILABLE', {
+                        command: 'change.transition',
+                      })
+                    : err instanceof CheckPredicateFailedError && err.skippable
+                      ? resolveCliErrorHint(
+                          err.checkId,
+                          { command: 'change.transition' },
+                          { isSkippable: true },
+                        )
+                      : undefined
                 writeStructuredRecord(fmt, {
                   stream: 'change-transition',
                   event: {
@@ -427,6 +456,7 @@ JSON/TOON output schema:
                       to: requestedTarget,
                       blockers: status.blockers,
                       nextAction: status.nextAction,
+                      ...(structuredHint !== undefined ? { hint: structuredHint } : {}),
                       ...(status.change !== undefined ? { state: status.change.state } : {}),
                       ...repairValidityFields(status),
                     },
@@ -438,7 +468,7 @@ JSON/TOON output schema:
             throw err
           }
         } catch (err) {
-          handleError(err, opts.format)
+          handleError(err, opts.format, { command: 'change.transition' })
         }
       },
     )

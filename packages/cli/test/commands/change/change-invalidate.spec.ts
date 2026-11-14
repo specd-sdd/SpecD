@@ -517,4 +517,33 @@ describe('change invalidate', () => {
     expect(out).toContain('verification valid → stale')
     expect(out).toContain('automatic return: verifying → designing (workflow-redesign)')
   })
+
+  it('includes --force hint in JSON output when approval guard blocks', async () => {
+    const { kernel, stdout, stderr } = setup()
+    kernel.changes.invalidate.execute.mockRejectedValue(
+      new InvalidateRequiresForceError([{ gate: 'spec', target: 'designing' }]),
+    )
+
+    const program = makeProgram()
+    registerChangeInvalidate(program.command('change'))
+    await program
+      .parseAsync([
+        'node',
+        'specd',
+        'change',
+        'invalidate',
+        'approved-change',
+        '--reason',
+        'rework',
+        '--format',
+        'json',
+      ])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toContain('--force')
+    const parsed = JSON.parse(stdout())
+    expect(parsed.code).toBe('INVALIDATE_REQUIRES_FORCE')
+    expect(parsed.hint).toContain('--force')
+  })
 })

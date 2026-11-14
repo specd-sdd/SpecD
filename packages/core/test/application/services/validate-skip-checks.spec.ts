@@ -55,6 +55,7 @@ describe('validateSkipChecks', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(CheckNotSkippableError)
       expect((error as CheckNotSkippableError).reason).toBe(HOOK_CHECK_NOT_SKIPPABLE_REASON)
+      expect((error as CheckNotSkippableError).message).not.toContain('--skip-hooks')
     }
   })
 

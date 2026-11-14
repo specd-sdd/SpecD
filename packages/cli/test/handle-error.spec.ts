@@ -43,7 +43,10 @@ function capturedStderr(): string {
 function callHandleError(
   err: unknown,
   format?: string,
-  options?: { readonly lockRepairHint?: boolean },
+  options?: {
+    readonly command?: import('../src/error-hints.js').CliCommandId
+    readonly lockRepairHint?: boolean
+  },
 ): void {
   try {
     handleError(err, format, options)
@@ -442,5 +445,69 @@ describe('exit signalling without process.exit', () => {
     expect(thrown).toBeInstanceOf(CliExitError)
     expect((thrown as CliExitError).exitCode).toBe(3)
     expect(capturedStderr()).toContain('fatal: unexpected')
+  })
+})
+
+describe('handleError — command-aware hint rendering', () => {
+  beforeEach(() => {
+    mockProcessExit()
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('renders command-specific DEPENDS_ON_OVERWRITE hints on stderr and json output', () => {
+    const err = new DependsOnOverwriteError(['a'], ['b'])
+    callHandleError(err, 'text', { command: 'specs.generate-metadata' })
+    expect(capturedStderr()).toContain('Re-run with --force to overwrite curated dependsOn entries')
+
+    vi.mocked(process.stderr.write).mockClear()
+    vi.mocked(process.stdout.write).mockClear()
+
+    callHandleError(err, 'json', { command: 'specs.validate' })
+    const payload = JSON.parse(capturedStdout()) as { code: string; hint?: string }
+    expect(payload.code).toBe('DEPENDS_ON_OVERWRITE')
+    expect(payload.hint).toContain('specd specs deps')
+    expect(payload.hint).not.toContain('specs validate --force')
+  })
+
+  it('renders spec.show-canonical hint for SpecNotInChangeError with metadata.specId', () => {
+    const err = new SpecNotInChangeError('core:auth', 'my-change')
+    callHandleError(err, 'json', { command: 'change.transition' })
+    const payload = JSON.parse(capturedStdout()) as {
+      code: string
+      message: string
+      hint?: string
+    }
+    expect(payload.code).toBe('SPEC_NOT_IN_CHANGE')
+    expect(payload.message).not.toContain('specd specs show')
+    expect(payload.hint).toBe('Run: specd specs show core:auth to view the canonical spec')
+  })
+
+  it('includes hint in toon output for command-aware errors', () => {
+    const err = new DependsOnOverwriteError(['a'], ['b'])
+    callHandleError(err, 'toon', { command: 'specs.generate-metadata' })
+    const toonOut = capturedStdout()
+    expect(toonOut).toContain('code: DEPENDS_ON_OVERWRITE')
+    expect(toonOut).toContain('hint: Re-run with --force to overwrite curated dependsOn entries')
+  })
+
+  it('resolves impl.linksInScope hint from checkId and skippable metadata in structured mode', () => {
+    const err = {
+      specd: true,
+      name: 'CheckPredicateFailedError',
+      code: 'IMPLEMENTATION_STATE',
+      message: 'Out of scope links',
+      checkId: 'impl.linksInScope',
+      skippable: true,
+    }
+    callHandleError(err, 'json', { command: 'change.archive' })
+    const payload = JSON.parse(capturedStdout()) as { code: string; hint?: string }
+    expect(payload.code).toBe('IMPLEMENTATION_STATE')
+    expect(payload.hint).toContain('--skip-checks impl.linksInScope')
+    expect(payload.hint).toContain('--allow-out-of-scope')
   })
 })

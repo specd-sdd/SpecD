@@ -111,6 +111,10 @@ For change-scoped artifacts, the expected path remains the artifact output basen
 
 If the expected file does not exist and the artifact is not optional, validation MUST record a failure that includes the expected file path. The file MUST NOT be marked complete.
 
+### Requirement: Host-neutral SpecNotInChangeError
+
+When `ValidateArtifacts` throws `SpecNotInChangeError` (`SPEC_NOT_IN_CHANGE`), the error `message` MUST be host-neutral without embedding CLI commands such as `specd specs show`, and the error MUST expose `specId` and `changeName` metadata properties.
+
 ### Requirement: Delta eligibility uses artifact-level base existence
 
 For a delta-capable spec-scoped artifact, delta eligibility MUST be decided at the concrete artifact-file level, not by a coarse "the spec exists" check.

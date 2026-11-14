@@ -12,15 +12,7 @@
     "core:spec-id-format",
     "core:workspace"
   ],
-  "implementation": [
-    {
-      "file": "core:src/application/use-cases/edit-change.ts",
-      "symbols": ["EditChange"]
-    },
-    {
-      "file": "core:test/application/use-cases/edit-change.spec.ts"
-    }
-  ],
+  "implementation": [],
   "optimizations": {
     "optimizedDescription": {
       "value": "Edit change specs, description, and invalidation policy atomically; unscaffold removed specs only.",

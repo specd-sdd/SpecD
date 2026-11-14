@@ -6,9 +6,16 @@ import { type ChangeState } from '../value-objects/change-state.js'
  * has no happy-path lifecycle hop.
  */
 export class HappyPathNextUnavailableError extends SpecdError {
+  private readonly _state: ChangeState
+
   /** Machine-readable error code for programmatic handling. */
   override get code(): string {
     return 'HAPPY_PATH_NEXT_UNAVAILABLE'
+  }
+
+  /** Current change state that blocked advancing to the next happy-path state. */
+  get state(): ChangeState {
+    return this._state
   }
 
   /**
@@ -18,26 +25,27 @@ export class HappyPathNextUnavailableError extends SpecdError {
    */
   constructor(state: ChangeState) {
     super(happyPathNextMessage(state))
+    this._state = state
   }
 }
 
 /**
- * Human explanation for why `--next` / `to: 'next'` cannot run.
+ * Human explanation for why `to: 'next'` cannot run.
  *
  * @param state - Current change state
- * @returns CLI-facing error message
+ * @returns Host-neutral error message
  */
 export function happyPathNextMessage(state: ChangeState): string {
   switch (state) {
     case 'pending-spec-approval':
-      return 'cannot advance with --next: change is waiting for human spec approval'
+      return 'cannot advance to next state: change is waiting for human spec approval'
     case 'pending-signoff':
-      return 'cannot advance with --next: change is waiting for human signoff'
+      return 'cannot advance to next state: change is waiting for human signoff'
     case 'archivable':
-      return 'cannot advance with --next: archiving is not a lifecycle transition'
+      return 'cannot advance to next state: archiving is not a lifecycle transition'
     case 'archiving':
-      return 'cannot advance with --next: archiving is a terminal state'
+      return 'cannot advance to next state: archiving is a terminal state'
     default:
-      return `cannot advance with --next: no happy-path hop from '${state}'`
+      return `cannot advance to next state: no happy-path hop from '${state}'`
   }
 }

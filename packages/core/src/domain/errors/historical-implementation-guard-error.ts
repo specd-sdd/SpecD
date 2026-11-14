@@ -8,7 +8,7 @@ export type GuardedChangeOperation = 'draft' | 'discard'
  * has previously reached the `implementing` lifecycle state.
  *
  * Implementation may already exist, so shelving or abandoning the workflow
- * would risk leaving permanent specs and code out of sync. Pass `--force`
+ * would risk leaving permanent specs and code out of sync. Pass `force: true`
  * to bypass this guard intentionally.
  */
 export class HistoricalImplementationGuardError extends SpecdError {
@@ -38,7 +38,7 @@ export class HistoricalImplementationGuardError extends SpecdError {
    */
   constructor(operation: GuardedChangeOperation, changeName: string) {
     super(
-      `Cannot ${operation} a change that has reached implementing without --force: implementation may already exist and specs and code could be left out of sync`,
+      `Cannot ${operation} a change that has reached implementing without force: implementation may already exist and specs and code could be left out of sync`,
     )
     this._operation = operation
     this._changeName = changeName

@@ -15,8 +15,8 @@
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/preview-spec.ts",
-      "symbols": ["PreviewSpec"]
+      "file": "core:src/application/errors/spec-not-in-change-error.ts",
+      "symbols": ["SpecNotInChangeError"]
     }
   ],
   "optimizations": {

@@ -114,6 +114,9 @@ export class InvalidateChange {
    *
    * @param input - The invalidation command
    * @returns The persisted change and affected set report
+   * @throws {ChangeNotFoundError} If no change with the given name exists
+   * @throws {InvalidInvalidateTargetError} If policy/target shape or target selectors are invalid
+   * @throws {InvalidateRequiresForceError} If active consent gates would be revoked without `force`
    */
   async execute(input: InvalidateChangeInput): Promise<InvalidateChangeResult> {
     const change = await this._changes.get(input.name)
@@ -248,12 +251,12 @@ function validateCommandShape(
   if (effectivePolicy.artifacts === 'none' || effectivePolicy.artifacts === 'global') {
     if (targets !== undefined && targets.length > 0) {
       errors.push(
-        `--target is not allowed with policy '${effectivePolicy.artifacts}' — targeting is semantically irrelevant`,
+        `targets are not allowed with policy '${effectivePolicy.artifacts}' — targeting is semantically irrelevant`,
       )
     }
   } else {
     if (targets === undefined || targets.length === 0) {
-      errors.push(`At least one --target is required with policy '${effectivePolicy.artifacts}'`)
+      errors.push(`At least one target is required with policy '${effectivePolicy.artifacts}'`)
     }
   }
 

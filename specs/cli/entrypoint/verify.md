@@ -488,3 +488,18 @@
 - **GIVEN** a CLI invocation that does not run a `guide-sdk` subcommand
 - **WHEN** the process executes
 - **THEN** the SDK catalog module MUST NOT be loaded
+
+### Requirement: Command-aware error hint rendering
+
+#### Scenario: Command context resolves a hint in text and structured output
+
+- **GIVEN** a typed `SpecdError` whose code and command context match a hint entry
+- **WHEN** `handleError` handles the error with that `command` context
+- **THEN** stderr prints `error: <message>` followed by the resolved `hint` on the next line
+- **AND** in `json` or `toon` format the emitted error payload includes `hint` without altering `message`
+
+#### Scenario: Unmatched command context emits no hint
+
+- **GIVEN** a typed `SpecdError` handled without a matching `command` hint rule
+- **WHEN** `handleError` handles the error
+- **THEN** no `hint` line is printed and `hint` is omitted from structured output

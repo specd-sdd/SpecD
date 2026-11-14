@@ -37,6 +37,10 @@ If the loaded change has ever reached `implementing`, `DiscardChange.execute` SH
 
 The use case MAY proceed only when `input.force === true`, in which case the guard is bypassed intentionally.
 
+### Requirement: Host-neutral HistoricalImplementationGuardError
+
+When `DiscardChange` throws `HistoricalImplementationGuardError` (`IMPLEMENTATION_DETECTED`), the error `message` MUST explain in host-neutral terms that the change has previously reached `implementing` and cannot be discarded without explicit `force` confirmation, without embedding CLI flags such as `--force`. The error MUST preserve `operation` and `changeName` metadata properties.
+
 ### Requirement: Discarded event appended to history
 
 The use case MUST call `change.discard(reason, actor, supersededBy, force)` to append a `discarded` event to the change's history after the historical implementation guard has been satisfied or explicitly bypassed. The event records:

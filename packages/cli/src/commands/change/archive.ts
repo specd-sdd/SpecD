@@ -9,6 +9,7 @@ import {
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat, serializeOutput, type OutputFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
+import { resolveCliErrorHint } from '../../error-hints.js'
 import { parseCommaSeparatedValues } from '../../helpers/parse-comma-values.js'
 import { createCheckProgressPresenter } from './_check-progress-presenter.js'
 import { CliExitError } from '../../helpers/cli-exit-error.js'
@@ -182,18 +183,24 @@ JSON/TOON output schema:
             throw new CliExitError(1)
           }
           if (err instanceof CheckPredicateFailedError && opts.format === 'text') {
+            const checkHint =
+              err.skippable === true
+                ? (resolveCliErrorHint(
+                    err.checkId,
+                    { command: 'change.archive' },
+                    { isSkippable: true },
+                  ) ?? `Retry with --skip-checks ${err.checkId} if an exception is granted`)
+                : undefined
             const lines = [
               `error: ${err.message}`,
               `  check:   ${err.label} (${err.checkId})`,
               ...(err.command ? [`  command: ${err.command}`] : []),
-              ...(err.skippable === true
-                ? [`  bypass:  Retry with --skip-checks ${err.checkId} if an exception is granted`]
-                : []),
+              ...(checkHint !== undefined ? [`  bypass:  ${checkHint}`] : []),
             ]
             process.stderr.write(`${lines.join('\n')}\n`)
             throw new CliExitError(1)
           }
-          handleError(err, opts.format)
+          handleError(err, opts.format, { command: 'change.archive' })
         }
       },
     )

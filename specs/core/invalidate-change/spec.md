@@ -25,7 +25,7 @@ After resolving the effective policy, the use case MUST validate command shape a
 - `surgical` and `downstream` REQUIRE at least one target
 - `none` and `global` MUST reject any target as invalid input
 
-This validation happens before any mutation or approval guard handling.
+This validation happens before any mutation or approval guard handling. Validation error messages MUST use host-neutral domain terms (`targets`, `policy`) and MUST NOT embed CLI flag names such as `--target`.
 
 ### Requirement: Target normalization and validation
 
@@ -46,7 +46,7 @@ For scope compatibility:
 
 ### Requirement: Approval guard
 
-Before mutation, the use case SHALL determine from the canonical verdict whether the requested invalidation would revoke a currently `valid` spec approval or sign-off. If so, it requires `force=true` and reports each affected gate and recovery target. Historical events and already stale or revoked projections do not by themselves trigger the guard.
+Before mutation, the use case SHALL determine from the canonical verdict whether the requested invalidation would revoke a currently `valid` spec approval or sign-off. If so, it requires `force=true` and reports each affected gate and recovery target via `InvalidateRequiresForceError` (exposing `gates` and `recoveries` metadata) with a host-neutral message that does not embed CLI flags such as `--force`. Historical events and already stale or revoked projections do not by themselves trigger the guard.
 
 Without force, no mutation occurs. With force, revocation, audit evidence, artifact effects, and recovery are applied atomically by the reconciler.
 

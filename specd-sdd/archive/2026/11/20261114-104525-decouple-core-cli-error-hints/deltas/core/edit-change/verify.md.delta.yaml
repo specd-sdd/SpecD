@@ -1,0 +1,14 @@
+- op: added
+  description: 'Verify host-neutral SpecNotInChangeError in EditChange'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Host-neutral SpecNotInChangeError
+
+    #### Scenario: SpecNotInChangeError omits CLI command syntax
+
+    - **WHEN** `EditChange` throws `SpecNotInChangeError` for an absent `specId`
+    - **THEN** `error.message` does not contain `specd specs show`
+    - **AND** `error.specId` and `error.changeName` are exposed as metadata properties

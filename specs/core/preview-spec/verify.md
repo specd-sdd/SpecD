@@ -254,3 +254,11 @@
 - `parsers: ArtifactParserRegistry`
 - `diffGenerator: DiffGenerator`
 - **AND** the factory delegates to canonical `createPreviewSpec(deps)`
+
+### Requirement: Host-neutral SpecNotInChangeError
+
+#### Scenario: SpecNotInChangeError omits CLI command syntax
+
+- **WHEN** `PreviewSpec` throws `SpecNotInChangeError`
+- **THEN** `error.message` does not contain `specd specs show`
+- **AND** `error.specId` and `error.changeName` are exposed as metadata properties

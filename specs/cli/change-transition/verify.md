@@ -378,3 +378,17 @@
 - **WHEN** `specd change transition my-change <step>` is run in text mode
 - **THEN** the repair guide shows those blocker codes and that next action
 - **AND** the CLI does not invent an alternative repair route
+
+### Requirement: CLI-rendered transition error hints
+
+#### Scenario: HappyPathNextUnavailableError renders --next context in CLI
+
+- **GIVEN** `TransitionChange` throws `HappyPathNextUnavailableError`
+- **WHEN** `specd change transition <name> --next` renders the failure
+- **THEN** the CLI renders `--next` context via the centralized hint-resolution helper
+
+#### Scenario: impl.linksInScope failure renders bypass flag hint
+
+- **GIVEN** `impl.linksInScope` fails as a skippable check during `change transition`
+- **WHEN** `specd change transition` renders the failure
+- **THEN** the CLI renders `--skip-checks impl.linksInScope` (and `--allow-out-of-scope` alias) guidance via the centralized hint-resolution helper

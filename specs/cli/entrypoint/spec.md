@@ -86,6 +86,14 @@ The CLI SHALL ensure all user-facing errors (validation, format, configuration) 
 
 `@specd/cli` SHALL define its own `SpecdCliError` base class (extending `SpecdError`) for CLI-specific errors. Generic `Error` throws MUST be eliminated from formatters, command helpers, and argument validation logic to ensure the global `handleError` can emit structured JSON/TOON output without stack traces.
 
+### Requirement: Command-aware error hint rendering
+
+The CLI SHALL maintain a centralized, reusable hint-resolution helper/table that maps `(errorCode, command, metadata)` to an optional command-specific `hint` string (or `undefined` when no hint applies).
+
+`handleError(err, format, options)` SHALL accept a `command` context identifier in `HandleErrorOptions` (superseding ad-hoc boolean flags while remaining backward-compatible with `lockRepairHint`). When a hint is resolved, `cliError` SHALL print it on a separate line after `error: <message>` on stderr and SHALL emit it as a top-level `hint` field in `json` and `toon` error payloads without mutating `message`.
+
+Commands with custom error or repair-guide rendering SHALL reuse the same hint-resolution helper rather than duplicating flag/command hint strings.
+
 ### Requirement: JSON/TOON output schema in help
 
 Every command that supports `--format json|toon` MUST include a human-readable description of its JSON output schema in the command help text, appended after the options list using Commander's `addHelpText('after', ...)`. The schema block MUST:

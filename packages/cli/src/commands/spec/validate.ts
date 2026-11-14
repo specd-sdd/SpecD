@@ -120,7 +120,7 @@ JSON/TOON output schema:
             }
           }
         } catch (err) {
-          handleError(err, opts.format)
+          handleError(err, opts.format, { command: 'specs.validate' })
         }
       },
     )

@@ -100,6 +100,10 @@ If extraction finds dependency values but transform execution cannot normalize
 them, metadata generation fails explicitly. It does not silently drop those
 found values and continue with an incomplete `dependsOn` set.
 
+### Requirement: Host-neutral DependsOnOverwriteError
+
+When `GenerateSpecMetadata` throws `DependsOnOverwriteError`, the error `message` MUST describe the `dependsOn` mismatch (removed and/or added entries) in host-neutral terms without embedding CLI flags such as `--force`. The error MUST expose `existingDeps` and `incomingDeps` as structured metadata properties.
+
 ### Requirement: One consistent lock snapshot or explicit absence
 
 `GenerateSpecMetadata` MUST read persisted state at most once per generation

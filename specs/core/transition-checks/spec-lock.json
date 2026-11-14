@@ -15,8 +15,8 @@
   ],
   "implementation": [
     {
-      "file": "core:src/domain/services/transition-checks.ts",
-      "symbols": ["resolveEffectiveBindings", "ResolveEffectiveBindingsInput"]
+      "file": "core:src/application/services/detect-impl-links-in-scope.ts",
+      "symbols": ["detectImplLinksInScope"]
     }
   ],
   "optimizations": {

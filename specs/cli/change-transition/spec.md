@@ -31,6 +31,10 @@ Optional-step shortcut recommendation belongs to `GetStatus.nextAction`: callers
 
 When Core rejects `to: 'next'` (no happy-path hop: at least `pending-spec-approval`, `pending-signoff`, `archivable`, `archiving`), the command MUST exit with code 1 and print an explanatory `error:` message to stderr.
 
+### Requirement: CLI-rendered transition error hints
+
+When `HappyPathNextUnavailableError` (`HAPPY_PATH_NEXT_UNAVAILABLE`) or a skippable `impl.linksInScope` failure is surfaced by `change transition`, the command SHALL use the centralized CLI hint-resolution helper (`change.transition` context) to render `--next` context and `--skip-checks impl.linksInScope` / `--allow-out-of-scope` hints, rather than relying on CLI flags embedded in `@specd/core` messages.
+
 ### Requirement: Validity-aware transition guidance
 
 Before resolving `next`, and when a requested transition fails after fresh reconciliation, the command SHALL consume the canonical `GetStatus` or `TransitionChange` result rather than reconstructing gate or verification rules.

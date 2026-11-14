@@ -70,6 +70,40 @@ describe('DiscardChange', () => {
       expect(mutateSpy).toHaveBeenCalledOnce()
       expect(mutateSpy).toHaveBeenCalledWith('my-change', expect.any(Function))
     })
+
+    it('records discarded.by from ActorResolver and omits supersededBy when not provided', async () => {
+      const change = makeChange('my-change')
+      const repo = makeChangeRepository([change])
+      const uc = new DiscardChange(
+        repo,
+        makeActorResolver({ name: 'Alice', email: 'alice@example.com' }),
+      )
+
+      const result = await uc.execute({ name: 'my-change', reason: 'not needed' })
+
+      const discarded = result.history.find((e) => e.type === 'discarded')
+      expect(discarded?.type).toBe('discarded')
+      if (discarded?.type === 'discarded') {
+        expect(discarded.by).toEqual({ name: 'Alice', email: 'alice@example.com' })
+        expect(discarded.supersededBy).toBeUndefined()
+      }
+    })
+
+    it('persists through ChangeRepository.mutateDraft for drafted changes', async () => {
+      const change = makeChange('my-draft')
+      change.draft({ name: 'User', email: 'user@example.com' }, 'shelved')
+      const repo = makeChangeRepository([change])
+      const mutateDraftSpy = vi.spyOn(repo, 'mutateDraft')
+      const mutateSpy = vi.spyOn(repo, 'mutate')
+      const uc = new DiscardChange(repo, makeActorResolver())
+
+      const result = await uc.execute({ name: 'my-draft', reason: 'cleanup draft' })
+
+      expect(mutateDraftSpy).toHaveBeenCalledOnce()
+      expect(mutateDraftSpy).toHaveBeenCalledWith('my-draft', expect.any(Function))
+      expect(mutateSpy).not.toHaveBeenCalled()
+      expect(result.history.some((e) => e.type === 'discarded')).toBe(true)
+    })
   })
 
   describe('given no change with that name', () => {

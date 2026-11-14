@@ -298,3 +298,12 @@
 - `extractorTransforms: ExtractorTransformRegistry`
 - `workspaceRoutes: readonly SpecWorkspaceRoute[]`
 - **AND** the factory delegates to canonical `createGenerateSpecMetadata(deps)`
+
+### Requirement: Host-neutral DependsOnOverwriteError
+
+#### Scenario: DependsOnOverwriteError message omits --force
+
+- **GIVEN** existing metadata has `dependsOn: ['core:a']` and incoming metadata has `dependsOn: ['core:b']`
+- **WHEN** `DependsOnOverwriteError` is thrown by `GenerateSpecMetadata`
+- **THEN** `error.message` describes the `dependsOn` difference without mentioning `--force`
+- **AND** `error.existingDeps` equals `['core:a']` and `error.incomingDeps` equals `['core:b']`

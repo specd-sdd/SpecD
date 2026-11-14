@@ -115,3 +115,13 @@
 - `changes: ChangeRepository`
 - `actor: ActorResolver`
 - **AND** the factory delegates to canonical `createDiscardChange(deps)`
+
+### Requirement: Host-neutral HistoricalImplementationGuardError
+
+#### Scenario: DiscardChange guard error omits --force
+
+- **GIVEN** a change that has previously reached `implementing`
+- **WHEN** `DiscardChange` is called without `force: true`
+- **THEN** `HistoricalImplementationGuardError` (`IMPLEMENTATION_DETECTED`) is thrown
+- **AND** `error.message` does not contain `--force`
+- **AND** `error.operation` is `'discard'` and `error.changeName` is the change name

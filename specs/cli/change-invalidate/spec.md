@@ -91,6 +91,10 @@ The command exits with code `1` for invalid user/domain input, including:
 - malformed or scope-incompatible targets
 - missing `--force` when approvals/signoff are active
 
+### Requirement: CLI-rendered invalidation hints
+
+When `InvalidateRequiresForceError` (`INVALIDATE_REQUIRES_FORCE`) or policy-targeting validation errors propagate from `InvalidateChange`, `change invalidate` SHALL use the centralized CLI hint-resolution helper (`change.invalidate` context) to render `--force` and `--target` hints on stderr and as `hint` in `json`/`toon` output, rather than relying on CLI flags embedded in `@specd/core` error messages.
+
 ## Constraints
 
 - The command MUST NOT expose `artifact-drift` as a manual cause.

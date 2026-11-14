@@ -16,8 +16,8 @@
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/generate-spec-metadata.ts",
-      "symbols": ["GenerateSpecMetadata"]
+      "file": "core:src/domain/errors/depends-on-overwrite-error.ts",
+      "symbols": ["DependsOnOverwriteError"]
     }
   ],
   "optimizations": {

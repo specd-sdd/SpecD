@@ -6,15 +6,8 @@
   "dependsOn": ["core:change", "core:change-manifest", "core:compile-context"],
   "implementation": [
     {
-      "file": "cli:src/helpers/confirm.ts",
-      "symbols": ["confirmOrExit", "ConfirmOptions"]
-    },
-    {
       "file": "cli:src/commands/change/deps.ts",
       "symbols": ["registerChangeDeps"]
-    },
-    {
-      "file": "cli:test/commands/change-deps.spec.ts"
     }
   ]
 }

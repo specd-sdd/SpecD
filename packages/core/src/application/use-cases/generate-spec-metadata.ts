@@ -98,6 +98,7 @@ export class GenerateSpecMetadata {
    * @throws {WorkspaceNotFoundError} If the spec ID names an unknown workspace
    * @throws {SpecNotFoundError} If the spec does not exist
    * @throws {SchemaNotFoundError} If the active schema cannot be resolved
+   * @throws {SchemaProviderIdentityMismatchError} If the resolved schema provider identity does not match
    * @throws {DependsOnOverwriteError} If declared `dependsOn` cannot be overwritten
    */
   async execute(input: GenerateSpecMetadataInput): Promise<GenerateSpecMetadataResult> {

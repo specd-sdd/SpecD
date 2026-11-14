@@ -51,6 +51,10 @@ When `--format json` succeeds:
 - If the change is already in `drafts/`, the command exits with code 1 and prints an `error:` message to stderr.
 - If the change has ever reached `implementing` and `--force` is not provided, the command exits with code 1 and prints an `error:` message explaining that implementation may already exist and shelving the change could leave specs and code out of sync.
 
+### Requirement: CLI-rendered historical implementation guard hint
+
+When `DraftChange` throws `HistoricalImplementationGuardError` (`IMPLEMENTATION_DETECTED`), `change draft` SHALL pass the `change.draft` command context to `handleError` so the centralized hint-resolution helper renders the `--force` bypass hint on stderr and as `hint` in `json`/`toon` output.
+
 ## Constraints
 
 - Drafting does not affect lifecycle state

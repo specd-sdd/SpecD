@@ -200,3 +200,11 @@
 
 - **WHEN** a modification is run with a bare `<specId>` such as `auth/login`
 - **THEN** the text output shows `default:auth/login`, the same value JSON output carries
+
+### Requirement: CLI-rendered dependency operation flag hints
+
+#### Scenario: UpdateSpecDeps validation error renders CLI flag hint
+
+- **GIVEN** `UpdateSpecDeps` throws `InvalidInputError` for conflicting or missing operations
+- **WHEN** `specd changes deps` handles the error
+- **THEN** the CLI renders flag guidance referencing `--set`, `--add`, `--remove`, and `--clear` via the centralized hint-resolution helper

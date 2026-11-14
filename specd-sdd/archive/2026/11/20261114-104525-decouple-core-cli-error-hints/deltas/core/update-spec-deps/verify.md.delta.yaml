@@ -1,0 +1,23 @@
+- op: modified
+  description: 'Verify host-neutral UpdateSpecDeps validation messages without CLI flag prefixes'
+  selector:
+    type: section
+    matches: 'Requirement: Typed errors for dependency update failures'
+  content: |
+    #### Scenario: Mutually exclusive operations throw host-neutral validation error
+
+    - **WHEN** `UpdateSpecDeps` is called with both `set` and `add`
+    - **THEN** `InvalidInputError` is thrown with code `INVALID_INPUT`
+    - **AND** `error.message` references `set`/`add` without `--` CLI flag prefixes
+
+    #### Scenario: Missing operation throws host-neutral validation error
+
+    - **WHEN** `UpdateSpecDeps` is called with none of `add`, `remove`, `set`, or `clear`
+    - **THEN** `InvalidInputError` is thrown with a host-neutral message without `--` CLI flag prefixes
+
+    #### Scenario: Dependency not found throws error
+
+    - **GIVEN** a spec has `dependsOn: ['core:existing']`
+    - **WHEN** `UpdateSpecDeps` is called to remove `'core:non-existent'`
+    - **THEN** a typed error is thrown
+    - **AND** the message indicates which dependency was not found

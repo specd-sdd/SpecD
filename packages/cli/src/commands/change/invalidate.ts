@@ -227,7 +227,7 @@ Target syntax:
               )
             }
           }
-          handleError(err, opts.format)
+          handleError(err, opts.format, { command: 'change.invalidate' })
         }
       },
     )

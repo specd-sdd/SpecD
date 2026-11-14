@@ -12,9 +12,6 @@
     {
       "file": "cli:src/commands/spec/generate-metadata.ts",
       "symbols": ["registerSpecGenerateMetadata"]
-    },
-    {
-      "file": "cli:test/commands/spec-generate-metadata.spec.ts"
     }
   ]
 }

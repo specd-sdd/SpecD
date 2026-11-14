@@ -204,4 +204,30 @@ describe('spec validate', () => {
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain('error:')
   })
+
+  it('renders specs.validate repair hint without suggesting --force on DependsOnOverwriteError', async () => {
+    const { kernel, stderr } = setup()
+    kernel.specs.validate.execute.mockRejectedValue(
+      Object.assign(
+        new Error(
+          'dependsOn would change (added: core:new; removed: core:old). Pass force to overwrite curated dependencies.',
+        ),
+        {
+          specd: true,
+          code: 'DEPENDS_ON_OVERWRITE',
+          existingDeps: ['core:old'],
+          incomingDeps: ['core:new'],
+        },
+      ),
+    )
+
+    const program = makeProgram()
+    registerSpecValidate(program.command('spec'))
+    await program.parseAsync(['node', 'specd', 'spec', 'validate', 'auth/login']).catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toContain('dependsOn would change')
+    expect(stderr()).toContain('specd specs deps add')
+    expect(stderr()).toContain('specd specs generate-metadata --force')
+  })
 })

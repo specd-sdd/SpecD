@@ -1,0 +1,13 @@
+- op: added
+  description: 'Document CLI-rendered --force hint for IMPLEMENTATION_DETECTED in change discard'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Error cases'
+  content: |
+    ### Requirement: CLI-rendered historical implementation guard hint
+
+    When `DiscardChange` throws `HistoricalImplementationGuardError` (`IMPLEMENTATION_DETECTED`), `change discard` SHALL pass the `change.discard` command context to `handleError` so the centralized hint-resolution helper renders the `--force` bypass hint on stderr and as `hint` in `json`/`toon` output.

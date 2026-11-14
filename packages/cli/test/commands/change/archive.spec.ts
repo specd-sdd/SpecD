@@ -551,7 +551,7 @@ describe('change archive', () => {
       kernel.changes.archive.execute.mockRejectedValue(
         new CheckNotSkippableError(
           'hook.pre',
-          'Effect checks (hooks) are governed exclusively by skipHookPhases (CLI: --skip-hooks)',
+          'Effect checks (hooks) are governed exclusively by skipHookPhases',
         ),
       )
       const program = makeProgram()
@@ -703,6 +703,41 @@ describe('change archive', () => {
         .catch(() => {})
       expect(process.exit).toHaveBeenCalledWith(1)
       expect(`${stdout()}${stderr()}`).toContain('SECURITY_FINDINGS')
+    })
+
+    it('renders centralized bypass hint for skippable impl.linksInScope in text and json modes', async () => {
+      const implFailure = new CheckPredicateFailedError(
+        'impl.linksInScope',
+        'Checking implementation links',
+        'IMPLEMENTATION_STATE',
+        'Implementation sidecar updates would touch 1 spec outside scope.',
+        undefined,
+        undefined,
+        true,
+      )
+
+      const { kernel: textKernel, stderr: textStderr } = setup()
+      textKernel.changes.archive.execute.mockRejectedValue(implFailure)
+      const textProgram = makeProgram()
+      registerChangeArchive(textProgram.command('change'))
+      await textProgram.parseAsync(['node', 'specd', 'change', 'archive', 'feat']).catch(() => {})
+      expect(process.exit).toHaveBeenCalledWith(1)
+      expect(textStderr()).toContain('--skip-checks impl.linksInScope')
+      expect(textStderr()).toContain('--allow-out-of-scope')
+
+      vi.clearAllMocks()
+      const { kernel: jsonKernel, stdout: jsonStdout } = setup()
+      jsonKernel.changes.archive.execute.mockRejectedValue(implFailure)
+      const jsonProgram = makeProgram()
+      registerChangeArchive(jsonProgram.command('change'))
+      await jsonProgram
+        .parseAsync(['node', 'specd', 'change', 'archive', 'feat', '--format', 'json'])
+        .catch(() => {})
+      expect(process.exit).toHaveBeenCalledWith(1)
+      const payload = JSON.parse(jsonStdout()) as { code: string; hint?: string }
+      expect(payload.code).toBe('IMPLEMENTATION_STATE')
+      expect(payload.hint).toContain('--skip-checks impl.linksInScope')
+      expect(payload.hint).toContain('--allow-out-of-scope')
     })
 
     it('still exits 1 naming the state when the change is not archivable', async () => {

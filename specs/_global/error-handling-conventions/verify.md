@@ -63,3 +63,18 @@
 - **WHEN** the code is reviewed or indexed
 - **THEN** it MUST have a JSDoc comment describing the error and its machine-readable code
 - **AND** failure to do so is a convention violation
+
+### Requirement: Host-Neutral Core Errors and Delivery Hints
+
+#### Scenario: Core error message omits CLI flags and commands
+
+- **GIVEN** a domain or application error in `@specd/core`
+- **WHEN** the error is instantiated
+- **THEN** its `message` describes the invariant violation without CLI flags (`--force`, `--next`, etc.) or `specd ...` command syntax
+- **AND** relevant context is exposed as structured metadata properties
+
+#### Scenario: CLI translates typed core error with active command context
+
+- **GIVEN** a `@specd/core` error with a machine-readable `code` and metadata
+- **WHEN** `@specd/cli` handles the error for a specific command
+- **THEN** the CLI renders a command-appropriate `hint` without mutating the core error `message`

@@ -136,3 +136,17 @@ Scenarios:
 - **GIVEN** an active signoff on the change
 - **WHEN** the command is run without `--force`
 - **THEN** it exits with code `1`
+
+### Requirement: CLI-rendered invalidation hints
+
+#### Scenario: InvalidateRequiresForceError renders --force hint via shared resolver
+
+- **GIVEN** `InvalidateChange` throws `InvalidateRequiresForceError`
+- **WHEN** `specd changes invalidate` handles the error without `--force`
+- **THEN** the CLI renders a `--force` hint via the centralized hint-resolution helper in text and structured output
+
+#### Scenario: Target policy validation error renders --target hint
+
+- **GIVEN** `InvalidateChange` rejects missing or forbidden targets
+- **WHEN** `specd changes invalidate` handles the error
+- **THEN** the CLI renders a `--target` hint via the centralized hint-resolution helper

@@ -143,6 +143,10 @@ If diff generation fails through the dedicated `DiffGenerationError`, `PreviewSp
 
 Once the change and its sovereign schema are resolved, the preview MUST always succeed for content-level failures — partial results are acceptable, total failure is not. This guarantee does not cover preconditions: change lookup failures, sovereign schema resolution failures, and `SchemaProviderIdentityMismatchError` MUST propagate as errors, because no trustworthy artifact model exists to preview against.
 
+### Requirement: Host-neutral SpecNotInChangeError
+
+When `PreviewSpec` throws `SpecNotInChangeError` (`SPEC_NOT_IN_CHANGE`), the error `message` MUST be host-neutral without embedding CLI commands such as `specd specs show`, and the error MUST expose `specId` and `changeName` metadata properties.
+
 ### Requirement: Sovereign schema resolution
 
 `PreviewSpec` MUST obtain the change's sovereign schema through `ResolveChangeSchema`. The change's recorded schema is the sovereign authority defining artifact parser registry lookups, delta formats, and templates. A different workspace default MUST remain irrelevant; provider identity mismatch MUST propagate as `SchemaProviderIdentityMismatchError`.

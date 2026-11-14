@@ -790,4 +790,33 @@ describe('Display mode (audit hardening)', () => {
     expect(source).not.toContain('parseSpecId')
     expect(source).not.toContain('listWorkspaces')
   })
+
+  it('renders centralized operation-flags hint when UpdateSpecDeps throws InvalidInputError', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.updateSpecDeps.execute.mockRejectedValue(
+      Object.assign(new Error('set is mutually exclusive with add, remove, and clear'), {
+        specd: true,
+        code: 'INVALID_INPUT',
+      }),
+    )
+
+    const program = makeProgram()
+    registerChangeDeps(program.command('change'))
+    await program
+      .parseAsync([
+        'node',
+        'specd',
+        'change',
+        'deps',
+        'add-auth',
+        'auth/login',
+        '--set',
+        'auth/session',
+      ])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toContain('set is mutually exclusive')
+    expect(stderr()).toContain('--add, --remove, --set, or --clear')
+  })
 })

@@ -36,6 +36,12 @@ try {
 }
 ```
 
+### Host-Neutral Error Messages & Delivery Hints
+
+`@specd/core` error messages MUST remain host-neutral: they describe the domain or validation condition without embedding CLI flags (such as `--force`, `--next`, `--target`, `--set`, or `--allow-out-of-scope`) or CLI commands (such as `specd specs show ...`).
+
+Instead, errors expose a machine-readable `code` plus structured metadata (via getters such as `state`, `specId`, `fieldPath`, or `recoveries`). Delivery adapters translate `(code, invokedCommand, metadata)` into host-appropriate remediation hints—for example, `@specd/cli` resolves hints centrally in `packages/cli/src/error-hints.ts` (`CLI_ERROR_HINTS` + `CLI_ERROR_HINT_RULES` via `resolveCliErrorHint`) and renders them through `handleError` as a separate `hint` line on stderr or top-level `hint` field in `json`/`toon` output.
+
 ---
 
 ## Application errors

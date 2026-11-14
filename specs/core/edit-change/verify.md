@@ -397,3 +397,11 @@ Scenarios:
 
 - **WHEN** an SDK caller adds a readOnly spec
 - **THEN** the same rejection applies without the CLI
+
+### Requirement: Host-neutral SpecNotInChangeError
+
+#### Scenario: SpecNotInChangeError omits CLI command syntax
+
+- **WHEN** `EditChange` throws `SpecNotInChangeError` for an absent `specId`
+- **THEN** `error.message` does not contain `specd specs show`
+- **AND** `error.specId` and `error.changeName` are exposed as metadata properties

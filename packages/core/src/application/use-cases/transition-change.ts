@@ -195,6 +195,7 @@ export class TransitionChange {
    * @throws {CheckPredicateFailedError} If a predicate check fails
    * @throws {HookFailedError} If a source.post or target.pre hook exits with a non-zero code
    * @throws {ReconciledOperationBlockedError} If validity reconciliation already committed a recovery
+   * @throws {HappyPathNextUnavailableError} If `to` is `'next'` and the current state has no happy-path hop
    */
   async execute(
     input: TransitionChangeInput,

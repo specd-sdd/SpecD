@@ -2,7 +2,7 @@
   "manifestVersion": 2,
   "name": "merged-spec-validity-gate",
   "createdAt": "2026-11-10T07:39:13.834Z",
-  "updatedAt": "2026-11-10T07:39:25.408Z",
+  "updatedAt": "2026-11-14T14:15:39.364Z",
   "description": "Block designing→ready and archive unless change-scoped merged/created specs pass ValidateSpecs-equivalent validation including metadata materialization.",
   "schema": {
     "name": "schema-std",
@@ -291,6 +291,31 @@
         }
       ],
       "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-14T14:15:39.358Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'decouple-core-cli-error-hints' was archived with overlapping specs: core:preview-spec, core:transition-checks",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:transition-checks", "core:preview-spec"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:transition-checks", "core:preview-spec"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
     }
   ]
 }

@@ -143,11 +143,16 @@
 
 ### Requirement: Typed errors for dependency update failures
 
-#### Scenario: Mutually exclusive flags throw validation error
+#### Scenario: Mutually exclusive operations throw host-neutral validation error
 
-- **WHEN** `UpdateSpecDeps` is called with both `--set` and `--add`
-- **THEN** a typed validation error is thrown (e.g. `InvalidInputError`)
-- **AND** the machine-readable code is `INVALID_INPUT`
+- **WHEN** `UpdateSpecDeps` is called with both `set` and `add`
+- **THEN** `InvalidInputError` is thrown with code `INVALID_INPUT`
+- **AND** `error.message` references `set`/`add` without `--` CLI flag prefixes
+
+#### Scenario: Missing operation throws host-neutral validation error
+
+- **WHEN** `UpdateSpecDeps` is called with none of `add`, `remove`, `set`, or `clear`
+- **THEN** `InvalidInputError` is thrown with a host-neutral message without `--` CLI flag prefixes
 
 #### Scenario: Dependency not found throws error
 

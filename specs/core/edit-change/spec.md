@@ -60,6 +60,10 @@ When both `removeSpecIds` and `addSpecIds` are provided, removals MUST be applie
 
 If any spec ID in `removeSpecIds` is not present in the change's current `specIds`, the use case MUST throw `SpecNotInChangeError` for that spec ID. Removal is atomic per ID — the first missing ID aborts the entire operation.
 
+### Requirement: Host-neutral SpecNotInChangeError
+
+When `EditChange` throws `SpecNotInChangeError` (`SPEC_NOT_IN_CHANGE`), the error `message` MUST state that the spec is not in the change's `specIds` in host-neutral terms without embedding CLI commands such as `specd specs show`. The error MUST expose `specId` and `changeName` as structured metadata properties.
+
 ### Requirement: Addition is idempotent
 
 If a spec ID in `addSpecIds` already exists in the change's `specIds` (after removals), it MUST be silently skipped — no duplicate is added and no error is thrown.

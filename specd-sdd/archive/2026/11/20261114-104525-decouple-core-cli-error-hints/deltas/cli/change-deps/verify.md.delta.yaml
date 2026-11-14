@@ -1,0 +1,14 @@
+- op: added
+  description: 'Verify CLI-rendered dependency operation flag hints in change deps'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: CLI-rendered dependency operation flag hints
+
+    #### Scenario: UpdateSpecDeps validation error renders CLI flag hint
+
+    - **GIVEN** `UpdateSpecDeps` throws `InvalidInputError` for conflicting or missing operations
+    - **WHEN** `specd changes deps` handles the error
+    - **THEN** the CLI renders flag guidance referencing `--set`, `--add`, `--remove`, and `--clear` via the centralized hint-resolution helper

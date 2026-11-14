@@ -6,23 +6,16 @@
   "dependsOn": ["core:config", "default:_global/error-handling-conventions"],
   "implementation": [
     {
-      "file": "cli:src/run.ts",
-      "symbols": ["run"]
-    },
-    {
-      "file": "cli:src/helpers/cli-signals.ts",
-      "symbols": ["installCliSignalHandlers"]
-    },
-    {
-      "file": "cli:src/helpers/cli-exit-error.ts",
-      "symbols": ["CliExitError"]
+      "file": "cli:src/error-hints.ts",
+      "symbols": ["resolveCliErrorHint"]
     },
     {
       "file": "cli:src/handle-error.ts",
-      "symbols": ["cliError", "handleError"]
+      "symbols": ["handleError"]
     },
     {
-      "file": "cli:src/index.ts"
+      "file": "cli:src/commands/spec/deps.ts",
+      "symbols": ["registerSpecDeps"]
     }
   ],
   "optimizations": {

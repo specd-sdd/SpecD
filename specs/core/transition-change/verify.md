@@ -635,3 +635,13 @@ Scenarios:
 - **GIVEN** a change is in `pending-signoff`
 - **WHEN** it requests `archivable`
 - **THEN** the transition fails with `approval-required` for the `signoff` gate
+
+### Requirement: Host-neutral HappyPathNextUnavailableError
+
+#### Scenario: HappyPathNextUnavailableError message omits --next and exposes state
+
+- **GIVEN** a change in a state with no happy-path next hop (such as `archivable` or `pending-spec-approval`)
+- **WHEN** `TransitionChange` is called with `to: 'next'`
+- **THEN** `HappyPathNextUnavailableError` (`HAPPY_PATH_NEXT_UNAVAILABLE`) is thrown
+- **AND** `error.message` does not contain `--next`
+- **AND** `error.state` equals the current change state

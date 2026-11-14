@@ -7,7 +7,7 @@ import {
 
 /** Reason shown when a hook check is passed in `skipChecks`. */
 export const HOOK_CHECK_NOT_SKIPPABLE_REASON =
-  'Effect checks (hooks) are governed exclusively by skipHookPhases (CLI: --skip-hooks)'
+  'Effect checks (hooks) are governed exclusively by skipHookPhases'
 
 /** Input for {@link validateSkipChecks}. */
 export interface ValidateSkipChecksInput {

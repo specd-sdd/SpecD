@@ -99,6 +99,10 @@ When `--format json` or `toon` is specified, success MUST emit a terminal struct
 - If a predicate of a plugin or schema-embedded check fails (`CheckPredicateFailedError`), exits with code 1 and reports the check id, label, and message. In text mode, when the error is skippable it also prints `bypass:  Retry with --skip-checks <id> if an exception is granted`; when it is not skippable no bypass is suggested.
 - If archive is blocked by spec overlap and `spec.overlap` is skippable, exits with code 1 and prints to stderr the overlapping specs and peer changes, ending with `Use --skip-checks spec.overlap to proceed despite overlap.` When `spec.overlap` is not skippable, the message MUST NOT suggest a bypass.
 
+### Requirement: CLI-rendered out-of-scope implementation hint
+
+When `ArchiveChange` fails on `impl.linksInScope`, `change archive` SHALL reuse the centralized CLI hint-resolution helper (`change.archive` context) to render `--skip-checks impl.linksInScope` (and `--allow-out-of-scope` alias) guidance, rather than relying on CLI flags embedded in `@specd/core` failure messages.
+
 ### Requirement: Canonical archive command naming
 
 Documentation and agent guidance MUST use `specd changes archive <name>` as the canonical command. `specd change archive <name>` remains a supported compatibility alias and MUST have identical archive semantics.

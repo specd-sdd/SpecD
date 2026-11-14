@@ -1,0 +1,13 @@
+- op: added
+  description: 'Document host-neutral DependsOnOverwriteError message without CLI flags'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: dependsOn resolution'
+  content: |
+    ### Requirement: Host-neutral DependsOnOverwriteError
+
+    When `GenerateSpecMetadata` throws `DependsOnOverwriteError`, the error `message` MUST describe the `dependsOn` mismatch (removed and/or added entries) in host-neutral terms without embedding CLI flags such as `--force`. The error MUST expose `existingDeps` and `incomingDeps` as structured metadata properties.

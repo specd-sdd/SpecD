@@ -101,6 +101,10 @@ All errors exit with code 1 and write to stderr:
 - An invalid spec ID (empty, blank, or malformed; for example `--set ""`) is rejected with the `InvalidSpecIdError` message quoting the full value, and nothing is stored
 - An unknown workspace is rejected with the `WorkspaceNotFoundError` message
 
+### Requirement: CLI-rendered dependency operation flag hints
+
+When `change deps` surfaces operation validation errors from `UpdateSpecDeps` (or invalid CLI option combinations), it SHALL use the `change.deps` command context and centralized hint-resolution helper to render CLI flag guidance (`--set`, `--add`, `--remove`, `--clear`), rather than relying on CLI flags embedded in `@specd/core` error messages.
+
 ## Constraints
 
 - `--set` is mutually exclusive with `--add`, `--remove`, and `--clear`; `--clear` is mutually exclusive with `--add` and `--remove`

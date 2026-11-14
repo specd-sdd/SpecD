@@ -36,11 +36,13 @@ Scenarios:
 
 - **WHEN** `InvalidateChange.execute` is called with effective policy `downstream` and no targets
 - **THEN** execution fails before mutating the change
+- **AND** the error message uses host-neutral terms without `--target`
 
 #### Scenario: Target forbidden for global execution
 
 - **WHEN** `InvalidateChange.execute` is called with effective policy `global` and any target
 - **THEN** execution fails before mutating the change
+- **AND** the error message uses host-neutral terms without `--target`
 
 ### Requirement: Target normalization and validation
 
@@ -59,7 +61,7 @@ Scenarios:
 
 - **GIVEN** a request affects valid approval
 - **WHEN** force is absent
-- **THEN** no mutation occurs and affected gates and recovery targets are reported
+- **THEN** no mutation occurs and `InvalidateRequiresForceError` reports `gates` and `recoveries` with a host-neutral message that does not mention `--force`
 - **AND** already-stale historical evidence does not trigger that guard
 
 #### Scenario: Forced revocation commits evidence and recovery together

@@ -1,0 +1,13 @@
+- op: added
+  description: 'Ensure HistoricalImplementationGuardError thrown by DiscardChange is host-neutral without --force CLI flag'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Historical implementation guard'
+  content: |
+    ### Requirement: Host-neutral HistoricalImplementationGuardError
+
+    When `DiscardChange` throws `HistoricalImplementationGuardError` (`IMPLEMENTATION_DETECTED`), the error `message` MUST explain in host-neutral terms that the change has previously reached `implementing` and cannot be discarded without explicit `force` confirmation, without embedding CLI flags such as `--force`. The error MUST preserve `operation` and `changeName` metadata properties.

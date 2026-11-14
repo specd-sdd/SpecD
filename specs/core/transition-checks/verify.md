@@ -600,3 +600,12 @@
 
 - **WHEN** status or archive composition resolves its workflow check registry
 - **THEN** the registry receives the overlap detector dependency
+
+### Requirement: Host-neutral impl.linksInScope message
+
+#### Scenario: Out-of-scope detection message omits --allow-out-of-scope
+
+- **GIVEN** a change with confirmed implementation links targeting specs outside `change.specIds`
+- **WHEN** `detectImplLinksInScope` runs
+- **THEN** `blocked` is `true` and `outOfScopeSpecIds` lists the out-of-scope spec IDs
+- **AND** `message` does not contain `--allow-out-of-scope`

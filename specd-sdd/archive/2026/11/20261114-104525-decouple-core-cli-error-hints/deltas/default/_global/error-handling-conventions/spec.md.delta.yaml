@@ -1,0 +1,15 @@
+- op: added
+  description: 'Require @specd/core errors and messages to be delivery-agnostic and delivery packages to render command-specific hints'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Actionable Messaging'
+  content: |
+    ### Requirement: Host-Neutral Core Errors and Delivery Hints
+
+    Domain and application errors, services, and use cases in `@specd/core` MUST NOT embed delivery-mechanism flags (such as `--force`, `--next`, `--target`, `--allow-out-of-scope`, `--set`, `--add`, `--remove`, `--clear`) or CLI command syntax (such as `specd ...`) inside `message`.
+
+    Core errors SHALL describe the violated domain or application invariant in host-neutral terms and expose structured metadata properties (such as `specId`, `state`, `operation`, `gates`, `existingDeps`, `incomingDeps`, or `outOfScopeSpecIds`) so delivery mechanisms (`@specd/cli`, `@specd/mcp`, `@specd/sdk` callers) can translate typed error codes and metadata into delivery-appropriate hints using their active command context.

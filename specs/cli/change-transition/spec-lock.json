@@ -16,13 +16,6 @@
     {
       "file": "cli:src/commands/change/transition.ts",
       "symbols": ["registerChangeTransition"]
-    },
-    {
-      "file": "cli:test/commands/change/transition.spec.ts"
-    },
-    {
-      "file": "cli:src/commands/change/_check-progress-presenter.ts",
-      "symbols": ["createCheckProgressPresenter"]
     }
   ],
   "optimizations": {

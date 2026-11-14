@@ -43,6 +43,10 @@ When `--format json` succeeds:
 - `--reason` is mandatory; omitting it is a CLI usage error (exit code 1).
 - If the change has ever reached `implementing` and `--force` is not provided, the command exits with code 1 and prints an `error:` message explaining that implementation may already exist and discarding the change could leave specs and code out of sync.
 
+### Requirement: CLI-rendered historical implementation guard hint
+
+When `DiscardChange` throws `HistoricalImplementationGuardError` (`IMPLEMENTATION_DETECTED`), `change discard` SHALL pass the `change.discard` command context to `handleError` so the centralized hint-resolution helper renders the `--force` bypass hint on stderr and as `hint` in `json`/`toon` output.
+
 ## Constraints
 
 - Discarding is irreversible — there is no undo command

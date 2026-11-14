@@ -8,7 +8,7 @@ export interface ForceInvalidationRecovery {
 }
 
 /**
- * Thrown when invalidation would clear an active approval/signoff without `--force`.
+ * Thrown when invalidation would clear an active approval/signoff without `force: true`.
  */
 export class InvalidateRequiresForceError extends SpecdError {
   /** Machine-readable error code for programmatic handling. */
@@ -28,7 +28,7 @@ export class InvalidateRequiresForceError extends SpecdError {
     recoveries: readonly ForceInvalidationRecovery[] = [{ gate: 'spec', target: 'designing' }],
   ) {
     super(
-      'Change has active consent affected by this invalidation. Use --force to revoke the reported gate(s); Core will select the required recovery target.',
+      'Change has active consent affected by this invalidation. Pass force to revoke the reported gate(s); Core will select the required recovery target.',
     )
     this._recoveries = recoveries
     this._gates = recoveries.map((entry) => entry.gate)

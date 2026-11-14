@@ -10,6 +10,7 @@ import {
 } from '@specd/sdk'
 import { output } from './formatter.js'
 import { CliExitError } from './helpers/cli-exit-error.js'
+import { resolveCliErrorHint, type CliCommandId } from './error-hints.js'
 
 /**
  *
@@ -25,6 +26,8 @@ interface CliErrorOptions {
 
 /** Options accepted by {@link handleError}. */
 export interface HandleErrorOptions {
+  /** Invoked CLI command identifier used to resolve command-appropriate repair hints. */
+  readonly command?: CliCommandId
   /**
    * Adds the `specs deps` repair hint to an invalid-lock error whose failing field is under
    * `dependsOn`. Only the `specs deps` commands set this; other commands print the typed message
@@ -32,9 +35,6 @@ export interface HandleErrorOptions {
    */
   readonly lockRepairHint?: boolean
 }
-
-const LOCK_REPAIR_HINT =
-  'Repair with: specd specs deps remove <spec-id>, specd specs deps set <spec-id>, or specd specs deps clear <spec-id>'
 
 /**
  * Exits with a CLI-level error. Writes a prefixed message to stderr and,
@@ -216,8 +216,18 @@ export function handleError(err: unknown, format?: string, options?: HandleError
       return cliError(err.message, format, 3, code, { metadata })
     }
 
+    const hint =
+      resolveCliErrorHint(code, options ?? {}, metadata) ??
+      (typeof metadata.checkId === 'string' && metadata.checkId.length > 0
+        ? resolveCliErrorHint(metadata.checkId, options ?? {}, {
+            ...metadata,
+            isSkippable: metadata.isSkippable ?? metadata.skippable,
+          })
+        : undefined)
+    const hintOption = hint !== undefined ? { hint } : {}
+
     if (err instanceof HistoricalImplementationGuardError || code === 'IMPLEMENTATION_DETECTED') {
-      return cliError(err.message, format, 1, code, { metadata })
+      return cliError(err.message, format, 1, code, { metadata, ...hintOption })
     }
 
     if (code === 'GRAPH_BUSY' || code === 'GRAPH_PROVIDER_STALE') {
@@ -225,21 +235,23 @@ export function handleError(err: unknown, format?: string, options?: HandleError
     }
 
     if (err instanceof InvalidSpecLockError || code === 'INVALID_SPEC_LOCK') {
-      const fieldPath =
-        err instanceof InvalidSpecLockError
-          ? err.fieldPath
-          : typeof metadata.fieldPath === 'string'
-            ? metadata.fieldPath
-            : ''
-      const underDependsOn = fieldPath === 'dependsOn' || fieldPath.startsWith('dependsOn.')
+      const lockHint = resolveCliErrorHint(code, options ?? {}, {
+        ...metadata,
+        fieldPath:
+          err instanceof InvalidSpecLockError
+            ? err.fieldPath
+            : typeof metadata.fieldPath === 'string'
+              ? metadata.fieldPath
+              : '',
+      })
       return cliError(err.message, format, 1, code, {
         metadata,
-        ...(options?.lockRepairHint === true && underDependsOn ? { hint: LOCK_REPAIR_HINT } : {}),
+        ...(lockHint !== undefined ? { hint: lockHint } : {}),
       })
     }
 
     // All other SpecdError subtypes → exit 1
-    return cliError(err.message, format, 1, code, { metadata })
+    return cliError(err.message, format, 1, code, { metadata, ...hintOption })
   }
 
   // Generic/unexpected errors — stderr only, no structured output
