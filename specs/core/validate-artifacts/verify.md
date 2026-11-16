@@ -255,6 +255,42 @@ Scenarios:
 - **WHEN** `ValidateArtifacts.execute` is called
 - **THEN** `ArtifactParser.apply()` throws `DeltaApplicationError`, `result.passed` is `false`, and `markComplete` is not called
 
+#### Scenario: modified entry with identical content fails effective-change check
+
+- **GIVEN** an artifact with `delta: true` and an existing base spec
+- **AND** a delta file containing an `op: modified` entry whose `content`, `value`, or `rename` produces the exact same serialized text as the base spec
+- **WHEN** `ValidateArtifacts.execute` is called
+- **THEN** `result.passed` is `false`
+- **AND** `result.failures` includes a failure identifying the ineffective operation
+- **AND** `markComplete` is not called
+
+#### Scenario: second non-no-op entry in multi-entry delta that produces no serialized diff fails effective-change check
+
+- **GIVEN** a delta file with two `modified` entries where the first entry modifies section A and the second entry writes the existing unchanged body back to section B
+- **WHEN** `ValidateArtifacts.execute` is called
+- **THEN** `result.passed` is `false`
+- **AND** `result.failures` reports the ineffective second operation even though the overall merged file differs from base
+- **AND** `markComplete` is not called
+
+#### Scenario: effective-change check fails when serialized output matches base even if AST metadata changed
+
+- **GIVEN** a custom or buggy parser where `apply` returns a cloned AST whose `serialize()` output is identical to the previous serialized state
+- **WHEN** `ValidateArtifacts.execute` runs the in-memory per-operation check
+- **THEN** `result.passed` is `false`
+- **AND** `markComplete` is not called
+
+#### Scenario: valid multi-entry delta where every non-no-op entry changes serialized state passes
+
+- **GIVEN** a delta file with `modified`, `added`, and `removed` entries where each entry changes the serialized output relative to the preceding step
+- **WHEN** `ValidateArtifacts.execute` is called
+- **THEN** the effective-change check passes and validation proceeds normally to `validations[]` and `markComplete`
+
+#### Scenario: effective-change check runs purely in memory without modifying SpecRepository
+
+- **GIVEN** a valid or invalid delta checked by `ValidateArtifacts.execute`
+- **WHEN** the sequential per-entry effective-change check executes
+- **THEN** `SpecRepository` is never written to
+
 #### Scenario: Application preview does not write to SpecRepository
 
 - **GIVEN** a valid delta that would modify the base spec

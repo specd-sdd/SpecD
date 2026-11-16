@@ -18,7 +18,12 @@
     "core:transition-checks",
     "core:resolve-change-schema"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/validate-artifacts.ts",
+      "symbols": ["ValidateArtifacts"]
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Validate artifacts against change schema, dependencies, deltas, metadata, hashes, and canonical validity reconciliation.",

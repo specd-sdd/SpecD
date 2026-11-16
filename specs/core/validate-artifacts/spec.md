@@ -166,10 +166,15 @@ For artifacts with `delta: true` and an existing base spec in `SpecRepository`:
 4. Call `parser.parse(baseContent)` to produce the base AST.
 5. Call `parser.apply(baseAST, deltaEntries)` to produce the merged AST.
 6. If `apply` throws `DeltaApplicationError`, record it as a validation failure and do not proceed to `validations[]` or `markComplete`.
+7. Verify in memory that each non-`no-op` entry in `deltaEntries` produces an effective change in the serialized output:
+   - Starting from `currentAST = baseAST` and `previousSerialized = parser.serialize(baseAST)`, iterate `deltaEntries` in declaration order.
+   - For each entry where `entry.op !== 'no-op'`, apply that single entry in memory (`stepResult = parser.apply(currentAST, [entry])`) and serialize (`nextSerialized = parser.serialize(stepResult.ast)`).
+   - If `nextSerialized === previousSerialized`, record a validation failure identifying the ineffective operation (operation index and `op`) and do not mark the artifact complete.
+   - Otherwise advance `currentAST = stepResult.ast` and `previousSerialized = nextSerialized`.
 
-**No-op bypass:** When the expected delta contains only `no-op` entries, steps 1–6 are skipped entirely. The delta application preview is not needed because `no-op` produces no changes. `ValidateArtifacts` proceeds directly to hash computation on the raw delta file content.
+**No-op bypass:** When the expected delta contains only `no-op` entries, steps 1–7 are skipped entirely. The delta application preview is not needed because `no-op` produces no changes. `ValidateArtifacts` proceeds directly to hash computation on the raw delta file content.
 
-The merged AST (from `parser.serialize(mergedAST)`) is used for `validations[]` checks. The base spec in `SpecRepository` is **not modified** — archive is the step that writes the merged content.
+The merged AST (from `parser.serialize(mergedAST)` in step 5) is used for `validations[]` checks. The base spec in `SpecRepository` is **not modified** — archive is the step that writes the merged content.
 
 For new files being created in the change, `ValidateArtifacts` validates the expected direct artifact file under `specs/<workspace>/<capability-path>/<filename>` against `validations[]`.
 

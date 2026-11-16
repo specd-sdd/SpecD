@@ -438,3 +438,57 @@ describe('resolveNodes', () => {
     expect(results).toHaveLength(0)
   })
 })
+
+describe('modified payload & rename descriptor validation', () => {
+  it('rejects modified entry with none of content, value, or rename', () => {
+    const ast: ArtifactAST = {
+      root: {
+        type: 'document',
+        children: [{ type: 'section', label: 'Intro', children: [] }],
+      },
+    }
+    const delta: DeltaEntry[] = [
+      {
+        op: 'modified',
+        selector: { type: 'section', matches: '^Intro$' },
+      },
+    ]
+
+    expect(() => applyDelta(ast, delta, parseContent, valueToNode)).toThrow(DeltaApplicationError)
+  })
+
+  it('rejects rename on contains-only node types', () => {
+    const descriptors = new Map([
+      [
+        'paragraph',
+        {
+          type: 'paragraph',
+          identifiedBy: ['contains'],
+          description: 'Prose block',
+          isCollection: false,
+          isSequence: false,
+          isSequenceItem: false,
+          isContainer: false,
+          isLeaf: true,
+        },
+      ],
+    ])
+    const ast: ArtifactAST = {
+      root: {
+        type: 'document',
+        children: [{ type: 'paragraph', value: 'Hello world' }],
+      },
+    }
+    const delta: DeltaEntry[] = [
+      {
+        op: 'modified',
+        selector: { type: 'paragraph', contains: 'Hello' },
+        rename: 'New label',
+      },
+    ]
+
+    expect(() => applyDelta(ast, delta, parseContent, valueToNode, descriptors)).toThrow(
+      DeltaApplicationError,
+    )
+  })
+})

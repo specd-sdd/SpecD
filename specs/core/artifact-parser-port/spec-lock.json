@@ -9,7 +9,16 @@
     "core:delta-format",
     "core:selector-model"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/application/ports/artifact-parser.ts",
+      "symbols": ["validateRename", "validateValue"]
+    },
+    {
+      "file": "core:src/infrastructure/artifact-parser/plaintext-parser.ts",
+      "symbols": ["PlaintextParser"]
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Uniform parser port and extensible registry provide format-neutral AST, delta, serialization, outline, and selector metadata.",

@@ -212,8 +212,21 @@ function isArrayLike(
 }
 
 /**
+ * Removes parser-internal cached serialization fields from a cloned AST node
+ * so serializers emit mutated `value`, `label`, or `children` rather than stale caches.
+ *
+ * @param target - The cloned AST node record to strip cached fields from
+ */
+function clearParserSerializationCaches(target: Record<string, unknown>): void {
+  delete target['_inlines']
+  delete target['_blockquoteChildren']
+  delete target['_yaml']
+}
+
+/**
  * Returns a shallow clone of `node` with `children` replaced by `newChildren`,
- * removing any existing `value` field while preserving adapter metadata.
+ * removing any existing `value` field and stale parser serialization caches
+ * while preserving other adapter metadata.
  *
  * @param node - The node whose children should be replaced
  * @param newChildren - The new children array
@@ -225,6 +238,7 @@ function setChildren(node: ArtifactNode, newChildren: readonly ArtifactNode[]): 
     if (k === 'children' || k === 'value') continue
     clone[k] = v
   }
+  clearParserSerializationCaches(clone)
   clone['children'] = newChildren
   return clone as ArtifactNode
 }
@@ -321,6 +335,18 @@ export function applyDelta(
     if (entry.op === 'added' && entry.selector !== undefined) {
       throw new DeltaApplicationError(
         '`added` entries must not have a `selector`; use `position.parent` instead',
+      )
+    }
+
+    // modified must specify at least one mutation field
+    if (
+      entry.op === 'modified' &&
+      entry.content === undefined &&
+      entry.value === undefined &&
+      entry.rename === undefined
+    ) {
+      throw new DeltaApplicationError(
+        '`modified` entry must have at least one of `content`, `value`, or `rename`',
       )
     }
 
@@ -499,6 +525,7 @@ export function applyDelta(
           for (const [k, v] of Object.entries(updated)) {
             clone[k] = v
           }
+          clearParserSerializationCaches(clone)
           clone['label'] = entry.rename
           updated = clone as ArtifactNode
         }
@@ -538,6 +565,7 @@ export function applyDelta(
             for (const [k, v] of Object.entries(updated)) {
               if (k !== 'value' && k !== 'children') clone[k] = v
             }
+            clearParserSerializationCaches(clone)
             if (newNode.type !== updated.type && newNode.children !== undefined) {
               clone['children'] = [newNode]
             } else if (newNode.children !== undefined) {

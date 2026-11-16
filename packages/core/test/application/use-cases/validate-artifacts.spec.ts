@@ -41,6 +41,8 @@ import { ValidityFingerprintService } from '../../../src/application/services/va
 import { ReconcileChangeValidity } from '../../../src/application/use-cases/reconcile-change-validity.js'
 import { type RefreshImplementationTracking } from '../../../src/application/use-cases/refresh-implementation-tracking.js'
 import { NodeBinaryContentHasher } from '../../../src/infrastructure/node/binary-content-hasher.js'
+import { MarkdownParser } from '../../../src/infrastructure/artifact-parser/markdown-parser.js'
+import { YamlParser } from '../../../src/infrastructure/artifact-parser/yaml-parser.js'
 
 import { applyPreHashCleanup } from '../../../src/domain/services/pre-hash-cleanup.js'
 import { type PreHashCleanup } from '../../../src/domain/value-objects/validation-rule.js'
@@ -3723,7 +3725,7 @@ describe('ValidateArtifacts', () => {
         const repo = makeChangeRepository([change])
 
         const baseSpecContent = 'Requirement: A'
-        const baseVerifyContent = 'Requirement: A\nRequirement: B'
+        const baseVerifyContent = 'Requirement: A'
         const deltaContent = '- op: modified'
         const files = new Map<string, string>([
           [specsFilename, deltaContent],
@@ -3744,7 +3746,24 @@ describe('ValidateArtifacts', () => {
           },
         })
 
-        const parser = makeRequirementParser()
+        const baseReqParser = makeRequirementParser()
+        const parser = makeParser({
+          parse: (c) => baseReqParser.parse(c),
+          apply: (ast) => ({
+            ast: {
+              root: {
+                ...ast.root,
+                children: [
+                  ...(ast.root.children ?? []),
+                  { type: 'section', label: 'Requirement: B' },
+                ],
+              },
+            },
+            warnings: [],
+          }),
+          serialize: (ast) =>
+            (ast.root.children ?? []).map((child) => child.label ?? '').join('\n'),
+        })
         const yamlParser = makeParser({
           parseDelta: () => [{ op: 'modified' }],
         })
@@ -4349,5 +4368,174 @@ describe('ValidateArtifacts reconciliation', () => {
     expect(result.passed).toBe(true)
     expect(saved?.specApproval?.status).toBe('valid')
     expect(saved?.history.some((event) => event.type === 'approval-invalidated')).toBe(false)
+  })
+})
+
+describe('ValidateArtifacts — per-operation effective-change check', () => {
+  function setupDeltaValidation(
+    baseContent: string,
+    deltaContent: string,
+    customMarkdownParser?: ReturnType<typeof makeParser>,
+  ) {
+    const specsType = makeArtifactType('specs', {
+      scope: 'spec',
+      format: 'markdown',
+      delta: true,
+    })
+    const schema = makeSchema([specsType])
+    const specsArtifact = new ChangeArtifact({
+      type: 'specs',
+      files: new Map([
+        [
+          'default:auth',
+          new ArtifactFile({
+            key: 'default:auth',
+            filename: 'deltas/default/auth/spec.md.delta.yaml',
+            status: 'in-progress',
+          }),
+        ],
+      ]),
+    })
+    const change = makeChangeWithArtifacts('c', [specsArtifact])
+    const repo = makeChangeRepository([change])
+    Object.assign(repo, {
+      async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+        if (filename === 'deltas/default/auth/spec.md.delta.yaml') {
+          return new SpecArtifact(filename, deltaContent)
+        }
+        return null
+      },
+    })
+    const specRepo = makeSpecRepository({
+      specs: [makeSpec({ workspace: 'default', name: 'auth', filenames: ['spec.md'] })],
+      artifacts: { 'auth/spec.md': baseContent },
+    })
+    const parsers = makeParsers(customMarkdownParser ?? new MarkdownParser(), new YamlParser())
+    const uc = makeValidateArtifacts(
+      repo,
+      makeListWorkspaces(new Map([['default', specRepo]])),
+      makeSchemaProvider(schema),
+      parsers,
+      makeActorResolver(),
+      makeContentHasher(),
+    )
+    return { uc, repo, specRepo }
+  }
+
+  it('fails when a single modified op produces identical serialized output', async () => {
+    const base = '# Auth\n\n### Requirement: Login\n\nThe system SHALL authenticate users.\n'
+    const delta = [
+      '- op: modified',
+      '  selector:',
+      '    type: section',
+      "    matches: '^Requirement: Login$'",
+      '  content: |',
+      '    The system SHALL authenticate users.',
+    ].join('\n')
+
+    const { uc, repo, specRepo } = setupDeltaValidation(base, delta)
+    const result = await uc.execute({ name: 'c', specPath: 'default:auth' })
+
+    expect(result.passed).toBe(false)
+    expect(
+      result.failures.some((f) => f.description.includes('Delta operation #1 (modified)')),
+    ).toBe(true)
+    expect(repo.store.get('c')?.getArtifact('specs')?.status).not.toBe('complete')
+    expect(specRepo.saved.size).toBe(0)
+  })
+
+  it('fails and identifies the second op when only the first op changes serialized output', async () => {
+    const base = [
+      '# Auth',
+      '',
+      '### Requirement: Login',
+      '',
+      'Old login body.',
+      '',
+      '### Requirement: Logout',
+      '',
+      'Unchanged logout body.',
+      '',
+    ].join('\n')
+    const delta = [
+      '- op: modified',
+      '  selector:',
+      '    type: section',
+      "    matches: '^Requirement: Login$'",
+      '  content: |',
+      '    New login body.',
+      '- op: modified',
+      '  selector:',
+      '    type: section',
+      "    matches: '^Requirement: Logout$'",
+      '  content: |',
+      '    Unchanged logout body.',
+    ].join('\n')
+
+    const { uc, repo } = setupDeltaValidation(base, delta)
+    const result = await uc.execute({ name: 'c', specPath: 'default:auth' })
+
+    expect(result.passed).toBe(false)
+    expect(
+      result.failures.some((f) => f.description.includes('Delta operation #2 (modified)')),
+    ).toBe(true)
+    expect(repo.store.get('c')?.getArtifact('specs')?.status).not.toBe('complete')
+  })
+
+  it('fails when parser.apply mutates AST metadata but serialize() returns identical output', async () => {
+    const base = '# Auth\n\n### Requirement: Login\n\nBody.\n'
+    const delta = [
+      '- op: modified',
+      '  selector:',
+      '    type: section',
+      "    matches: '^Requirement: Login$'",
+      '  content: |',
+      '    Changed body.',
+    ].join('\n')
+    const buggyParser = makeParser({
+      parse: () => ({
+        root: { type: 'document', children: [{ type: 'section', label: 'Login' }] },
+      }),
+      apply: (ast) => ({ ast: { root: { ...ast.root, _touched: true } }, warnings: [] }),
+      serialize: () => base,
+    })
+
+    const { uc, repo } = setupDeltaValidation(base, delta, buggyParser)
+    const result = await uc.execute({ name: 'c', specPath: 'default:auth' })
+
+    expect(result.passed).toBe(false)
+    expect(
+      result.failures.some((f) => f.description.includes('Delta operation #1 (modified)')),
+    ).toBe(true)
+    expect(repo.store.get('c')?.getArtifact('specs')?.status).not.toBe('complete')
+  })
+
+  it('passes when every non-no-op entry changes serialized output without writing SpecRepository', async () => {
+    const base = '# Auth\n\n## Requirements\n\n### Requirement: Login\n\nOld login body.\n'
+    const delta = [
+      '- op: modified',
+      '  selector:',
+      '    type: section',
+      "    matches: '^Requirement: Login$'",
+      '  content: |',
+      '    New login body.',
+      '- op: added',
+      '  position:',
+      '    parent:',
+      '      type: section',
+      "      matches: '^Requirements$'",
+      '  content: |',
+      '    ### Requirement: Logout',
+      '',
+      '    The system SHALL log users out.',
+    ].join('\n')
+
+    const { uc, repo, specRepo } = setupDeltaValidation(base, delta)
+    const result = await uc.execute({ name: 'c', specPath: 'default:auth' })
+
+    expect(result.passed).toBe(true)
+    expect(result.failures).toHaveLength(0)
+    expect(repo.store.get('c')?.getArtifact('specs')?.status).toBe('complete')
+    expect(specRepo.saved.size).toBe(0)
   })
 })

@@ -4,7 +4,12 @@ import { SpecNotInChangeError } from '../errors/spec-not-in-change-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
-import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
+import {
+  type ArtifactAST,
+  type ArtifactParser,
+  type ArtifactParserRegistry,
+  type DeltaEntry,
+} from '../ports/artifact-parser.js'
 import { DeltaApplicationError } from '../../domain/errors/delta-application-error.js'
 import { type Spec } from '../../domain/entities/spec.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
@@ -507,6 +512,19 @@ export class ValidateArtifacts {
                 for (const w of mergedResult.warnings) {
                   warnings.push({ artifactId: artifactType.id, description: w })
                 }
+                const ineffectiveMessage = verifyDeltaOperationsEffective(
+                  parser,
+                  baseAST,
+                  deltaEntries,
+                )
+                if (ineffectiveMessage !== null) {
+                  failures.push({
+                    artifactId: artifactType.id,
+                    description: ineffectiveMessage,
+                    filename: validationFilename,
+                  })
+                  artifactFailed = true
+                }
               }
             } catch (err) {
               if (err instanceof DeltaApplicationError) {
@@ -857,4 +875,40 @@ function resolveArtifactValidationFilename(
     return expectedFilename
   }
   return trackedFile.filename
+}
+
+/**
+ * Verifies in memory that every non-`no-op` delta entry changes the serialized
+ * artifact output relative to the immediately preceding state.
+ *
+ * @param parser - Format parser used to apply entries and serialize intermediate ASTs
+ * @param baseAST - Parsed base artifact AST before applying any delta entry
+ * @param deltaEntries - Ordered list of parsed delta entries
+ * @returns Failure description for the first ineffective entry, or `null` if all entries change output
+ */
+function verifyDeltaOperationsEffective(
+  parser: ArtifactParser,
+  baseAST: ArtifactAST,
+  deltaEntries: readonly DeltaEntry[],
+): string | null {
+  let currentAST = baseAST
+  let previousSerialized = parser.serialize(baseAST)
+
+  for (let i = 0; i < deltaEntries.length; i += 1) {
+    const entry = deltaEntries[i]!
+    if (entry.op === 'no-op') {
+      continue
+    }
+
+    const stepResult = parser.apply(currentAST, [entry])
+    const nextSerialized = parser.serialize(stepResult.ast)
+    if (nextSerialized === previousSerialized) {
+      return `Delta operation #${i + 1} (${entry.op}) produced no change in serialized output`
+    }
+
+    currentAST = stepResult.ast
+    previousSerialized = nextSerialized
+  }
+
+  return null
 }

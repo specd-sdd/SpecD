@@ -1,0 +1,31 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Apply contract — atomic selector resolution$'
+  content: |
+    The `apply` method MUST resolve all selectors before applying any operation. If any selector fails to resolve (no match or ambiguous match), the entire application MUST be rejected with a `DeltaApplicationError`. Partial application SHALL NOT occur.
+
+    `apply` MUST also reject with `DeltaApplicationError`:
+
+    - any `modified` entry that omits all of `content`, `value`, and `rename`
+    - any `modified` entry with `rename` whose resolved target node type's `NodeTypeDescriptor.identifiedBy` does not include `'matches'`
+
+    When a node or its children are mutated during `apply`, any cached adapter serialization metadata on the mutated node or mutated ancestor/root (such as `_inlines`, `_blockquoteChildren`, or `_yaml`) MUST be cleared so `serialize()` reflects the applied changes rather than stale cached content.
+
+    The method returns a `DeltaApplicationResult` containing the modified AST and any semantic validation warnings. Callers MUST check `result.warnings` for ambiguity warnings on hybrid node types.
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Serialize round-trip$'
+  content: |
+    Calling `serialize(parse(content))` MUST produce output that, when parsed again, yields an equivalent AST. Implementations SHOULD preserve formatting where practical, but semantic equivalence is the binding constraint.
+
+    For the markdown adapter, serialize/apply behavior MUST preserve inline formatting intent represented in the AST (for example inline code, emphasis, and strong markers) for nodes not targeted by delta operations, while serializing updated `value` or `label` on mutated `paragraph` and `list-item` nodes rather than stale `_inlines` or `_blockquoteChildren`.
+
+    For the YAML adapter, `serialize` MUST NOT return a cached root `_yaml` string once the AST has been mutated by `apply`; it MUST serialize the updated AST nodes.
+
+    For the plaintext adapter, `paragraph` and `line` MUST support `value` updates on `modified` operations (with `isLeaf: true` or equivalent descriptor semantics) and `serialize` MUST emit the updated `value`.
+
+    The markdown adapter MUST support serializer style options derived from source content (at minimum unordered list marker, emphasis marker, and strong marker) so merged output can preserve original style where unambiguous.
+
+    If source style is ambiguous (mixed markers for the same construct), the markdown adapter MUST serialize deterministically using project markdown conventions so output is stable across runs.

@@ -113,11 +113,11 @@ export class PlaintextParser implements ArtifactParser {
         type: 'paragraph',
         identifiedBy: ['contains'],
         description: 'A block of text separated from other blocks by blank lines.',
-        isCollection: true,
+        isCollection: false,
         isSequence: false,
         isSequenceItem: false,
         isContainer: false,
-        isLeaf: false,
+        isLeaf: true,
       },
       {
         type: 'line',

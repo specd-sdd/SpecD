@@ -1,0 +1,100 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Delta application preview and conflict detection$'
+  content: |
+    #### Scenario: DeltaApplicationError blocks validation
+
+    - **GIVEN** a delta file where two entries both target the same node
+    - **WHEN** `ValidateArtifacts.execute` is called
+    - **THEN** `ArtifactParser.apply()` throws `DeltaApplicationError`, `result.passed` is `false`, and `markComplete` is not called
+
+    #### Scenario: modified entry with identical content fails effective-change check
+
+    - **GIVEN** an artifact with `delta: true` and an existing base spec
+    - **AND** a delta file containing an `op: modified` entry whose `content`, `value`, or `rename` produces the exact same serialized text as the base spec
+    - **WHEN** `ValidateArtifacts.execute` is called
+    - **THEN** `result.passed` is `false`
+    - **AND** `result.failures` includes a failure identifying the ineffective operation
+    - **AND** `markComplete` is not called
+
+    #### Scenario: second non-no-op entry in multi-entry delta that produces no serialized diff fails effective-change check
+
+    - **GIVEN** a delta file with two `modified` entries where the first entry modifies section A and the second entry writes the existing unchanged body back to section B
+    - **WHEN** `ValidateArtifacts.execute` is called
+    - **THEN** `result.passed` is `false`
+    - **AND** `result.failures` reports the ineffective second operation even though the overall merged file differs from base
+    - **AND** `markComplete` is not called
+
+    #### Scenario: effective-change check fails when serialized output matches base even if AST metadata changed
+
+    - **GIVEN** a custom or buggy parser where `apply` returns a cloned AST whose `serialize()` output is identical to the previous serialized state
+    - **WHEN** `ValidateArtifacts.execute` runs the in-memory per-operation check
+    - **THEN** `result.passed` is `false`
+    - **AND** `markComplete` is not called
+
+    #### Scenario: valid multi-entry delta where every non-no-op entry changes serialized state passes
+
+    - **GIVEN** a delta file with `modified`, `added`, and `removed` entries where each entry changes the serialized output relative to the preceding step
+    - **WHEN** `ValidateArtifacts.execute` is called
+    - **THEN** the effective-change check passes and validation proceeds normally to `validations[]` and `markComplete`
+
+    #### Scenario: effective-change check runs purely in memory without modifying SpecRepository
+
+    - **GIVEN** a valid or invalid delta checked by `ValidateArtifacts.execute`
+    - **WHEN** the sequential per-entry effective-change check executes
+    - **THEN** `SpecRepository` is never written to
+
+    #### Scenario: Application preview does not write to SpecRepository
+
+    - **GIVEN** a valid delta that would modify the base spec
+    - **WHEN** `ValidateArtifacts.execute` is called
+    - **THEN** the base spec file in `SpecRepository` is unchanged — the merged result is used only for `validations[]` checks
+
+    #### Scenario: Existing spec without expected delta fails
+
+    - **GIVEN** an artifact with `delta: true`
+    - **AND** the base spec exists in `SpecRepository`
+    - **AND** the expected delta file is missing from the change directory
+    - **WHEN** `ValidateArtifacts.execute` is called
+    - **THEN** validation fails with the expected delta filename
+    - **AND** no direct artifact fallback is attempted
+
+    #### Scenario: New file is validated directly
+
+    - **GIVEN** an artifact with `delta: true`
+    - **AND** the target spec does not exist in `SpecRepository`
+    - **AND** the expected direct artifact file exists under `specs/<workspace>/<capability-path>/`
+    - **WHEN** `ValidateArtifacts.execute` is called
+    - **THEN** `validations[]` run against the direct artifact content with no application preview step
+
+    #### Scenario: Missing non-optional artifact file causes failure
+
+    - **GIVEN** an artifact that is NOT optional (`optional: false` in schema)
+    - **AND** the expected artifact file does not exist in the change directory
+    - **AND** the artifact belongs to the spec being validated
+    - **WHEN** `ValidateArtifacts.execute` processes the artifact
+    - **THEN** validation fails with a failure indicating the missing expected file
+    - **AND** the artifact is NOT marked complete
+
+    #### Scenario: Missing optional artifact file is silently skipped
+
+    - **GIVEN** an artifact that IS optional (`optional: true` in schema)
+    - **AND** the expected artifact file does not exist in the change directory
+    - **WHEN** `ValidateArtifacts.execute` processes the artifact
+    - **THEN** validation continues without failure
+    - **AND** no failure is recorded for the missing file
+
+    #### Scenario: Non-delta artifact validated directly
+
+    - **GIVEN** an artifact with `delta: false`
+    - **WHEN** `ValidateArtifacts.execute` is called
+    - **THEN** `validations[]` run against the artifact file content directly, with no application preview step
+
+    #### Scenario: no-op delta skips application preview
+
+    - **GIVEN** an artifact with `delta: true` and a delta file containing only `[{ op: "no-op" }]`
+    - **WHEN** `ValidateArtifacts.execute` is called
+    - **THEN** no base spec is loaded from `SpecRepository`
+    - **AND** `parser.apply()` is not called
+    - **AND** `markComplete` is called with the hash of the raw delta file content

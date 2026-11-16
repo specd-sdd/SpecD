@@ -62,6 +62,18 @@
 - **WHEN** `apply` is called
 - **THEN** it throws a `DeltaApplicationError`
 
+#### Scenario: modified entry without payload throws DeltaApplicationError
+
+- **GIVEN** a valid AST and a `modified` entry with a matching `selector` but none of `content`, `value`, or `rename`
+- **WHEN** `apply` is called
+- **THEN** it throws a `DeltaApplicationError` and no changes are applied
+
+#### Scenario: rename on node without matches identifier throws DeltaApplicationError
+
+- **GIVEN** a valid AST and a `modified` entry with `rename` targeting a node whose descriptor `identifiedBy` does not include `"matches"` (such as `paragraph` or `line`)
+- **WHEN** `apply` is called
+- **THEN** it throws a `DeltaApplicationError`
+
 ### Requirement: Serialize round-trip
 
 #### Scenario: Parse then serialize produces equivalent content
@@ -76,6 +88,24 @@
 - **AND** delta application modifies a different node in the same document
 - **WHEN** the markdown adapter serializes the resulting AST
 - **THEN** the untouched paragraph preserves inline formatting intent (inline code/emphasis/strong)
+
+#### Scenario: Markdown serialize emits updated paragraph value and list-item label instead of stale \_inlines
+
+- **GIVEN** a markdown AST whose `paragraph` and `list-item` nodes carry parsed `_inlines`
+- **WHEN** `apply` updates a `paragraph` via `value` or a `list-item` via `rename` and `serialize` is called
+- **THEN** `serialize` emits the updated `value` and `label` rather than the stale `_inlines`
+
+#### Scenario: YAML serialize emits mutated AST instead of stale \_yaml root cache
+
+- **GIVEN** a YAML AST whose `root` carries `_yaml` from `parse()`
+- **WHEN** `apply` executes a `modified`, `added`, or `removed` entry and `serialize` is called
+- **THEN** `serialize` emits the updated YAML reflecting the mutation rather than returning the stale `_yaml` string
+
+#### Scenario: Plaintext serialize emits updated paragraph value
+
+- **GIVEN** a plaintext AST parsed from a multi-paragraph document
+- **WHEN** `apply` updates a `paragraph` via `value` and `serialize` is called
+- **THEN** `serialize` outputs the updated paragraph text while preserving untouched paragraphs
 
 #### Scenario: Markdown serializer uses source style when unambiguous
 

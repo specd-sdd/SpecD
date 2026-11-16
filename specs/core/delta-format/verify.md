@@ -262,6 +262,41 @@
 - **WHEN** `apply` is executed and the result is serialized
 - **THEN** untouched paragraph inline formatting remains semantically equivalent and is not downgraded to plain text
 
+#### Scenario: markdown paragraph modified via value serializes updated text
+
+- **GIVEN** a markdown document with a target paragraph containing `` `old` `` inline formatting and an untouched sibling paragraph containing `*preserved*`
+- **WHEN** a `modified` entry targets the first paragraph with `value: "Updated paragraph text"`
+- **AND** `apply` and `serialize` are executed
+- **THEN** the serialized markdown contains `"Updated paragraph text"` instead of the stale `_inlines` text
+- **AND** the untouched sibling paragraph still preserves `*preserved*`
+
+#### Scenario: markdown blockquote paragraph modified via value serializes updated text
+
+- **GIVEN** a markdown document containing a blockquote paragraph
+- **WHEN** a `modified` entry targets that paragraph with `value: "Replaced quote text"`
+- **AND** `apply` and `serialize` are executed
+- **THEN** the serialized markdown reflects `"Replaced quote text"` rather than stale `_blockquoteChildren`
+
+#### Scenario: markdown list-item modified via rename serializes updated item text
+
+- **GIVEN** a markdown document containing a list with `- Old item`
+- **WHEN** a `modified` entry targets that `list-item` with `rename: "New item"`
+- **AND** `apply` and `serialize` are executed
+- **THEN** the serialized markdown contains `- New item` instead of `- Old item`
+
+#### Scenario: YAML delta apply invalidates root \_yaml cache and serializes updated content
+
+- **GIVEN** a YAML document parsed with `YamlParser.parse` (which attaches `_yaml` to `ast.root`)
+- **WHEN** `apply` executes `modified`, `added`, or `removed` entries and `serialize` is called
+- **THEN** the serialized YAML reflects every applied mutation instead of returning the unmodified original YAML string
+
+#### Scenario: plaintext paragraph modified via value serializes updated text
+
+- **GIVEN** a plaintext document containing `"Old paragraph line."`
+- **WHEN** a `modified` entry targets that `paragraph` with `value: "New paragraph line."`
+- **AND** `apply` and `serialize` are executed
+- **THEN** `apply` succeeds and `serialize` outputs `"New paragraph line."`
+
 #### Scenario: markdown apply output is deterministic for mixed style input
 
 - **GIVEN** a markdown document that mixes supported style markers for the same construct
@@ -347,6 +382,21 @@
 
 - **WHEN** a delta has two `modified` entries whose selectors both resolve to the same node
 - **THEN** `apply` must throw `DeltaApplicationError` before applying any changes
+
+#### Scenario: modified entry without content value or rename — error
+
+- **WHEN** a delta has a `modified` entry with a valid `selector` but omits `content`, `value`, and `rename`
+- **THEN** `apply` must throw `DeltaApplicationError` before applying any changes
+
+#### Scenario: rename on contains-only markdown paragraph — error
+
+- **WHEN** a `modified` entry targets a markdown `paragraph` node (identified only by `contains`) and specifies `rename`
+- **THEN** `apply` must throw `DeltaApplicationError`
+
+#### Scenario: rename on contains-only plaintext paragraph or line — error
+
+- **WHEN** a `modified` entry targets a plaintext `paragraph` or `line` node (identified only by `contains`) and specifies `rename`
+- **THEN** `apply` must throw `DeltaApplicationError`
 
 #### Scenario: strategy on non-array target
 

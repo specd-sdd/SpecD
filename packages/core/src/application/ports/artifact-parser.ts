@@ -107,7 +107,7 @@ export function validateValue(
   const descriptor = descriptors.get(nodeType)
   if (!descriptor) return undefined
 
-  const hasLabel = descriptor.identifiedBy.length > 0
+  const hasNameIdentifier = descriptor.identifiedBy.includes('matches')
 
   if (descriptor.isSequence) return undefined
   if (entry.strategy !== undefined) return undefined
@@ -119,7 +119,7 @@ export function validateValue(
     return undefined
   }
   if (descriptor.isLeaf) {
-    if (hasLabel) {
+    if (hasNameIdentifier) {
       warnings.push(
         `\`value\` on leaf-with-label "${nodeType}" — consider using \`rename\` to update the identifier`,
       )
@@ -127,12 +127,12 @@ export function validateValue(
     return undefined
   }
   if (descriptor.isContainer) {
-    if (hasLabel)
+    if (hasNameIdentifier)
       return `\`value\` is not valid on container "${nodeType}" — use \`content\` or \`rename\``
     return `\`value\` is not valid on container "${nodeType}" — use \`content\``
   }
 
-  if (hasLabel) return `\`value\` is not valid on node type "${nodeType}" — use \`rename\``
+  if (hasNameIdentifier) return `\`value\` is not valid on node type "${nodeType}" — use \`rename\``
   return `\`value\` is not valid on node type "${nodeType}" — this node type cannot be modified`
 }
 
@@ -158,10 +158,10 @@ export function validateRename(
   const descriptor = descriptors.get(nodeType)
   if (!descriptor) return undefined
 
-  const hasLabel = descriptor.identifiedBy.length > 0
+  const hasNameIdentifier = descriptor.identifiedBy.includes('matches')
 
-  if (!hasLabel) {
-    return `\`rename\` is not valid on node type "${nodeType}" — this node has no identifying property to rename`
+  if (!hasNameIdentifier) {
+    return `\`rename\` is not valid on node type "${nodeType}" — this node has no name/label identifying property to rename`
   }
 
   if (descriptor.isContainer && descriptor.isLeaf) {
