@@ -2,7 +2,7 @@
  * Determines whether a value is a non-null, non-array object record.
  *
  * @param value - Value to test
- * @returns True if value is a Record<string, unknown>
+ * @returns True if value is a `Record<string, unknown>`
  */
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)

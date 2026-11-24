@@ -1,19 +1,12 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { createSkillRepository } from '../src/index.js'
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
-const repoRoot = join(packageRoot, '..', '..')
 
 const LIFECYCLE_SKILLS = ['specd-design', 'specd-implement', 'specd-verify', 'specd-archive']
-const INSTALLED_COPIES = [
-  '.claude/skills',
-  '.agents/skills',
-  '.codex/skills',
-  '.github/skills',
-  '.opencode/skills',
-] as const
 
 const STATES =
   'drafting|designing|ready|pending-spec-approval|spec-approved|implementing|verifying|done|pending-signoff|signed-off|archivable|archiving'
@@ -170,14 +163,13 @@ describe('lifecycle skill template protocol validator', () => {
       expect(describeViolations(findViolations(content))).toBe('')
     })
 
-    for (const copyRoot of INSTALLED_COPIES) {
-      const installed = join(repoRoot, copyRoot, skill, 'SKILL.md')
-      it(`${copyRoot}/${skill} has no literal-state recipes outside routed blocks`, () => {
-        // Installed copies are generated: a missing copy means the sync was not run.
-        expect(existsSync(installed), `missing installed copy ${copyRoot}/${skill}`).toBe(true)
-        expect(describeViolations(findViolations(readFileSync(installed, 'utf8')))).toBe('')
-      })
-    }
+    // Installed agent copies are gitignored output of the rendered bundle: check the bundle.
+    it(`${skill} rendered bundle has no literal-state recipes outside routed blocks`, async () => {
+      const bundle = await createSkillRepository().getBundle(skill)
+      const body = bundle.files.find((file) => file.filename === 'SKILL.md')?.content ?? ''
+      expect(body).not.toBe('')
+      expect(describeViolations(findViolations(body))).toBe('')
+    })
   }
 
   it('shared notes template names no fixed delivery-state hook list', () => {
