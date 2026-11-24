@@ -246,8 +246,10 @@ describe('resolveCliContext host cleanup', () => {
 describe('CLI host bootstrap sources', () => {
   it('has no hand-built host and no direct SDK bootstrap outside the helper and the worker', async () => {
     const { readdir, readFile } = await import('node:fs/promises')
-    const { join } = await import('node:path')
-    const root = new URL('../../src', import.meta.url).pathname
+    const { join, sep } = await import('node:path')
+    const { fileURLToPath } = await import('node:url')
+    const root = fileURLToPath(new URL('../../src', import.meta.url))
+    const toPosix = (path: string): string => path.split(sep).join('/')
 
     async function walk(dir: string): Promise<string[]> {
       const entries = await readdir(dir, { withFileTypes: true })
@@ -258,7 +260,10 @@ describe('CLI host bootstrap sources', () => {
             : Promise.resolve([join(dir, entry.name)]),
         ),
       )
-      return nested.flat().filter((file) => file.endsWith('.ts'))
+      return nested
+        .flat()
+        .filter((file) => file.endsWith('.ts'))
+        .map(toPosix)
     }
 
     const forbidden: Array<[RegExp, string]> = [

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { readdir, readFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const parseAsync = vi.fn()
 const handleErrorSpy = vi.hoisted(() =>
@@ -243,7 +244,9 @@ describe('run', () => {
 })
 
 describe('CLI source guards', () => {
-  const srcRoot = new URL('../src', import.meta.url).pathname
+  // Normalise to forward slashes so the allowlist keys below match on Windows too.
+  const toPosix = (path: string): string => path.split(sep).join('/')
+  const srcRoot = toPosix(fileURLToPath(new URL('../src', import.meta.url)))
 
   async function walk(dir: string): Promise<string[]> {
     const entries = await readdir(dir, { withFileTypes: true })
@@ -254,7 +257,10 @@ describe('CLI source guards', () => {
           : Promise.resolve([join(dir, entry.name)]),
       ),
     )
-    return nested.flat().filter((file) => file.endsWith('.ts'))
+    return nested
+      .flat()
+      .filter((file) => file.endsWith('.ts'))
+      .map(toPosix)
   }
 
   it('calls process.exit only from run.ts and helpers/cli-signals.ts', async () => {

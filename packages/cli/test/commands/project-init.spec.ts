@@ -423,7 +423,7 @@ describe('project init', () => {
       registerProjectInit(program.command('project'))
       await program.parseAsync(['node', 'specd', 'project', 'init']).catch(() => {})
       const message = (vi.mocked(confirm).mock.calls[0]?.[0] as { message: string }).message
-      expect(message).toContain('/project/specd.yaml')
+      expect(message).toContain(join('/project', 'specd.yaml'))
       expect(message).toContain('Overwrit')
       expect(message).toContain('declared plugins')
       expect(message).toContain('workspaces')

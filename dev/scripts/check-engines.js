@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 import { readdirSync, readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const FLOOR = '>=22'
 // `SPECD_REPO_ROOT` lets tests point the check at a fixture repository.
-const root = process.env.SPECD_REPO_ROOT ?? new URL('../../', import.meta.url).pathname
+const root = process.env.SPECD_REPO_ROOT ?? fileURLToPath(new URL('../../', import.meta.url))
 
 /**
  * Lists the `package.json` files of the workspace packages under `packages/` and `apps/`.
