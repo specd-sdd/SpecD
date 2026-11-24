@@ -1,6 +1,5 @@
 /* eslint-disable jsdoc/require-jsdoc -- Private verdict helpers; public types and evaluateLifecycleVerdict() are documented. */
 import { type Change, type InvalidatedEvent } from '../entities/change.js'
-import { type ChangeArtifact } from '../entities/change-artifact.js'
 import { type ArtifactStatus } from '../value-objects/artifact-status.js'
 import { type ChangeState } from '../value-objects/change-state.js'
 import { type Schema } from '../value-objects/schema.js'
@@ -9,32 +8,32 @@ import {
   checkMatches,
   classifyAlong,
   resolveEffectiveBindings,
+  type CheckAction,
   type CheckBinding,
   type CheckResult,
 } from './transition-checks.js'
-import { ARCHIVE_BINDINGS, boundFromStates, TRANSITION_BINDINGS } from './check-bindings.js'
+import { ARCHIVE_BINDINGS, TRANSITION_BINDINGS } from './check-bindings.js'
 import {
+  effectiveStatus,
+  findBlockingParent,
+  type ArtifactGraphSource,
+} from './find-blocking-parent.js'
+import {
+  drainAnchorOf,
+  isDrainState,
   isWorkflowStepEnabled,
   isWorkflowTransitionLegal,
   listWorkflowTransitions,
+  nextWorkflowStep,
   resolveWorkflowPipeline,
   type PipelineStep,
 } from './workflow-topology.js'
 import { Logger } from '../../observability/logger.js'
 
-function isBypassFlagActive(bypassFlag: string | undefined, flags: ReadonlySet<string>): boolean {
-  if (bypassFlag === undefined) return false
-  const trimmed = bypassFlag.replace(/^--/, '')
-  if (flags.has(bypassFlag) || flags.has(trimmed) || flags.has(`--${trimmed}`)) {
-    return true
-  }
-  if (bypassFlag.startsWith('--skip-checks ')) {
-    const checkId = bypassFlag.slice('--skip-checks '.length)
-    if (flags.has(checkId)) {
-      return true
-    }
-  }
-  return false
+export { findBlockingParent, type ArtifactGraphSource }
+
+function isCheckSkipped(checkId: string | undefined, skipped: ReadonlySet<string>): boolean {
+  return checkId !== undefined && skipped.has(checkId)
 }
 
 function reviewMessage(
@@ -50,13 +49,6 @@ function reviewMessage(
   }
 }
 
-/** Artifact lookup for DAG projection (`Change` or a drafted view). */
-export interface ArtifactGraphSource {
-  readonly name: string
-  readonly artifacts: ReadonlyMap<string, ChangeArtifact>
-  getArtifact(type: string): ChangeArtifact | null
-}
-
 export interface LifecycleVerdictInput {
   /**
    * Predicate results per protocol-legal target, produced by application
@@ -70,8 +62,8 @@ export interface LifecycleVerdictInput {
    * fallback when a target has no injected predicate results.
    */
   readonly approvals?: { readonly spec: boolean; readonly signoff: boolean }
-  /** Bypass tokens such as `spec.overlap` or `--skip-checks spec.overlap` that skip matching skippable blockers. */
-  readonly bypassFlags?: readonly string[]
+  /** Check ids that skip matching skippable blockers. */
+  readonly skippedCheckIds?: readonly string[]
   /**
    * Optional resolved check bindings for the evaluated attempt or operation.
    * When omitted, skippability is resolved from `schema` against the default bindings.
@@ -110,7 +102,8 @@ export interface LifecycleBlocker {
   readonly code: string
   readonly message: string
   readonly isSkippable: boolean
-  readonly bypassFlag?: string
+  /** Host-neutral remediation action propagated from the failed check or validity blocker. */
+  readonly action?: CheckAction
   /** Gerund label from the failed check when the blocker is predicate-projected. */
   readonly label?: string
   /** Check id that produced this blocker when predicate-projected. */
@@ -183,7 +176,7 @@ export function evaluateLifecycleVerdict(
   options: LifecycleVerdictInput,
 ): LifecycleDomainVerdict {
   const approvals = options.approvals ?? { spec: false, signoff: false }
-  const bypassFlags = new Set(options.bypassFlags ?? [])
+  const skippedCheckIds = new Set(options.skippedCheckIds ?? [])
   const validTransitions = listWorkflowTransitions(change.state, schema, approvals)
   const effectiveTarget =
     options.requestedTarget !== undefined ? options.requestedTarget : undefined
@@ -307,12 +300,12 @@ export function evaluateLifecycleVerdict(
           verdictByArtifact,
           reviewBlockers,
           checksByTarget[options.requestedTarget] ?? [],
-          bypassFlags,
+          skippedCheckIds,
           skippableByCheckId,
         )
       : blockersFromFailedChecks(
           Object.values(checksByTarget).flatMap((rows) => rows ?? []),
-          bypassFlags,
+          skippedCheckIds,
           skippableByCheckId,
         )
 
@@ -322,17 +315,7 @@ export function evaluateLifecycleVerdict(
     ...(options.validity !== undefined ? validityBlockers(options.validity) : []),
   ])
   const nextArtifactId = nextArtifact(schema, verdictByArtifact)
-  const guidedTransitions =
-    options.validity?.artifactReviewRequired === true
-      ? availableTransitions.filter((target) => !isForward(change.state, target, schema, approvals))
-      : availableTransitions
-  const nextHop = projectValidityNextHop(
-    change,
-    options.validity,
-    resolveLifecycleNextHop(change, review, guidedTransitions, approvals, schema),
-    schema,
-    approvals,
-  )
+  const nextHop = resolveLifecycleNextHop(change, review, availableTransitions, approvals, schema)
   const checks =
     options.requestedTarget !== undefined
       ? (checksByTarget[options.requestedTarget] ?? [])
@@ -347,8 +330,8 @@ export function evaluateLifecycleVerdict(
   ]
   const requestedAllowed =
     options.requestedTarget !== undefined
-      ? guidedTransitions.includes(options.requestedTarget)
-      : guidedTransitions.includes(nextHop.targetStep)
+      ? availableTransitions.includes(options.requestedTarget)
+      : availableTransitions.includes(nextHop.targetStep)
 
   Logger.debug('evaluateLifecycleVerdict evaluated change lifecycle', {
     change: change.name,
@@ -357,7 +340,7 @@ export function evaluateLifecycleVerdict(
     allowed: requestedAllowed,
     failedCheckIds,
     approvals,
-    bypassFlags: [...bypassFlags],
+    skippedCheckIds: [...skippedCheckIds],
     blockerCodes: blockers.map((blocker) => blocker.code),
     nextArtifact: nextArtifactId,
     nextHop: nextHop.targetStep,
@@ -370,7 +353,7 @@ export function evaluateLifecycleVerdict(
     review,
     nextHop,
     validTransitions,
-    availableTransitions: guidedTransitions,
+    availableTransitions,
     transitionBlockers,
     nextArtifact: nextArtifactId,
     checksByTarget,
@@ -413,100 +396,6 @@ export function toEffectiveStatusMap(
   artifacts: readonly { readonly type: string; readonly effectiveStatus: ArtifactStatus }[],
 ): ReadonlyMap<string, ArtifactStatus> {
   return new Map(artifacts.map((artifact) => [artifact.type, artifact.effectiveStatus]))
-}
-
-export function findBlockingParent(
-  change: ArtifactGraphSource,
-  schema: Schema,
-  artifactId: string,
-): { artifactId: string; status: ArtifactStatus } | null {
-  return findBlockingParentInternal(change, schema, artifactId, new Set())
-}
-
-function effectiveStatus(
-  change: ArtifactGraphSource,
-  schema: Schema,
-  artifactId: string,
-  visiting: Set<string>,
-): ArtifactStatus {
-  const artifact = change.getArtifact(artifactId)
-  if (artifact === null) return 'missing'
-  if (artifact.status === 'missing') return 'missing'
-  if (
-    artifact.status === 'pending-review' ||
-    artifact.status === 'drifted-pending-review' ||
-    artifact.status === 'skipped' ||
-    artifact.status === 'in-progress'
-  ) {
-    return artifact.status
-  }
-  if (visiting.has(artifactId)) {
-    return 'in-progress'
-  }
-
-  visiting.add(artifactId)
-  let blockedByReview = false
-  let blockedByIncomplete = false
-  for (const requiredId of requiresForArtifact(change, schema, artifactId)) {
-    const requiredStatus = effectiveStatus(change, schema, requiredId, visiting)
-    if (requiredStatus === 'complete' || requiredStatus === 'skipped') {
-      continue
-    }
-    if (
-      requiredStatus === 'pending-review' ||
-      requiredStatus === 'drifted-pending-review' ||
-      requiredStatus === 'pending-parent-artifact-review'
-    ) {
-      blockedByReview = true
-      continue
-    }
-
-    blockedByIncomplete = true
-  }
-  visiting.delete(artifactId)
-
-  if (blockedByReview) {
-    const parent = findBlockingParentInternal(change, schema, artifactId, new Set())
-    Logger.debug('evaluateLifecycleVerdict downgraded artifact to parent-review', {
-      change: change.name,
-      artifactId,
-      blockedBy: parent?.artifactId ?? null,
-      blockedByStatus: parent?.status ?? null,
-    })
-    return 'pending-parent-artifact-review'
-  }
-
-  if (blockedByIncomplete) {
-    return 'in-progress'
-  }
-
-  return artifact.status
-}
-
-function findBlockingParentInternal(
-  change: ArtifactGraphSource,
-  schema: Schema,
-  artifactId: string,
-  visiting: Set<string>,
-): { artifactId: string; status: ArtifactStatus } | null {
-  const requiredIds = requiresForArtifact(change, schema, artifactId)
-  if (visiting.has(artifactId)) {
-    return null
-  }
-
-  visiting.add(artifactId)
-  for (const requiredId of requiredIds) {
-    const requiredStatus = effectiveStatus(change, schema, requiredId, new Set())
-    if (requiredStatus === 'pending-review' || requiredStatus === 'drifted-pending-review') {
-      return { artifactId: requiredId, status: requiredStatus }
-    }
-    const parent = findBlockingParentInternal(change, schema, requiredId, visiting)
-    if (parent !== null) {
-      return parent
-    }
-  }
-
-  return null
 }
 
 function deriveReview(change: Change): LifecycleReviewSummary {
@@ -622,7 +511,7 @@ function reviewBlockersFromSummary(review: LifecycleReviewSummary): LifecycleBlo
     ]
   }
 
-  // Invalidation from another archive is review + /specd-design, not OVERLAP_CONFLICT.
+  // Invalidation from another archive is review + the `design` intent, not OVERLAP_CONFLICT.
   return []
 }
 
@@ -634,39 +523,14 @@ function requestedTargetBlockers(
   verdictByArtifact: ReadonlyMap<string, LifecycleArtifactVerdict>,
   reviewBlockers: readonly LifecycleBlocker[],
   requestedChecks: readonly CheckResult[],
-  bypassFlags: ReadonlySet<string>,
+  skippedCheckIds: ReadonlySet<string>,
   skippableByCheckId: ReadonlyMap<string, boolean>,
 ): LifecycleBlocker[] {
   const blockers: LifecycleBlocker[] = blockersFromFailedChecks(
     requestedChecks,
-    bypassFlags,
+    skippedCheckIds,
     skippableByCheckId,
   )
-  if (
-    (requestedTarget === 'pending-spec-approval' || requestedTarget === 'spec-approved') &&
-    !approvals.spec
-  ) {
-    return [
-      {
-        code: 'INVALID_TRANSITION',
-        message: `Transition to '${requestedTarget}' is not permitted when spec approvals are disabled`,
-        isSkippable: false,
-      },
-    ]
-  }
-
-  if (
-    (requestedTarget === 'pending-signoff' || requestedTarget === 'signed-off') &&
-    !approvals.signoff
-  ) {
-    return [
-      {
-        code: 'INVALID_TRANSITION',
-        message: `Transition to '${requestedTarget}' is not permitted when signoff approvals are disabled`,
-        isSkippable: false,
-      },
-    ]
-  }
 
   if (!isWorkflowTransitionLegal(change.state, requestedTarget, schema, approvals)) {
     return [
@@ -771,7 +635,7 @@ function artifactBlockers(
     ]
   }
 
-  const parent = findBlockingParentInternal(change, schema, artifactId, new Set())
+  const parent = findBlockingParent(change, schema, artifactId)
   const parentArtifacts =
     parent === null ? affectedArtifacts : reviewAffectedArtifacts(change, parent.artifactId)
   return [
@@ -809,8 +673,9 @@ function dedupeBlockers(blockers: readonly LifecycleBlocker[]): LifecycleBlocker
   for (const blocker of blockers) {
     const key = JSON.stringify([
       blocker.code,
+      blocker.checkId ?? null,
+      blocker.isSkippable,
       blocker.message,
-      blocker.bypassFlag ?? null,
       blocker.affectedArtifacts?.map((artifact) => [
         artifact.type,
         artifact.files.map((file) => [file.key, file.filename, file.state]),
@@ -955,7 +820,7 @@ function buildSkippableByCheckId(
 
 function blockersFromFailedChecks(
   checks: readonly CheckResult[],
-  bypassFlags: ReadonlySet<string>,
+  skippedCheckIds: ReadonlySet<string>,
   skippableByCheckId: ReadonlyMap<string, boolean>,
 ): LifecycleBlocker[] {
   return checks
@@ -969,23 +834,13 @@ function blockersFromFailedChecks(
         isSkippable: skippable,
         label: check.label,
         checkId: check.id,
-        ...(skippable ? { bypassFlag: `--skip-checks ${check.id}` } : {}),
+        ...(check.action !== undefined ? { action: check.action } : {}),
       }
-      if (skippable && isBypassFlagActive(blocker.bypassFlag, bypassFlags)) {
+      if (skippable && isCheckSkipped(check.id, skippedCheckIds)) {
         return []
       }
       return [blocker]
     })
-}
-
-/** Drain states sit just after their pipeline anchor; used for comparison only. */
-const DRAIN_OFFSETS: Readonly<
-  Partial<Record<ChangeState, { anchor: ChangeState; offset: number }>>
-> = {
-  'pending-spec-approval': { anchor: 'ready', offset: 0.25 },
-  'spec-approved': { anchor: 'ready', offset: 0.5 },
-  'pending-signoff': { anchor: 'done', offset: 0.25 },
-  'signed-off': { anchor: 'done', offset: 0.5 },
 }
 
 /**
@@ -995,8 +850,8 @@ const DRAIN_OFFSETS: Readonly<
  * @param pipeline - Active pipeline in canonical order
  * @returns Pipeline index (drain states fall between their anchor and its successor), or -1
  */
-function pipelinePosition(state: ChangeState, pipeline: readonly PipelineStep[]): number {
-  const drain = DRAIN_OFFSETS[state]
+export function pipelinePosition(state: ChangeState, pipeline: readonly PipelineStep[]): number {
+  const drain = drainAnchorOf(state)
   const index = pipeline.findIndex((entry) => entry.step === (drain?.anchor ?? state))
   return index === -1 ? -1 : index + (drain?.offset ?? 0)
 }
@@ -1012,7 +867,7 @@ function pipelinePosition(state: ChangeState, pipeline: readonly PipelineStep[])
  * @param approvals.signoff - Whether the signoff approval anchor is active
  * @returns True when `to` is strictly later than `from`
  */
-function isForward(
+export function isForward(
   from: ChangeState,
   to: ChangeState,
   schema: Schema,
@@ -1033,56 +888,8 @@ function validityBlocker(blocker: ValidityBlocker): LifecycleBlocker {
     code: blocker.code,
     message: blocker.message,
     isSkippable: false,
+    ...(blocker.action !== undefined ? { action: blocker.action } : {}),
   }
-}
-
-function projectValidityNextHop(
-  change: Change,
-  validity: ChangeValidityVerdict | undefined,
-  nextHop: LifecycleNextHop,
-  schema: Schema,
-  approvals: { readonly spec: boolean; readonly signoff: boolean },
-): LifecycleNextHop {
-  if (validity === undefined) return nextHop
-  if (validity.specApproval === 'stale' || validity.specApproval === 'revoked') {
-    return {
-      targetStep: 'designing',
-      actionType: 'cognitive',
-      reason: 'Spec approval must be renewed',
-    }
-  }
-  if (
-    (validity.signoff === 'stale' || validity.signoff === 'revoked') &&
-    isForward('done', change.state, schema, approvals)
-  ) {
-    return {
-      targetStep: 'done',
-      actionType: 'mechanical',
-      reason: 'Sign-off must be renewed from done',
-    }
-  }
-  if (
-    isAtOrAfterVerificationBoundary(change.state, schema, approvals) &&
-    verificationNeedsRenewal(validity)
-  ) {
-    return {
-      targetStep: change.state,
-      actionType: 'cognitive',
-      reason: 'Renew verification in place',
-    }
-  }
-  if (
-    validity.artifactReviewRequired &&
-    validity.recovery === null &&
-    isForward(change.state, nextHop.targetStep, schema, approvals)
-  ) {
-    return {
-      targetStep: change.state,
-      actionType: 'cognitive',
-      reason: 'Artifact review is required before forward progress',
-    }
-  }
-  return nextHop
 }
 
 /**
@@ -1109,14 +916,6 @@ export function isAtOrAfterVerificationBoundary(
   const boundary = pipelinePosition('verifying', pipeline)
   const position = pipelinePosition(state, pipeline)
   return boundary >= 0 && position >= boundary
-}
-
-function verificationNeedsRenewal(validity: ChangeValidityVerdict): boolean {
-  return (
-    validity.verification === 'stale' ||
-    validity.verification === 'absent' ||
-    validity.verification === 'attempt-active'
-  )
 }
 
 /**
@@ -1188,30 +987,6 @@ export function resolveLifecycleNextHop(
     }
   }
 
-  if (
-    boundFromStates('approval.spec').includes(state) &&
-    approvals.spec &&
-    change.activeSpecApproval === undefined
-  ) {
-    return {
-      targetStep: state,
-      actionType: 'mechanical',
-      reason: 'Spec approval is required before the bound delivery hop',
-    }
-  }
-
-  if (
-    boundFromStates('approval.signoff').includes(state) &&
-    approvals.signoff &&
-    change.activeSignoff === undefined
-  ) {
-    return {
-      targetStep: state,
-      actionType: 'mechanical',
-      reason: 'Signoff is required before the bound delivery hop',
-    }
-  }
-
   const forwardTarget = schema
     ? recommendedForwardTarget(state, availableTransitions, schema, approvals)
     : null
@@ -1241,24 +1016,26 @@ export function resolveLifecycleNextHop(
         reason: 'Design complete, ready to implement',
       }
     }
-  }
-
-  if (state === 'pending-spec-approval') {
     return {
-      targetStep: 'spec-approved',
+      targetStep: 'ready',
       actionType: 'mechanical',
-      reason: 'Spec approval is required',
+      reason: 'Remaining blockers prevent leaving ready',
     }
   }
 
-  if (state === 'spec-approved') {
-    const nextTarget = forwardTarget ?? 'implementing'
-    if (availableTransitions.includes(nextTarget)) {
+  if (isDrainState(state)) {
+    const drainTarget = schema ? nextWorkflowStep(state, schema, approvals) : null
+    if (drainTarget !== null && availableTransitions.includes(drainTarget)) {
       return {
-        targetStep: nextTarget,
+        targetStep: drainTarget,
         actionType: 'mechanical',
-        reason: 'Design complete, ready to implement',
+        reason: 'Ready to leave the legacy parking state',
       }
+    }
+    return {
+      targetStep: state,
+      actionType: 'mechanical',
+      reason: 'Remaining blockers prevent leaving the legacy parking state',
     }
   }
 
@@ -1297,15 +1074,7 @@ export function resolveLifecycleNextHop(
     }
   }
 
-  if (state === 'pending-signoff') {
-    return {
-      targetStep: 'signed-off',
-      actionType: 'mechanical',
-      reason: 'Signoff is required',
-    }
-  }
-
-  if (state === 'done' || state === 'signed-off') {
+  if (state === 'done') {
     const nextTarget = forwardTarget ?? 'archivable'
     if (availableTransitions.includes(nextTarget)) {
       return {
@@ -1364,15 +1133,4 @@ export function resolveLifecycleNextHop(
     actionType: 'cognitive',
     reason: 'Proceed to next lifecycle step',
   }
-}
-
-function requiresForArtifact(
-  change: ArtifactGraphSource,
-  schema: Schema,
-  artifactId: string,
-): readonly string[] {
-  if (schema.artifact(artifactId) !== null) {
-    return schema.artifactDag().parentsOf(artifactId)
-  }
-  return change.getArtifact(artifactId)?.requires ?? []
 }

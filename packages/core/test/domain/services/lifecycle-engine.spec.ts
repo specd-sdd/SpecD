@@ -4,7 +4,8 @@ import {
   evaluateLifecycleVerdict,
   type LifecycleVerdictInput,
 } from '../../../src/domain/services/lifecycle-verdict.js'
-import { resolveLifecycleCommand } from '../../../src/application/services/lifecycle-guidance.js'
+import { resolveLifecycleIntent } from '../../../src/application/services/lifecycle-guidance.js'
+import { approveSignoffAction, fail } from '../../../src/domain/services/transition-checks.js'
 import { type ChangeValidityVerdict } from '../../../src/domain/services/change-validity.js'
 import { SchemaValidationError } from '../../../src/domain/errors/schema-validation-error.js'
 import { makeSchema, makeWorkflowStep, testActor } from '../../application/use-cases/helpers.js'
@@ -133,7 +134,7 @@ describe('LifecycleEngine with disabled verification', () => {
     expect(verdict.nextHop.reason).not.toContain('verification')
   })
 
-  it('recommends /specd-archive from implementing when verifying is disabled and next hop is done', () => {
+  it('recommends the `archive` intent from implementing when verifying is disabled and next hop is done', () => {
     const change = makeChange('implementing')
     const validity: ChangeValidityVerdict = {
       artifactReviewRequired: false,
@@ -153,7 +154,7 @@ describe('LifecycleEngine with disabled verification', () => {
         done: [{ id: 'protocol.edge', kind: 'predicate', outcome: 'pass', label: 'Protocol' }],
       },
     })
-    const command = resolveLifecycleCommand(
+    const result = resolveLifecycleIntent(
       change,
       verdict.nextHop,
       verdict.review,
@@ -163,7 +164,7 @@ describe('LifecycleEngine with disabled verification', () => {
       validity,
     )
 
-    expect(command).toBe('/specd-archive')
+    expect(result).toEqual({ intent: 'archive' })
   })
 
   it('recommends nextHop targetStep archivable from done when verifying is disabled', () => {
@@ -190,7 +191,7 @@ describe('LifecycleEngine with disabled verification', () => {
     })
     expect(verdict.nextHop.targetStep).toBe('archivable')
 
-    const command = resolveLifecycleCommand(
+    const result = resolveLifecycleIntent(
       change,
       verdict.nextHop,
       verdict.review,
@@ -200,10 +201,10 @@ describe('LifecycleEngine with disabled verification', () => {
       validity,
     )
 
-    expect(command).toBe('/specd-archive')
+    expect(result).toEqual({ intent: 'archive' })
   })
 
-  it('never recommends /specd-verify from done when verifying is disabled', () => {
+  it('never recommends the `verify` intent from done when verifying is disabled', () => {
     const change = makeChange('done')
     const validity: ChangeValidityVerdict = {
       artifactReviewRequired: false,
@@ -224,7 +225,7 @@ describe('LifecycleEngine with disabled verification', () => {
     const review = evaluate(change, disabledVerifyingSchema, { validity }).review
 
     expect(
-      resolveLifecycleCommand(
+      resolveLifecycleIntent(
         change,
         hop,
         review,
@@ -233,9 +234,9 @@ describe('LifecycleEngine with disabled verification', () => {
         disabledVerifyingSchema,
         validity,
       ),
-    ).toBe('/specd-design')
+    ).toEqual({ intent: 'design' })
     expect(
-      resolveLifecycleCommand(
+      resolveLifecycleIntent(
         change,
         { ...hop, targetStep: 'done' },
         review,
@@ -244,7 +245,7 @@ describe('LifecycleEngine with disabled verification', () => {
         disabledVerifyingSchema,
         validity,
       ),
-    ).toBe('/specd-archive')
+    ).toEqual({ intent: 'archive' })
   })
 
   it('uses the normalized approvals snapshot for every topology projection', () => {
@@ -278,8 +279,18 @@ describe('LifecycleEngine with disabled verification', () => {
     }
     const review = evaluate(change, disabledVerifyingSchema, { validity: validity('valid') }).review
 
+    const signoffFailure = fail(
+      'approval.signoff',
+      'APPROVAL_STALE',
+      'Signoff is stale',
+      { gate: 'signoff' },
+      undefined,
+      undefined,
+      approveSignoffAction(),
+    )
+
     expect(
-      resolveLifecycleCommand(
+      resolveLifecycleIntent(
         change,
         hop,
         review,
@@ -287,10 +298,11 @@ describe('LifecycleEngine with disabled verification', () => {
         gated,
         disabledVerifyingSchema,
         validity('stale'),
+        [signoffFailure],
       ),
-    ).toBe('specd changes approve signoff')
+    ).toEqual({ intent: null, action: approveSignoffAction() })
     expect(
-      resolveLifecycleCommand(
+      resolveLifecycleIntent(
         change,
         hop,
         review,
@@ -299,9 +311,9 @@ describe('LifecycleEngine with disabled verification', () => {
         disabledVerifyingSchema,
         validity('valid'),
       ),
-    ).toBe('/specd-archive')
+    ).toEqual({ intent: 'archive' })
     expect(
-      resolveLifecycleCommand(
+      resolveLifecycleIntent(
         change,
         { ...hop, targetStep: 'archivable' },
         review,
@@ -310,7 +322,7 @@ describe('LifecycleEngine with disabled verification', () => {
         disabledVerifyingSchema,
         validity('valid'),
       ),
-    ).toBe('/specd-archive')
+    ).toEqual({ intent: 'archive' })
   })
   it('derives guidance from the pipeline when workflow rows are in noncanonical order', () => {
     const noncanonical = makeSchema(
@@ -340,8 +352,8 @@ describe('LifecycleEngine with disabled verification', () => {
       const change = makeChange(state)
       const review = evaluate(change, noncanonical, { validity }).review
       expect(
-        resolveLifecycleCommand(change, hop, review, [], approvals, noncanonical, validity),
-      ).not.toBe('/specd-verify')
+        resolveLifecycleIntent(change, hop, review, [], approvals, noncanonical, validity).intent,
+      ).not.toBe('verify')
     }
     // Canonical order comes from the pipeline, not from the declared row order.
     expect(

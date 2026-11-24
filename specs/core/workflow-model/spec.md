@@ -75,7 +75,7 @@ Each change is bound at creation to a specific schema recorded in its manifest (
 
 Each workflow step declares a `requires` array of artifact IDs. That declaration SHALL be evaluated as the `workflow.requires` check with `to = effective` (see [`core:transition-checks`](../transition-checks/spec.md)). Status and `TransitionChange` MUST share that evaluation.
 
-If any required artifact has an effective status other than `complete` or `skipped`, the transition is rejected with `InvalidStateTransitionError`.
+If any required artifact has an effective status other than `complete` or `skipped`, the transition is rejected: the `workflow.requires` check fails and `TransitionChange` throws `CheckPredicateFailedError` for it.
 
 An empty or omitted `requires` means the step has no artifact gating — the `workflow.requires` check skips. Other matching predicates (`protocol.edge`, enter-ready deps, approvals, …) MAY still block the hop.
 
@@ -87,7 +87,7 @@ Artifacts in `missing`, `in-progress`, `pending-review`, or `drifted-pending-rev
 
 When a workflow step declares a `requiresTaskCompletion` array, that declaration SHALL be evaluated as the `workflow.taskCompletion` check with `to = effective`. Only artifacts listed in `requiresTaskCompletion` are content-checked — other artifacts in `requires` are checked only via `effectiveStatus`.
 
-The `requiresTaskCompletion` array MUST be a subset of the step's `requires` array. Each listed artifact ID MUST reference an artifact type that declares `taskCompletionCheck` on its `ArtifactType`. These constraints are validated at schema build time by `buildSchema`.
+The `requiresTaskCompletion` array MUST be a subset of the step's `requires` array. Each listed artifact ID MUST reference an artifact type with task capability (`hasTasks: true`). These constraints are validated at schema build time by `buildSchema`.
 
 For each artifact ID in `requiresTaskCompletion`:
 
@@ -95,10 +95,12 @@ For each artifact ID in `requiresTaskCompletion`:
 2. Get the `ChangeArtifact` via `change.getArtifact(artifactId)`. If it does not exist, skip it.
 3. Iterate the artifact's `files` map. For each `ArtifactFile`, load the file content via `ChangeRepository.artifact(change, file.filename)`.
 4. If the file does not exist (returns `null`), skip it.
-5. Compile `incompletePattern` using `safeRegex` with the `'m'` flag.
-6. If the regex is valid and matches any line in the file content, reject the transition with `InvalidStateTransitionError` including a structured reason (`incomplete-tasks`) with the artifact ID and match counts.
+5. Compile `incompletePattern` using `safeRegex` with the `'gm'` flag (the flags used by `CountTasks`).
+6. If the regex is valid and matches any line in the file content, reject the transition: the `workflow.taskCompletion` check fails with the artifact ID and match counts in its `details`, and `TransitionChange` throws `CheckPredicateFailedError` for it.
 
 Application use cases MUST NOT duplicate file walks in `evaluateLifecycleVerdict`. `CountTasks` SHALL be composed into `workflow.taskCompletion` via `createWorkflowTaskCompletion`.
+
+`workflow.taskCompletion` also runs at archive scope: it evaluates the same task-completion rule for every workflow step that declares a non-empty `requiresTaskCompletion`, fails with the first failing step's result, and skips when no step declares `requiresTaskCompletion`.
 
 When `requiresTaskCompletion` is absent or empty on a workflow step, no task completion gating applies — even if the step requires artifacts that declare `taskCompletionCheck`. The `taskCompletionCheck` on the artifact type defines _what_ pattern to check; the workflow step's `requiresTaskCompletion` controls _when_ it applies.
 
@@ -123,7 +125,7 @@ The step declaration delegates execution to the orchestrator while allowing decl
 
 - `along`: The transition direction (`forward`, `backward`, `recovery`, `redesign`, or `*`) when the check applies. Defaults to `forward`.
 - `onFailure`: Whether a failure aborts immediately (`'abort'`, default) or accumulates with other failures (`'collect'`).
-- `skippable`: Permission to bypass via `--skip-checks`, subject to kernel governance locks.
+- `skippable`: Permission for the caller to bypass the check by listing its check id in the orchestrator's host-neutral bypass input (`skipChecks` on the use cases, `skippedCheckIds` on the lifecycle verdict input), subject to kernel governance locks. How a delivery host collects that input is outside core.
 - `disabled`: Whether the check is declaratively disabled and omitted from execution on this step, subject to `allowDisable` governance locks.
 - `config`: Step-specific configuration merged over check-level defaults.
 
@@ -156,7 +158,7 @@ Entering a workflow step corresponds to transitioning the Change entity to the l
 
 ### Requirement: Hook execution at step boundaries
 
-All workflow steps can declare `run:` and `instruction:` hooks in their `pre` and `post` phases. `run:` entries are **effects** selected with the same `from` / `to` / `along` matcher as predicates: pre matches `to = that step`, `from = *`, `along = any`; post matches `from = that step`, `to = *`, `along = forward` only. `instruction:` entries are not in the predicate/effect pipeline.
+All workflow steps can declare `run:` and `instruction:` hooks in their `pre` and `post` phases. `run:` entries are **effects** selected with the same `from` / `to` / `along` matcher as predicates: pre matches `to = that step`, `from = *`, `along = any` except `recovery` (the `hook.pre` binding carries `exceptAlong: ['recovery']`); post matches `from = that step`, `to = *`, `along = forward` only. `instruction:` entries are not in the predicate/effect pipeline.
 
 `TransitionChange` executes matching `run:` effects after predicates pass and **before persist** (`hook.post` on transitions is `phase = before-persist`), unless skipped via `skipHookPhases`. The archiving step's archive `run:` hooks are executed by `ArchiveChange` as operation `archive`, not as a lifecycle `along` value.
 
@@ -164,7 +166,7 @@ All workflow steps can declare `run:` and `instruction:` hooks in their `pre` an
 
 `TransitionChange` SHALL auto-execute matching `run:` effects after predicates pass unless `skipHookPhases` skips them. `ArchiveChange` SHALL auto-execute operation-`archive` effects according to binding `phase` / `onFailure`.
 
-Skills MAY pass `skipHookPhases` and invoke `run-hooks` / `hook-instruction` manually. That MUST NOT be a second pipeline where agent-driven steps never auto-run. There is one pipeline: predicates then matching effects.
+Delivery hosts MAY pass `skipHookPhases` and run hook effects or instructions manually through their own entry points. That MUST NOT be a second pipeline where agent-driven steps never auto-run. There is one pipeline: predicates then matching effects.
 
 ### Requirement: Step requires reference artifact IDs
 
@@ -180,7 +182,7 @@ A workflow step's `requires` array contains **artifact IDs** (e.g. `specs`, `tas
 - The artifact dependency graph is validated as a DAG by `buildSchema()` — cycles are rejected at schema load time.
 - The archiving step is the only step that is both a workflow step and handled by a dedicated use case (`ArchiveChange`).
 - Task completion gating is controlled by `requiresTaskCompletion` on the workflow step — not by the mere presence of `taskCompletionCheck` on the artifact type.
-- `requiresTaskCompletion` must be a subset of `requires` and reference artifacts with `taskCompletionCheck` — validated at schema build time.
+- `requiresTaskCompletion` must be a subset of `requires` and reference artifacts with task capability (`hasTasks: true`) — validated at schema build time.
 - Task completion checks use `safeRegex` to compile patterns; patterns that fail compilation or contain nested quantifiers are treated as non-matching (no error thrown).
 
 ## Spec Dependencies
@@ -188,7 +190,7 @@ A workflow step's `requires` array contains **artifact IDs** (e.g. `specs`, `tas
 - [`core:change`](../change/spec.md) — change lifecycle states and artifact state lookup
 - [`core:schema-format`](../schema-format/spec.md) — workflow array structure and artifact definitions
 - [`core:build-schema`](../build-schema/spec.md) — DAG cycle detection at schema build time
-- [`core:compile-context`](../compile-context/spec.md) — step availability during context assembly
+- [`core:compile-context`](../compile-context/spec.md) — context assembly (does not evaluate step availability)
 - [`core:get-status`](../get-status/spec.md) — status reporting of the active workflow step
 - [`core:transition-change`](../transition-change/spec.md) — runtime transition enforcement
 - [`core:archive-change`](../archive-change/spec.md) — deterministic archiving step behavior

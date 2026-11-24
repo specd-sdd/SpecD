@@ -164,16 +164,17 @@ describe('TransitionChange', () => {
     } as unknown as ReconcileChangeValidity
     const useCase = makeUseCase(repo, { reconcile })
 
-    await expect(useCase.execute({ name: change.name, to: 'archiving' })).rejects.toMatchObject({
-      name: ReconciledOperationBlockedError.name,
-      code: 'RECONCILED_OPERATION_BLOCKED',
-      operation: 'transition',
-      changeName: change.name,
-      state: 'done',
-      automaticReturn: recovery,
-      blockers: verdict.blockers,
-      nextAction: { targetStep: 'done', command: '/specd-verify' },
-    })
+    const caught = (await useCase
+      .execute({ name: change.name, to: 'archiving' })
+      .catch((e: unknown) => e)) as ReconciledOperationBlockedError
+    expect(caught).toBeInstanceOf(ReconciledOperationBlockedError)
+    expect(caught.code).toBe('RECONCILED_OPERATION_BLOCKED')
+    expect(caught.operation).toBe('transition')
+    expect(caught.changeName).toBe(change.name)
+    expect(caught.state).toBe('done')
+    expect(caught.automaticReturn).toEqual(recovery)
+    expect(caught.blockers).toEqual(verdict.blockers)
+    expect(caught.nextAction).toMatchObject({ targetStep: 'archivable', intent: 'archive' })
   })
 
   it('never recommends /specd-verify for a committed recovery when verifying is disabled', async () => {
@@ -220,7 +221,7 @@ describe('TransitionChange', () => {
 
     expect(error).toBeInstanceOf(ReconciledOperationBlockedError)
     const nextAction = (error as ReconciledOperationBlockedError).nextAction
-    expect(nextAction.command).not.toBe('/specd-verify')
+    expect(nextAction.intent).not.toBe('verify')
     expect(nextAction.reason).toContain('returned the change to done')
   })
 
@@ -232,9 +233,13 @@ describe('TransitionChange', () => {
       ])
       const useCase = makeUseCase(makeChangeRepository([change]))
 
-      await expect(useCase.execute({ name: change.name, to: 'done' })).rejects.toThrow(
-        InvalidStateTransitionError,
-      )
+      await expect(useCase.execute({ name: change.name, to: 'done' })).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'protocol.edge',
+        checkCode: 'INVALID_TRANSITION',
+        from,
+        to: 'done',
+      })
     },
   )
 
@@ -337,7 +342,7 @@ describe('TransitionChange', () => {
       )
     })
 
-    it('rejects from pending-spec-approval', async () => {
+    it('advances from pending-spec-approval to implementing when spec gate is off', async () => {
       const change = makeChangeInState('my-change', [
         { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
         { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
@@ -351,12 +356,11 @@ describe('TransitionChange', () => {
       ])
       const uc = makeUseCase(makeChangeRepository([change]))
 
-      await expect(uc.execute({ name: 'my-change', to: 'next' })).rejects.toThrow(
-        HappyPathNextUnavailableError,
-      )
+      const result = await uc.execute({ name: 'my-change', to: 'next' })
+      expect(result.change.state).toBe('implementing')
     })
 
-    it('rejects from pending-signoff', async () => {
+    it('advances from pending-signoff to archivable when signoff gate is off', async () => {
       const change = makeChangeInState('my-change', [
         { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
         { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
@@ -367,9 +371,8 @@ describe('TransitionChange', () => {
       ])
       const uc = makeUseCase(makeChangeRepository([change]))
 
-      await expect(uc.execute({ name: 'my-change', to: 'next' })).rejects.toThrow(
-        HappyPathNextUnavailableError,
-      )
+      const result = await uc.execute({ name: 'my-change', to: 'next' })
+      expect(result.change.state).toBe('archivable')
     })
 
     it('rejects from archiving', async () => {
@@ -474,7 +477,7 @@ describe('TransitionChange', () => {
       expect(result.change.state).toBe('designing')
     })
 
-    it('throws InvalidStateTransitionError for invalid transition', async () => {
+    it('throws CheckPredicateFailedError for invalid transition', async () => {
       const change = makeChangeInState('my-change', [])
       const uc = makeUseCase(makeChangeRepository([change]))
 
@@ -483,7 +486,13 @@ describe('TransitionChange', () => {
           name: 'my-change',
           to: 'implementing',
         }),
-      ).rejects.toThrow(InvalidStateTransitionError)
+      ).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'protocol.edge',
+        checkCode: 'INVALID_TRANSITION',
+        from: 'drafting',
+        to: 'implementing',
+      })
     })
   })
 
@@ -509,7 +518,7 @@ describe('TransitionChange', () => {
       expect(result.change.state).toBe('implementing')
     })
 
-    it('stays in ready and throws approval-required when spec gate is on without consent', async () => {
+    it('stays in ready and throws approval.spec CheckPredicateFailedError when spec gate is on without consent', async () => {
       const change = makeReadyChange('my-change')
       const uc = makeUseCase(makeChangeRepository([change]), {
         approvals: { spec: true, signoff: false },
@@ -521,7 +530,12 @@ describe('TransitionChange', () => {
           to: 'implementing',
         }),
       ).rejects.toMatchObject({
-        reason: { type: 'approval-required', gate: 'spec' },
+        name: 'CheckPredicateFailedError',
+        checkId: 'approval.spec',
+        checkCode: 'APPROVAL_REQUIRED',
+        action: { kind: 'approve-spec' },
+        from: 'ready',
+        to: 'implementing',
       })
       expect(change.state).toBe('ready')
     })
@@ -567,7 +581,7 @@ describe('TransitionChange', () => {
       expect(result.change.state).toBe('archivable')
     })
 
-    it('stays in done and throws approval-required when signoff gate is on without consent', async () => {
+    it('stays in done and throws approval.signoff CheckPredicateFailedError when signoff gate is on without consent', async () => {
       const change = makeDoneChange('my-change')
       const uc = makeUseCase(makeChangeRepository([change]), {
         approvals: { spec: false, signoff: true },
@@ -579,7 +593,12 @@ describe('TransitionChange', () => {
           to: 'archivable',
         }),
       ).rejects.toMatchObject({
-        reason: { type: 'approval-required', gate: 'signoff' },
+        name: 'CheckPredicateFailedError',
+        checkId: 'approval.signoff',
+        checkCode: 'APPROVAL_REQUIRED',
+        action: { kind: 'approve-signoff' },
+        from: 'done',
+        to: 'archivable',
       })
       expect(change.state).toBe('done')
     })
@@ -626,32 +645,44 @@ describe('TransitionChange', () => {
       ])
     }
 
-    it('drains pending-spec-approval → spec-approved', async () => {
+    it('rejects pending-spec-approval → spec-approved as an invalid transition', async () => {
       const change = makePendingSpecApprovalChange('my-change')
       const uc = makeUseCase(makeChangeRepository([change]), {
         approvals: { spec: true, signoff: false },
       })
 
-      const result = await uc.execute({
-        name: 'my-change',
+      await expect(
+        uc.execute({
+          name: 'my-change',
+          to: 'spec-approved',
+        }),
+      ).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'protocol.edge',
+        checkCode: 'INVALID_TRANSITION',
+        from: 'pending-spec-approval',
         to: 'spec-approved',
       })
-
-      expect(result.change.state).toBe('spec-approved')
     })
 
-    it('drains pending-signoff → signed-off', async () => {
+    it('rejects pending-signoff → signed-off as an invalid transition', async () => {
       const change = makePendingSignoffChange('my-change')
       const uc = makeUseCase(makeChangeRepository([change]), {
         approvals: { spec: false, signoff: true },
       })
 
-      const result = await uc.execute({
-        name: 'my-change',
+      await expect(
+        uc.execute({
+          name: 'my-change',
+          to: 'signed-off',
+        }),
+      ).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'protocol.edge',
+        checkCode: 'INVALID_TRANSITION',
+        from: 'pending-signoff',
         to: 'signed-off',
       })
-
-      expect(result.change.state).toBe('signed-off')
     })
 
     it('still allows redesign from pending spec approval', async () => {
@@ -666,24 +697,46 @@ describe('TransitionChange', () => {
       expect(result.change.state).toBe('designing')
     })
 
-    it('reports spec approval guidance for a non-drain pending spec transition', async () => {
+    it('gates pending-spec-approval → implementing with approval.spec when spec gate is on', async () => {
       const change = makePendingSpecApprovalChange('my-change')
-      const uc = makeUseCase(makeChangeRepository([change]))
+      const uc = makeUseCase(makeChangeRepository([change]), {
+        approvals: { spec: true, signoff: false },
+      })
 
       await expect(uc.execute({ name: 'my-change', to: 'implementing' })).rejects.toMatchObject({
-        reason: { type: 'approval-required', gate: 'spec' },
+        name: 'CheckPredicateFailedError',
+        checkId: 'approval.spec',
+        checkCode: 'APPROVAL_REQUIRED',
+        action: { kind: 'approve-spec' },
+        from: 'pending-spec-approval',
+        to: 'implementing',
       })
       expect(change.state).toBe('pending-spec-approval')
+
+      change.recordSpecApproval('ok', makeSpecApprovalFingerprint(change.specIds), actor)
+      const drained = await uc.execute({ name: 'my-change', to: 'implementing' })
+      expect(drained.change.state).toBe('implementing')
     })
 
-    it('reports signoff guidance for a non-drain pending signoff transition', async () => {
+    it('gates pending-signoff → archivable with approval.signoff when signoff gate is on', async () => {
       const change = makePendingSignoffChange('my-change')
-      const uc = makeUseCase(makeChangeRepository([change]))
+      const uc = makeUseCase(makeChangeRepository([change]), {
+        approvals: { spec: false, signoff: true },
+      })
 
       await expect(uc.execute({ name: 'my-change', to: 'archivable' })).rejects.toMatchObject({
-        reason: { type: 'approval-required', gate: 'signoff' },
+        name: 'CheckPredicateFailedError',
+        checkId: 'approval.signoff',
+        checkCode: 'APPROVAL_REQUIRED',
+        action: { kind: 'approve-signoff' },
+        from: 'pending-signoff',
+        to: 'archivable',
       })
       expect(change.state).toBe('pending-signoff')
+
+      change.recordSignoff('ok', {}, actor)
+      const drained = await uc.execute({ name: 'my-change', to: 'archivable' })
+      expect(drained.change.state).toBe('archivable')
     })
   })
 
@@ -818,7 +871,11 @@ describe('TransitionChange', () => {
           name: 'my-change',
           to: 'verifying',
         }),
-      ).rejects.toThrow(InvalidStateTransitionError)
+      ).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'workflow.taskCompletion',
+        checkCode: 'INCOMPLETE_TASKS',
+      })
     })
 
     it('allows transition when all tasks are complete', async () => {
@@ -910,7 +967,13 @@ describe('TransitionChange', () => {
       await expect(
         uc.execute({ name: 'missing-task-configuration', to: 'verifying' }),
       ).rejects.toMatchObject({
-        reason: { type: 'missing-task-capability', artifactId: 'tasks' },
+        name: 'CheckPredicateFailedError',
+        checkId: 'workflow.taskCompletion',
+        checkCode: 'INCOMPLETE_TASKS',
+        details: expect.objectContaining({
+          reason: 'missing-task-capability',
+          artifactId: 'tasks',
+        }),
       })
     })
 
@@ -957,7 +1020,11 @@ describe('TransitionChange', () => {
           name: 'my-change',
           to: 'archivable',
         }),
-      ).rejects.toThrow(InvalidStateTransitionError)
+      ).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'workflow.taskCompletion',
+        checkCode: 'INCOMPLETE_TASKS',
+      })
     })
 
     it('does not gate when requiresTaskCompletion is absent', async () => {
@@ -1036,16 +1103,17 @@ describe('TransitionChange', () => {
         })
         expect.unreachable('should have thrown')
       } catch (err) {
-        expect(err).toBeInstanceOf(InvalidStateTransitionError)
-        const error = err as InstanceType<typeof InvalidStateTransitionError>
-        expect(error.reason).toEqual({
-          type: 'incomplete-tasks',
+        expect(err).toBeInstanceOf(CheckPredicateFailedError)
+        const error = err as CheckPredicateFailedError
+        expect(error.checkId).toBe('workflow.taskCompletion')
+        expect(error.checkCode).toBe('INCOMPLETE_TASKS')
+        expect(error.details).toMatchObject({
           artifactId: 'tasks',
           incomplete: 2,
           complete: 2,
           total: 4,
         })
-        expect(error.message).toContain('2/4 tasks complete')
+        expect(error.message).toContain('2 incomplete tasks')
       }
     })
 
@@ -1064,7 +1132,7 @@ describe('TransitionChange', () => {
       const events: TransitionProgressEvent[] = []
       await expect(
         uc.execute({ name: 'my-change', to: 'verifying' }, (evt) => events.push(evt)),
-      ).rejects.toThrow(InvalidStateTransitionError)
+      ).rejects.toThrow(CheckPredicateFailedError)
 
       const failedEvent = events.find((e) => e.type === 'task-completion-failed')
       expect(failedEvent).toBeDefined()
@@ -1104,10 +1172,14 @@ describe('TransitionChange', () => {
           name: 'my-change',
           to: 'implementing',
         }),
-      ).rejects.toThrow(InvalidStateTransitionError)
+      ).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'workflow.requires',
+        checkCode: 'INCOMPLETE_ARTIFACT',
+      })
     })
 
-    it('throws with incomplete-artifact reason when requires unsatisfied', async () => {
+    it('throws CheckPredicateFailedError with artifactId and status when requires unsatisfied', async () => {
       const change = makeReadyChange('my-change')
       const schema = makeSchema({
         workflow: [
@@ -1128,14 +1200,15 @@ describe('TransitionChange', () => {
         })
         expect.unreachable('should have thrown')
       } catch (err) {
-        expect(err).toBeInstanceOf(InvalidStateTransitionError)
-        const error = err as InstanceType<typeof InvalidStateTransitionError>
-        expect(error.reason).toEqual({
-          type: 'incomplete-artifact',
+        expect(err).toBeInstanceOf(CheckPredicateFailedError)
+        const error = err as CheckPredicateFailedError
+        expect(error.checkId).toBe('workflow.requires')
+        expect(error.checkCode).toBe('INCOMPLETE_ARTIFACT')
+        expect(error.details).toEqual({
           artifactId: 'tasks',
           status: 'missing',
         })
-        expect(error.message).toContain("artifact 'tasks' is missing")
+        expect(error.message).toContain("Required artifact 'tasks' is 'missing'")
       }
     })
 
@@ -1287,7 +1360,7 @@ describe('TransitionChange', () => {
           name: 'my-change',
           to: 'implementing',
         }),
-      ).rejects.toThrow(InvalidStateTransitionError)
+      ).rejects.toThrow(CheckPredicateFailedError)
     })
 
     it('emits requires-check event with satisfied:false for unsatisfied artifact', async () => {
@@ -2548,7 +2621,7 @@ describe('TransitionChange', () => {
       const uc = makeUseCase(makeChangeRepository([change]))
 
       await expect(uc.execute({ name: 'my-change', to: 'verifying' })).rejects.toThrow(
-        InvalidStateTransitionError,
+        CheckPredicateFailedError,
       )
       expect(change.history).toHaveLength(historyLength)
       expect(change.updatedAt).toEqual(updatedAt)
@@ -2782,7 +2855,11 @@ describe('TransitionChange', () => {
           to: 'verifying',
           skipHookPhases: new Set(['all']),
         }),
-      ).rejects.toMatchObject({ reason: { type: 'incomplete-tasks' } })
+      ).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'workflow.taskCompletion',
+        checkCode: 'INCOMPLETE_TASKS',
+      })
     })
 
     it('skips source.post on redesign into designing', async () => {
@@ -3464,7 +3541,7 @@ describe('TransitionChange', () => {
           outcome: 'fail',
           code: 'AUDIT_VULNERABILITY_FOUND',
           message: 'Found high severity vulnerability',
-          command: 'npm audit fix',
+          action: { kind: '@acme/security.audit-fix', guidance: 'npm audit fix' },
         }),
       }
       registry.register('@acme/security', customCheck, [
@@ -3492,7 +3569,10 @@ describe('TransitionChange', () => {
         expect(checkErr.label).toBe('Code Audit')
         expect(checkErr.code).toBe('AUDIT_VULNERABILITY_FOUND')
         expect(checkErr.message).toContain('Found high severity vulnerability')
-        expect(checkErr.command).toBe('npm audit fix')
+        expect(checkErr.action).toEqual({
+          kind: '@acme/security.audit-fix',
+          guidance: 'npm audit fix',
+        })
       }
     })
 

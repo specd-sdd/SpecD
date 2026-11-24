@@ -147,7 +147,7 @@ describe('resolveWorkflowCheckRegistry', () => {
     ).toBe(false)
   })
 
-  it('binds verification.current only on verifying to done and reuses it for archive', () => {
+  it('binds verification.current on verification-requiring exits and reuses it for archive', () => {
     const registry = resolveWorkflowCheckRegistry(makeResolver([]))
     const transitionRows = registry.transitionBindings.filter(
       (binding) => binding.check.id === 'verification.current',
@@ -155,6 +155,9 @@ describe('resolveWorkflowCheckRegistry', () => {
     expect(transitionRows).toHaveLength(1)
     expect(transitionRows[0]?.applicability).toEqual([
       { scope: 'transition', from: 'verifying', to: 'done', along: 'forward' },
+      { scope: 'transition', from: 'done', to: 'archivable', along: 'forward' },
+      { scope: 'transition', from: 'pending-signoff', to: 'archivable', along: 'forward' },
+      { scope: 'transition', from: 'signed-off', to: 'archivable', along: 'forward' },
     ])
     expect(
       registry.archiveBindings.some((binding) => binding.check.id === 'verification.current'),
@@ -163,7 +166,9 @@ describe('resolveWorkflowCheckRegistry', () => {
       registry.transitionBindings.some(
         (binding) =>
           binding.check.id === 'verification.current' &&
-          binding.applicability.some((row) => row.scope === 'transition' && row.to !== 'done'),
+          binding.applicability.some(
+            (row) => row.scope === 'transition' && row.to !== 'done' && row.to !== 'archivable',
+          ),
       ),
     ).toBe(false)
   })

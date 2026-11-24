@@ -13,8 +13,7 @@
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/change/archive.ts",
-      "symbols": ["registerChangeArchive"]
+      "file": "cli:src/commands/change/archive.ts"
     }
   ],
   "optimizations": {

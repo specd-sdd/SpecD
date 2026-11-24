@@ -1,4 +1,4 @@
-/** Compatibility barrel: domain lifecycle lives in `lifecycle-verdict.ts`. */
+/** Re-exports the domain lifecycle verdict functions implemented in `lifecycle-verdict.ts`. */
 export {
   evaluateLifecycleVerdict,
   projectArtifacts,

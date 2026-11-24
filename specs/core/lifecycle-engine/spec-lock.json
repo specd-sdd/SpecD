@@ -15,8 +15,19 @@
   ],
   "implementation": [
     {
-      "file": "core:src/domain/services/lifecycle-verdict.ts",
-      "symbols": ["evaluateLifecycleVerdict", "LifecycleVerdictInput"]
+      "file": "core:src/domain/services/lifecycle-verdict.ts"
+    },
+    {
+      "file": "core:src/application/services/lifecycle-guidance.ts"
+    },
+    {
+      "file": "core:src/application/services/lifecycle-evaluation.ts"
+    },
+    {
+      "file": "core:src/domain/services/change-validity.ts"
+    },
+    {
+      "file": "core:src/application/use-cases/reconcile-change-validity.ts"
     }
   ],
   "optimizations": {

@@ -83,23 +83,9 @@ Scenarios:
 
 #### Scenario: Persisted dependency state seeds new spec entry
 
-- **GIVEN** a persisted spec being added to the change has semantic dependency state available through `readPersistedDependsOn(spec)`
+- **GIVEN** a persisted spec being added to the change has persisted state available through `readPersistedState(spec)`
 - **WHEN** `EditChange.execute` adds that spec to the change
-- **THEN** the seeded `change.specDependsOn` entry comes from that semantic persisted state
-
-#### Scenario: Legacy metadata seeds when persisted semantic state is absent
-
-- **GIVEN** a persisted spec being added has no semantic persisted dependency state
-- **AND** `metadata.json.dependsOn` exists for that spec
-- **WHEN** `EditChange.execute` adds that spec
-- **THEN** the seeded `change.specDependsOn` entry comes from `metadata.json.dependsOn`
-
-#### Scenario: Stale metadata still seeds as legacy fallback
-
-- **GIVEN** a persisted spec being added has no semantic persisted dependency state
-- **AND** `metadata.json.dependsOn` exists for that spec but the metadata is marked stale
-- **WHEN** `EditChange.execute` adds that spec
-- **THEN** the seeded `change.specDependsOn` entry still comes from the persisted metadata dependency list
+- **THEN** the seeded `change.specDependsOn` entry equals the `dependsOn` of that persisted state
 
 #### Scenario: Existing in-change dependency snapshot is not overwritten
 
@@ -107,6 +93,13 @@ Scenarios:
 - **AND** `change.specDependsOn` already contains an entry for it
 - **WHEN** later scope edits run
 - **THEN** `EditChange` does not overwrite that existing dependency snapshot automatically
+
+#### Scenario: Absent persisted state seeds an empty dependency list
+
+- **GIVEN** a spec being added to the change has no persisted state (or does not exist in its repository)
+- **WHEN** `EditChange.execute` adds that spec
+- **THEN** the seeded `change.specDependsOn` entry is an empty array
+- **AND** `metadata.json.dependsOn` is not consulted
 
 ### Requirement: No-op when specIds unchanged after processing
 
@@ -125,7 +118,7 @@ Scenarios:
 
 - **WHEN** effective spec scope changes
 - **THEN** affected artifact review and evidence are updated in the same mutation
-- **AND** required stale spec consent returns to design while ungated preserve retains state
+- **AND** required stale spec consent returns to design from a state after `ready` while ungated preserve retains state
 
 #### Scenario: Scope change always affects spec consent but not unrelated evidence
 
@@ -137,6 +130,13 @@ Scenarios:
 
 - **WHEN** an edit only reorders or duplicates inputs that normalize to the approved canonical spec set
 - **THEN** spec approval remains valid and no scope-change invalidation event is appended
+
+#### Scenario: Scope change in ready keeps the change in ready
+
+- **GIVEN** a change in `ready` with valid required spec consent
+- **WHEN** effective spec scope changes
+- **THEN** the approval is reported stale and no automatic return is committed
+- **AND** the change stays in `ready` so consent can be renewed there
 
 ### Requirement: Directory cleanup on removal
 
@@ -200,14 +200,14 @@ Scenarios:
 #### Scenario: Unknown invalidation policy rejected
 
 - **GIVEN** a change exists
-- **WHEN** `execute` is called with `invalidationPolicy: 'sugical'`
+- **WHEN** `execute` is called with `invalidation: { artifacts: 'sugical' }`
 - **THEN** `InvalidInputError` is thrown quoting `sugical` and listing `none`, `surgical`, `downstream`, `global`
 - **AND** nothing is persisted
 
 #### Scenario: Invalid invalidation policy is rejected together with valid edits
 
 - **GIVEN** a change exists
-- **WHEN** `execute` is called with `description: 'x'` and `invalidationPolicy: 'bogus'`
+- **WHEN** `execute` is called with `description: 'x'` and `invalidation: { workflow: 'bogus' }`
 - **THEN** `InvalidInputError` is thrown and the description is not changed
 
 ### Requirement: Output contract

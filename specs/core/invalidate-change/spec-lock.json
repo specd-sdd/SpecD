@@ -13,12 +13,7 @@
   ],
   "implementation": [
     {
-      "file": "core:src/application/errors/invalidate-requires-force-error.ts",
-      "symbols": ["InvalidateRequiresForceError"]
-    },
-    {
-      "file": "core:src/application/use-cases/invalidate-change.ts",
-      "symbols": ["InvalidateChange"]
+      "file": "core:src/application/use-cases/invalidate-change.ts"
     }
   ],
   "optimizations": {

@@ -210,7 +210,7 @@ describe('spec validate', () => {
     kernel.specs.validate.execute.mockRejectedValue(
       Object.assign(
         new Error(
-          'dependsOn would change (added: core:new; removed: core:old). Pass force to overwrite curated dependencies.',
+          'dependsOn would change (added: core:new; removed: core:old). overwriting curated dependencies requires explicit confirmation.',
         ),
         {
           specd: true,

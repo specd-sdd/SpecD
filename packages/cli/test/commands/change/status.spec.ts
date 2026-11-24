@@ -71,7 +71,8 @@ it('help documents nested schema.artifactDag and overlapDetail', async () => {
   registerChangeStatus(program.command('change'))
   await program.parseAsync(['node', 'specd', 'change', 'status', '--help']).catch(() => {})
   expect(stdout()).toContain('overlapDetail')
-  expect(stdout()).toContain('schema: { name: string, version: number, artifactDag:')
+  expect(stdout()).toMatch(/schema: \{\s*\/\/ schema snapshot/)
+  expect(stdout()).toContain('artifactDag: Array<{')
 })
 
 it('JSON drafted status includes isDrafted and empty transitions', async () => {
@@ -1159,7 +1160,7 @@ describe('Lifecycle projections from GetStatus', () => {
         targetStep: 'implementing',
         actionType: 'cognitive',
         reason: 'Tasks are complete',
-        command: '/specd-verify',
+        intent: 'verify',
       },
     })
 
@@ -1400,7 +1401,7 @@ describe('reconciled validity and next action', () => {
           targetStep: 'designing',
           actionType: 'cognitive',
           reason: 'Renew design consent',
-          command: '/specd-design',
+          intent: 'design',
         },
         validity: {
           specApproval: 'stale',
@@ -1480,7 +1481,12 @@ describe('reconciled validity and next action', () => {
         targetStep: 'verifying',
         actionType: 'cognitive',
         reason: 'Renew verification in place',
-        command: 'specd changes verification start my-change',
+        intent: null,
+        action: {
+          kind: 'start-verification',
+          params: { changeName: 'my-change' },
+          supersedesIntent: false,
+        },
       },
       validity: {
         specApproval: 'valid',
@@ -1680,7 +1686,7 @@ describe('reconciled validity and next action', () => {
         ],
       },
       blockers: [],
-      nextAction: { ...defaultNextAction, targetStep: 'verifying', command: '/specd-verify' },
+      nextAction: { ...defaultNextAction, targetStep: 'verifying', intent: 'verify' },
     })
 
     const programText = makeProgram()
@@ -1712,7 +1718,7 @@ describe('reconciled validity and next action', () => {
         ],
       },
       blockers: [],
-      nextAction: { ...defaultNextAction, targetStep: 'verifying', command: '/specd-verify' },
+      nextAction: { ...defaultNextAction, targetStep: 'verifying', intent: 'verify' },
     })
 
     const programJson = makeProgram()
@@ -1756,7 +1762,7 @@ describe('reconciled validity and next action', () => {
           checkId: '@security.code-audit',
         },
       ],
-      nextAction: { ...defaultNextAction, targetStep: 'verifying', command: null },
+      nextAction: { ...defaultNextAction, targetStep: 'verifying', intent: null },
     })
 
     const programText = makeProgram()
@@ -1786,7 +1792,7 @@ describe('reconciled validity and next action', () => {
           checkId: '@security.code-audit',
         },
       ],
-      nextAction: { ...defaultNextAction, targetStep: 'verifying', command: null },
+      nextAction: { ...defaultNextAction, targetStep: 'verifying', intent: null },
     })
 
     const programJson = makeProgram()
@@ -1830,7 +1836,7 @@ describe('archive bypass hints come from resolved bindings', () => {
         targetStep: 'archivable',
         actionType: 'mechanical',
         reason,
-        command: '/specd-archive',
+        intent: 'archive',
       },
     }
   }
@@ -1852,20 +1858,21 @@ describe('archive bypass hints come from resolved bindings', () => {
     message: 'Specs overlap with other active changes',
     label: 'Checking spec overlap',
     checkId: 'spec.overlap',
-    bypassFlag: '--skip-checks spec.overlap',
+    isSkippable: true,
   }
   const scope = {
     code: 'IMPLEMENTATION_STATE',
     message: 'Links resolve outside scope',
     label: 'Checking implementation links',
     checkId: 'impl.linksInScope',
-    bypassFlag: '--skip-checks impl.linksInScope',
+    isSkippable: true,
   }
   const readOnly = {
     code: 'READ_ONLY_WORKSPACE',
     message: 'Contains readOnly specs',
     label: 'Checking workspace ownership',
     checkId: 'workspace.readOnly',
+    isSkippable: false,
   }
 
   it('renders the projected bypass flag under a skippable blocker in text', async () => {
@@ -1883,8 +1890,7 @@ describe('archive bypass hints come from resolved bindings', () => {
   })
 
   it('never builds a bypass when GetStatus supplies none', async () => {
-    const hardened = { ...overlap }
-    delete (hardened as { bypassFlag?: string }).bypassFlag
+    const hardened = { ...overlap, isSkippable: false }
     const output = await run(
       archivable([hardened], 'Specs overlap with other active changes'),
       'text',
@@ -1895,8 +1901,7 @@ describe('archive bypass hints come from resolved bindings', () => {
   })
 
   it.each(['json', 'toon'] as const)('serializes the same hints in %s', async (format) => {
-    const hardened = { ...overlap, code: 'HARDENED_OVERLAP' }
-    delete (hardened as { bypassFlag?: string }).bypassFlag
+    const hardened = { ...overlap, code: 'HARDENED_OVERLAP', isSkippable: false }
     const output = await run(archivable([overlap, readOnly, hardened]), format)
     const parsed = format === 'json' ? JSON.parse(output) : decodeToon(output)
     const blockersList = parsed.blockers as Array<{ code: string; bypassFlag?: string }>
@@ -1914,5 +1919,371 @@ describe('archive bypass hints come from resolved bindings', () => {
     const output = await run(archivable([]), 'text')
     expect(output).not.toContain('OVERLAP_CONFLICT')
     expect(output).not.toContain('bypass:')
+  })
+})
+
+describe('host-neutral next action rendering', () => {
+  async function renderStatus(
+    nextAction: Record<string, unknown>,
+    format: 'text' | 'json' | 'toon',
+    extra: Record<string, unknown> = {},
+  ): Promise<string> {
+    const { kernel, stdout } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
+      change: makeMockChange({ name: 'my-change', state: 'ready' }),
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
+      artifactStatuses: [],
+      lifecycle: defaultLifecycle,
+      blockers: [],
+      nextAction: {
+        targetStep: 'ready',
+        actionType: 'mechanical',
+        reason: 'blocked',
+        ...nextAction,
+      },
+      ...extra,
+    })
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    const argv = ['node', 'specd', 'change', 'status', 'my-change']
+    await program.parseAsync(format === 'text' ? argv : [...argv, '--format', format])
+    return stdout()
+  }
+
+  it('renders a gate action as its approval command and keeps intent null', async () => {
+    const out = await renderStatus({ intent: null, action: { kind: 'approve-spec' } }, 'json')
+    const parsed = JSON.parse(out) as {
+      nextAction: { command: string; intent: null; action: { kind: string }; guidance?: string }
+    }
+    expect(parsed.nextAction.command).toBe('specd changes approve spec')
+    expect(parsed.nextAction.intent).toBeNull()
+    expect(parsed.nextAction.action.kind).toBe('approve-spec')
+    expect(parsed.nextAction.guidance).toBeUndefined()
+    expect(
+      await renderStatus({ intent: null, action: { kind: 'approve-spec' } }, 'text'),
+    ).toContain('command: specd changes approve spec')
+  })
+
+  it('lets the phase intent win over an informational action', async () => {
+    const out = await renderStatus(
+      {
+        intent: 'verify',
+        action: { kind: 'start-verification', params: { changeName: 'my-change' } },
+      },
+      'json',
+    )
+    const parsed = JSON.parse(out) as { nextAction: { command: string; intent: string } }
+    expect(parsed.nextAction.command).toBe('/specd-verify')
+    expect(parsed.nextAction.intent).toBe('verify')
+  })
+
+  it('exposes guidance separately for an unknown plugin action in text, json and toon', async () => {
+    const action = { kind: '@security.code-scan', guidance: 'Run the security scan' }
+    const json = JSON.parse(await renderStatus({ intent: null, action }, 'json')) as {
+      nextAction: { command: string | null; guidance?: string }
+    }
+    expect(json.nextAction.command).toBeNull()
+    expect(json.nextAction.guidance).toBe('Run the security scan')
+    const text = await renderStatus({ intent: null, action }, 'text')
+    expect(text).toContain('command: (none)')
+    expect(text).toContain('guidance: Run the security scan')
+    const toon = await renderStatus({ intent: null, action }, 'toon')
+    expect(toon).toContain('guidance: Run the security scan')
+  })
+
+  it('does not leak intent or action for a drafted change', async () => {
+    const out = await renderStatus({ intent: 'design', action: { kind: 'approve-spec' } }, 'json', {
+      change: undefined,
+      draftView: {
+        name: 'my-change',
+        state: 'designing',
+        specIds: [],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
+      },
+    })
+    const parsed = JSON.parse(out) as { nextAction: Record<string, unknown> }
+    expect(parsed.nextAction.command).toBeNull()
+    expect('intent' in parsed.nextAction).toBe(false)
+    expect('action' in parsed.nextAction).toBe(false)
+    expect('guidance' in parsed.nextAction).toBe(false)
+  })
+})
+
+describe('status DAG, schema drift and drafted blockers', () => {
+  const baseResult = {
+    schemaWarnings: [],
+    specDependsOn: {},
+    implementationTracking: { trackedFiles: [], links: [] },
+    artifactStatuses: [],
+    nextAction: defaultNextAction,
+  }
+
+  it('renders a convergent DAG node once in text output', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      ...baseResult,
+      change: makeMockChange({ name: 'dag-change', state: 'designing' }),
+      lifecycle: {
+        ...defaultLifecycle,
+        schemaInfo: {
+          name: '@specd/schema-std',
+          version: 1,
+          artifacts: [
+            { id: 'proposal', scope: 'change', requires: [] },
+            { id: 'design', scope: 'change', requires: [] },
+            { id: 'tasks', scope: 'change', requires: ['proposal', 'design'] },
+          ],
+        },
+      },
+      blockers: [],
+    })
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', 'dag-change'])
+
+    const out = stdout()
+    expect(out.match(/tasks \[scope: change\]/g)).toHaveLength(1)
+    expect(out.match(/proposal \[scope: change\]/g)).toHaveLength(1)
+    expect(out.match(/design \[scope: change\]/g)).toHaveLength(1)
+  })
+
+  it('does not treat a different workspace default schema as drift', async () => {
+    const { kernel, stdout, stderr } = setup()
+    kernel.specs.getActiveSchema.execute.mockResolvedValue({
+      raw: false,
+      schema: {
+        name: () => '@acme/other-schema',
+        version: () => 7,
+        artifacts: () => [],
+        workflow: () => [],
+      },
+    })
+    kernel.changes.status.execute.mockResolvedValue({
+      ...baseResult,
+      change: makeMockChange({
+        name: 'my-change',
+        state: 'designing',
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
+      }),
+      lifecycle: defaultLifecycle,
+      blockers: [],
+    })
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', 'my-change'])
+
+    expect(stdout()).not.toContain('warnings:')
+    expect(stdout()).not.toContain('DRIFT')
+    expect(stderr()).not.toContain('@acme/other-schema')
+    expect(stderr()).not.toContain('active schema')
+  })
+
+  describe('drafted blockers', () => {
+    const blockers = [
+      {
+        code: 'OVERLAP_CONFLICT',
+        message: 'Specs overlap with other active changes',
+        label: 'Checking spec overlap',
+        checkId: 'spec.overlap',
+        isSkippable: true,
+        action: { kind: 'refresh-status', params: { changeName: 'my-change' } },
+      },
+      {
+        code: 'READ_ONLY_WORKSPACE',
+        message: 'Contains readOnly specs',
+        checkId: 'workspace.readOnly',
+        isSkippable: false,
+      },
+    ]
+
+    function drafted() {
+      return {
+        ...baseResult,
+        draftView: {
+          name: 'my-change',
+          state: 'designing',
+          specIds: [],
+          schemaName: '@specd/schema-std',
+          schemaVersion: 1,
+        },
+        lifecycle: { ...defaultLifecycle, changePath: '.specd/drafts/my-change' },
+        blockers,
+      }
+    }
+
+    it('renders blocker labels and bypass line like active status in text', async () => {
+      const { kernel, stdout } = setup()
+      kernel.changes.status.execute.mockResolvedValue(drafted())
+      const program = makeProgram()
+      registerChangeStatus(program.command('change'))
+      await program.parseAsync(['node', 'specd', 'change', 'status', 'my-change'])
+
+      const out = stdout()
+      expect(out).toContain('blockers:')
+      expect(out).toContain(
+        '  ! OVERLAP_CONFLICT — Checking spec overlap: Specs overlap with other active changes',
+      )
+      expect(out).toContain('    bypass: --skip-checks spec.overlap')
+      expect(out).toContain('  ! READ_ONLY_WORKSPACE: Contains readOnly specs')
+      expect(out.match(/bypass:/g)).toHaveLength(1)
+    })
+
+    it('projects label, checkId and bypassFlag in drafted JSON blockers', async () => {
+      const { kernel, stdout } = setup()
+      kernel.changes.status.execute.mockResolvedValue(drafted())
+      const program = makeProgram()
+      registerChangeStatus(program.command('change'))
+      await program.parseAsync([
+        'node',
+        'specd',
+        'change',
+        'status',
+        'my-change',
+        '--format',
+        'json',
+      ])
+
+      const parsed = JSON.parse(stdout()) as {
+        blockers: Array<Record<string, unknown>>
+      }
+      expect(parsed.blockers[0]).toMatchObject({
+        code: 'OVERLAP_CONFLICT',
+        label: 'Checking spec overlap',
+        checkId: 'spec.overlap',
+        bypassFlag: '--skip-checks spec.overlap',
+        action: { kind: 'refresh-status' },
+      })
+      expect('isSkippable' in parsed.blockers[0]!).toBe(false)
+      expect('bypassFlag' in parsed.blockers[1]!).toBe(false)
+    })
+
+    it('projects drafted artifacts with the display-status fallback', async () => {
+      const { kernel, stdout } = setup()
+      kernel.changes.status.execute.mockResolvedValue({
+        ...drafted(),
+        artifactStatuses: [
+          {
+            type: 'proposal',
+            state: 'complete',
+            effectiveStatus: 'pending-review',
+            files: [
+              {
+                key: 'proposal',
+                filename: 'proposal.md',
+                state: 'complete',
+                hasDrift: false,
+              },
+            ],
+          },
+        ],
+      })
+      const program = makeProgram()
+      registerChangeStatus(program.command('change'))
+      await program.parseAsync([
+        'node',
+        'specd',
+        'change',
+        'status',
+        'my-change',
+        '--format',
+        'json',
+      ])
+
+      const parsed = JSON.parse(stdout()) as {
+        artifacts: Array<{ displayStatus: string; files: Array<{ displayStatus: string }> }>
+      }
+      expect(parsed.artifacts[0]?.displayStatus).toBe('pending-review')
+      expect(parsed.artifacts[0]?.files[0]?.displayStatus).toBe('complete')
+    })
+  })
+
+  it('appends the overlap bypass sentence to nextAction.reason at status level', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      ...baseResult,
+      change: makeMockChange({ name: 'my-change', state: 'archivable' }),
+      lifecycle: defaultLifecycle,
+      blockers: [
+        {
+          code: 'OVERLAP_CONFLICT',
+          message: 'Specs overlap',
+          label: 'Checking spec overlap',
+          checkId: 'spec.overlap',
+          isSkippable: true,
+        },
+      ],
+      nextAction: {
+        targetStep: 'archivable',
+        actionType: 'mechanical',
+        reason: 'Specs overlap with other active changes.',
+        intent: 'archive',
+      },
+    })
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', 'my-change', '--format', 'json'])
+
+    const parsed = JSON.parse(stdout()) as { nextAction: { reason: string; command: string } }
+    expect(parsed.nextAction.reason).toContain('Use --skip-checks spec.overlap to archive anyway.')
+    expect(parsed.nextAction.command).toBe('/specd-archive')
+  })
+
+  it('--help JSON schema lists intent, action, guidance and bypassFlag', async () => {
+    const { stdout } = setup()
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', '--help']).catch(() => {})
+    const help = stdout()
+    for (const term of ['intent', 'action?', 'guidance?', 'bypassFlag?']) {
+      expect(help).toContain(term)
+    }
+  })
+
+  it('--help JSON schema lists every emitted top-level and lifecycle field', async () => {
+    const { stdout } = setup()
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', '--help']).catch(() => {})
+    const help = stdout()
+    for (const term of [
+      'validity?',
+      'verification?',
+      'invalidation?',
+      'implementationTracking?',
+      'approvalGates',
+      'specEnabled',
+      'signoffEnabled',
+      'checks?',
+      'checksByTarget?',
+      'displayStatus',
+      'hasDrift',
+    ]) {
+      expect(help).toContain(term)
+    }
+  })
+
+  it('--help JSON schema describes every listed field and marks schema.artifactDag active-only', async () => {
+    const { stdout } = setup()
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', '--help']).catch(() => {})
+    const help = stdout()
+    const start = help.indexOf('JSON/TOON output schema')
+    expect(start).toBeGreaterThanOrEqual(0)
+    const fieldLines = help
+      .slice(start)
+      .split('\n')
+      .filter((line) => /^\s+[A-Za-z]+\??:/.test(line))
+    expect(fieldLines.length).toBeGreaterThan(50)
+    const undescribed = fieldLines.filter((line) => !/\/\/\s*\S/.test(line))
+    expect(undescribed).toEqual([])
+    expect(help).toMatch(/artifactDag: Array<\{\s*\/\/ active changes only/)
+    expect(help).toMatch(/legacy top-level copy kept for compatibility/)
   })
 })

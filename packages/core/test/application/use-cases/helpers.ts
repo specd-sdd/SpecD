@@ -1021,6 +1021,8 @@ export function newArchiveChange(
   archiveBindings?: readonly CheckBinding[],
   reconcile?: ReconcileChangeValidity,
   checkRegistry?: CheckRegistry,
+  transitionBindings?: readonly CheckBinding[],
+  approvals?: { readonly spec: boolean; readonly signoff: boolean },
 ): ArchiveChange {
   return new ArchiveChange(
     changes,
@@ -1048,6 +1050,8 @@ export function newArchiveChange(
     reconcile ?? makeObservingReconcile(changes),
     undefined,
     checkRegistry,
+    transitionBindings,
+    approvals,
   )
 }
 

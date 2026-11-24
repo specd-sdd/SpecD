@@ -183,7 +183,7 @@
 
 - **GIVEN** archive is blocked by spec overlap and `spec.overlap` is skippable
 - **WHEN** the command fails
-- **THEN** stderr lists the overlapping specs and peers and ends with `Use --skip-checks spec.overlap to proceed despite overlap.`
+- **THEN** stderr lists the overlapping specs and peers and ends with `Retry with --skip-checks spec.overlap if an exception is granted`
 
 #### Scenario: No bypass suggestion when spec.overlap is not skippable
 
@@ -230,6 +230,46 @@
 - **GIVEN** the schema makes `impl.linksInScope` non-skippable
 - **WHEN** the user runs `specd changes archive my-change --allow-out-of-scope`
 - **THEN** the command exits with code 1 and reports `CheckNotSkippableError`
+
+#### Scenario: Dependency mismatch lists every mismatching spec
+
+- **GIVEN** archive fails with `CheckPredicateFailedError` for `deps.consistent` with three entries in `details.mismatches`
+- **WHEN** the command renders the failure
+- **THEN** stderr lists the three specs with their extracted and persisted dependencies
+- **AND** the CLI adds the hint to re-run dependency extraction or update the change dependencies
+
+#### Scenario: Read-only workspace failure lists affected specs
+
+- **GIVEN** archive fails with `CheckPredicateFailedError` for `workspace.readOnly` with `details.specs`
+- **WHEN** the command renders the failure
+- **THEN** stderr lists every affected spec and its workspace
+- **AND** no bypass is suggested
+
+#### Scenario: Committed recovery is not rendered as an edge error
+
+- **GIVEN** `ArchiveChange` fails with `ReconciledOperationBlockedError` after committing a return to `designing`
+- **WHEN** `specd changes archive` renders the failure in text mode
+- **THEN** output shows the committed state, the projected blockers with label and `checkId`, and the projected next-action command or guidance with its reason
+- **AND** no invalid-edge error line is printed
+- **AND** json output carries `state`, `automaticReturn`, projected blockers without raw `isSkippable`, and `nextAction` with `intent`, `action`, `command` and `guidance`
+
+#### Scenario: Skippable deps.consistent gets the generic bypass hint
+
+- **GIVEN** archive fails on a skippable `deps.consistent`
+- **WHEN** the command renders the failure
+- **THEN** the generic bypass hint is printed and the dependency-extraction hint is not
+
+#### Scenario: Skipped hooks report the user-skip reason
+
+- **GIVEN** archive runs with `--skip-hooks`
+- **WHEN** the progress presenter renders the skipped hook checks
+- **THEN** they report the user-skip reason derived from the effective `skipHooks`
+
+#### Scenario: Stale verification suggests the verification action
+
+- **GIVEN** archive fails with `CheckPredicateFailedError` for `verification.current` with a `start-verification` action
+- **WHEN** the command renders the failure
+- **THEN** stderr reports the check and shows the command projected from the action by the presenter
 
 ### Requirement: Output on success (extended)
 
@@ -283,4 +323,5 @@
 
 - **GIVEN** `ArchiveChange` fails on `impl.linksInScope` as a skippable check
 - **WHEN** `specd changes archive` renders the failure
-- **THEN** the CLI renders `--skip-checks impl.linksInScope` (and `--allow-out-of-scope`) guidance via the centralized hint-resolution helper
+- **THEN** the CLI renders `Retry with --skip-checks impl.linksInScope if an exception is granted` via the centralized hint-resolution helper
+- **AND** the hint does not mention `--allow-out-of-scope`

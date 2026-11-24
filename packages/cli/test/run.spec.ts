@@ -24,6 +24,55 @@ const { handleError: actualHandleError } =
 import { CliExitError } from '../src/helpers/cli-exit-error.js'
 import { registerCliCleanup, resetCliCleanupForTests } from '../src/helpers/cli-cleanup.js'
 
+/**
+ * Removes `//` and block comments from TypeScript source while leaving string, template and
+ * regex-free code intact, so a `//` inside a quoted string (for example `'https://x'`) does not
+ * start a comment. Template literal contents are kept verbatim (including `${...}` code).
+ *
+ * @param source - Source text to strip.
+ * @returns The source with comments removed.
+ */
+function stripComments(source: string): string {
+  let out = ''
+  let quote: string | undefined
+  for (let i = 0; i < source.length; i += 1) {
+    const ch = source[i]!
+    const next = source[i + 1]
+    if (quote !== undefined) {
+      out += ch
+      if (ch === '\\' && next !== undefined) {
+        out += next
+        i += 1
+      } else if (ch === quote) {
+        quote = undefined
+      }
+    } else if (ch === "'" || ch === '"' || ch === '`') {
+      quote = ch
+      out += ch
+    } else if (ch === '/' && next === '/') {
+      while (i < source.length && source[i] !== '\n') i += 1
+      i -= 1
+    } else if (ch === '/' && next === '*') {
+      const end = source.indexOf('*/', i + 2)
+      i = end === -1 ? source.length : end + 1
+      out += ' '
+    } else {
+      out += ch
+    }
+  }
+  return out
+}
+
+/**
+ * Counts `.catch(` call sites in executable code (comments excluded).
+ *
+ * @param source - Source text to scan.
+ * @returns Number of `.catch(` occurrences outside comments.
+ */
+function countPromiseCatches(source: string): number {
+  return [...stripComments(source).matchAll(/\.catch\s*\(/g)].length
+}
+
 const events: string[] = []
 
 beforeEach(() => {
@@ -299,5 +348,45 @@ describe('CLI source guards', () => {
     }
 
     expect(found).toEqual(allowedBestEffort)
+  })
+
+  it('has no promise .catch(...) outside the reviewed allowlist in commands and helpers', async () => {
+    // Any `.catch(` callback shape (`() =>`, `_ =>`, `(e) =>`, `function () {}`, `noop`) can
+    // discard an error or swallow a CliExitError, so every use must be listed here by file with
+    // a count after being reviewed.
+    const allowed: Record<string, number> = {
+      // Best-effort status read, followed by `if (status === undefined) throw err` so the
+      // original transition error still reaches the user.
+      '/commands/change/transition.ts': 1,
+      // Each graph command's context resolution reports the failure through cliError.
+      '/commands/graph/hotspots.ts': 1,
+      '/commands/graph/impact.ts': 1,
+      '/commands/graph/search.ts': 1,
+      '/commands/graph/stats.ts': 1,
+      '/commands/graph/why.ts': 1,
+    }
+    const found: Record<string, number> = {}
+    for (const dir of ['commands', 'helpers']) {
+      for (const file of await walk(join(srcRoot, dir))) {
+        const source = await readFile(file, 'utf8')
+        const count = countPromiseCatches(source)
+        if (count > 0) found[file.replace(srcRoot, '')] = count
+      }
+    }
+    expect(found).toEqual(allowed)
+  })
+
+  it('counts .catch( only in code, not in comments, even after // inside strings', () => {
+    expect(countPromiseCatches("const u = 'https://x'; p.catch(() => 1)")).toBe(1)
+    expect(countPromiseCatches('const u = "http://x"; p.catch(() => 1)')).toBe(1)
+    expect(countPromiseCatches('// p.catch(() => 1)')).toBe(0)
+    expect(countPromiseCatches('const a = 1 // p.catch(() => 1)')).toBe(0)
+    expect(countPromiseCatches('/* p.catch(() => 1) */ const a = 1')).toBe(0)
+    expect(countPromiseCatches('/*\n p.catch(() => 1)\n*/\np.catch(() => 2)')).toBe(1)
+    expect(countPromiseCatches('const t = `see //x ${p.catch(() => 1)}`')).toBe(1)
+    expect(countPromiseCatches('const t = `//` ; p.catch(() => 1)')).toBe(1)
+    expect(countPromiseCatches("const s = 'it\\'s //'; p.catch(() => 1)")).toBe(1)
+    expect(countPromiseCatches('const s = "say \\"//\\""; p.catch(() => 1)')).toBe(1)
+    expect(countPromiseCatches("const s = 'a'; // 'unterminated\np.catch(() => 1)")).toBe(1)
   })
 })

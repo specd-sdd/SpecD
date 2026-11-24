@@ -50,7 +50,8 @@ function isHookCheck(id: string): boolean {
  * @param options.streamName - Structured stream discriminator
  * @param options.stream - Destination write stream
  * @param options.skipChecks - Check ids bypassed with `--skip-checks` (text skip reasons)
- * @param options.skipHooks - Whether any hook phase is skipped with `--skip-hooks`
+ * @param options.skipHooks - `true` when any hook phase is skipped, or the exact `--skip-hooks`
+ *   phase selectors; a set maps each hook check to the phase that actually skipped it
  * @returns Presenter that accepts check progress events
  */
 export function createCheckProgressPresenter(options: {
@@ -58,7 +59,7 @@ export function createCheckProgressPresenter(options: {
   streamName: CheckProgressStreamName
   stream: NodeJS.WriteStream
   skipChecks?: ReadonlySet<string>
-  skipHooks?: boolean
+  skipHooks?: boolean | ReadonlySet<string>
 }): CheckProgressPresenter {
   const completed = new Set<string>()
   const suppressed = new Set<string>()
@@ -66,8 +67,18 @@ export function createCheckProgressPresenter(options: {
   let hookRan = false
   let recheckLabelled = false
 
+  const hookSkippedByFlag = (id: string): boolean => {
+    const skipHooks = options.skipHooks
+    if (skipHooks === undefined || skipHooks === false) return false
+    if (skipHooks === true) return true
+    if (skipHooks.has('all')) return true
+    const archive = options.streamName === 'change-archive'
+    if (id === 'hook.pre') return skipHooks.has(archive ? 'pre' : 'target.pre')
+    return skipHooks.has(archive ? 'post' : 'source.post')
+  }
+
   const skipReason = (event: Extract<CheckProgressEvent, { type: 'check-done' }>): string => {
-    if (isHookCheck(event.id) && options.skipHooks === true) return '--skip-hooks'
+    if (isHookCheck(event.id) && hookSkippedByFlag(event.id)) return '--skip-hooks'
     if (options.skipChecks?.has(event.id) === true) return '--skip-checks'
     return event.reason ?? 'not applicable'
   }

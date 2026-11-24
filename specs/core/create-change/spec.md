@@ -79,10 +79,8 @@ When `CreateChange.execute` is called with spec IDs that already exist in a conf
 
 Seeding rules:
 
-- If the repository exposes persisted dependency state for the spec via `readPersistedDependsOn(spec)`, that value MUST be used.
-- Otherwise, if canonical `metadata.json.dependsOn` exists for the spec, that value MUST be used as the legacy fallback even when the persisted metadata file is stale.
-- Otherwise, the seeded value is an empty array.
-- Specs that do not yet exist in the repository do not require a seeded dependency entry at creation time.
+- If the spec's repository returns persisted state through `readPersistedState(spec)` (the `spec-lock.json` state), its `dependsOn` MUST be used. No fallback to `metadata.json.dependsOn` exists.
+- If the workspace is unknown, the spec does not exist in its repository, or the repository has no persisted state for it, no `specDependsOn` entry is seeded at creation time.
 
 This ensures a change created against existing specs starts from the current persisted dependency snapshot without depending on raw sidecar filenames or generic artifact reads.
 

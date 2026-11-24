@@ -272,7 +272,6 @@ export class CheckRegistry {
       id: canonicalId,
       label: check.label,
       kind: 'predicate',
-      ...(check.command !== undefined ? { command: check.command } : {}),
       execute: (ctx) => check.execute(ctx),
     }
 

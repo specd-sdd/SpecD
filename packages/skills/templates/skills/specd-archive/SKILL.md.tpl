@@ -208,7 +208,7 @@ be skipped if the agent forgets a later `run-hooks` call.
 specd changes archive <name> --skip-hooks pre --format toon
 ```
 
-If the command fails with a `SpecOverlapError` (spec overlap detected), other active
+If the command fails with `OVERLAP_CONFLICT` (spec overlap detected), other active
 changes target the same specs as this change. When this happens:
 
 1. Show the user the overlapping specs and the other changes involved.

@@ -63,7 +63,7 @@ export interface WorkflowStepCheckDeclaration {
   readonly along?: TransitionAlong | '*'
   /** Failure policy ('abort' or 'collect'). Defaults to 'abort'. */
   readonly onFailure?: 'abort' | 'collect'
-  /** Permission to bypass via `--skip-checks`, subject to governance locks. */
+  /** Permission to bypass through the orchestrator's check-bypass input, subject to governance locks. */
   readonly skippable?: boolean
   /** Whether this check is disabled for this workflow step, subject to governance locks. */
   readonly disabled?: boolean
@@ -80,7 +80,7 @@ export interface WorkflowStepSkipCheckDeclaration {
   readonly id: string
   /** Failure policy ('abort' or 'collect'). Defaults to 'abort'. */
   readonly onFailure?: 'abort' | 'collect'
-  /** Permission to bypass via `--skip-checks`, subject to governance locks. */
+  /** Permission to bypass through the orchestrator's check-bypass input, subject to governance locks. */
   readonly skippable?: boolean
   /** Whether this check is disabled for skipping this step, subject to governance locks. */
   readonly disabled?: boolean
@@ -98,7 +98,7 @@ export interface WorkflowStepSkipCheckDeclaration {
 export interface WorkflowStepArchiveCheckDeclaration {
   /** Check identifier (must be registered in CheckRegistry). */
   readonly id: string
-  /** Permission to bypass via `--skip-checks`, subject to governance locks. */
+  /** Permission to bypass through the orchestrator's check-bypass input, subject to governance locks. */
   readonly skippable?: boolean
   /** Whether this check is disabled for the archive operation, subject to governance locks. */
   readonly disabled?: boolean

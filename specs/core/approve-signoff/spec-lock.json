@@ -14,8 +14,11 @@
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/approve-signoff.ts",
-      "symbols": ["ApproveSignoff"]
+      "file": "core:src/application/use-cases/approve-signoff.ts"
+    },
+    {
+      "file": "core:src/application/errors/verification-stale-error.ts",
+      "symbols": ["VerificationStaleError"]
     }
   ],
   "optimizations": {

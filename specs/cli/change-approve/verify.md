@@ -84,6 +84,25 @@ Scenarios:
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message
 
+#### Scenario: Approving from a legacy parking state prints no transition
+
+- **GIVEN** a change in `pending-spec-approval` with the spec gate on
+- **WHEN** `specd changes approve spec <name> --reason "..."` succeeds
+- **THEN** the output includes the recorded approval and a `state: pending-spec-approval` line (and `state` field in JSON) with the unchanged state
+- **AND** it does not print a transition to `spec-approved`
+
+#### Scenario: Approve failure prints error first, then state and blockers
+
+- **GIVEN** `ApproveSpec` fails with an error carrying blockers with labels
+- **WHEN** `specd changes approve spec <name> --reason "..."` renders the failure in text mode
+- **THEN** the `error:` line is printed first, followed by the `state:` line, the labelled blocker lines and the next-action lines
+
+#### Scenario: Failure enrichment tolerates read-only error properties
+
+- **GIVEN** the thrown error exposes `state`, `blockers` or `nextAction` as getter-only properties
+- **WHEN** the command enriches the failure
+- **THEN** no `TypeError` is raised and the original error is rendered with exit code 1
+
 ### Requirement: Approve signoff behaviour
 
 #### Scenario: Successful signoff from done

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Human spec approval MUST record consent on a change that stays in `ready` (when the spec gate is on). This use case hashes in-scope artifacts, appends a spec-approval history event, and MUST NOT transition into `pending-spec-approval` or `spec-approved` on that happy path. Drain from `pending-spec-approval` remains for in-flight changes.
+Human spec approval MUST record consent on a change that stays in the state where it was requested (`ready` when the spec gate is on, or a legacy parking state of a historic manifest). This use case hashes in-scope artifacts, appends a spec-approval history event, and MUST NOT transition the change on any path. The gate on leaving the state is enforced by the bound `approval.spec` check.
 
 ## Requirements
 
@@ -27,7 +27,7 @@ The approval MUST fail if a required artifact is missing or structurally invalid
 
 ### Requirement: Approval recording and state transition
 
-Spec approval MAY be granted or renewed only while the reconciled change is in `ready`. `ApproveSpec` MUST NOT transition the change to an approval state.
+Spec approval MAY be granted or renewed only while the reconciled change is in a state from which the `approval.spec` check is bound as a transition source, read from the check registry bindings (`boundFromStates('approval.spec')`; today `ready` and the legacy parking states `pending-spec-approval` and `spec-approved`). The use case MUST NOT hardcode those state names. `ApproveSpec` MUST NOT transition the change in any of those states: a change in a legacy parking state records consent and stays there (a stale approval in a legacy parking state is first recovered to `designing` by reconciliation), and leaves through a normal `TransitionChange` hop whose bound check now passes. A request from any other state fails with `InvalidStateTransitionError` whose `from` is the current state; its `to` names the nominal state the consent applies to and is informational only (it is not derived from the bindings and does not imply a transition).
 
 On success it SHALL append the `spec-approved` audit event and persist a current spec-approval projection with status `valid`, actor, reason, timestamp, and the exact scope-aware fingerprint reviewed. The current projection and event SHALL contain the same canonical scope and artifact fingerprint. It replaces the current projection but never removes prior approval or invalidation events.
 
@@ -41,9 +41,9 @@ A stale or revoked required spec approval cannot be renewed in `implementing`; r
 
 ### Requirement: Persistence and return value
 
-After the disabled-gate fast failure, `ApproveSpec` SHALL run reconciliation and approval through one serialized repository mutation using fresh persisted state and file facts. If the canonical verdict is not eligible for approval, it persists any detected invalidity or recovery and returns the typed blocker without adding approval.
+After the disabled-gate fast failure, `ApproveSpec` SHALL run reconciliation and approval through one serialized repository mutation using fresh persisted state and file facts. If reconciliation changes the state so that approval is inapplicable, it persists any detected invalidity or recovery, adds no approval, and then throws `InvalidStateTransitionError` whose `from` is the reconciled state (its `to` is the informational nominal state `ready`); it does not throw `ReconciledOperationBlockedError`. An unresolved non-task artifact review fails the same way with the `incomplete-artifact` reason.
 
-If eligible, the mutation records the valid materialized spec approval and its audit event while the change remains in `ready`. Historic drain from `pending-spec-approval` remains supported for in-flight manifests, but new work MUST NOT enter that state. The result is the post-mutation reconciled `Change`.
+If eligible, the mutation records the valid materialized spec approval and its audit event while the change remains in its current state. It MUST NOT move a change out of a legacy parking state. The result is the post-mutation reconciled `Change`.
 
 ### Requirement: Input contract
 

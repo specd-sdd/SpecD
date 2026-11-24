@@ -51,6 +51,8 @@ The first call reports `invalidated: true`. A second call against evidence that 
 | `text`         | Ids, state, file counts, algorithms, superseded attempt, invalidation idempotence, sign-off consequence, recovery, blockers, and the next command. No source bytes and no full hashes.                                                                                             |
 | `json`, `toon` | Whitelisted ids, states, fingerprint algorithms/counts, and public reconciliation fields. Unknown/private fields, source bytes, and full hashes are dropped. `start` and `complete` do not invent a next action; `invalidate` includes Core's blockers, recovery, and next action. |
 
+Each projected blocker carries `code` and `message`, plus `label`, `checkId`, `details`, and `action` when Core supplied them. `bypassFlag` (`--skip-checks <checkId>`) is built by the CLI presenter and appears only for skippable blockers. For an `action` that maps to a command, the `invalidate` blocker also carries `command`, or `guidance` prose when no command exists. The projected `nextAction` carries `targetStep`, `actionType`, `reason`, `intent`, `action`, and `command`. `command` is `null` when the action has no command, in which case `guidance` holds Core's host-neutral prose. Text prints the same blockers (with a `bypass:` line when applicable) and the next command or guidance.
+
 Success exits 0, including an idempotent invalidate. Expected Core errors exit 1 through the normal error handler and keep `code` plus metadata.
 
 ## Retry in the current state

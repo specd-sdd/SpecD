@@ -43,6 +43,7 @@ export function run(facts: ProtocolEdgeFacts): CheckResult {
     'protocol.edge',
     'INVALID_TRANSITION',
     `Cannot transition from '${facts.from}' to '${facts.to}'`,
+    { from: facts.from, to: facts.to },
   )
 }
 

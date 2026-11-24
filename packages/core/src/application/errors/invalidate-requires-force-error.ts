@@ -28,7 +28,7 @@ export class InvalidateRequiresForceError extends SpecdError {
     recoveries: readonly ForceInvalidationRecovery[] = [{ gate: 'spec', target: 'designing' }],
   ) {
     super(
-      'Change has active consent affected by this invalidation. Pass force to revoke the reported gate(s); Core will select the required recovery target.',
+      'Change has active consent affected by this invalidation. Revoking the reported gate(s) requires explicit confirmation; Core selects the required recovery target.',
     )
     this._recoveries = recoveries
     this._gates = recoveries.map((entry) => entry.gate)

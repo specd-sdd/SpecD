@@ -160,6 +160,27 @@
 - **WHEN** a transition to `done` is attempted
 - **THEN** the entity rejects the pair as invalid
 
+#### Scenario: pending-spec-approval exits to implementing without another legacy state
+
+- **GIVEN** the canonical `VALID_TRANSITIONS` table
+- **WHEN** the exits of `pending-spec-approval` are read
+- **THEN** they are exactly `implementing` and `designing`, with `implementing` listed first
+- **AND** `spec-approved` is not an exit
+
+#### Scenario: pending-signoff exits to archivable without another legacy state
+
+- **GIVEN** the canonical `VALID_TRANSITIONS` table
+- **WHEN** the exits of `pending-signoff` are read
+- **THEN** they are exactly `archivable`, `designing`, and `done`, with `archivable` listed first
+- **AND** `signed-off` is not an exit
+
+#### Scenario: spec-approved and signed-off have no entry edge
+
+- **GIVEN** the canonical `VALID_TRANSITIONS` table
+- **WHEN** every source state is scanned for an exit to `spec-approved` or `signed-off`
+- **THEN** no source state lists either of them
+- **AND** both states keep their existing exits so historic manifests can leave them
+
 ### Requirement: Neutral designing self-entry
 
 #### Scenario: Designing self-entry preserves history and validated evidence
@@ -233,13 +254,26 @@ Scenarios:
 
 - **GIVEN** the spec gate is enabled and approval fingerprint is stale
 - **WHEN** forward progress from `ready` is evaluated
-- **THEN** progress is blocked and recovery returns through design and renewed ready approval
+- **THEN** progress is blocked and consent is renewed in `ready` (after design when the change was in a later state)
 - **AND** disabling the gate skips consent without waiving artifact freshness
 
 #### Scenario: Ready approval remains in place
 
 - **WHEN** current spec consent is granted in `ready`
 - **THEN** the approval projection becomes valid without entering a pending state
+
+#### Scenario: Stale consent stays in ready until it is renewed
+
+- **GIVEN** the spec gate is enabled and a change in `ready` whose spec consent is stale (recovered from a later state, or stale since `designing`)
+- **WHEN** the change is reconciled
+- **THEN** no recovery to `designing` is requested and the change stays in `ready`
+- **AND** `approval.spec` still blocks forward progress and recording approval in `ready` renews the consent
+
+#### Scenario: Stale consent after ready still returns to designing
+
+- **GIVEN** the spec gate is enabled and a change in `implementing` whose consent becomes stale
+- **WHEN** the change is reconciled
+- **THEN** recovery returns it to `designing`, and consent is renewed only after it reaches `ready` again
 
 ### Requirement: Signoff gate
 
@@ -414,6 +448,25 @@ Scenarios:
 - **GIVEN** required spec consent becomes stale
 - **WHEN** invalidation is applied with workflow `preserve`
 - **THEN** the change returns to `designing` exactly once and history is retained
+
+#### Scenario: Stale sign-off in pending-signoff recovers to done
+
+- **GIVEN** a historic change in `pending-signoff` with a recorded sign-off whose fingerprint became stale
+- **WHEN** the reconciler commits the recovery
+- **THEN** the change returns to `done` instead of failing with `InvalidStateTransitionError`
+
+#### Scenario: Stale approval in pending-spec-approval recovers to designing
+
+- **GIVEN** a historic change in `pending-spec-approval` with a recorded spec approval that became stale
+- **WHEN** the reconciler commits the recovery
+- **THEN** the change returns to `designing`
+
+#### Scenario: One reconciliation commits at most one recovery
+
+- **GIVEN** a change in `archivable` with required sign-off stale, effective policy `workflow: redesign`, non-task artifact drift, and the spec gate off
+- **WHEN** the reconciler runs once
+- **THEN** it commits only the sign-off recovery from `archivable` to `done`
+- **AND** the next status or reconcile commits the workflow-redesign recovery from `done` to `designing`
 
 ### Requirement: Per-file drift tracking
 

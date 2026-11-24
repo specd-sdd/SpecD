@@ -38,7 +38,7 @@ export class HistoricalImplementationGuardError extends SpecdError {
    */
   constructor(operation: GuardedChangeOperation, changeName: string) {
     super(
-      `Cannot ${operation} a change that has reached implementing without force: implementation may already exist and specs and code could be left out of sync`,
+      `Cannot ${operation} a change that has reached implementing without explicit confirmation: implementation may already exist and specs and code could be left out of sync`,
     )
     this._operation = operation
     this._changeName = changeName

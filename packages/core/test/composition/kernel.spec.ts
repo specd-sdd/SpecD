@@ -469,7 +469,13 @@ describe('createKernel', () => {
           name: 'illegal-transition-change',
           to: 'done',
         }),
-      ).rejects.toThrow(InvalidStateTransitionError)
+      ).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'protocol.edge',
+        checkCode: 'INVALID_TRANSITION',
+        from: 'drafting',
+        to: 'done',
+      })
 
       // Execute mode evaluates protocol.edge first and stops on failure, so the
       // custom check never runs for an illegal edge.

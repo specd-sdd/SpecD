@@ -429,7 +429,7 @@ describe('GetStatus', () => {
         targetStep: 'designing',
         actionType: 'cognitive',
         reason: 'Provider returned the wrong schema identity',
-        command: null,
+        intent: null,
       })
     })
   })
@@ -780,12 +780,13 @@ describe('GetStatus', () => {
 
     const blocker = result.blockers.find((entry) => entry.code === 'IMPLEMENTATION_STATE')
     expect(blocker).toBeDefined()
-    expect(blocker?.bypassFlag).toBeUndefined()
+    expect('bypassFlag' in (blocker ?? {})).toBe(false)
+    expect(blocker?.isSkippable).toBe(false)
     expect(blocker?.checkId).toBe('impl.filesResolved')
     expect(blocker?.label).toBe('Checking open implementation files')
   })
 
-  it('given a schema-declared skippable impl.filesResolved, when GetStatus merges blockers, then bypassFlag derives from the resolved bindings', async () => {
+  it('given a schema-declared skippable impl.filesResolved, when GetStatus merges blockers, then isSkippable derives from the resolved bindings', async () => {
     const change = makeChange('impl-open-skippable')
     change.transition('designing', testActor)
     change.transition('ready', testActor)
@@ -836,12 +837,13 @@ describe('GetStatus', () => {
 
     const blocker = result.blockers.find((entry) => entry.code === 'IMPLEMENTATION_STATE')
     expect(blocker).toBeDefined()
-    expect(blocker?.bypassFlag).toBe('--skip-checks impl.filesResolved')
+    expect('bypassFlag' in (blocker ?? {})).toBe(false)
+    expect(blocker?.isSkippable).toBe(true)
     expect(blocker?.checkId).toBe('impl.filesResolved')
     expect(blocker?.label).toBe('Checking open implementation files')
   })
 
-  it('given failed impl.linksInScope, when GetStatus merges blockers, then bypassFlag is --skip-checks impl.linksInScope', async () => {
+  it('given failed impl.linksInScope, when GetStatus merges blockers, then isSkippable and checkId are set without bypassFlag', async () => {
     const change = makeChange('impl-scope')
     change.transition('designing', testActor)
     change.transition('ready', testActor)
@@ -892,7 +894,8 @@ describe('GetStatus', () => {
 
     const blocker = result.blockers.find((entry) => entry.code === 'IMPLEMENTATION_STATE')
     expect(blocker).toBeDefined()
-    expect(blocker?.bypassFlag).toBe('--skip-checks impl.linksInScope')
+    expect('bypassFlag' in (blocker ?? {})).toBe(false)
+    expect(blocker?.isSkippable).toBe(true)
     expect(blocker?.checkId).toBe('impl.linksInScope')
     expect(blocker?.label).toBe('Checking implementation links')
   })
@@ -1092,7 +1095,7 @@ describe('GetStatus', () => {
       expect(result.lifecycle.availableSteps).toEqual([])
       expect(result.lifecycle.blockers).toEqual([])
       expect(result.lifecycle.nextArtifact).toBeNull()
-      expect(result.nextAction.command).toBeNull()
+      expect(result.nextAction.intent).toBeNull()
     })
 
     it('projects pending-parent-artifact-review for drafted dependents without calling evaluate', async () => {
@@ -1386,7 +1389,7 @@ describe('GetStatus', () => {
     expect(result.review.message).toBe('Conflict detected with archived overlapping specs')
     expect(result.review.required).toBe(true)
     expect(result.blockers.some((blocker) => blocker.code === 'OVERLAP_CONFLICT')).toBe(false)
-    expect(result.nextAction.command).toBe('/specd-design')
+    expect(result.nextAction.intent).toBe('design')
   })
 
   it('given archivable live overlap, when GetStatus runs archive predicates, then OVERLAP_CONFLICT is skippable', async () => {
@@ -1419,13 +1422,14 @@ describe('GetStatus', () => {
 
     const overlap = result.blockers.find((blocker) => blocker.code === 'OVERLAP_CONFLICT')
     expect(overlap).toBeDefined()
-    expect(overlap?.bypassFlag).toBe('--skip-checks spec.overlap')
+    expect(overlap?.isSkippable).toBe(true)
+    expect('bypassFlag' in (overlap ?? {})).toBe(false)
     expect(overlap?.checkId).toBe('spec.overlap')
-    expect(result.nextAction.command).toBe('/specd-archive')
+    expect(result.nextAction.intent).toBe('archive')
     expect(result.nextAction.targetStep).toBe('archivable')
     expect(result.nextAction.reason).not.toBe('Ready to archive')
     expect(result.nextAction.reason).toMatch(/overlap/i)
-    expect(result.nextAction.reason).toContain('--skip-checks spec.overlap')
+    expect(result.nextAction.reason).not.toContain('--skip-checks')
   })
 
   it('does not run archive overlap I/O or emit OVERLAP_CONFLICT when not archivable', async () => {
@@ -1462,7 +1466,9 @@ describe('GetStatus', () => {
     expect(detectSpecOverlap).toHaveBeenCalled()
     const overlap = result.blockers.find((blocker) => blocker.code === 'OVERLAP_CONFLICT')
     expect(overlap).toBeDefined()
-    expect(overlap?.bypassFlag).toBe('--skip-checks spec.overlap')
+    expect(overlap?.isSkippable).toBe(true)
+    expect(overlap?.checkId).toBe('spec.overlap')
+    expect('bypassFlag' in (overlap ?? {})).toBe(false)
   })
 
   describe('reconciled validity projection', () => {
@@ -1537,8 +1543,12 @@ describe('GetStatus', () => {
       expect(result.change?.verification.activeAttempt?.id).toBe(attempt.id)
       expect(result.change?.verification.completed?.id).toBe(completed.id)
       expect(result.change?.verification.completed?.status).toBe('valid')
-      expect(result.nextAction.reason).toBe('Renew verification in place')
-      expect(result.nextAction.command).toBe('/specd-verify')
+      expect(result.nextAction.intent).toBe('verify')
+      expect(result.nextAction.action).toEqual({
+        kind: 'start-verification',
+        params: { changeName: 'my-change' },
+        supersedesIntent: false,
+      })
       expect(result.nextAction.targetStep).toBe('verifying')
     })
 
@@ -1566,7 +1576,8 @@ describe('GetStatus', () => {
       expect(result.validity?.verification.freshness).toBe('stale')
       expect(result.nextAction.reason).toBe('Tasks complete, ready to verify')
       expect(result.nextAction.targetStep).toBe('verifying')
-      expect(result.nextAction.command).toBe('/specd-verify')
+      expect(result.nextAction.intent).toBe('verify')
+      expect(result.nextAction.action).toBeUndefined()
     })
 
     it('projects committed spec-approval recovery', async () => {
@@ -1594,7 +1605,7 @@ describe('GetStatus', () => {
         from: 'implementing',
         to: 'designing',
       })
-      expect(result.nextAction.command).toBe('/specd-design')
+      expect(result.nextAction.intent).toBe('design')
       expect(result.blockers.some((blocker) => blocker.code === 'APPROVAL_STALE')).toBe(true)
     })
 
@@ -1622,7 +1633,7 @@ describe('GetStatus', () => {
   })
 
   describe('dynamic check blocker projection', () => {
-    it('projects bypassFlag: "--skip-checks <id>" for failing skippable checks', async () => {
+    it('projects isSkippable and checkId without bypassFlag for failing skippable checks', async () => {
       const change = makeChange('my-change')
       change.transition('designing', testActor)
       change.transition('ready', testActor)
@@ -1645,7 +1656,8 @@ describe('GetStatus', () => {
       const blocker = result.blockers.find((b) => b.checkId === 'impl.linksInScope')
 
       expect(blocker).toBeDefined()
-      expect(blocker?.bypassFlag).toBe('--skip-checks impl.linksInScope')
+      expect(blocker?.isSkippable).toBe(true)
+      expect('bypassFlag' in (blocker ?? {})).toBe(false)
     })
   })
 })
@@ -1675,13 +1687,16 @@ describe('GetStatus with verifying disabled and the real reconciler', () => {
     return uc.execute({ name: change.name })
   }
 
-  it('routes a blocked done to the sign-off command, never to verification', async () => {
+  it('routes a blocked done to the sign-off action, never to verification', async () => {
     const result = await statusFor(doneChange('blocked-done'), { spec: false, signoff: true })
 
     expect(result.change?.state).toBe('done')
-    expect(result.nextAction.command).toBe('specd changes approve signoff')
-    expect(result.blockers.some((blocker) => blocker.code === 'SIGNOFF_REQUIRED')).toBe(true)
-    expect(result.nextAction.command).not.toContain('verif')
+    expect(result.nextAction.intent).toBeNull()
+    expect(result.nextAction.action).toEqual({ kind: 'approve-signoff' })
+    const consent = result.blockers.filter((blocker) => blocker.checkId === 'approval.signoff')
+    expect(consent).toHaveLength(1)
+    expect(consent[0]?.action).toEqual({ kind: 'approve-signoff' })
+    expect(result.blockers.some((blocker) => blocker.code === 'SIGNOFF_REQUIRED')).toBe(false)
   })
 
   it('raises no verification blocker and passes the sign-off gate once signed off', async () => {
@@ -1777,14 +1792,17 @@ describe('GetStatus — archive hints from the effective archive bindings', () =
     return uc.execute({ name: 'c' })
   }
 
-  it('keeps the canonical bypass flag for a skippable overlap', async () => {
+  it('keeps skippable and checkId without bypassFlag for a skippable overlap', async () => {
     const result = await statusFor([
       binding('spec.overlap', 'OVERLAP_CONFLICT', { skippable: true }),
     ])
     const blocker = result.blockers.find((b) => b.code === 'OVERLAP_CONFLICT')
     expect(blocker?.isSkippable).toBe(true)
-    expect(blocker?.bypassFlag).toBe('--skip-checks spec.overlap')
-    expect(result.nextAction.reason).toContain('--skip-checks spec.overlap')
+    expect(blocker?.checkId).toBe('spec.overlap')
+    expect('bypassFlag' in (blocker ?? {})).toBe(false)
+    expect(result.nextAction.intent).toBe('archive')
+    expect(result.nextAction.reason).toBe('spec.overlap failed')
+    expect(result.nextAction.reason).not.toContain('--skip-checks')
   })
 
   it('produces no overlap blocker when the schema disables spec.overlap', async () => {
@@ -1803,7 +1821,7 @@ describe('GetStatus — archive hints from the effective archive bindings', () =
     const blocker = result.blockers.find((b) => b.code === 'OVERLAP_CONFLICT')
     expect(blocker).toBeDefined()
     expect(blocker?.isSkippable).toBe(false)
-    expect(blocker?.bypassFlag).toBeUndefined()
+    expect('bypassFlag' in (blocker ?? {})).toBe(false)
     expect(result.nextAction.reason).toBe('spec.overlap failed')
     expect(result.nextAction.reason).not.toContain('--skip-checks')
     expect(result.nextAction.reason).not.toContain('anyway')
@@ -1813,7 +1831,7 @@ describe('GetStatus — archive hints from the effective archive bindings', () =
     ])
     const baseBlocker = baseNonSkippable.blockers.find((b) => b.code === 'OVERLAP_CONFLICT')
     expect(baseBlocker?.isSkippable).toBe(false)
-    expect(baseBlocker?.bypassFlag).toBeUndefined()
+    expect('bypassFlag' in (baseBlocker ?? {})).toBe(false)
     expect(baseNonSkippable.nextAction.reason).toBe('spec.overlap failed')
     expect(baseNonSkippable.nextAction.reason).not.toContain('--skip-checks')
   })
@@ -1825,7 +1843,7 @@ describe('GetStatus — archive hints from the effective archive bindings', () =
     const blocker = result.blockers.find((b) => b.code === 'READ_ONLY_WORKSPACE')
     expect(blocker).toBeDefined()
     expect(blocker?.isSkippable).toBe(false)
-    expect(blocker?.bypassFlag).toBeUndefined()
+    expect('bypassFlag' in (blocker ?? {})).toBe(false)
   })
 
   it('follows the resolved skippability of a plugin archive check', async () => {
@@ -1834,7 +1852,8 @@ describe('GetStatus — archive hints from the effective archive bindings', () =
     ])
     const skippableBlocker = skippable.blockers.find((b) => b.code === 'SECURITY_FINDINGS')
     expect(skippableBlocker?.isSkippable).toBe(true)
-    expect(skippableBlocker?.bypassFlag).toBe('--skip-checks @sec.scan')
+    expect(skippableBlocker?.checkId).toBe('@sec.scan')
+    expect('bypassFlag' in (skippableBlocker ?? {})).toBe(false)
 
     const hardened = await statusFor(
       [binding('@sec.scan', 'SECURITY_FINDINGS', { skippable: true })],
@@ -1842,7 +1861,7 @@ describe('GetStatus — archive hints from the effective archive bindings', () =
     )
     const hardenedBlocker = hardened.blockers.find((b) => b.code === 'SECURITY_FINDINGS')
     expect(hardenedBlocker?.isSkippable).toBe(false)
-    expect(hardenedBlocker?.bypassFlag).toBeUndefined()
+    expect('bypassFlag' in (hardenedBlocker ?? {})).toBe(false)
   })
 
   it('projects isSkippable: false for non-predicate review blockers', async () => {
@@ -1857,7 +1876,7 @@ describe('GetStatus — archive hints from the effective archive bindings', () =
     const blocker = result.blockers.find((b) => b.code === 'INCOMPLETE_ARTIFACT')
     expect(blocker).toBeDefined()
     expect(blocker?.isSkippable).toBe(false)
-    expect(blocker?.bypassFlag).toBeUndefined()
+    expect('bypassFlag' in (blocker ?? {})).toBe(false)
   })
 
   it('judges an archive failure by the archive binding even if the same check is skippable on a transition', async () => {
@@ -1868,19 +1887,25 @@ describe('GetStatus — archive hints from the effective archive bindings', () =
     )
     const blocker = result.blockers.find((b) => b.code === 'IMPLEMENTATION_STATE')
     expect(blocker).toBeDefined()
-    expect(blocker?.bypassFlag).toBeUndefined()
+    expect(blocker?.isSkippable).toBe(false)
+    expect('bypassFlag' in (blocker ?? {})).toBe(false)
   })
 
-  it('gives each failing skippable archive check its own flag', async () => {
+  it('gives each failing skippable archive check its own checkId and isSkippable', async () => {
     const result = await statusFor([
       binding('spec.overlap', 'OVERLAP_CONFLICT', { skippable: true }),
       binding('impl.linksInScope', 'IMPLEMENTATION_STATE', { skippable: true }),
       binding('workspace.readOnly', 'READ_ONLY_WORKSPACE', { skippable: false, locked: true }),
     ])
-    const flags = Object.fromEntries(result.blockers.map((b) => [b.code, b.bypassFlag]))
-    expect(flags.OVERLAP_CONFLICT).toBe('--skip-checks spec.overlap')
-    expect(flags.IMPLEMENTATION_STATE).toBe('--skip-checks impl.linksInScope')
-    expect(flags.READ_ONLY_WORKSPACE).toBeUndefined()
+    const byCode = Object.fromEntries(
+      result.blockers.map((b) => [b.code, { isSkippable: b.isSkippable, checkId: b.checkId }]),
+    )
+    expect(byCode.OVERLAP_CONFLICT).toEqual({ isSkippable: true, checkId: 'spec.overlap' })
+    expect(byCode.IMPLEMENTATION_STATE).toEqual({ isSkippable: true, checkId: 'impl.linksInScope' })
+    expect(byCode.READ_ONLY_WORKSPACE).toEqual({
+      isSkippable: false,
+      checkId: 'workspace.readOnly',
+    })
   })
 
   it('embeds a registered check declared by the schema and reports it without a flag', async () => {
@@ -1893,7 +1918,8 @@ describe('GetStatus — archive hints from the effective archive bindings', () =
     const result = await statusFor([], [{ id: '@acme/qa.lint' }], registry)
     const blocker = result.blockers.find((b) => b.code === 'LINT_FAILED')
     expect(blocker).toBeDefined()
-    expect(blocker?.bypassFlag).toBeUndefined()
+    expect(blocker?.isSkippable).toBe(false)
+    expect('bypassFlag' in (blocker ?? {})).toBe(false)
   })
 })
 

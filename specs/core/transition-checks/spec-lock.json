@@ -15,6 +15,45 @@
   ],
   "implementation": [
     {
+      "file": "core:src/domain/services/transition-checks.ts"
+    },
+    {
+      "file": "core:src/domain/services/check-registry.ts"
+    },
+    {
+      "file": "core:src/domain/services/check-bindings.ts"
+    },
+    {
+      "file": "core:src/domain/errors/check-predicate-failed-error.ts"
+    },
+    {
+      "file": "core:src/domain/services/find-blocking-parent.ts"
+    },
+    {
+      "file": "core:src/domain/checks/approval-spec.ts"
+    },
+    {
+      "file": "core:src/domain/checks/approval-signoff.ts"
+    },
+    {
+      "file": "core:src/domain/checks/verification-current.ts"
+    },
+    {
+      "file": "core:src/domain/checks/protocol-edge.ts"
+    },
+    {
+      "file": "core:src/domain/checks/workflow-requires.ts"
+    },
+    {
+      "file": "core:src/domain/checks/impl-links-in-scope.ts"
+    },
+    {
+      "file": "core:src/domain/checks/spec-overlap.ts"
+    },
+    {
+      "file": "core:src/domain/checks/schema-name-match.ts"
+    },
+    {
       "file": "core:src/application/services/detect-impl-links-in-scope.ts",
       "symbols": ["detectImplLinksInScope"]
     }

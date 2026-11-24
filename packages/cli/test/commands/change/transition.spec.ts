@@ -21,7 +21,6 @@ import {
   InvalidStateTransitionError,
   HookFailedError,
   ReadOnlyWorkspaceError,
-  ArchiveDependencyMismatchError,
   ArchiveImplementationStateError,
   HappyPathNextUnavailableError,
   CheckPredicateFailedError,
@@ -301,14 +300,21 @@ describe('Approval-gate routing', () => {
           targetStep: 'ready',
           actionType: 'human',
           reason: 'Spec approval required',
-          command: null,
+          intent: null,
+          action: { kind: 'approve-spec' },
         },
       })
     kernel.changes.transition.execute.mockRejectedValue(
-      new InvalidStateTransitionError('ready', 'implementing', {
-        type: 'approval-required',
-        gate: 'spec',
-      }),
+      new CheckPredicateFailedError(
+        'approval.spec',
+        'Checking spec approval',
+        'APPROVAL_REQUIRED',
+        'Spec approval required',
+        { kind: 'approve-spec' },
+        { gate: 'spec' },
+        false,
+        { from: 'ready', to: 'implementing' },
+      ),
     )
 
     const program = makeProgram()
@@ -350,14 +356,21 @@ describe('Approval-gate routing', () => {
           targetStep: 'done',
           actionType: 'human',
           reason: 'Signoff required',
-          command: null,
+          intent: null,
+          action: { kind: 'approve-signoff' },
         },
       })
     kernel.changes.transition.execute.mockRejectedValue(
-      new InvalidStateTransitionError('done', 'archivable', {
-        type: 'approval-required',
-        gate: 'signoff',
-      }),
+      new CheckPredicateFailedError(
+        'approval.signoff',
+        'Checking human signoff',
+        'APPROVAL_REQUIRED',
+        'Signoff required before archiving',
+        { kind: 'approve-signoff' },
+        { gate: 'signoff' },
+        false,
+        { from: 'done', to: 'archivable' },
+      ),
     )
 
     const program = makeProgram()
@@ -389,14 +402,21 @@ describe('Approval-gate routing', () => {
           targetStep: 'ready',
           actionType: 'human',
           reason: 'Spec approval required',
-          command: null,
+          intent: null,
+          action: { kind: 'approve-spec' },
         },
       })
     kernel.changes.transition.execute.mockRejectedValue(
-      new InvalidStateTransitionError('ready', 'implementing', {
-        type: 'approval-required',
-        gate: 'spec',
-      }),
+      new CheckPredicateFailedError(
+        'approval.spec',
+        'Checking spec approval',
+        'APPROVAL_REQUIRED',
+        'Spec approval required',
+        { kind: 'approve-spec' },
+        { gate: 'spec' },
+        false,
+        { from: 'ready', to: 'implementing' },
+      ),
     )
 
     const program = makeProgram()
@@ -731,7 +751,7 @@ describe('Invalid transition error', () => {
         targetStep: 'designing',
         actionType: 'cognitive',
         reason: '...',
-        command: '/specd-design',
+        intent: 'design',
       },
     })
     kernel.changes.transition.execute.mockRejectedValue(
@@ -770,7 +790,7 @@ describe('Invalid transition error', () => {
         targetStep: 'designing',
         actionType: 'cognitive',
         reason: 'Missing specs',
-        command: '/specd-design',
+        intent: 'design',
       },
     })
 
@@ -800,47 +820,158 @@ describe('Invalid transition error', () => {
     })
   })
 
+  const failingStatusReadCases = [
+    {
+      label: 'InvalidStateTransitionError',
+      code: 'INVALID_STATE_TRANSITION',
+      standardHint: false,
+      message: "Cannot transition from 'designing' to 'ready'",
+      make: () =>
+        new InvalidStateTransitionError('designing', 'ready', {
+          type: 'incomplete-artifact',
+          artifactId: 'specs',
+        }),
+    },
+    {
+      label: 'CheckPredicateFailedError',
+      code: 'OVERLAP_CONFLICT',
+      // handleError itself emits the skip-checks hint for skippable checks (standard field).
+      standardHint: true,
+      message: 'Specs overlap',
+      make: () =>
+        new CheckPredicateFailedError(
+          'spec.overlap',
+          'Checking spec overlap',
+          'OVERLAP_CONFLICT',
+          'Specs overlap',
+          undefined,
+          undefined,
+          true,
+        ),
+    },
+  ]
+
+  describe.each(failingStatusReadCases)(
+    'failing repair-guide status read ($label)',
+    ({ code, message, make, standardHint }) => {
+      async function run(format: 'text' | 'json' | 'toon') {
+        const { kernel, stdout, stderr } = setup()
+        kernel.changes.status.execute.mockResolvedValueOnce({
+          change: makeMockChange({ name: 'my-change', state: 'designing' }),
+          artifactStatuses: [],
+        })
+        kernel.changes.transition.execute.mockRejectedValue(make())
+        kernel.changes.status.execute.mockRejectedValueOnce(new Error('status exploded'))
+
+        const program = makeProgram()
+        registerChangeTransition(program.command('change'))
+        await program
+          .parseAsync([
+            'node',
+            'specd',
+            'change',
+            'transition',
+            'my-change',
+            'ready',
+            ...(format !== 'text' ? ['--format', format] : []),
+          ])
+          .catch(() => {})
+        return { stdout: stdout(), stderr: stderr(), exit: vi.mocked(process.exit) }
+      }
+
+      it('text: prints only the original error, no repair guide, exit 1', async () => {
+        const { stdout, stderr, exit } = await run('text')
+        const out = `${stderr}\n${stdout}`
+        expect(exit).toHaveBeenCalledTimes(1)
+        expect(exit).toHaveBeenCalledWith(1)
+        expect(out).toContain(message)
+        expect(out).not.toContain('status exploded')
+        for (const line of ['repair guide:', 'bypass:', 'command:', 'target:']) {
+          expect(out).not.toContain(line)
+        }
+      })
+
+      it('json: failure record carries only standard error fields, exit 1', async () => {
+        const { stdout, stderr, exit } = await run('json')
+        expect(exit).toHaveBeenCalledTimes(1)
+        expect(exit).toHaveBeenCalledWith(1)
+        const out = `${stderr}\n${stdout}`
+        expect(out).toContain(code)
+        expect(out).toContain(message)
+        expect(out).not.toContain('status exploded')
+        const absent = ['blockers', 'nextAction', 'state', 'validity']
+        if (!standardHint) absent.push('hint')
+        for (const key of absent) expect(out).not.toContain(`"${key}"`)
+      })
+
+      it('toon: failure record carries only standard error fields, exit 1', async () => {
+        const { stdout, stderr, exit } = await run('toon')
+        expect(exit).toHaveBeenCalledTimes(1)
+        expect(exit).toHaveBeenCalledWith(1)
+        const out = `${stderr}\n${stdout}`
+        expect(out).toContain(code)
+        expect(out).toContain(message)
+        expect(out).not.toContain('status exploded')
+        const absent = ['blockers', 'nextAction', 'state', 'validity']
+        if (!standardHint) absent.push('hint')
+        for (const key of absent) {
+          expect(out).not.toMatch(new RegExp(`^\\s*${key}[:\\[]`, 'm'))
+        }
+      })
+    },
+  )
+
   it('surfaces approval-required message for blocked signoff transition', async () => {
     const { kernel, stderr } = setup()
     kernel.changes.status.execute.mockResolvedValue({
-      change: makeMockChange({ name: 'my-change', state: 'pending-signoff' }),
+      change: makeMockChange({ name: 'my-change', state: 'done' }),
       artifactStatuses: [],
       blockers: [],
       nextAction: {
-        targetStep: 'designing',
-        actionType: 'cognitive',
+        targetStep: 'archivable',
+        actionType: 'mechanical',
         reason: 'Approval required',
-        command: '/specd-design',
+        intent: null,
+        action: { kind: 'approve-signoff' },
       },
     })
     kernel.changes.transition.execute.mockRejectedValue(
-      new InvalidStateTransitionError('pending-signoff', 'signed-off', {
-        type: 'approval-required',
-        gate: 'signoff',
-      }),
+      new CheckPredicateFailedError(
+        'approval.signoff',
+        'Checking human signoff',
+        'APPROVAL_REQUIRED',
+        'Human signoff is required before archiving.',
+        { kind: 'approve-signoff' },
+        { gate: 'signoff' },
+        false,
+        { from: 'done', to: 'archivable' },
+      ),
     )
 
     const program = makeProgram()
     registerChangeTransition(program.command('change'))
     await program
-      .parseAsync(['node', 'specd', 'change', 'transition', 'my-change', 'signed-off'])
+      .parseAsync(['node', 'specd', 'change', 'transition', 'my-change', 'archivable'])
       .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
-    expect(stderr()).toMatch(/waiting for human signoff/)
+    expect(stderr()).toContain(
+      "Check 'approval.signoff' failed: Human signoff is required before archiving.",
+    )
+    expect(stderr()).toContain('command: specd changes approve signoff')
   })
 })
 
 describe('--next failures', () => {
-  it('fails clearly in pending-spec-approval state', async () => {
+  it('fails clearly in archived state', async () => {
     const { kernel, stderr } = setup()
     kernel.changes.status.execute.mockResolvedValue({
-      change: makeMockChange({ name: 'my-change', state: 'pending-spec-approval' }),
+      change: makeMockChange({ name: 'my-change', state: 'archived' }),
       artifactStatuses: [],
     })
 
     kernel.changes.transition.execute.mockRejectedValue(
-      new HappyPathNextUnavailableError('pending-spec-approval'),
+      new HappyPathNextUnavailableError('archived' as never),
     )
 
     const program = makeProgram()
@@ -854,19 +985,25 @@ describe('--next failures', () => {
       expect.objectContaining({ to: 'next' }),
       expect.any(Function),
     )
-    expect(stderr()).toMatch(/waiting for human spec approval/)
-    expect(stderr()).toContain('Specify an explicit target <step> instead of --next')
+    expect(stderr()).toContain('archived')
     expect(stderr()).not.toContain('--to')
   })
 
   it('includes centralized hint in json mode for HappyPathNextUnavailableError', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
-      change: makeMockChange({ name: 'my-change', state: 'pending-spec-approval' }),
+      change: makeMockChange({ name: 'my-change', state: 'archivable' }),
       artifactStatuses: [],
+      blockers: [],
+      nextAction: {
+        targetStep: 'archivable',
+        actionType: 'mechanical',
+        reason: 'Ready to archive',
+        intent: 'archive',
+      },
     })
     kernel.changes.transition.execute.mockRejectedValue(
-      new HappyPathNextUnavailableError('pending-spec-approval'),
+      new HappyPathNextUnavailableError('archivable'),
     )
 
     const program = makeProgram()
@@ -894,15 +1031,15 @@ describe('--next failures', () => {
     )
   })
 
-  it('fails clearly in pending-signoff state', async () => {
+  it('fails clearly in cancelled state', async () => {
     const { kernel, stderr } = setup()
     kernel.changes.status.execute.mockResolvedValue({
-      change: makeMockChange({ name: 'my-change', state: 'pending-signoff' }),
+      change: makeMockChange({ name: 'my-change', state: 'cancelled' }),
       artifactStatuses: [],
     })
 
     kernel.changes.transition.execute.mockRejectedValue(
-      new HappyPathNextUnavailableError('pending-signoff'),
+      new HappyPathNextUnavailableError('cancelled' as never),
     )
 
     const program = makeProgram()
@@ -916,7 +1053,7 @@ describe('--next failures', () => {
       expect.objectContaining({ to: 'next' }),
       expect.any(Function),
     )
-    expect(stderr()).toMatch(/waiting for human signoff/)
+    expect(stderr()).toMatch(/cancelled/)
   })
 
   it('fails clearly in archivable state', async () => {
@@ -1082,7 +1219,7 @@ describe('Incomplete tasks error', () => {
         targetStep: 'implementing',
         actionType: 'cognitive',
         reason: 'Tasks are incomplete',
-        command: '/specd-implement',
+        intent: 'implement',
       },
     }
     kernel.changes.status.execute.mockResolvedValue(sharedStatus)
@@ -1129,7 +1266,7 @@ describe('Incomplete tasks error', () => {
         targetStep: 'implementing',
         actionType: 'cognitive',
         reason: 'Tasks are incomplete',
-        command: '/specd-implement',
+        intent: 'implement',
       },
     })
     kernel.changes.transition.execute.mockRejectedValue(
@@ -1162,7 +1299,7 @@ describe('Incomplete tasks error', () => {
         targetStep: 'implementing',
         actionType: 'cognitive',
         reason: 'Tasks are incomplete',
-        command: '/specd-implement',
+        intent: 'implement',
       },
     })
     kernel.changes.transition.execute.mockRejectedValue(
@@ -1212,7 +1349,7 @@ describe('Incomplete tasks error', () => {
             targetStep: 'implementing',
             actionType: 'cognitive',
             reason: 'Tasks are incomplete',
-            command: '/specd-implement',
+            intent: 'implement',
           },
         },
       },
@@ -1231,7 +1368,7 @@ describe('Incomplete tasks error', () => {
         targetStep: 'implementing',
         actionType: 'cognitive',
         reason: 'Tasks are incomplete',
-        command: '/specd-implement',
+        intent: 'implement',
       },
     })
     kernel.changes.transition.execute.mockRejectedValue(
@@ -1276,7 +1413,7 @@ describe('Repair Guide from GetStatus nextAction', () => {
         targetStep: 'verifying',
         actionType: 'cognitive',
         reason: 'Tasks are complete',
-        command: '/specd-verify',
+        intent: 'verify',
       },
     })
     kernel.changes.transition.execute.mockRejectedValue(
@@ -1314,11 +1451,20 @@ describe('Typed transition failures render Repair Guide', () => {
         targetStep: 'designing',
         actionType: 'cognitive',
         reason: 'Remove read-only specs',
-        command: '/specd-design',
+        intent: 'design',
       },
     })
     kernel.changes.transition.execute.mockRejectedValue(
-      new ReadOnlyWorkspaceError('Workspace "core" is read-only'),
+      new CheckPredicateFailedError(
+        'workspace.readOnly',
+        'Checking workspace ownership',
+        'READ_ONLY_WORKSPACE',
+        'Workspace "core" is read-only',
+        undefined,
+        { specs: ['core:a'] },
+        false,
+        { from: 'designing', to: 'ready' },
+      ),
     )
 
     const program = makeProgram()
@@ -1330,12 +1476,10 @@ describe('Typed transition failures render Repair Guide', () => {
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain('repair guide:')
     expect(stderr()).toContain('command: /specd-design')
-    expect(stderr()).toContain(
-      '! READ_ONLY_WORKSPACE — Checking workspace ownership: Workspace "core" is read-only',
-    )
+    expect(stderr()).toContain('check:   Checking workspace ownership (workspace.readOnly)')
   })
 
-  it('catches ArchiveDependencyMismatchError', async () => {
+  it('catches CheckPredicateFailedError for deps.consistent', async () => {
     const { kernel, stderr } = setup()
     kernel.changes.status.execute.mockResolvedValue({
       change: makeMockChange({ name: 'my-change', state: 'implementing' }),
@@ -1345,11 +1489,22 @@ describe('Typed transition failures render Repair Guide', () => {
         targetStep: 'implementing',
         actionType: 'cognitive',
         reason: 'Re-extract dependencies',
-        command: '/specd-implement',
+        intent: 'implement',
       },
     })
     kernel.changes.transition.execute.mockRejectedValue(
-      new ArchiveDependencyMismatchError('core:change', ['core:a'], ['core:b']),
+      new CheckPredicateFailedError(
+        'deps.consistent',
+        'Checking dependency consistency',
+        'DEPS_INCONSISTENT',
+        'Dependencies drifted',
+        undefined,
+        {
+          mismatches: [{ specId: 'core:a', extracted: ['core:b'], persisted: ['core:c'] }],
+        },
+        false,
+        { from: 'implementing', to: 'verifying' },
+      ),
     )
 
     const program = makeProgram()
@@ -1360,24 +1515,34 @@ describe('Typed transition failures render Repair Guide', () => {
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain('repair guide:')
-    expect(stderr()).toContain('! DEPS_INCONSISTENT')
+    expect(stderr()).toContain('check:   Checking dependency consistency (deps.consistent)')
+    expect(stderr()).toContain('detail:  core:a: extracted [core:b] vs persisted [core:c]')
   })
 
-  it('catches ArchiveImplementationStateError', async () => {
+  it('catches CheckPredicateFailedError for impl.filesResolved', async () => {
     const { kernel, stderr } = setup()
     kernel.changes.status.execute.mockResolvedValue({
       change: makeMockChange({ name: 'my-change', state: 'implementing' }),
       artifactStatuses: [],
-      blockers: [{ code: 'IMPL_UNRESOLVED', message: 'Open implementation files' }],
+      blockers: [{ code: 'IMPL_FILES_UNRESOLVED', message: 'Open implementation files' }],
       nextAction: {
         targetStep: 'implementing',
         actionType: 'cognitive',
         reason: 'Resolve implementation files',
-        command: '/specd-implement',
+        intent: 'implement',
       },
     })
     kernel.changes.transition.execute.mockRejectedValue(
-      new ArchiveImplementationStateError(['src/a.ts'], 'unresolved files'),
+      new CheckPredicateFailedError(
+        'impl.filesResolved',
+        'Checking implementation file resolution',
+        'IMPL_FILES_UNRESOLVED',
+        'Open implementation files',
+        undefined,
+        { files: ['src/a.ts'] },
+        false,
+        { from: 'implementing', to: 'verifying' },
+      ),
     )
 
     const program = makeProgram()
@@ -1388,7 +1553,7 @@ describe('Typed transition failures render Repair Guide', () => {
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain('repair guide:')
-    expect(stderr()).toContain('! IMPL_UNRESOLVED')
+    expect(stderr()).toContain('detail:  Open files: src/a.ts')
   })
 })
 
@@ -1403,7 +1568,7 @@ describe('validity-aware transition guidance', () => {
         targetStep: 'designing',
         actionType: 'cognitive',
         reason: 'Spec consent must be renewed',
-        command: '/specd-design',
+        intent: 'design',
       },
       validity: {
         specApproval: 'stale',
@@ -1546,7 +1711,7 @@ describe('validity-aware transition guidance', () => {
       expect(call.skipChecks).toEqual(['impl.linksInScope', 'spec.overlap'])
     })
 
-    it('renders Repair Guide with check label, command, and bypass for CheckPredicateFailedError', async () => {
+    it('renders Repair Guide with check label, guidance, and bypass for CheckPredicateFailedError', async () => {
       const { kernel, stderr } = setup()
       kernel.changes.status.execute.mockResolvedValue({
         change: makeMockChange({ name: 'my-change', state: 'implementing' }),
@@ -1556,9 +1721,9 @@ describe('validity-aware transition guidance', () => {
         new CheckPredicateFailedError(
           'impl.linksInScope',
           'Checking implementation links',
-          'Links out of scope',
           'IMPL_LINKS_OUT_OF_SCOPE',
-          '/specd-implement my-change',
+          'Links out of scope',
+          { kind: 'custom', guidance: '/specd-implement my-change' },
           undefined,
           true,
         ),
@@ -1574,9 +1739,10 @@ describe('validity-aware transition guidance', () => {
       const err = stderr()
       expect(err).toContain('repair guide:')
       expect(err).toContain('check:   Checking implementation links (impl.linksInScope)')
-      expect(err).toContain('command: /specd-implement my-change')
+      expect(err).toContain('guidance: /specd-implement my-change')
+      expect(err).not.toContain('command: /specd-implement my-change')
       expect(err).toContain(
-        'bypass:  Re-run with --skip-checks impl.linksInScope (or --allow-out-of-scope) if intentional',
+        'bypass:  Retry with --skip-checks impl.linksInScope if an exception is granted',
       )
     })
 
@@ -1590,9 +1756,9 @@ describe('validity-aware transition guidance', () => {
         new CheckPredicateFailedError(
           'impl.filesResolved',
           'Checking implementation file resolution',
-          'Open files remain',
           'IMPL_FILES_UNRESOLVED',
-          '/specd-implement my-change',
+          'Open files remain',
+          { kind: 'custom', guidance: '/specd-implement my-change' },
           undefined,
           false, // skippable: false
         ),
@@ -1608,7 +1774,8 @@ describe('validity-aware transition guidance', () => {
       const err = stderr()
       expect(err).toContain('repair guide:')
       expect(err).toContain('check:   Checking implementation file resolution (impl.filesResolved)')
-      expect(err).toContain('command: /specd-implement my-change')
+      expect(err).toContain('guidance: /specd-implement my-change')
+      expect(err).not.toContain('command: /specd-implement my-change')
       expect(err).not.toContain('bypass:')
     })
 
@@ -1668,6 +1835,60 @@ describe('validity-aware transition guidance', () => {
       expect(stderr()).toContain("Check 'protocol.edge' cannot be skipped")
     })
 
+    it('renders the approval command declared by approval.spec and no bypass', async () => {
+      const { kernel, stderr } = setup()
+      kernel.changes.status.execute.mockResolvedValue({
+        change: makeMockChange({ name: 'checkout-retry', state: 'ready' }),
+        artifactStatuses: [],
+      })
+      kernel.changes.transition.execute.mockRejectedValue(
+        new CheckPredicateFailedError(
+          'approval.spec',
+          'Checking spec approval',
+          'APPROVAL_REQUIRED',
+          'Spec approval is required',
+          { kind: 'approve-spec' },
+          undefined,
+          false,
+        ),
+      )
+      const program = makeProgram()
+      registerChangeTransition(program.command('change'))
+      await program
+        .parseAsync(['node', 'specd', 'change', 'transition', 'checkout-retry', 'implementing'])
+        .catch(() => {})
+      const err = stderr()
+      expect(err).toContain('command: specd changes approve spec')
+      expect(err).not.toContain('bypass:')
+    })
+
+    it('renders the start-verification command with the real change name', async () => {
+      const { kernel, stderr } = setup()
+      kernel.changes.status.execute.mockResolvedValue({
+        change: makeMockChange({ name: 'checkout-retry', state: 'done' }),
+        artifactStatuses: [],
+      })
+      kernel.changes.transition.execute.mockRejectedValue(
+        new CheckPredicateFailedError(
+          'verification.current',
+          'Checking verification freshness',
+          'VERIFICATION_STALE',
+          'Verification evidence is stale',
+          { kind: 'start-verification', params: { changeName: 'checkout-retry' } },
+          undefined,
+          false,
+        ),
+      )
+      const program = makeProgram()
+      registerChangeTransition(program.command('change'))
+      await program
+        .parseAsync(['node', 'specd', 'change', 'transition', 'checkout-retry', 'archivable'])
+        .catch(() => {})
+      const err = stderr()
+      expect(err).toContain('command: specd changes verification start checkout-retry')
+      expect(err).not.toContain('<name>')
+    })
+
     it('renders Repair Guide for custom check failure with command and bypass', async () => {
       const { kernel, stderr } = setup()
       kernel.changes.status.execute.mockResolvedValue({
@@ -1678,9 +1899,9 @@ describe('validity-aware transition guidance', () => {
         new CheckPredicateFailedError(
           '@qa.smoke',
           'QA Smoke Test',
-          'Smoke assertions failed',
           'QA_SMOKE_FAILED',
-          'pnpm test:smoke',
+          'Smoke assertions failed',
+          { kind: 'custom', guidance: 'pnpm test:smoke' },
           undefined,
           true,
         ),
@@ -1696,7 +1917,8 @@ describe('validity-aware transition guidance', () => {
       const err = stderr()
       expect(err).toContain('repair guide:')
       expect(err).toContain('check:   QA Smoke Test (@qa.smoke)')
-      expect(err).toContain('command: pnpm test:smoke')
+      expect(err).toContain('guidance: pnpm test:smoke')
+      expect(err).not.toContain('command: pnpm test:smoke')
       expect(err).toContain(
         'bypass:  Retry with --skip-checks @qa.smoke if an exception is granted',
       )
@@ -1757,5 +1979,546 @@ describe('validity-aware transition guidance', () => {
       )
       expect(stdout()).toContain('my-change')
     })
+  })
+})
+
+describe('host-neutral failure rendering', () => {
+  const statusWith = (extra: Record<string, unknown>) => ({
+    change: makeMockChange({ name: 'my-change', state: 'implementing' }),
+    artifactStatuses: [],
+    blockers: [],
+    nextAction: {
+      targetStep: 'implementing',
+      actionType: 'cognitive',
+      reason: 'Fix the blockers',
+      intent: 'implement',
+    },
+    ...extra,
+  })
+
+  async function runFailing(
+    format: 'text' | 'json' | 'toon',
+    error: Error,
+    status: Record<string, unknown>,
+    progress?: (onProgress: (evt: Record<string, unknown>) => void) => void,
+  ) {
+    const { kernel, stdout, stderr } = setup()
+    kernel.changes.status.execute.mockResolvedValue(status)
+    kernel.changes.transition.execute.mockImplementation(
+      (_input: unknown, onProgress?: (evt: Record<string, unknown>) => void) => {
+        if (progress !== undefined && onProgress !== undefined) progress(onProgress)
+        throw error
+      },
+    )
+    const program = makeProgram()
+    registerChangeTransition(program.command('change'))
+    await program
+      .parseAsync([
+        'node',
+        'specd',
+        'change',
+        'transition',
+        'my-change',
+        'verifying',
+        ...(format !== 'text' ? ['--format', format] : []),
+      ])
+      .catch(() => {})
+    return { kernel, stdout: stdout(), stderr: stderr() }
+  }
+
+  it('re-reads status without refreshing implementation tracking after a failure', async () => {
+    const { kernel } = await runFailing(
+      'text',
+      new InvalidStateTransitionError('implementing', 'done'),
+      statusWith({}),
+    )
+    expect(kernel.changes.status.execute).toHaveBeenCalledWith({
+      name: 'my-change',
+      refreshImplementationTracking: false,
+    })
+    expect(kernel.changes.refreshImplementationTracking.execute).not.toHaveBeenCalled()
+  })
+
+  it('prints the Re-checking after hooks heading once when a hook ran before a failure', async () => {
+    const check = (type: string, id: string, label: string, extra: object = {}) => ({
+      type,
+      id,
+      label,
+      ...extra,
+    })
+    const { stderr } = await runFailing(
+      'text',
+      new InvalidStateTransitionError('implementing', 'done'),
+      statusWith({}),
+      (onProgress) => {
+        onProgress(check('check-start', 'workflow.requires', 'Checking required artifacts'))
+        onProgress(
+          check('check-done', 'workflow.requires', 'Checking required artifacts', {
+            outcome: 'pass',
+          }),
+        )
+        onProgress(check('check-start', 'hook.post', 'Running post hooks'))
+        onProgress(check('check-done', 'hook.post', 'Running post hooks', { outcome: 'pass' }))
+        onProgress(check('check-start', 'workflow.requires', 'Checking required artifacts'))
+        onProgress(
+          check('check-done', 'workflow.requires', 'Checking required artifacts', {
+            outcome: 'fail',
+          }),
+        )
+      },
+    )
+    expect(stderr.match(/Re-checking after hooks/g)).toHaveLength(1)
+  })
+
+  it('includes intent, action and bypassFlag in the structured failure record', async () => {
+    const action = { kind: 'approve-spec' }
+    const { stdout } = await runFailing(
+      'json',
+      new CheckPredicateFailedError(
+        'spec.overlap',
+        'Checking spec overlap',
+        'OVERLAP_CONFLICT',
+        'Specs overlap',
+        undefined,
+        undefined,
+        true,
+      ),
+      statusWith({
+        blockers: [
+          {
+            code: 'OVERLAP_CONFLICT',
+            message: 'Specs overlap',
+            checkId: 'spec.overlap',
+            isSkippable: true,
+          },
+          { code: 'OTHER', message: 'locked', checkId: 'x.y', isSkippable: false },
+        ],
+        nextAction: {
+          targetStep: 'ready',
+          actionType: 'mechanical',
+          reason: 'Approve the spec',
+          intent: null,
+          action,
+        },
+      }),
+    )
+    const record = JSON.parse(stdout.trim().split('\n').pop()!) as {
+      event: {
+        result: {
+          result: string
+          blockers: Array<Record<string, unknown>>
+          nextAction: Record<string, unknown>
+        }
+      }
+    }
+    const result = record.event.result
+    expect(result.result).toBe('failure')
+    expect(result.blockers[0]?.bypassFlag).toBe('--skip-checks spec.overlap')
+    expect('bypassFlag' in result.blockers[1]!).toBe(false)
+    expect(result.nextAction).toMatchObject({
+      intent: null,
+      action,
+      command: 'specd changes approve spec',
+    })
+  })
+
+  it('treats a name-only CheckPredicateFailedError like the real class in json mode', async () => {
+    const duck = Object.assign(new Error('Specs overlap'), {
+      name: 'CheckPredicateFailedError',
+      code: 'OVERLAP_CONFLICT',
+      checkId: 'spec.overlap',
+      label: 'Checking spec overlap',
+      checkCode: 'OVERLAP_CONFLICT',
+      skippable: true,
+    })
+    const { stdout } = await runFailing(
+      'json',
+      duck,
+      statusWith({
+        blockers: [
+          {
+            code: 'OVERLAP_CONFLICT',
+            message: 'Specs overlap',
+            checkId: 'spec.overlap',
+            isSkippable: true,
+          },
+        ],
+      }),
+    )
+    const record = JSON.parse(stdout.trim().split('\n').pop()!) as {
+      event: { result: { result: string; hint?: string } }
+    }
+    expect(record.event.result.result).toBe('failure')
+    expect(record.event.result.hint).toContain('--skip-checks spec.overlap')
+  })
+
+  it('emits failure error and hint fields in toon format', async () => {
+    const { stdout } = await runFailing(
+      'toon',
+      new CheckPredicateFailedError(
+        'spec.overlap',
+        'Checking spec overlap',
+        'OVERLAP_CONFLICT',
+        'Specs overlap',
+        undefined,
+        undefined,
+        true,
+      ),
+      statusWith({
+        blockers: [
+          {
+            code: 'OVERLAP_CONFLICT',
+            message: 'Specs overlap',
+            checkId: 'spec.overlap',
+            isSkippable: true,
+          },
+        ],
+      }),
+    )
+    expect(stdout).toContain('result: failure')
+    expect(stdout).toMatch(/error:\s*\n\s+code: OVERLAP_CONFLICT/)
+    expect(stdout).toContain('checkId: spec.overlap')
+    expect(stdout).toContain('hint:')
+    expect(stdout).toContain('--skip-checks spec.overlap')
+  })
+
+  it('prints a single bypass line for blockers sharing a checkId', async () => {
+    const blockers = [
+      { code: 'OVERLAP_CONFLICT', message: 'one', checkId: 'spec.overlap', isSkippable: true },
+      { code: 'OVERLAP_CONFLICT', message: 'two', checkId: 'spec.overlap', isSkippable: true },
+    ]
+    const withCheckError = await runFailing(
+      'text',
+      new CheckPredicateFailedError(
+        'impl.filesResolved',
+        'Checking implementation file resolution',
+        'IMPL_FILES_UNRESOLVED',
+        'Open files remain',
+      ),
+      statusWith({ blockers }),
+    )
+    expect(withCheckError.stderr.match(/bypass:  .*--skip-checks spec\.overlap/g)).toHaveLength(1)
+
+    const withoutCheckError = await runFailing(
+      'text',
+      new InvalidStateTransitionError('implementing', 'done'),
+      statusWith({ blockers }),
+    )
+    expect(withoutCheckError.stderr.match(/bypass:  /g)).toHaveLength(1)
+  })
+
+  it('prints guidance and never command for a guidance-only check action', async () => {
+    const { stderr } = await runFailing(
+      'text',
+      new CheckPredicateFailedError(
+        '@security.code-scan',
+        'Scanning code',
+        'SECURITY_FINDINGS',
+        '2 findings',
+        { kind: '@security.audit-fix', guidance: 'pnpm audit:fix' },
+        undefined,
+        false,
+      ),
+      statusWith({
+        nextAction: {
+          targetStep: 'implementing',
+          actionType: 'cognitive',
+          reason: 'Fix findings',
+          intent: null,
+        },
+      }),
+    )
+    expect(stderr).toContain('guidance: pnpm audit:fix')
+    expect(stderr).not.toContain('command:')
+  })
+
+  it('prints the check guidance together with the next-action command', async () => {
+    const { stderr } = await runFailing(
+      'text',
+      new CheckPredicateFailedError(
+        '@security.code-scan',
+        'Scanning code',
+        'SECURITY_FINDINGS',
+        '2 findings',
+        { kind: '@security.audit-fix', guidance: 'pnpm audit:fix' },
+        undefined,
+        false,
+      ),
+      statusWith({}),
+    )
+    expect(stderr).toContain('guidance: pnpm audit:fix')
+    expect(stderr).toContain('command: /specd-implement')
+  })
+
+  it("prints the failed check's diagnostic code even when status carries no matching blocker", async () => {
+    const { stderr } = await runFailing(
+      'text',
+      new CheckPredicateFailedError(
+        '@security.code-scan',
+        'Scanning code',
+        'SECURITY_FINDINGS',
+        '2 findings',
+        undefined,
+        undefined,
+        false,
+      ),
+      statusWith({ blockers: [] }),
+    )
+    expect(stderr).toContain('code:    SECURITY_FINDINGS')
+  })
+
+  it('projects structured failure blockers without the raw isSkippable flag', async () => {
+    const { stdout } = await runFailing(
+      'json',
+      new CheckPredicateFailedError(
+        'spec.overlap',
+        'Checking spec overlap',
+        'OVERLAP_CONFLICT',
+        'Specs overlap',
+        undefined,
+        undefined,
+        true,
+      ),
+      statusWith({
+        blockers: [
+          {
+            code: 'OVERLAP_CONFLICT',
+            message: 'Specs overlap',
+            label: 'Checking spec overlap',
+            checkId: 'spec.overlap',
+            isSkippable: true,
+          },
+        ],
+      }),
+    )
+    const record = JSON.parse(stdout.trim().split('\n').pop()!) as {
+      event: { result: { blockers: Array<Record<string, unknown>> } }
+    }
+    const blocker = record.event.result.blockers[0]!
+    expect(blocker).toMatchObject({
+      code: 'OVERLAP_CONFLICT',
+      label: 'Checking spec overlap',
+      checkId: 'spec.overlap',
+      bypassFlag: '--skip-checks spec.overlap',
+    })
+    expect('isSkippable' in blocker).toBe(false)
+  })
+
+  it('falls back to the next-action command when the failed check declares no action', async () => {
+    const { stderr } = await runFailing(
+      'text',
+      new CheckPredicateFailedError(
+        'impl.filesResolved',
+        'Checking implementation file resolution',
+        'IMPL_FILES_UNRESOLVED',
+        'Open files remain',
+        undefined,
+        undefined,
+        false,
+      ),
+      statusWith({}),
+    )
+    expect(stderr).toContain('command: /specd-implement')
+  })
+
+  it('falls back to next-action guidance for a non-check failure with no command', async () => {
+    const { stderr } = await runFailing(
+      'text',
+      new InvalidStateTransitionError('implementing', 'done'),
+      statusWith({
+        nextAction: {
+          targetStep: 'implementing',
+          actionType: 'cognitive',
+          reason: 'r',
+          intent: null,
+          action: { kind: '@security.audit-fix', guidance: 'pnpm audit:fix' },
+        },
+      }),
+    )
+    expect(stderr).toContain('guidance: pnpm audit:fix')
+    expect(stderr).not.toContain('command:')
+  })
+
+  it('transition --help documents intent, action, guidance, bypassFlag and hint', async () => {
+    const { stdout } = setup()
+    const program = makeProgram()
+    registerChangeTransition(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'transition', '--help']).catch(() => {})
+    const help = stdout()
+    for (const term of ['intent', 'action', 'guidance', 'bypassFlag', 'hint']) {
+      expect(help).toContain(term)
+    }
+  })
+
+  it('prints a bypass line for every extra skippable blocker beside a CheckPredicateFailedError', async () => {
+    const { stderr } = await runFailing(
+      'text',
+      new CheckPredicateFailedError(
+        'impl.linksInScope',
+        'Checking implementation links',
+        'LINKS_OUT_OF_SCOPE',
+        'links out of scope',
+        undefined,
+        undefined,
+        true,
+      ),
+      statusWith({
+        blockers: [
+          { code: 'A', message: 'a', checkId: 'impl.linksInScope', isSkippable: true },
+          { code: 'B', message: 'b', checkId: 'spec.overlap', isSkippable: true },
+          { code: 'C', message: 'c', checkId: 'other', isSkippable: false },
+        ],
+      }),
+    )
+    const lines = stderr.split('\n').filter((l) => l.includes('bypass:'))
+    expect(lines).toHaveLength(2)
+    expect(stderr).toContain('bypass:  Retry with --skip-checks impl.linksInScope')
+    expect(stderr).toContain('bypass:  Retry with --skip-checks spec.overlap')
+    expect(stderr).not.toContain('--skip-checks other')
+  })
+
+  it('renders the --skip-hooks hint for a non-skippable hook check', async () => {
+    const err = new CheckNotSkippableError('hook.pre')
+    const text = await runFailing('text', err, statusWith({}))
+    expect(text.stderr).toContain('--skip-hooks')
+    const json = await runFailing('json', err, statusWith({}))
+    const result = JSON.parse(json.stdout.trim().split('\n').at(-1) as string).event.result
+    expect(result.hint).toContain('--skip-hooks')
+    expect(result.error).toEqual({
+      code: 'CHECK_NOT_SKIPPABLE',
+      message: err.message,
+      checkId: 'hook.pre',
+    })
+  })
+
+  it('treats a name-only CheckNotSkippableError like the real class in text mode', async () => {
+    const real = new CheckNotSkippableError('hook.pre')
+    const duck = Object.assign(new Error(real.message), {
+      name: 'CheckNotSkippableError',
+      code: 'CHECK_NOT_SKIPPABLE',
+      checkId: 'hook.pre',
+    })
+    const realOut = await runFailing('text', real, statusWith({}))
+    const duckOut = await runFailing('text', duck, statusWith({}))
+    expect(duckOut.stderr).toContain('--skip-hooks')
+    expect(duckOut.stderr).toBe(realOut.stderr)
+  })
+
+  it.each(['protocol.edge', 'spec.overlap'])('gives no hint for non-hook check %s', async (id) => {
+    const err = new CheckNotSkippableError(id)
+    const text = await runFailing('text', err, statusWith({}))
+    expect(text.stderr).not.toContain('--skip-hooks')
+    const json = await runFailing('json', err, statusWith({}))
+    const result = JSON.parse(json.stdout.trim().split('\n').at(-1) as string).event.result
+    expect(result.hint).toBeUndefined()
+    expect(result.error.checkId).toBe(id)
+  })
+
+  it('json failure carries error and the bypass hint for a skippable check', async () => {
+    const { stdout } = await runFailing(
+      'json',
+      new CheckPredicateFailedError(
+        'spec.overlap',
+        'Checking overlap',
+        'OVERLAP_CONFLICT',
+        'overlap',
+        undefined,
+        undefined,
+        true,
+      ),
+      statusWith({}),
+    )
+    const result = JSON.parse(stdout.trim().split('\n').at(-1) as string).event.result
+    expect(result.error).toEqual({
+      code: 'OVERLAP_CONFLICT',
+      message: "Check 'spec.overlap' failed: overlap",
+      checkId: 'spec.overlap',
+    })
+    expect(result.hint).toBe('Retry with --skip-checks spec.overlap if an exception is granted')
+  })
+
+  const depsError = (skippable: boolean) =>
+    new CheckPredicateFailedError(
+      'deps.consistent',
+      'Checking dependency consistency',
+      'DEPS_INCONSISTENT',
+      'Dependencies drifted',
+      undefined,
+      { mismatches: [{ specId: 'core:a', extracted: ['core:b'], persisted: [] }] },
+      skippable,
+    )
+
+  it('renders the dependency extraction hint for a non-skippable deps.consistent failure', async () => {
+    const { stderr } = await runFailing('text', depsError(false), statusWith({}))
+    expect(stderr).toContain('  hint:    Re-run dependency extraction')
+    expect(stderr).not.toContain('bypass:')
+  })
+
+  it('omits the dependency extraction hint when deps.consistent is skippable', async () => {
+    const { stderr } = await runFailing('text', depsError(true), statusWith({}))
+    expect(stderr).not.toContain('hint:')
+    expect(stderr).toContain('bypass:  Retry with --skip-checks deps.consistent')
+  })
+
+  it('transition --help lists the error field', async () => {
+    const { stdout } = setup()
+    const program = makeProgram()
+    registerChangeTransition(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'transition', '--help']).catch(() => {})
+    expect(stdout()).toContain('error?: { code, message, checkId? }')
+  })
+})
+
+describe('Duck-typed CheckPredicateFailedError in text mode (transition)', () => {
+  async function run(err: unknown): Promise<string> {
+    const { kernel, stderr } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'designing' }),
+      artifactStatuses: [],
+      blockers: [],
+      nextAction: {
+        targetStep: 'designing',
+        actionType: 'cognitive',
+        reason: 'Remove read-only specs',
+        intent: 'design',
+      },
+    })
+    kernel.changes.transition.execute.mockRejectedValue(err)
+    const program = makeProgram()
+    registerChangeTransition(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'transition', 'my-change', 'ready'])
+      .catch(() => {})
+    expect(process.exit).toHaveBeenCalledWith(1)
+    return stderr()
+  }
+
+  it('renders the same repair guide as the real class', async () => {
+    const real = new CheckPredicateFailedError(
+      'workspace.readOnly',
+      'Checking workspace ownership',
+      'READ_ONLY_WORKSPACE',
+      'Workspace "core" is read-only',
+      undefined,
+      { specs: ['core:a'] },
+      false,
+      { from: 'designing', to: 'ready' },
+    )
+    const duck = Object.assign(new Error(real.message), {
+      name: 'CheckPredicateFailedError',
+      checkId: real.checkId,
+      label: real.label,
+      checkCode: real.checkCode,
+      action: real.action,
+      details: real.details,
+      skippable: real.skippable,
+      from: real.from,
+      to: real.to,
+    })
+    const realOut = await run(real)
+    vi.restoreAllMocks()
+    const duckOut = await run(duck)
+    expect(realOut).toContain('repair guide:')
+    expect(duckOut).toBe(realOut)
   })
 })

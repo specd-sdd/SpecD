@@ -148,7 +148,13 @@ The `changes status` response also includes a `nextAction` object:
 - `targetStep`: the lifecycle step to aim for
 - `actionType`: `cognitive` (needs thinking/editing) or `mechanical` (just run a command)
 - `reason`: short explanation of why this action is recommended
-- `command`: the exact CLI or skill command to run
+- `intent`: the lifecycle skill intent (`design`, `implement`, `verify` or `archive`), or `null` when none applies
+- `action`: the host-neutral remedy declared by the failing check, shaped `{kind, params?, guidance?}`
+- `command`: the exact CLI or skill command to run, or `null` when the host cannot map `action` to a command
+- `guidance`: human-readable instructions for the remedy
+
+When the host cannot map an `action` to a command, `nextAction` has `command: null`
+plus `guidance`. In that case you MUST follow `guidance` instead of inventing a command.
 
 **Always prefer the `nextAction` recommendation** over manual state derivation.
 It accounts for both structural blockers and the logical workflow progression.
@@ -480,7 +486,8 @@ specd changes approve signoff <name> --reason "..."
 ```
 
 Pending states (`pending-spec-approval`, `pending-signoff`) MAY appear only as **drain**
-for in-flight changes already in those states — not as the happy-path wait.
+for in-flight changes already in those states — not as the happy-path wait. Approving in a
+drain state records consent without moving the change.
 
 Do not attempt to approve, do not offer to approve, do not auto-approve. Stop and wait.
 

@@ -45,9 +45,17 @@ Scenarios:
 
 #### Scenario: Stale approval returns to design instead of parking
 
-- **GIVEN** required spec approval is stale at `ready`
+- **GIVEN** required spec approval is stale in `implementing`
 - **WHEN** a forward transition is requested
 - **THEN** reconciliation commits `designing` recovery and the request fails
+- **AND** no pending approval state is entered
+
+#### Scenario: Stale approval at ready stays in ready and the check blocks
+
+- **GIVEN** required spec approval is stale or revoked at `ready` with the spec gate enabled
+- **WHEN** a forward transition is requested
+- **THEN** reconciliation commits no recovery and the change stays in `ready`
+- **AND** the request fails with `CheckPredicateFailedError` for `approval.spec` carrying `action: { kind: 'approve-spec' }`
 - **AND** no pending approval state is entered
 
 #### Scenario: Valid current consent permits normal edge evaluation
@@ -75,19 +83,16 @@ Scenarios:
 
 #### Scenario: Pending spec approval blocks normal forward transition
 
-- **GIVEN** a change in `pending-spec-approval` state
-- **WHEN** `execute` is called with `to: 'spec-approved'`
-- **THEN** matching predicates / `evaluateLifecycle` identify an approval-required or invalid-transition blocker
-- **AND** it throws `InvalidStateTransitionError`
-- **AND** the error reason equals `{ type: 'approval-required', gate: 'spec' }` or `{ type: 'invalid-transition' }`
+- **GIVEN** a change in `pending-spec-approval` state with the spec gate on and no spec approval
+- **WHEN** `execute` is called with `to: 'implementing'`
+- **THEN** `approval.spec` fails and it throws `CheckPredicateFailedError` with `checkId: 'approval.spec'`, `code: 'APPROVAL_REQUIRED'`, and `action.kind: 'approve-spec'`
+- **AND** the error carries `from: 'pending-spec-approval'` and `to: 'implementing'`
 
 #### Scenario: Pending signoff blocks normal forward transition
 
-- **GIVEN** a change in `pending-signoff` state
-- **WHEN** `execute` is called with `to: 'signed-off'`
-- **THEN** matching predicates / `evaluateLifecycle` identify an approval-required or invalid-transition blocker
-- **AND** it throws `InvalidStateTransitionError`
-- **AND** the error reason equals `{ type: 'approval-required', gate: 'signoff' }` or `{ type: 'invalid-transition' }`
+- **GIVEN** a change in `pending-signoff` state with the signoff gate on and no signoff
+- **WHEN** `execute` is called with `to: 'archivable'`
+- **THEN** `approval.signoff` fails and it throws `CheckPredicateFailedError` with `checkId: 'approval.signoff'` and `action.kind: 'approve-signoff'`
 
 #### Scenario: Pending approval still allows redesign
 
@@ -102,19 +107,19 @@ Scenarios:
 - **GIVEN** a completion-gated artifact has an incomplete count returned by `CountTasks`
 - **WHEN** `TransitionChange.execute()` targets that step
 - **THEN** it emits `task-completion-failed`
-- **AND** throws `InvalidStateTransitionError` with reason `incomplete-tasks` and the counts
+- **AND** throws `CheckPredicateFailedError` for `workflow.taskCompletion` whose `details` carry `artifactId`, `incomplete`, `complete`, and `total`
 
 #### Scenario: Missing task capability blocks a gated artifact
 
 - **GIVEN** a workflow step requires task completion for an artifact without `hasTasks: true`
 - **WHEN** `TransitionChange.execute()` targets that step
-- **THEN** it throws `InvalidStateTransitionError` with reason `missing-task-capability`
+- **THEN** it throws `CheckPredicateFailedError` for `workflow.taskCompletion` whose `details.reason` is `missing-task-capability`
 
 #### Scenario: Missing completion configuration blocks a gated artifact
 
 - **GIVEN** a workflow step requires task completion for an artifact with `hasTasks: true` but no `taskCompletionCheck`
 - **WHEN** `TransitionChange.execute()` targets that step
-- **THEN** it throws `InvalidStateTransitionError` with reason `missing-task-capability`
+- **THEN** it throws `CheckPredicateFailedError` for `workflow.taskCompletion` whose `details.reason` is `missing-task-capability`
 
 #### Scenario: All completed tasks allow transition
 
@@ -139,7 +144,7 @@ Scenarios:
 
 - **GIVEN** `GetStatus` already evaluated `workflow.taskCompletion` as fail
 - **WHEN** `TransitionChange.execute()` targets `verifying`
-- **THEN** it throws `incomplete-tasks`
+- **THEN** it throws `CheckPredicateFailedError` for `workflow.taskCompletion` with the task counts in `details`
 - **AND** the use case does not invoke `CountTasks` after a green predicate `execute`
 
 ### Requirement: Canonical pre-transition validity reconciliation
@@ -186,8 +191,31 @@ Scenarios:
 - **GIVEN** a change whose schema disables `verifying`
 - **AND** post-hook reconciliation commits an automatic recovery away from the source state
 - **WHEN** `TransitionChange` throws the committed-recovery error
-- **THEN** the error reports the committed state and the command from lifecycle guidance for that state
-- **AND** the command is not `/specd-verify` or `specd changes verification start`
+- **THEN** the error reports the committed state and carries `nextAction` with an `intent` or `action` from lifecycle guidance for that state
+- **AND** `nextAction.intent` is not `'verify'` and no action has kind `start-verification`
+- **AND** neither the error message nor the guidance contains a CLI command or slash command
+
+#### Scenario: Committed recovery to designing reports the design intent
+
+- **GIVEN** a spec gate is enabled and reconciliation commits a recovery to `designing` because spec consent is stale in a state after `ready`
+- **WHEN** `TransitionChange` throws the committed-recovery error
+- **THEN** `nextAction.intent` is `'design'` and `nextAction.action` is undefined
+- **AND** neither the error message nor the guidance contains a CLI command or slash command
+
+#### Scenario: Committed recovery to done reports the sign-off action from the check
+
+- **GIVEN** a sign-off gate is enabled and reconciliation commits a recovery to `done` because sign-off is stale while verification is still current
+- **WHEN** `TransitionChange` throws the committed-recovery error
+- **THEN** `nextAction.action` is the action declared by the failing `approval.signoff` check evaluated for the committed state
+- **AND** the use case did not hardcode that action
+
+#### Scenario: skipChecks are validated on the designing to designing redesign path
+
+- **GIVEN** a change in `designing`
+- **WHEN** `TransitionChange.execute` is called with `to: 'designing'` and `skipChecks: ['unknown.check']`
+- **THEN** it throws `UnknownCheckError` before any neutral no-op return
+- **AND** `skipChecks: ['hook.pre']` or a non-skippable check id on the same request throws `CheckNotSkippableError`
+- **AND** with an empty or valid `skipChecks` the request returns the unchanged change without appending an event
 
 ### Requirement: Workflow requires enforcement
 
@@ -196,23 +224,22 @@ Scenarios:
 - **GIVEN** a workflow step with `requires: [specs, tasks]`
 - **AND** `projectArtifacts` reports `specs` with effective status `in-progress`
 - **WHEN** `execute` is called
-- **THEN** `InvalidStateTransitionError` is thrown with reason `incomplete-artifact` and blocking artifact `specs`
+- **THEN** `CheckPredicateFailedError` is thrown for `workflow.requires` with `details.artifactId: 'specs'` and `details.status: 'in-progress'`
 
 #### Scenario: Transition blocked by recursive parent review
 
 - **GIVEN** a workflow step requires artifact `design`
 - **AND** `projectArtifacts` reports `design` as `pending-parent-artifact-review`
-- **AND** the detailed blocker context includes `blockedBy: { artifactId: 'specs', status: 'pending-review' }`
+- **AND** the parent chain makes `specs` the blocking artifact with status `pending-review`
 - **WHEN** `execute` is called
-- **THEN** it throws `InvalidStateTransitionError`
-- **AND** the error reason includes `status: 'pending-parent-artifact-review'`
-- **AND** it includes `blockedBy: { artifactId: 'specs', status: 'pending-review' }`
+- **THEN** it throws `CheckPredicateFailedError` for `workflow.requires`
+- **AND** `details.status` is `pending-parent-artifact-review` and `details.blockedBy` is `{ artifactId: 'specs', status: 'pending-review' }`, computed by the check
 
 #### Scenario: Requires failure matches predicate evaluation
 
 - **GIVEN** matching `workflow.requires` already failed for the attempt
 - **WHEN** `TransitionChange.execute()` runs
-- **THEN** the thrown `incomplete-artifact` reason identifies the same artifact
+- **THEN** the thrown `CheckPredicateFailedError` carries the same `details.artifactId`
 
 ### Requirement: Implementation-only retry from verifying
 
@@ -278,6 +305,13 @@ Scenarios:
 - **WHEN** a backward transition accompanies actual artifact or implementation drift
 - **THEN** reconciliation stales only evidence whose fingerprint changed
 
+#### Scenario: Backward skill hop from a post-verification state invalidates sign-off in the mutation
+
+- **GIVEN** a change in `done`, `signed-off`, or `archivable` with a valid sign-off
+- **WHEN** it transitions to `implementing` or `verifying`
+- **THEN** sign-off is invalidated inside the `ChangeRepository.mutate` callback together with the state change
+- **AND** spec approval is preserved unless its fingerprint changed
+
 ### Requirement: Transition to designing from any state
 
 Scenarios:
@@ -285,7 +319,8 @@ Scenarios:
 #### Scenario: Explicit redesign applies focused policy
 
 - **WHEN** a non-drafting change explicitly transitions to `designing`
-- **THEN** artifact reopening follows the configured artifact policy and required consent is revoked
+- **THEN** artifact reopening follows the configured artifact policy
+- **AND** spec consent is preserved when its artifact fingerprint is unchanged and no explicit consent revocation is requested
 - **AND** unchanged verification is preserved unless its inputs changed
 
 #### Scenario: Designing self-entry remains validity neutral
@@ -307,7 +342,7 @@ Scenarios:
 - **GIVEN** a change in `archiving` state with validated artifacts
 - **WHEN** `TransitionChange.execute` is called with `to: 'designing'`
 - **THEN** the change transitions to `designing`
-- **AND** artifact files are downgraded for review
+- **AND** artifact files are not marked pending review unless real drift or a reconciler verdict requires it
 
 #### Scenario: Recovery does not run archiving.post
 
@@ -403,7 +438,7 @@ Scenarios:
 
 - **WHEN** `TransitionChange.execute` completes successfully
 - **THEN** `ChangeRepository.mutate(input.name, fn)` was called for the final persisted mutation
-- **AND** the callback applied any redesign invalidation, validation clearing, and lifecycle transition on the fresh persisted `Change`
+- **AND** the callback applied any sign-off invalidation for a skill hop and the lifecycle transition on the fresh persisted `Change`, without clearing unchanged artifact validation
 
 ### Requirement: Input contract
 
@@ -577,9 +612,10 @@ Scenarios:
 
 #### Scenario: Failed predicate check throws unified CheckPredicateFailedError
 
-- **GIVEN** an active check returning `outcome: 'fail'` with code `'SPEC_OVERLAP'`
+- **GIVEN** an active check returning `outcome: 'fail'` with code `'SPEC_OVERLAP'` and `action: { kind: '@plugin.fix' }`
 - **WHEN** `TransitionChange.execute` evaluates transition preflight
-- **THEN** it throws `CheckPredicateFailedError` containing the check's `checkId`, `label`, `code`, `message`, `command`, and `skippable`
+- **THEN** it throws `CheckPredicateFailedError` containing the check's `checkId`, `label`, `code`, `message`, `action`, `skippable`, and the attempted `from` / `to`
+- **AND** the error has no `command` property
 - **AND** legacy error classes like `ArchiveImplementationStateError` are not thrown
 
 #### Scenario: Multiple failed checks with collect policy populate details
@@ -591,8 +627,9 @@ Scenarios:
 #### Scenario: Canonical built-in failures map to InvalidStateTransitionError reasons
 
 - **WHEN** `protocol.edge`, `workflow.requires`, `workflow.taskCompletion`, or `approval.spec` fails during `TransitionChange.execute`
-- **THEN** it throws `InvalidStateTransitionError` with reason `invalid-transition`, `incomplete-artifact`, `incomplete-tasks` (or `missing-task-capability`), or `approval-required` respectively
-- **AND** it does not throw `CheckPredicateFailedError` for those checks
+- **THEN** it throws `CheckPredicateFailedError` with the failing check's `checkId`, `code`, `details`, and the attempted `from` / `to`
+- **AND** it does not throw `InvalidStateTransitionError` for those checks
+- **AND** the error class and reason are not chosen by switching on the check id (the use case may key on a check id only to emit `requires-check` / `task-completion-failed` progress events)
 
 #### Scenario: Failed step-skip and plugin checks use CheckPredicateFailedError
 
@@ -623,24 +660,34 @@ Scenarios:
 
 ### Requirement: Historic parked approval repair precedence
 
-#### Scenario: Parked spec approval rejects a non-drain target
+#### Scenario: next from a parked state resolves to the delivery edge
 
-- **GIVEN** a change is in `pending-spec-approval`
+- **GIVEN** a change in `pending-spec-approval` or `pending-signoff` (each case starts from its own parked state)
+- **WHEN** `TransitionChange` is called with `to: 'next'`
+- **THEN** the target resolves to `implementing` or `archivable` respectively
+- **AND** the bound approval check decides whether the hop proceeds
+
+#### Scenario: Parked spec approval rejects a target without a protocol edge
+
+- **GIVEN** a change is in `pending-spec-approval` with a valid spec approval recorded
+- **AND** each request below is made independently, starting from that parked state rather than from the result of the previous request
 - **WHEN** it requests `implementing`
-- **THEN** the transition fails with `approval-required` for the `spec` gate
-- **AND** it does not fail with `invalid-transition`
+- **THEN** the change transitions to `implementing`
+- **AND** requesting `spec-approved` fails with `CheckPredicateFailedError` for `protocol.edge`
 
-#### Scenario: Parked signoff rejects a non-drain target
+#### Scenario: Parked signoff rejects a target without a protocol edge
 
-- **GIVEN** a change is in `pending-signoff`
+- **GIVEN** a change is in `pending-signoff` with a valid sign-off recorded
+- **AND** each request below is made independently, starting from that parked state rather than from the result of the previous request
 - **WHEN** it requests `archivable`
-- **THEN** the transition fails with `approval-required` for the `signoff` gate
+- **THEN** the change transitions to `archivable`
+- **AND** requesting `signed-off` fails with `CheckPredicateFailedError` for `protocol.edge`
 
 ### Requirement: Host-neutral HappyPathNextUnavailableError
 
 #### Scenario: HappyPathNextUnavailableError message omits --next and exposes state
 
-- **GIVEN** a change in a state with no happy-path next hop (such as `archivable` or `pending-spec-approval`)
+- **GIVEN** a change in a state with no happy-path next hop (`archivable` or `archiving`)
 - **WHEN** `TransitionChange` is called with `to: 'next'`
 - **THEN** `HappyPathNextUnavailableError` (`HAPPY_PATH_NEXT_UNAVAILABLE`) is thrown
 - **AND** `error.message` does not contain `--next`

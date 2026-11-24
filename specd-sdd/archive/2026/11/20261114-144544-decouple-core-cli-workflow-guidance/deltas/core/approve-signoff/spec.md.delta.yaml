@@ -1,0 +1,33 @@
+- op: modified
+  description: 'Host-neutral wording (converted from paragraph edits)'
+  selector:
+    type: section
+    matches: 'Purpose'
+  content: |
+    Human signoff MUST record consent on a change that stays in the state where it was requested (`done` when the signoff gate is on, or a legacy parking state of a historic manifest). This use case hashes in-scope artifacts, appends a signoff history event, and MUST NOT transition the change on any path. The gate on leaving the state is enforced by the bound `approval.signoff` check.
+
+- op: modified
+  description: 'Host-neutral wording (converted from paragraph edits)'
+  selector:
+    type: section
+    matches: 'Requirement: Signoff recording and state transition'
+  content: |
+    Sign-off MAY be granted or renewed only while the reconciled change is in a state from which the `approval.signoff` check is bound as a transition source, read from the check registry bindings (`boundFromStates('approval.signoff')`; today `done` and the legacy parking states `pending-signoff` and `signed-off`). The use case MUST NOT hardcode those state names. It additionally requires no unresolved non-task artifact review and, when verification is required for the change (see `core:change` "Verification requirement follows workflow topology"), valid verification evidence. When the change schema disables `verifying`, `ApproveSignoff` SHALL NOT require or fingerprint-compare verification evidence, and any evidence it reads SHALL have no effect on eligibility, and SHALL NOT raise verification eligibility errors. `ApproveSignoff` MUST NOT transition the change in any of those states: a change in a legacy parking state records consent and stays there. Stale or revoked consent is recovered by reconciliation before the request is evaluated, also in a legacy parking state (a stale sign-off returns the change to `done`), so renewal is recorded in the recovered state. A request from any other state fails with `InvalidStateTransitionError` whose `from` is the current state; its `to` names the nominal state the consent applies to and is informational only (it is not derived from the bindings and does not imply a transition).
+
+    On success `ApproveSignoff` SHALL append the `signed-off` audit event and persist a current sign-off projection with status `valid`, actor, reason, timestamp, artifact fingerprint, implementation fingerprint, and both algorithm identifiers. Prior sign-off and invalidation events remain unchanged.
+
+    Actor name and email SHALL continue to be resolved through the existing approval actor decorator and its privacy/fallback rules. One logical sign-off operation MUST resolve exactly one decorated `ActorIdentity` value and reuse it for reconciliation consequences, the materialized projection, and every appended event. Direct-dependency factory forms MUST NOT permit the use case and reconciler to observe different actor resolvers.
+
+    If required sign-off is stale while the change is beyond `done`, reconciliation SHALL first return it to `done`. If verification is required and stale, verification recovery must complete before sign-off can be renewed.
+
+    When verification is required, eligibility failures SHALL remain semantically distinct: never-completed evidence raises the typed not-found error; an active attempt without completion raises the typed in-progress error; stale or legacy-unknown evidence raises `VerificationStaleError`, whose `message` describes the stale evidence in host-neutral terms (no CLI command or slash command) and which exposes the change name as the structured `changeName` property so delivery hosts can render the recovery (re-run verification) in their own syntax; and a current record that does not match a supplied expected fingerprint raises fingerprint mismatch. Stale evidence MUST NOT be reported as `VerificationNotFoundError`.
+
+- op: modified
+  description: 'Host-neutral wording (converted from paragraph edits)'
+  selector:
+    type: section
+    matches: 'Requirement: Persistence and return value'
+  content: |
+    After the disabled-gate fast failure and implementation-tracking refresh, `ApproveSignoff` SHALL run reconciliation, fingerprinting, and sign-off through one serialized repository mutation. The valid sign-off MUST refer to the same fresh artifact and implementation snapshot that passed eligibility checks.
+
+    If reconciliation makes sign-off inapplicable, it persists any invalidity and recovery, records no sign-off, and then throws `InvalidStateTransitionError` whose `from` is the reconciled state (its `to` is the informational nominal state `done`); it does not throw `ReconciledOperationBlockedError`. A change in a legacy parking state is never moved by this use case. The result is the post-mutation reconciled `Change`.

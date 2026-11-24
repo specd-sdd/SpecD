@@ -187,7 +187,7 @@ describe('EditChange', () => {
       expect(result.invalidated).toBe(false)
     })
 
-    it('seeds newly added specs from persisted dependencies before metadata fallback', async () => {
+    it('seeds newly added specs from persisted dependencies, ignoring metadata.json', async () => {
       const change = makeChange('c', { specIds: ['default:auth/login'] })
       const repo = makeChangeRepository([change])
       const specs = new Map([
@@ -220,7 +220,7 @@ describe('EditChange', () => {
       ])
     })
 
-    it('seeds newly added specs from stale metadata when persisted dependencies are absent', async () => {
+    it('seeds newly added specs from the persisted spec-lock state of a spec that also has content files', async () => {
       const change = makeChange('c', { specIds: ['default:auth/login'] })
       const repo = makeChangeRepository([change])
       const specs = new Map([
@@ -250,6 +250,75 @@ describe('EditChange', () => {
 
       expect(result.change.specDependsOn.get('default:auth/logout')).toEqual([
         'default:shared/metadata',
+      ])
+    })
+
+    it('seeds an empty list when the added spec has no persisted state, ignoring metadata.json', async () => {
+      const change = makeChange('c', { specIds: ['default:auth/login'] })
+      const repo = makeChangeRepository([change])
+      const specs = new Map([
+        [
+          'default',
+          makeSpecRepository({
+            specs: [
+              makeSpec({ workspace: 'default', name: 'auth/logout', filenames: ['spec.md'] }),
+            ],
+            artifacts: {
+              'auth/logout/spec.md': '# Logout flow',
+              'auth/logout/metadata.json': JSON.stringify({
+                dependsOn: ['default:shared/metadata'],
+              }),
+            },
+          }),
+        ],
+      ])
+      const uc = createEditChange(repo, specs)
+
+      const result = await uc.execute({ name: 'c', addSpecIds: ['default:auth/logout'] })
+
+      expect(result.change.specDependsOn.get('default:auth/logout')).toEqual([])
+    })
+
+    it('seeds an empty list when the added spec does not exist in its repository', async () => {
+      const change = makeChange('c', { specIds: ['default:auth/login'] })
+      const repo = makeChangeRepository([change])
+      const uc = createEditChange(repo)
+
+      const result = await uc.execute({ name: 'c', addSpecIds: ['default:auth/brand-new'] })
+
+      expect(result.change.specDependsOn.get('default:auth/brand-new')).toEqual([])
+    })
+  })
+
+  describe('existing specDependsOn snapshot', () => {
+    it('does not overwrite an already seeded specDependsOn entry when the spec is added', async () => {
+      const change = makeChange('c', {
+        specIds: ['default:auth/login'],
+        specDependsOn: new Map([['default:auth/logout', ['default:shared/existing']]]),
+      })
+      const repo = makeChangeRepository([change])
+      const specs = new Map([
+        [
+          'default',
+          makeSpecRepository({
+            specs: [makeSpec({ workspace: 'default', name: 'auth/logout', filenames: [] })],
+            artifacts: {
+              'auth/logout/spec-lock.json': JSON.stringify({
+                schema: { name: 'test-schema', version: 1 },
+                dependsOn: ['default:shared/persisted'],
+                implementation: [],
+              }),
+            },
+          }),
+        ],
+      ])
+      const uc = createEditChange(repo, specs)
+
+      const result = await uc.execute({ name: 'c', addSpecIds: ['default:auth/logout'] })
+
+      expect(result.change.specIds).toContain('default:auth/logout')
+      expect(result.change.specDependsOn.get('default:auth/logout')).toEqual([
+        'default:shared/existing',
       ])
     })
   })
@@ -485,6 +554,33 @@ describe('EditChange', () => {
         artifacts: 'downstream',
         workflow: 'preserve',
       })
+    })
+
+    it('reports stale spec consent in ready without an automatic return', async () => {
+      const change = makeChange('in-ready', { specIds: ['default:auth/login'] })
+      change.transition('designing', testActor)
+      change.transition('ready', testActor)
+      change.recordSpecApproval(
+        'LGTM',
+        {
+          version: 1,
+          specIds: ['default:auth/login'],
+          artifacts: { version: 1, algorithm: 'artifact-pre-hash-v1', files: {} },
+        },
+        testActor,
+      )
+      const { uc } = buildReconciledEdit(change)
+
+      const result = await uc.execute({ name: 'in-ready', addSpecIds: ['auth/logout'] })
+
+      expect(result.scopeChanged).toBe(true)
+      expect(result.validityChanged).toBe(true)
+      expect(result.projectionChanges).toEqual([
+        expect.objectContaining({ projection: 'specApproval', from: 'valid', to: 'stale' }),
+      ])
+      expect(result.change.specApproval?.status).toBe('stale')
+      expect(result.automaticReturn).toBeNull()
+      expect(result.change.state).toBe('ready')
     })
 
     it('treats scope reordering as a scope edit without invalidating consent', async () => {

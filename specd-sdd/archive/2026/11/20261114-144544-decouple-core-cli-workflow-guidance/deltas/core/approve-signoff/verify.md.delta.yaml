@@ -1,0 +1,68 @@
+- op: modified
+  description: 'Legacy parking state records consent and stays'
+  selector:
+    type: section
+    matches: 'Scenario: Enabled gate allows execute with name and reason'
+  content: |
+    - **GIVEN** `ApproveSignoff` is constructed with `approvals.signoff: true`
+    - **GIVEN** the change is in `pending-signoff` state
+    - **WHEN** `execute({ name, reason })` is called
+    - **THEN** a valid signoff is recorded
+    - **AND** the change remains in `pending-signoff`
+
+- op: added
+  description: 'Eligible states are read from the approval.signoff bindings'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Signoff recording and state transition'
+  content: |
+    #### Scenario: Eligible states come from the check bindings
+
+    - **GIVEN** `approval.signoff` is bound as a transition source from `done`, `pending-signoff`, and `signed-off`
+    - **WHEN** `ApproveSignoff` decides whether the current state accepts consent
+    - **THEN** the decision uses the binding `from` states of `approval.signoff`
+    - **AND** a change in any other state fails with `InvalidStateTransitionError`
+
+    #### Scenario: Consent in a parking state never transitions
+
+    - **GIVEN** a historic change in `signed-off` with no recorded sign-off and valid verification
+    - **WHEN** sign-off is recorded
+    - **THEN** the sign-off is recorded
+    - **AND** no `transitioned` event is appended and the state is still `signed-off`
+
+    #### Scenario: Stale consent in a parking state is recovered before it is renewed
+
+    - **GIVEN** a historic change in `signed-off` with a stale sign-off
+    - **WHEN** `ApproveSignoff` runs
+    - **THEN** the reconciler first commits the return to `done`
+    - **AND** the renewed sign-off is recorded in `done`
+
+- op: added
+  description: 'VerificationStaleError is host-neutral and exposes the change name'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Signoff recording and state transition'
+    after:
+      type: section
+      matches: 'Scenario: Verification evidence errors remain distinct'
+  content: |
+    #### Scenario: Stale verification error carries no command and exposes changeName
+
+    - **GIVEN** a change in `done` whose completed verification is stale
+    - **WHEN** `execute({ name: 'checkout-retry', reason })` is called
+    - **THEN** it throws `VerificationStaleError` with code `VERIFICATION_STALE` and `changeName` equal to `checkout-retry`
+    - **AND** its `message` contains no CLI command, flag, or slash command (no `specd`, `--`, or `/specd-`)
+
+- op: modified
+  description: 'Stale verification: error carries only changeName; hosts render the recommendation'
+  selector:
+    type: section
+    matches: 'Scenario: Signoff requires current completed verification'
+  content: |
+    - **GIVEN** the change is `done` but completed verification is stale
+    - **WHEN** signoff is requested
+    - **THEN** no signoff is recorded and `VerificationStaleError` is thrown
+    - **AND** the error carries only structured data (`changeName`), not a recommended action or command
+    - **AND** the delivery layer renders the in-place verification renewal recommendation from that data in its own syntax

@@ -38,6 +38,18 @@
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message
 
+#### Scenario: Drafted JSON blockers use the CLI projection
+
+- **GIVEN** a drafted change whose `GetStatus` result has a blocker with `isSkippable: true` and `checkId`
+- **WHEN** status is rendered in JSON or TOON
+- **THEN** the blocker carries `label`, `checkId`, and `bypassFlag` and no raw `isSkippable`
+
+#### Scenario: Drafted artifacts never render undefined status
+
+- **GIVEN** a drafted change whose artifact rows have no `displayStatus`
+- **WHEN** status is rendered in JSON or TOON
+- **THEN** each artifact status falls back to `effectiveStatus`, then to the persisted state, and is never `undefined`
+
 ### Requirement: Output format
 
 #### Scenario: Text output shows artifact and file state
@@ -91,6 +103,12 @@
 - **WHEN** `specd change status <name> --format json` is run
 - **THEN** the `state` field in `artifactDag` is reported as `complete-with-drift`
 - **AND** agents can detect drift without manually comparing hashes
+
+#### Scenario: Help schema lists every emitted field
+
+- **WHEN** `specd change status --help` is rendered
+- **THEN** the JSON schema describes `validity`, `verification`, `invalidation`, `implementationTracking`, `approvalGates`, `lifecycle.checks`, `lifecycle.checksByTarget`, and the artifact and file `displayStatus` and file `hasDrift` fields
+- **AND** every field it lists carries a description
 
 ### Requirement: Task completion display in DAG
 
@@ -241,10 +259,19 @@
 
 #### Scenario: Skippable overlap blocker shows the canonical bypass
 
-- **GIVEN** a change in `archivable` blocked by `spec.overlap` with a skippable binding
+- **GIVEN** a change in `archivable` whose only blocker is `spec.overlap` with `isSkippable: true` and `checkId: 'spec.overlap'`
 - **WHEN** the user runs `specd changes status my-change`
 - **THEN** the blocker renders a `    bypass: --skip-checks spec.overlap` line under the blocker in text mode
-- **AND** the next-action reason ends with `Use --skip-checks spec.overlap to archive anyway.` unless the message already contains the flag
+- **AND** Core's `nextAction.reason` carries no flag
+- **AND** the CLI-projected next-action reason ends with `Use --skip-checks spec.overlap to archive anyway.`
+
+#### Scenario: Overlap suffix is absent while another blocker drives the next action
+
+- **GIVEN** a change in `archivable` with stale verification and a skippable live `spec.overlap` blocker
+- **AND** Core's `nextAction.intent` is `'verify'`
+- **WHEN** the user runs `specd changes status my-change`
+- **THEN** the blocker still renders its `bypass: --skip-checks spec.overlap` line
+- **AND** the displayed next-action reason does not end with `to archive anyway.`
 
 #### Scenario: The shown flag is accepted by changes archive
 
@@ -265,24 +292,24 @@
 - **THEN** no bypass flag is shown
 - **AND** the next-action reason does not suggest one
 
-#### Scenario: The CLI never builds a bypass locally
+#### Scenario: The CLI never invents a bypass when isSkippable is false
 
-- **GIVEN** `GetStatus` supplies no `bypassFlag` for a blocker
+- **GIVEN** `GetStatus` returns a blocker with `isSkippable: false`
 - **WHEN** the CLI renders it
-- **THEN** it does not add a flag
+- **THEN** it does not add a `--skip-checks` flag
 
 #### Scenario: Several archive blockers each carry their own flag
 
-- **GIVEN** a change blocked by both `spec.overlap` and `impl.linksInScope`, both skippable
+- **GIVEN** a change blocked by both `spec.overlap` and `impl.linksInScope`, both with `isSkippable: true`
 - **WHEN** the user runs `specd changes status my-change`
 - **THEN** each blocker shows its own `--skip-checks <checkId>` flag
 
 #### Scenario: Plugin archive check follows its resolved skippability
 
 - **GIVEN** `@security.code-scan` fails on archive
-- **WHEN** its resolved binding is skippable
+- **WHEN** its resolved binding has `isSkippable: true`
 - **THEN** the blocker shows `--skip-checks @security.code-scan`
-- **AND** when it is not skippable no flag is shown
+- **AND** when `isSkippable` is `false` no flag is shown
 
 #### Scenario: Structured output includes the same hints
 
@@ -300,6 +327,42 @@
 - **GIVEN** `workspace.readOnly` and `spec.overlap` both fail
 - **WHEN** status is rendered
 - **THEN** only the `spec.overlap` blocker shows a bypass flag
+
+#### Scenario: Gate action is rendered as a command
+
+- **GIVEN** `GetStatus` returns `nextAction` with `intent: null` and `action: { kind: 'approve-spec' }`
+- **WHEN** the user runs `specd changes status my-change`
+- **THEN** the next action command is `specd changes approve spec`
+
+#### Scenario: Unknown plugin action renders guidance without a command
+
+- **GIVEN** `GetStatus` returns `nextAction` with `intent: null` and `action: { kind: '@security.code-scan', guidance: 'Run the security scan' }`
+- **WHEN** status is rendered in text, JSON, and TOON
+- **THEN** `nextAction.command` is `null` and `nextAction.guidance` is `Run the security scan`
+- **AND** the text output shows the guidance line without a command
+
+#### Scenario: Intent wins over an informational action
+
+- **GIVEN** `nextAction` has `intent: 'verify'` and `action: { kind: 'start-verification', params: { changeName: 'my-change' } }`
+- **WHEN** status is rendered
+- **THEN** the next action command is `/specd-verify`
+
+#### Scenario: Structured output exposes intent and action additively
+
+- **WHEN** the user runs `specd changes status my-change --format json` or `toon` on an active change
+- **THEN** `nextAction` carries `command`, `intent`, and `action`, and blockers carry `bypassFlag` and `action` when present
+
+#### Scenario: Drafted status does not leak intent or action
+
+- **GIVEN** a change that exists only under `drafts/`
+- **WHEN** status is rendered in JSON or TOON
+- **THEN** `nextAction.command` is `null` and no `intent` or `action` field is present
+
+#### Scenario: Unknown plugin action falls back to guidance
+
+- **GIVEN** `nextAction.action` is `{ kind: '@audit.fix', guidance: 'Run the audit fixer' }`
+- **WHEN** status is rendered
+- **THEN** the CLI shows the guidance and invents no command
 
 ### Requirement: Schema version warning
 

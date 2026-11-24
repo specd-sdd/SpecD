@@ -2,6 +2,7 @@ import { type Change } from '../entities/change.js'
 import { type ChangeValidityVerdict } from '../services/change-validity.js'
 import {
   CHECK_LABELS,
+  approveSpecAction,
   fail,
   pass,
   skip,
@@ -22,7 +23,7 @@ export interface ApprovalSpecFacts {
  * are registry bindings, not this runner.
  *
  * @param facts - Gate flag and recorded spec approval
- * @returns Skip, pass, or `APPROVAL_REQUIRED`
+ * @returns Skip, pass, or a failure with `APPROVAL_REQUIRED`, `APPROVAL_STALE`, or `APPROVAL_REVOKED`
  */
 export function run(facts: ApprovalSpecFacts): CheckResult {
   if (!facts.specGateEnabled) {
@@ -36,13 +37,25 @@ export function run(facts: ApprovalSpecFacts): CheckResult {
     return pass('approval.spec')
   }
   if (status === 'stale' || status === 'revoked') {
-    return fail('approval.spec', 'APPROVAL_STALE', 'Spec approval is stale', { gate: 'spec' })
+    const revoked = status === 'revoked'
+    return fail(
+      'approval.spec',
+      revoked ? 'APPROVAL_REVOKED' : 'APPROVAL_STALE',
+      revoked ? 'Spec approval is revoked' : 'Spec approval is stale',
+      { gate: 'spec' },
+      undefined,
+      undefined,
+      approveSpecAction(),
+    )
   }
   return fail(
     'approval.spec',
     'APPROVAL_REQUIRED',
     'Spec approval is required before leaving ready',
     { gate: 'spec' },
+    undefined,
+    undefined,
+    approveSpecAction(),
   )
 }
 

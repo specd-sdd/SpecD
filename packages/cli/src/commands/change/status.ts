@@ -11,6 +11,37 @@ import {
 } from './_validity-present.js'
 import { enrichImplementationTracking } from './_implementation-tracking.js'
 import { resolveChangeSchemaForCli } from '../../helpers/change-schema.js'
+import {
+  blockerTextLines,
+  projectCliBlocker,
+  projectCliNextAction,
+  projectCliNextActionRecord,
+} from '../../guidance-presenter.js'
+
+/**
+ * Projects artifact rows for structured output, with the display-status fallback shared by
+ * active and drafted status (`displayStatus`, then `effectiveStatus`, then the persisted state).
+ *
+ * @param artifactStatuses - Artifact rows from `GetStatus`
+ * @returns Structured artifact rows
+ */
+function projectArtifactStatuses(artifactStatuses: ArtifactStatusEntry[]): unknown[] {
+  return artifactStatuses.map((a) => ({
+    type: a.type,
+    state: a.state,
+    displayStatus: a.displayStatus ?? a.effectiveStatus ?? a.state,
+    effectiveStatus: a.effectiveStatus,
+    ...(a.taskCompletion !== undefined ? { taskCompletion: a.taskCompletion } : {}),
+    files: a.files.map((file) => ({
+      key: file.key,
+      filename: file.filename,
+      state: file.state,
+      displayStatus: file.displayStatus ?? file.state,
+      hasDrift: file.hasDrift,
+      ...(file.validatedHash !== undefined ? { validatedHash: file.validatedHash } : {}),
+    })),
+  }))
+}
 
 /** Schema metadata attached to lifecycle evaluation. */
 type LifecycleSchemaInfo = NonNullable<
@@ -91,42 +122,155 @@ export function registerChangeStatus(parent: Command): void {
     .addHelpText(
       'after',
       `
-JSON/TOON output schema:
+JSON/TOON output schema (every field is described inline after //):
   {
-    name: string
-    state: string
-    isDrafted?: boolean
-    specIds: string[]
-    schema: { name: string, version: number, artifactDag: Array<{ id: string, scope: string, requires: string[], children: string[] }> }
-    description?: string
-    schemaWarnings: Array<{ code: 'SCHEMA_VERSION_DRIFT', changeName: string, schemaName: string, recordedVersion: number, resolvedVersion: number, message: string }>
-    blockers: Array<{ code: string, message: string, label?: string, checkId?: string, details?: Record<string, unknown> }>
-    nextAction: { targetStep: string, actionType: string, reason: string, command: string | null }
-    specDependsOn: Record<string, string[]>
-    availableTransitions: string[]  // legacy top-level; active changes use lifecycle.availableTransitions
-    availableSteps: Array<{ step: string, optional: boolean, available: boolean, isReady: boolean, isPermitted: boolean }>  // legacy top-level; active changes use lifecycle.availableSteps
-    lifecycle?: {
-      availableTransitions: string[]  // check-derived hops for active (non-drafted) changes
-      availableSteps: Array<{ step: string, optional: boolean, available: boolean, isReady: boolean, isPermitted: boolean }>
+    name: string  // change name
+    state: string  // current lifecycle state (for drafted changes, the state the draft is in)
+    isDrafted?: boolean  // true only for drafted changes
+    specIds: string[]  // spec IDs the change targets
+    schema: {  // schema snapshot used to render the change
+      name: string  // schema name
+      version: number  // schema version
+      artifactDag: Array<{  // active changes only; omitted for drafted changes
+        id: string  // artifact type id
+        scope: string  // artifact scope (spec or change)
+        optional: boolean  // whether the artifact may be skipped
+        requires: string[]  // ids of artifacts this one depends on
+        hasTasks: boolean  // whether the artifact carries a task checklist
+        output: string  // output path pattern of the artifact
+        children: string[]  // ids of artifacts that depend on this one
+      }>
     }
-    artifactDag: Array<{ id: string, scope: string, state: string, requires: string[], children: string[], hasTasks?: boolean }>
-    artifacts: Array<{
-      type: string
-      state: string
-      effectiveStatus: string
-      displayStatus?: string
-      taskCompletion?: { complete: number, incomplete: number, total: number }
-      files: Array<{ key: string, filename: string, state: string, validatedHash?: string }>
+    description?: string  // change description, when set
+    invalidation?: {  // effective invalidation policy (active changes)
+      artifacts: string  // artifact invalidation policy
+      workflow: string  // workflow invalidation policy
+    }
+    validity?: object  // validity projection: spec/signoff consent validity, drift and projection changes (active changes)
+    verification?: object  // verification evidence summary: id, status, fingerprint, validity (active changes)
+    schemaWarnings: Array<{  // schema resolution advisories
+      code: 'SCHEMA_VERSION_DRIFT'  // advisory code
+      changeName: string  // change the advisory applies to
+      schemaName: string  // schema the advisory applies to
+      recordedVersion: number  // schema version recorded on the change
+      resolvedVersion: number  // schema version resolved now
+      message: string  // human-readable advisory
     }>
-    review: {
-      required: boolean
-      route: string | null
-      reason: string | null
-      message?: string
-      overlapDetail: Array<{ archivedChangeName: string, overlappingSpecIds: string[] }>
-      affectedArtifacts: Array<{
-        type: string
-        files: Array<{ key: string, filename: string, path: string }>
+    blockers: Array<{  // conditions currently blocking forward progress
+      code: string  // stable blocker code
+      message: string  // human-readable explanation
+      label?: string  // short check label
+      checkId?: string  // id of the check that produced the blocker
+      action?: { kind: string, params?: object }  // structured recovery action, when core provides one
+      bypassFlag?: string  // CLI flag that bypasses the blocker, when it is skippable
+      details?: Record<string, unknown>  // blocker-specific structured details
+    }>
+    nextAction: {  // recommended next step
+      targetStep: string  // lifecycle step the action moves toward
+      actionType: string  // kind of action (cognitive or mechanical)
+      reason: string  // why this action is recommended
+      intent: 'design'|'implement'|'verify'|'archive'|null  // workflow intent, or null when none applies
+      action?: { kind: string, params?: object }  // structured action, when core provides one
+      command: string | null  // command or skill to run, or null when only guidance applies
+      guidance?: string  // advice shown when command is null
+    }
+    checks?: Array<object>  // drafted changes only: lifecycle check rows, when emitted by core
+    checksByTarget?: Record<string, Array<object>>  // drafted changes only: check rows grouped by transition target, when emitted by core
+    specDependsOn: Record<string, string[]>  // per spec ID, the spec IDs it depends on
+    availableTransitions: string[]  // legacy top-level copy kept for compatibility; active changes should read lifecycle.availableTransitions
+    availableSteps: Array<{  // legacy top-level copy kept for compatibility; active changes should read lifecycle.availableSteps
+      step: string  // step name
+      optional: boolean  // whether the step may be skipped
+      available: boolean  // whether the step can be entered now
+      isReady: boolean  // whether the step prerequisites are met
+      isPermitted: boolean  // whether the schema workflow permits the step
+    }>
+    lifecycle?: {  // active (non-drafted) changes only
+      validTransitions: string[]  // protocol-legal hops
+      availableTransitions: string[]  // check-derived hops
+      availableSteps: Array<{  // per-step availability
+        step: string  // step name
+        optional?: boolean  // whether the step may be skipped
+        available: boolean  // whether the step can be entered now
+        isReady: boolean  // whether the step prerequisites are met
+        isPermitted: boolean  // whether the schema workflow permits the step
+        blockingArtifacts: string[]  // artifacts that must complete first
+      }>
+      blockers: Array<{  // per-transition blockers
+        transition: string  // transition the blocker applies to
+        reason: string  // why the transition is blocked
+        blocking: string[]  // artifacts or checks causing the block
+      }>
+      approvals: {  // approval gate status
+        spec: boolean  // spec approval recorded
+        signoff: boolean  // signoff approval recorded
+      }
+      nextArtifact: string | null  // next artifact to work on, or null
+      changePath: string  // path to the change directory
+      schemaInfo: { name: string, version: number } | null  // schema snapshot, or null when unavailable
+      checks?: Array<object>  // lifecycle check rows evaluated for the change, when emitted by core
+      checksByTarget?: Record<string, Array<object>>  // lifecycle check rows grouped by transition target, when emitted by core
+    }
+    implementationTracking?: {  // only with --implementation
+      trackedFiles: Array<{  // implementation files tracked for the change
+        file: string  // file path
+        state: 'open'|'resolved'|'ignored'  // tracking state
+      }>
+      links: Array<{  // links between specs and implementation files
+        specId: string  // linked spec ID
+        file: string  // linked file path
+        symbols?: string[]  // linked symbols, when recorded
+      }>
+      graphHealth: object  // code graph health summary
+      graphHint: { message: string }  // hint about graph freshness
+    }
+    approvalGates: {  // whether the approval gates are enabled
+      specEnabled: boolean  // spec approval gate enabled
+      signoffEnabled: boolean  // signoff approval gate enabled
+    }
+    artifactDag: Array<{  // DAG with per-artifact state
+      id: string  // artifact type id
+      scope: string  // artifact scope
+      state: string  // artifact state
+      requires: string[]  // ids of artifacts this one depends on
+      children: string[]  // ids of artifacts that depend on this one
+      hasTasks?: boolean  // whether the artifact carries a task checklist
+    }>
+    artifacts: Array<{  // artifact rows
+      type: string  // artifact type id
+      state: string  // persisted artifact state
+      effectiveStatus: string  // status after drift and dependency evaluation
+      displayStatus: string  // user-facing artifact status (falls back to effectiveStatus, then state)
+      taskCompletion?: {  // task progress, when the artifact has tasks
+        complete: number  // completed tasks
+        incomplete: number  // open tasks
+        total: number  // all tasks
+      }
+      files: Array<{  // files of the artifact
+        key: string  // file key
+        filename: string  // file name
+        state: string  // persisted file state
+        displayStatus: string  // user-facing file status
+        hasDrift: boolean  // true when the file drifted from its validated hash
+        validatedHash?: string  // hash recorded at validation
+      }>
+    }>
+    review: {  // review requirement
+      required: boolean  // whether review is required
+      route: string | null  // lifecycle route to review, or null
+      reason: string | null  // why review is required, or null
+      message?: string  // additional message
+      overlapDetail: Array<{  // archived changes overlapping this one
+        archivedChangeName: string  // overlapping archived change
+        overlappingSpecIds: string[]  // spec IDs in the overlap
+      }>
+      affectedArtifacts: Array<{  // artifacts affected by the overlap
+        type: string  // artifact type id
+        files: Array<{  // affected files
+          key: string  // file key
+          filename: string  // file name
+          path: string  // file path
+        }>
       }>
     }
   }
@@ -144,7 +288,12 @@ JSON/TOON output schema:
           if (statusResult.draftView !== undefined) {
             const draftView = statusResult.draftView
             const { artifactStatuses, lifecycle, specDependsOn } = statusResult
-            const nextAction = { ...statusResult.nextAction, command: null }
+            const nextAction = {
+              targetStep: statusResult.nextAction.targetStep,
+              actionType: statusResult.nextAction.actionType,
+              reason: statusResult.nextAction.reason,
+              command: null,
+            }
             const fmt = parseFormat(opts.format)
             if (fmt === 'text') {
               const lines = [
@@ -159,7 +308,7 @@ JSON/TOON output schema:
               }
               if (statusResult.blockers.length > 0) {
                 lines.push('', 'blockers:')
-                for (const b of statusResult.blockers) lines.push(`  ! ${b.code}: ${b.message}`)
+                for (const b of statusResult.blockers) lines.push(...blockerTextLines(b))
               }
               if (statusResult.schemaWarnings.length > 0) {
                 lines.push('', 'warnings:')
@@ -189,12 +338,12 @@ JSON/TOON output schema:
                   schema: { name: draftView.schemaName, version: draftView.schemaVersion },
                   specDependsOn,
                   schemaWarnings: statusResult.schemaWarnings,
-                  blockers: statusResult.blockers,
+                  blockers: statusResult.blockers.map(projectCliBlocker),
                   availableTransitions: [],
                   availableSteps: [],
                   ...optionalCheckFields(lifecycle),
                   nextAction,
-                  artifacts: artifactStatuses,
+                  artifacts: projectArtifactStatuses(artifactStatuses),
                 },
                 fmt,
               )
@@ -209,7 +358,7 @@ JSON/TOON output schema:
             : undefined
 
           const fmt = parseFormat(opts.format)
-          const validity = publicValidity((statusResult as { validity?: unknown }).validity)
+          const validity = publicValidity(statusResult.validity)
           const evidence = publicVerificationEvidence(change)
           const invalidation = readStructuredPolicy(change)
 
@@ -261,17 +410,7 @@ JSON/TOON output schema:
             // Blockers Section
             if (textBlockers.length > 0) {
               lines.push('blockers:')
-              for (const b of textBlockers) {
-                lines.push(
-                  b.label !== undefined
-                    ? `  ! ${b.code} — ${b.label}: ${b.message}`
-                    : `  ! ${b.code}: ${b.message}`,
-                )
-                // Rendered exactly as GetStatus projected it; the CLI never builds a bypass.
-                if (b.bypassFlag !== undefined) {
-                  lines.push(`    bypass: ${b.bypassFlag}`)
-                }
-              }
+              for (const b of textBlockers) lines.push(...blockerTextLines(b))
               lines.push('')
             }
 
@@ -296,11 +435,19 @@ JSON/TOON output schema:
               lines.push('')
             }
 
+            const projectedNextAction = projectCliNextAction(nextAction, blockers)
+
             // Next Action Section
             lines.push('next action:')
-            lines.push(`  target:  ${nextAction.targetStep}`)
-            lines.push(`  command: ${nextAction.command ?? '(none)'}`)
-            lines.push(`  reason:  ${nextAction.reason}`)
+            lines.push(`  target:  ${projectedNextAction.targetStep}`)
+            lines.push(`  command: ${projectedNextAction.command ?? '(none)'}`)
+            if (
+              projectedNextAction.command === null &&
+              projectedNextAction.guidance !== undefined
+            ) {
+              lines.push(`  guidance: ${projectedNextAction.guidance}`)
+            }
+            lines.push(`  reason:  ${projectedNextAction.reason}`)
             lines.push('')
 
             // Lifecycle Section
@@ -446,20 +593,8 @@ JSON/TOON output schema:
                 ...(validity !== undefined ? { validity } : {}),
                 ...(evidence !== undefined ? { verification: evidence } : {}),
                 schemaWarnings: statusResult.schemaWarnings,
-                blockers: blockers.map((b) => ({
-                  code: b.code,
-                  message: b.message,
-                  ...(b.details !== undefined ? { details: b.details } : {}),
-                  ...(b.label !== undefined ? { label: b.label } : {}),
-                  ...(b.checkId !== undefined ? { checkId: b.checkId } : {}),
-                  ...(b.bypassFlag !== undefined ? { bypassFlag: b.bypassFlag } : {}),
-                })),
-                nextAction: {
-                  targetStep: nextAction.targetStep,
-                  actionType: nextAction.actionType,
-                  reason: nextAction.reason,
-                  command: nextAction.command,
-                },
+                blockers: blockers.map(projectCliBlocker),
+                nextAction: projectCliNextActionRecord(nextAction, blockers),
                 specDependsOn: statusResult.specDependsOn,
                 artifactDag:
                   statusDag === null
@@ -481,23 +616,7 @@ JSON/TOON output schema:
                           }
                         })
                         .filter((entry): entry is NonNullable<typeof entry> => entry !== null),
-                artifacts: artifactStatuses.map((a) => ({
-                  type: a.type,
-                  state: a.state,
-                  displayStatus: a.displayStatus ?? a.effectiveStatus ?? a.state,
-                  effectiveStatus: a.effectiveStatus,
-                  ...(a.taskCompletion !== undefined ? { taskCompletion: a.taskCompletion } : {}),
-                  files: a.files.map((file) => ({
-                    key: file.key,
-                    filename: file.filename,
-                    state: file.state,
-                    displayStatus: file.displayStatus ?? file.state,
-                    hasDrift: file.hasDrift,
-                    ...(file.validatedHash !== undefined
-                      ? { validatedHash: file.validatedHash }
-                      : {}),
-                  })),
-                })),
+                artifacts: projectArtifactStatuses(artifactStatuses),
                 review: {
                   required: review?.required ?? false,
                   route: review?.route ?? null,

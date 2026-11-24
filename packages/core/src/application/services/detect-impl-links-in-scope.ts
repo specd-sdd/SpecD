@@ -49,6 +49,6 @@ export function detectImplLinksInScope(change: Change): ImplLinksInScopeDetectio
   return {
     blocked: true,
     outOfScopeSpecIds,
-    message: `Implementation sidecar updates would touch ${String(count)} ${noun} outside the change "${change.name}" scope (${list}). Re-run with allowOutOfScope if intentional.`,
+    message: `Implementation sidecar updates would touch ${String(count)} ${noun} outside the change "${change.name}" scope (${list}).`,
   }
 }

@@ -6,6 +6,7 @@ import { ResolveChangeSchema } from '../services/resolve-change-schema.js'
 import { ApprovalGateDisabledError } from '../errors/approval-gate-disabled-error.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { FingerprintInputError } from '../errors/fingerprint-input-error.js'
+import { boundFromStates } from '../../domain/services/check-bindings.js'
 import { InvalidStateTransitionError } from '../../domain/errors/invalid-state-transition-error.js'
 import { type ChangeValidityVerdict } from '../../domain/services/change-validity.js'
 import { type Schema } from '../../domain/value-objects/schema.js'
@@ -22,10 +23,8 @@ export interface ApproveSpecInput {
 }
 
 /**
- * Records spec-gate consent only while the reconciled change is `ready`.
- *
- * Historic `pending-spec-approval` manifests still drain to `spec-approved`.
- * New work does not enter that state, and this use case does not invent it.
+ * Records spec-gate consent for changes in a state bound by `approval.spec`
+ * (such as `ready`, or legacy parking states). Never transitions lifecycle state.
  */
 export class ApproveSpec {
   private readonly _changes: ChangeRepository
@@ -72,6 +71,8 @@ export class ApproveSpec {
    * @returns The updated change
    * @throws {ApprovalGateDisabledError} If the spec approval gate is not enabled
    * @throws {ChangeNotFoundError} If no change with the given name exists
+   * @throws {SchemaNotFoundError} If the change's schema cannot be resolved by the provider
+   * @throws {SchemaProviderIdentityMismatchError} If the provider returns a differently named schema
    * @throws {InvalidStateTransitionError} If the reconciled change cannot accept spec consent
    * @throws {FingerprintInputError} If a required artifact fingerprint cannot be collected
    */
@@ -94,7 +95,7 @@ export class ApproveSpec {
     const actor = await this._actor.identity()
     const mutation = await this._reconcile.mutate({ name: input.name, actor }, async (ctx) => {
       const state = ctx.change.state
-      if (state !== 'ready' && state !== 'pending-spec-approval') {
+      if (!boundFromStates('approval.spec').includes(state)) {
         return { outcome: 'state' as const, state }
       }
       const collected = await this._fingerprint.specApprovalFingerprint(ctx.change)
@@ -106,9 +107,6 @@ export class ApproveSpec {
         return { outcome: 'ineligible' as const, state, artifactId }
       }
       ctx.change.recordSpecApproval(input.reason, collected.fingerprint, actor)
-      if (ctx.change.state === 'pending-spec-approval') {
-        ctx.change.transition('spec-approved', actor)
-      }
       return { outcome: 'ok' as const }
     })
 

@@ -59,6 +59,7 @@ class ImplLinksInScopeCheck extends WorkflowCheck {
     return Promise.resolve(
       runImplLinksInScope({
         linksInScopeBlocked: detection.blocked,
+        outOfScopeSpecIds: detection.outOfScopeSpecIds,
         ...(detection.message !== undefined ? { linksInScopeMessage: detection.message } : {}),
       }),
     )

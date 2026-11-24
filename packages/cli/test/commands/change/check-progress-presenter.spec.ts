@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { type CheckProgressEvent } from '@specd/sdk'
 import { createCheckProgressPresenter } from '../../../src/commands/change/_check-progress-presenter.js'
 
-function collect(options: { skipChecks?: ReadonlySet<string>; skipHooks?: boolean } = {}) {
+function collect(
+  options: { skipChecks?: ReadonlySet<string>; skipHooks?: boolean | ReadonlySet<string> } = {},
+) {
   const chunks: string[] = []
   const stream = { write: (text: string) => chunks.push(text) } as unknown as NodeJS.WriteStream
   const presenter = createCheckProgressPresenter({
@@ -41,6 +43,18 @@ describe('check progress presenter', () => {
     feed(start('hook.pre', 'Running pre hooks'), done('hook.pre', 'Running pre hooks', 'skip'))
     expect(output()).toContain('⊘ Running pre hooks (skipped: --skip-hooks)')
     expect(output()).not.toContain('✓ Running pre hooks')
+  })
+
+  it('maps transition skip-hooks phases per hook check', () => {
+    const { feed, output } = collect({ skipHooks: new Set(['target.pre']) })
+    feed(
+      start('hook.pre', 'Pre'),
+      done('hook.pre', 'Pre', 'skip'),
+      start('hook.post', 'Post'),
+      done('hook.post', 'Post', 'skip', 'nothing to run'),
+    )
+    expect(output()).toContain('⊘ Pre (skipped: --skip-hooks)')
+    expect(output()).toContain('⊘ Post (skipped: nothing to run)')
   })
 
   it('labels user-bypassed checks with --skip-checks', () => {

@@ -1,8 +1,12 @@
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type ResolveChangeSchema } from '../services/resolve-change-schema.js'
 import { type Schema } from '../../domain/value-objects/schema.js'
-import { type ChangeState } from '../../domain/value-objects/change-state.js'
-import { isWorkflowStepEnabled } from '../../domain/services/workflow-topology.js'
+import {
+  isWorkflowStepEnabled,
+  type ApprovalGates,
+} from '../../domain/services/workflow-topology.js'
+import { isAtOrAfterVerificationBoundary } from '../../domain/services/lifecycle-verdict.js'
+import { startVerificationAction } from '../../domain/services/transition-checks.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
 import { type RefreshImplementationTracking } from './refresh-implementation-tracking.js'
 import { type ValidityFingerprintService } from '../services/validity-fingerprint-service.js'
@@ -16,6 +20,7 @@ import {
 import {
   evaluateChangeValidity,
   selectAutomaticRecovery,
+  collectChangeReviewTargets,
   type ArtifactReviewTarget,
   type AutomaticRecovery,
   type ChangeValidityFacts,
@@ -221,8 +226,8 @@ export class ReconcileChangeValidity {
             artifacts: collected.fingerprint.artifacts,
           }
     const policy = intent.type === 'manual-invalidation' ? intent.policy : change.invalidationPolicy
-    const direct = collectReviewTargets(change, collected.fingerprint, taskArtifacts)
-    const verificationIsRequired = verificationRequired(change, schema)
+    const direct = collectChangeReviewTargets(change, collected.fingerprint, taskArtifacts)
+    const verificationIsRequired = verificationRequired(change, schema, this._deps.approvals)
     const facts: ChangeValidityFacts = {
       currentFingerprint: collected.fingerprint,
       currentSpecApprovalFingerprint: approvalFingerprint,
@@ -275,70 +280,19 @@ export class ReconcileChangeValidity {
   }
 }
 
-/** States at or beyond the verification boundary. */
-const VERIFICATION_STATES: ReadonlySet<ChangeState> = new Set<ChangeState>([
-  'verifying',
-  'done',
-  'archivable',
-  'archiving',
-  'pending-signoff',
-  'signed-off',
-])
-
 /**
- * Whether verification evidence is required: the change schema enables `verifying`
- * and the change is at or beyond the verification boundary.
+ * Determines whether verification is required at the change's current state.
  *
- * @param change - Change under reconciliation
- * @param schema - The change's own sovereign schema
- * @returns True when verification evidence is required
+ * @param change - Change entity
+ * @param schema - Sovereign schema
+ * @param approvals - Approval gate configuration
+ * @returns Whether verification is required
  */
-function verificationRequired(change: Change, schema: Schema): boolean {
-  return isWorkflowStepEnabled('verifying', schema) && VERIFICATION_STATES.has(change.state)
-}
-
-/**
- * Collect review targets.
- *
- * @param change - change
- * @param fingerprint - fingerprint
- * @param taskArtifacts - task artifacts
- * @returns drifted and pending artifact review targets
- */
-function collectReviewTargets(
-  change: Change,
-  fingerprint: ValidityFingerprint | null,
-  taskArtifacts: ReadonlySet<string>,
-): { readonly drifted: ArtifactReviewTarget[]; readonly pending: ArtifactReviewTarget[] } {
-  const drifted: ArtifactReviewTarget[] = []
-  const pending: ArtifactReviewTarget[] = []
-  for (const [typeId, artifact] of change.artifacts) {
-    if (taskArtifacts.has(typeId)) continue
-    for (const file of artifact.files.values()) {
-      if (file.status === 'skipped') continue
-      const hash = fingerprint?.artifacts.files[`${typeId}:${file.key}`]
-      const hashDrift =
-        file.validatedHash !== undefined && hash !== undefined && hash !== file.validatedHash
-      if (file.hasDrift || hashDrift) {
-        drifted.push({
-          artifactId: typeId,
-          fileKey: file.key,
-          filename: file.filename,
-          origin: 'drift',
-        })
-        continue
-      }
-      if (file.status === 'pending-review') {
-        pending.push({
-          artifactId: typeId,
-          fileKey: file.key,
-          filename: file.filename,
-          origin: 'direct',
-        })
-      }
-    }
-  }
-  return { drifted, pending }
+function verificationRequired(change: Change, schema: Schema, approvals: ApprovalGates): boolean {
+  return (
+    isWorkflowStepEnabled('verifying', schema) &&
+    isAtOrAfterVerificationBoundary(change.state, schema, approvals)
+  )
 }
 
 /**
@@ -484,7 +438,7 @@ function applyIntent(
     blockers.push({
       code: 'VERIFICATION_STALE',
       message: 'Verification is stale',
-      details: { command: 'specd changes verification start <name>' },
+      action: startVerificationAction(change.name),
     })
   }
   return {

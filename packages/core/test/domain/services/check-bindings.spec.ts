@@ -18,6 +18,12 @@ describe('check-bindings skippability permissions', () => {
     for (const spec of nonSkippablePredicateSpecs) {
       expect(spec.skippable).toBe(false)
     }
+
+    const hookSpecs = TRANSITION_BINDING_SPECS.filter((b) => b.id.startsWith('hook.'))
+    expect(hookSpecs.map((s) => s.id).sort()).toEqual(['hook.post', 'hook.pre'])
+    for (const spec of hookSpecs) {
+      expect(spec.skippable).toBe(false)
+    }
   })
 
   it('declares skippable: true only for spec.overlap and impl.linksInScope in archive bindings', () => {
@@ -28,6 +34,12 @@ describe('check-bindings skippability permissions', () => {
       (b) => b.id !== 'impl.linksInScope' && b.id !== 'spec.overlap' && !b.phase,
     )
     for (const spec of nonSkippablePredicateSpecs) {
+      expect(spec.skippable).toBe(false)
+    }
+
+    const hookSpecs = ARCHIVE_BINDING_SPECS.filter((b) => b.id.startsWith('hook.'))
+    expect(hookSpecs.map((s) => s.id).sort()).toEqual(['hook.post', 'hook.pre'])
+    for (const spec of hookSpecs) {
       expect(spec.skippable).toBe(false)
     }
   })

@@ -55,14 +55,15 @@ describe('reconciled transition and status', () => {
       [],
       reconcile as never,
     )
-    await expect(useCase.execute({ name: 'c', to: 'verifying' })).rejects.toMatchObject({
-      name: ReconciledOperationBlockedError.name,
-      code: 'RECONCILED_OPERATION_BLOCKED',
-      operation: 'transition',
-      state: 'designing',
-      automaticReturn: verdict.recovery,
-      nextAction: { targetStep: 'designing', command: '/specd-design' },
-    })
+    const caught = (await useCase
+      .execute({ name: 'c', to: 'verifying' })
+      .catch((err: unknown) => err)) as ReconciledOperationBlockedError
+    expect(caught).toBeInstanceOf(ReconciledOperationBlockedError)
+    expect(caught.code).toBe('RECONCILED_OPERATION_BLOCKED')
+    expect(caught.operation).toBe('transition')
+    expect(caught.state).toBe('designing')
+    expect(caught.automaticReturn).toEqual(verdict.recovery)
+    expect(caught.nextAction).toMatchObject({ targetStep: 'ready', intent: 'design' })
     expect(repo.store.get('c')?.state).toBe('designing')
   })
 

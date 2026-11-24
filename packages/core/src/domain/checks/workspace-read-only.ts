@@ -19,6 +19,8 @@ export interface ReadOnlySpecDetail {
 /** Facts for `workspace.readOnly`. */
 export interface WorkspaceReadOnlyFacts {
   readonly ownershipBySpecId: ReadonlyMap<string, 'owned' | 'shared' | 'readOnly'>
+  /** Change name quoted in the failure message when known. */
+  readonly changeName?: string
 }
 
 /**
@@ -43,15 +45,16 @@ export function runWorkspaceReadOnly(facts: WorkspaceReadOnlyFacts): CheckResult
   if (specs.length === 0) {
     return pass('workspace.readOnly')
   }
-  const summary = specs
-    .map((s) =>
-      s.workspace === '(unknown)' ? s.specId : `${s.specId} (workspace '${s.workspace}')`,
-    )
-    .join(', ')
+  const lines = specs.map((s) =>
+    s.workspace === '(unknown)'
+      ? `  - ${s.specId}`
+      : `  - ${s.specId}  →  workspace "${s.workspace}" (readOnly)`,
+  )
+  const subject = facts.changeName === undefined ? 'Change' : `Change "${facts.changeName}"`
   return fail(
     'workspace.readOnly',
     'READ_ONLY_WORKSPACE',
-    `Change contains specs from readOnly workspaces: ${summary}`,
+    `${subject} contains specs from readOnly workspaces:\n\n${lines.join('\n')}\n\nWriting deltas into protected specs is not allowed.`,
     { specs, specIds: specs.map((s) => s.specId) },
   )
 }

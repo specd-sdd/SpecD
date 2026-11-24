@@ -272,6 +272,7 @@
 - **WHEN** `packages/skills/templates/skills/specd-new/SKILL.md.tpl` `targetStep` table is inspected
 - **THEN** `pending-spec-approval` and `pending-signoff` rows are drain-only
 - **AND** they are not presented as the default wait for new work
+- **AND** they suggest the matching `approve` command while consent is missing and follow `nextAction` once it is recorded
 
 #### Scenario: Design skill stays in ready for spec gate
 
@@ -290,6 +291,20 @@
 - **WHEN** `specd-archive/SKILL.md.tpl` is inspected
 - **THEN** it requires `archivable` or `archiving` and points signoff wait at `/specd-verify` in `done`
 - **AND** it does not mention `pending-signoff` or a `change transition` into it
+
+#### Scenario: Implement skill accepts pending-spec-approval after consent
+
+- **WHEN** `packages/skills/templates/skills/specd-implement/SKILL.md.tpl` state gate is inspected
+- **THEN** `pending-spec-approval` is accepted next to `spec-approved` as a drain entry state
+- **AND** with spec consent recorded it transitions to `implementing`
+- **AND** without consent it stops and redirects to human `approve spec` without transitioning
+
+#### Scenario: Shared template documents command null with guidance
+
+- **WHEN** `packages/skills/templates/shared/shared.md.tpl` `nextAction` documentation is inspected
+- **THEN** the "Next Action engine" section lists `targetStep`, `actionType`, `reason`, `intent`, `action`, `command`, and `guidance`
+- **AND** it states that an action without a command mapping yields `command: null` plus `guidance`, and that agents follow the guidance and never invent a command
+- **AND** a template contract test asserts these terms in the rendered shared template content
 
 ### Requirement: Reconciled invalidation protocol in lifecycle templates
 

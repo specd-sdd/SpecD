@@ -303,7 +303,7 @@ describe('CreateChange', () => {
       expect(result.change.specDependsOn.get('default:auth/login')).toEqual(['default:shared/auth'])
     })
 
-    it('falls back to persisted state for dependencies when sidecar is absent', async () => {
+    it("seeds dependencies from persisted spec-lock state when it is the spec's only file", async () => {
       const repo = makeChangeRepository()
       const specRepo = makeSpecRepository({
         specs: [
@@ -329,7 +329,7 @@ describe('CreateChange', () => {
       expect(result.change.specDependsOn.get('default:auth/login')).toEqual(['default:shared/auth'])
     })
 
-    it('still falls back to persisted state for dependencies when metadata cache is stale', async () => {
+    it('seeds dependencies from persisted spec-lock state, not from a stale metadata cache', async () => {
       const repo = makeChangeRepository()
       const specRepo = makeSpecRepository({
         specs: [
@@ -364,7 +364,7 @@ describe('CreateChange', () => {
       expect(result.change.specDependsOn.get('default:auth/login')).toEqual(['default:shared/auth'])
     })
 
-    it('prefers persisted dependencies over metadata fallback when both exist', async () => {
+    it('uses persisted dependencies and ignores metadata.json dependsOn when both exist', async () => {
       const repo = makeChangeRepository()
       const specRepo = makeSpecRepository({
         specs: [makeSpec({ workspace: 'default', name: 'auth/login', filenames: [] })],
@@ -391,6 +391,29 @@ describe('CreateChange', () => {
       expect(result.change.specDependsOn.get('default:auth/login')).toEqual([
         'default:shared/persisted',
       ])
+    })
+
+    it('seeds no entry for an existing spec without persisted state, ignoring metadata.json', async () => {
+      const repo = makeChangeRepository()
+      const specRepo = makeSpecRepository({
+        specs: [makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })],
+        artifacts: {
+          'auth/login/spec.md': '# Login flow',
+          'auth/login/metadata.json': JSON.stringify({
+            dependsOn: ['default:shared/metadata'],
+          }),
+        },
+      })
+      const uc = makeCreateChange(repo, makeListWorkspaces(new Map([['default', specRepo]])))
+
+      const result = await uc.execute({
+        name: 'add-oauth',
+        specIds: ['default:auth/login'],
+        schemaName: 'specd-std',
+        schemaVersion: 1,
+      })
+
+      expect(result.change.specDependsOn.has('default:auth/login')).toBe(false)
     })
 
     it('does not seed dependsOn for non-existent specs (newly created)', async () => {

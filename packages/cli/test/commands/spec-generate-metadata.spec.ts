@@ -201,7 +201,7 @@ describe('spec generate-metadata', () => {
         ok: false,
         code: 'DEPENDS_ON_OVERWRITE',
         error:
-          'dependsOn would change (added: core:auth). Pass force to overwrite curated dependencies.',
+          'dependsOn would change (added: core:auth); overwriting curated dependencies requires explicit confirmation.',
       },
     })
 
@@ -226,7 +226,7 @@ describe('spec generate-metadata', () => {
         ok: false,
         code: 'DEPENDS_ON_OVERWRITE',
         error:
-          'dependsOn would change (added: core:auth). Pass force to overwrite curated dependencies.',
+          'dependsOn would change (added: core:auth); overwriting curated dependencies requires explicit confirmation.',
       },
     })
 

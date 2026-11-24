@@ -92,8 +92,8 @@ All design artifacts are complete. The change is ready to hand off to implementa
 Historic wait state for in-flight changes that already sit here. New work does not enter this state.
 
 - **What it means:** An older change is waiting for human spec approval under the previous parking model.
-- **What you do:** A reviewer runs `specd changes approve spec <name> --reason "..."` (drain to `spec-approved`), or redesign to `designing`.
-- **Transition out:** `spec-approved`, or `designing`.
+- **What you do:** A reviewer runs `specd changes approve spec <name> --reason "..."` (records consent in place without moving the state), then transition directly to `implementing`, or redesign to `designing`.
+- **Transition out:** `implementing`, or `designing` (gated by the bound `approval.spec` check when `approvals.spec` is enabled).
 
 See [Approval gates](#approval-gates).
 
@@ -106,7 +106,7 @@ Historic post-approval parking state. New work records spec approval in `ready` 
 - **What it means:** Specs were signed off while the change was in the old pending path.
 - **What you do:** Transition to `implementing`, or back to `designing`.
 - **Transition out:** `implementing`, or `designing`.
-- **What can block it:** If specs were modified after approval, the materialized approval becomes stale and the change returns to `designing`. The approval and invalidation events remain in append-only history; later approval replaces only the current projection.
+- **What can block it:** If specs were modified after approval, the materialized approval becomes stale; the `approval.spec` check blocks the transition from `ready` until consent is renewed, and a later state returns to `designing`. The approval and invalidation events remain in append-only history; later approval replaces only the current projection.
 
 ---
 
@@ -148,8 +148,8 @@ Implementation and verification are complete.
 Historic wait state for in-flight changes that already sit here. New work does not enter this state.
 
 - **What it means:** An older change is waiting for human sign-off under the previous parking model.
-- **What you do:** A reviewer runs `specd changes approve signoff <name> --reason "..."` (drain to `signed-off`), or redesign to `designing`.
-- **Transition out:** `signed-off`, or `designing`.
+- **What you do:** A reviewer runs `specd changes approve signoff <name> --reason "..."` (records consent in place without moving the state), then transition directly to `archivable`, or return to `done` or `designing`.
+- **Transition out:** `archivable`, `designing`, or `done` (gated by the bound `approval.signoff` check when `approvals.signoff` is enabled).
 
 See [Approval gates](#approval-gates).
 
@@ -194,13 +194,13 @@ The change is in the archive **commit phase** (canonical publication, archive mo
 | `drafting`              | `designing`                                                                                                 |
 | `designing`             | `ready`, `designing`                                                                                        |
 | `ready`                 | `implementing`, `designing`                                                                                 |
-| `pending-spec-approval` | `spec-approved`, `designing` _(drain only)_                                                                 |
-| `spec-approved`         | `implementing`, `designing` _(drain only)_                                                                  |
+| `pending-spec-approval` | `implementing`, `designing` _(drain only; gated by `approval.spec`)_                                        |
+| `spec-approved`         | `implementing`, `designing` _(drain only; gated by `approval.spec`)_                                        |
 | `implementing`          | `verifying`, `designing`                                                                                    |
 | `verifying`             | `implementing`, `done`, `designing`                                                                         |
 | `done`                  | `archivable`, `designing`, `implementing`, `verifying`                                                      |
-| `pending-signoff`       | `signed-off`, `designing` _(drain only)_                                                                    |
-| `signed-off`            | `archivable`, `designing`, `implementing`, `verifying` _(drain hops from signed-off)_                       |
+| `pending-signoff`       | `archivable`, `designing`, `done` _(drain only; gated by `approval.signoff`)_                               |
+| `signed-off`            | `archivable`, `designing`, `implementing`, `verifying` _(drain only; gated by `approval.signoff`)_          |
 | `archivable`            | `archiving`, `designing`, `implementing`, `verifying`                                                       |
 | `archiving`             | `archivable`, `designing` _(active change only; successful archive removes the change from the active set)_ |
 
@@ -260,7 +260,7 @@ specd changes archive <name> --skip-checks spec.overlap
 specd changes archive <name> --skip-checks spec.overlap,impl.linksInScope
 ```
 
-By default only `spec.overlap` and `impl.linksInScope` are skippable. `workspace.readOnly`, `impl.filesResolved`, `deps.consistent`, `verification.current`, and the schema, archivable, and task-completion checks can never be bypassed on archive, and `specd changes status` shows a bypass flag only for blockers that can be skipped. `--allow-overlap` and `--allow-out-of-scope` are CLI aliases of the two skippable ids above.
+By default only `spec.overlap` and `impl.linksInScope` are skippable. `workspace.readOnly`, `impl.filesResolved`, `deps.consistent`, `verification.current`, and the schema, archivable, and task-completion checks can never be bypassed on archive, and `specd changes status` shows a bypass flag only for blockers that can be skipped. `--allow-overlap` and `--allow-out-of-scope` are CLI aliases of the two skippable ids above. Every skippable failure shows the same hint, `Retry with --skip-checks <id> if an exception is granted`; the aliases are not mentioned in hints.
 
 ### Shortcut transitions via `--next`
 
@@ -355,7 +355,7 @@ Fingerprints cover non-task artifacts (`artifact-pre-hash-v1`) and linked implem
 
 Artifact policy, workflow policy, and gate recovery are independent. Gate recovery wins. Recovery never advances an earlier state.
 
-1. A required spec approval that becomes stale or revoked returns the change to `designing` when the state is after `designing`.
+1. A required spec approval that becomes stale or revoked returns the change to `designing` when the state is after `ready`. From `ready` no recovery is requested: the `approval.spec` check blocks forward transitions until consent is renewed.
 2. Otherwise a required sign-off that becomes stale or revoked returns the change to `done` only when the state is later than `done`.
 3. Otherwise `workflow: redesign` plus unresolved non-task drift or review returns the change to `designing`.
 4. Otherwise the phase is preserved.
@@ -405,7 +405,7 @@ approvals:
 specd changes approve spec add-auth --reason "Specs reviewed and approved — all requirements are clear"
 ```
 
-The approver reviews the spec and verify artifacts in the change directory. The command records consent only from `ready` and leaves the change there. The approval stores an artifact fingerprint. Task artifacts are not part of that fingerprint. If a required approval later becomes stale or revoked, recovery follows [Validity and verification](#validity-and-verification): the change returns to `designing` only when it is already past `designing`.
+The approver reviews the spec and verify artifacts in the change directory. The command records consent from `ready` (or a legacy parking state, `pending-spec-approval` or `spec-approved`), never transitions, and leaves the change in its current state. The approval stores an artifact fingerprint. Task artifacts are not part of that fingerprint. If a required approval later becomes stale or revoked, recovery follows [Validity and verification](#validity-and-verification): the change returns to `designing` only when it is already past `ready`; from `ready` the `approval.spec` check blocks forward transitions until consent is renewed.
 
 ### Signoff gate
 
@@ -430,7 +430,7 @@ approvals:
 specd changes approve signoff add-auth --reason "Implementation reviewed — all scenarios verified"
 ```
 
-The command records consent only from `done` and leaves the change there. Sign-off stores a complete fingerprint, including an empty implementation map when no files are linked, and the completed verification id. Legacy unknown implementation evidence (`null`) cannot satisfy the gate until it is renewed.
+The command records consent from `done` (or a legacy parking state, `pending-signoff` or `signed-off`), never transitions, and leaves the change in its current state. Sign-off stores a complete fingerprint, including an empty implementation map when no files are linked, and the completed verification id. Legacy unknown implementation evidence (`null`) cannot satisfy the gate until it is renewed.
 
 Approval renewal is append-only. A new approval or sign-off replaces the current materialized projection and appends a new event; it never deletes earlier pending-state transitions, approvals, sign-offs, or invalidations. Both commands continue to persist the privacy-decorated actor returned by the configured `ActorResolver`.
 

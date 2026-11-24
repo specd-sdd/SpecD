@@ -35,9 +35,17 @@ Error messages MUST be descriptive and, whenever possible, tell the user how to 
 
 ### Requirement: Host-Neutral Core Errors and Delivery Hints
 
-Domain and application errors, services, and use cases in `@specd/core` MUST NOT embed delivery-mechanism flags (such as `--force`, `--next`, `--target`, `--allow-out-of-scope`, `--set`, `--add`, `--remove`, `--clear`) or CLI command syntax (such as `specd ...`) inside `message`.
+Domain and application errors, services, and use cases in `@specd/core` MUST NOT embed delivery-mechanism flags (such as `--force`, `--next`, `--target`, `--allow-out-of-scope`, `--set`, `--add`, `--remove`, `--clear`), CLI command syntax (such as `specd ...`, and also such a command with the `specd` prefix omitted, for example `run "specs init" first`), agent slash commands (such as `/specd-verify`), or use-case input names presented as a remedy or bypass instruction (such as `allowOutOfScope`, `force`, or `skipChecks`; for example `Pass force to overwrite`) inside `message`. A bare input name MUST NOT be used as an imperative instruction even when it has no `--` prefix and equals a generic word, and descriptive phrasing that names an input (such as `without force`, as in the historical-implementation guard) MUST likewise be reworded to state the invariant (for example `without explicit confirmation`); the message states the violated invariant (for example that overwriting requires explicit confirmation) and leaves the means of confirmation to the delivery mechanism.
 
-Core errors SHALL describe the violated domain or application invariant in host-neutral terms and expose structured metadata properties (such as `specId`, `state`, `operation`, `gates`, `existingDeps`, `incomingDeps`, or `outOfScopeSpecIds`) so delivery mechanisms (`@specd/cli`, `@specd/mcp`, `@specd/sdk` callers) can translate typed error codes and metadata into delivery-appropriate hints using their active command context.
+Core errors SHALL describe the violated domain or application invariant in host-neutral terms and expose structured metadata properties (such as `specId`, `changeName`, `state`, `operation`, `gates`, `existingDeps`, `incomingDeps`, or `outOfScopeSpecIds`) so delivery mechanisms (`@specd/cli`, `@specd/mcp`, `@specd/sdk` callers) can translate typed error codes and metadata into delivery-appropriate hints using their active command context. Every core error code that previously relied on an embedded recovery command or input-name instruction (for example `VERIFICATION_STALE`, `SPEC_NOT_INITIALIZED`, or the codes that told the caller to pass `force`) MUST have a matching CLI hint so the recovery stays discoverable. The hint MUST apply to every CLI command that can surface that code (for example `DEPENDS_ON_OVERWRITE` for every command that can propagate `DependsOnOverwriteError`, not only `specs generate-metadata` and `specs validate`), not to a fixed subset of command contexts.
+
+### Requirement: Host-Neutral Core Projections
+
+Non-error read and projection models exposed by `@specd/core` — including next actions, blockers, check results, and validity details — MUST NOT embed delivery-mechanism syntax: CLI commands (`specd ...`), CLI flags (such as `--skip-checks`), or agent slash commands (such as `/specd-design`).
+
+Core SHALL express guidance as structured host-neutral data: workflow-phase intents, check-declared actions (`kind`, optional `params`, optional host-neutral `guidance`), and capability markers such as `isSkippable` plus `checkId`. Delivery mechanisms (`@specd/cli`, `@specd/mcp`, `@specd/sdk` callers) translate that data into their own interaction model (commands, slash commands, flags, tool calls) in a centralized presenter, using their active command context.
+
+A host that does not recognize an action `kind` MUST fall back to the action's host-neutral `guidance` and MUST NOT invent delivery syntax.
 
 ### Requirement: Metadata Extraction
 

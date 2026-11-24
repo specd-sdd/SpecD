@@ -14,13 +14,13 @@ This guide details how to implement custom transition checks, configure two-tier
 
 ## 1. Checks vs. Hooks: Understanding the Distinction
 
-| Feature              | Transition Check (`Check` / `CustomCheckDefinition`)                                                                  | Transition Hook (`HookEntry`)                                                                               |
-| :------------------- | :-------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------- |
-| **Execution Model**  | Pure in-memory predicate function evaluated synchronously/asynchronously during transition preflight.                 | Subprocess execution (`run:`) or external runner (`external:`) dispatched before or after step persistence. |
-| **Primary Intent**   | Domain invariants, safety verification, security scanning, architectural linting, and policy conformance.             | Environment provisioning, automated testing pipelines, notifications, and AI instructions.                  |
-| **Namespace**        | Namespaced under `@<plugin>.<id>` (or core built-in IDs).                                                             | Identified by step-unique ID (`id:`).                                                                       |
-| **Failure Handling** | Blocks transitions and throws a structured `CheckPredicateFailedError` with remediation commands and bypass guidance. | Governed by `onFailure: 'abort' \| 'warn'`. Non-fatal hook warnings collect without halting transitions.    |
-| **Bypass Semantics** | Skippable checks can be bypassed explicitly via `--skip-checks <id>`.                                                 | Hook phases can be skipped via `--skip-hooks <phases>`.                                                     |
+| Feature              | Transition Check (`Check` / `CustomCheckDefinition`)                                                                                                      | Transition Hook (`HookEntry`)                                                                               |
+| :------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------- |
+| **Execution Model**  | Pure in-memory predicate function evaluated synchronously/asynchronously during transition preflight.                                                     | Subprocess execution (`run:`) or external runner (`external:`) dispatched before or after step persistence. |
+| **Primary Intent**   | Domain invariants, safety verification, security scanning, architectural linting, and policy conformance.                                                 | Environment provisioning, automated testing pipelines, notifications, and AI instructions.                  |
+| **Namespace**        | Namespaced under `@<plugin>.<id>` (or core built-in IDs).                                                                                                 | Identified by step-unique ID (`id:`).                                                                       |
+| **Failure Handling** | Blocks transitions and throws a structured `CheckPredicateFailedError` with a typed `CheckAction` (`action`), check-owned `details`, and bypass metadata. | Governed by `onFailure: 'abort' \| 'warn'`. Non-fatal hook warnings collect without halting transitions.    |
+| **Bypass Semantics** | Skippable checks can be bypassed explicitly via `--skip-checks <id>`.                                                                                     | Hook phases can be skipped via `--skip-hooks <phases>`.                                                     |
 
 ---
 
@@ -34,7 +34,6 @@ import type { CustomCheckDefinition, CheckExecutionContext, CheckResult } from '
 export const securityScanCheck: CustomCheckDefinition = {
   id: 'code-scan',
   label: 'Scanning code for security vulnerabilities',
-  command: 'pnpm audit:fix',
   async execute(ctx: CheckExecutionContext): Promise<CheckResult> {
     const minSeverity = (ctx.config?.minSeverity as string) ?? 'high'
 
@@ -49,7 +48,11 @@ export const securityScanCheck: CustomCheckDefinition = {
         outcome: 'fail',
         code: 'SECURITY_VULNERABILITIES_FOUND',
         message: `Found ${issues.length} ${minSeverity}-severity vulnerabilities.`,
-        command: 'pnpm audit:fix',
+        action: {
+          kind: '@security.run-audit-fix',
+          guidance: 'Resolve the reported vulnerabilities and run the audit again.',
+          supersedesIntent: true,
+        },
         details: { issues },
       }
     }
@@ -63,6 +66,17 @@ export const securityScanCheck: CustomCheckDefinition = {
   },
 }
 ```
+
+### Remediation Actions (`CheckAction`) and `details`
+
+Failing `CheckResult` entries emit a host-neutral `action?: CheckAction` rather than raw CLI or slash commands:
+
+- `kind`: Built-in `BuiltInCheckActionKind` (`'approve-spec' | 'approve-signoff' | 'start-verification' | 'refresh-status'`) or a namespaced plugin kind (`@<plugin>.<action>`).
+- `params`: Optional structured parameters for hosts that render native remediation controls.
+- `guidance`: Optional host-neutral prose fallback rendered when a host does not recognize `kind`. It must not contain CLI syntax.
+- `supersedesIntent`: Defaults to `true`: `GetStatus` promotes this `action` to `nextAction.action` and sets `nextAction.intent = null`. When `false`, the action refines the phase intent, which is kept.
+
+`details` is the check's own structured failure payload (for example `{ issues }` for custom checks or `{ mismatches, specIds }` for `deps.consistent`). Hosts inspect `checkId` and `details` to format per-check context lines.
 
 ### Execution Context (`CheckExecutionContext`)
 
@@ -258,13 +272,13 @@ workflow:
 
 `archiveChecks` entries accept only `id`, `skippable`, `disabled`, and `config`. `onFailure` is rejected: archive predicate failures have no abort/collect distinction. Governance on archive is the table in the [schema format reference](../schemas/schema-format.md#archive-operation-checks).
 
-When a plugin or schema-embedded archive check fails, `ArchiveChange` throws `CheckPredicateFailedError` (check id, label, failure code, message, command, details, and the resolved `skippable`), like a failing transition check. Built-in archive checks keep their dedicated errors.
+When any built-in, plugin, or schema-embedded archive check fails, `ArchiveChange` throws `CheckPredicateFailedError` (check id, label, failure code, message, `action`, check-owned `details`, `skippable`, `from`, and `to`), just like a failing transition check.
 
 ---
 
 ## 7. CLI Bypass and Repair Guide
 
-When a check fails during a transition attempt, the CLI formats a structured Text Repair Guide:
+When a check fails during a transition attempt, the CLI formats a structured Text Repair Guide (the validity lines between `state:` and `target:` come from the reconciled validity verdict):
 
 ```text
 error: Check '@security.code-scan' failed: Found 2 high-severity vulnerabilities
@@ -272,9 +286,17 @@ error: Check '@security.code-scan' failed: Found 2 high-severity vulnerabilities
 
 repair guide:
   state:   implementing
+  spec approval: not-required
+  signoff:       not-required
+  verification:  not-required
+  recovery:      (none)
   target:  verifying
-  command: pnpm audit:fix
+  check:   Scanning code for security vulnerabilities (@security.code-scan)
+  code:    SECURITY_VULNERABILITIES_FOUND
+  hop:     implementing → verifying
+  guidance: Resolve the reported vulnerabilities and run the audit again.
   bypass:  Retry with --skip-checks @security.code-scan if an exception is granted
+  reason:  Tasks complete, ready to verify
 ```
 
 Users can bypass skippable checks directly:

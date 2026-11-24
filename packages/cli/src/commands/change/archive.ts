@@ -1,15 +1,19 @@
 import { type Command } from 'commander'
 import * as path from 'node:path'
-import {
-  type ArchiveHookPhaseSelector,
-  type CheckProgressEvent,
-  CheckPredicateFailedError,
-  SpecOverlapError,
-} from '@specd/sdk'
+import { type ArchiveHookPhaseSelector, type CheckProgressEvent } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat, serializeOutput, type OutputFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
-import { resolveCliErrorHint } from '../../error-hints.js'
+import { resolveCliErrorHint, skippableCheckHint } from '../../error-hints.js'
+import {
+  describeCheckFailure,
+  isCheckPredicateFailed,
+  isReconciledOperationBlocked,
+  projectReconciledOperationBlocked,
+  reconciledRepairGuideLines,
+  resolveCliWorkflowCommand,
+  resolveCliWorkflowGuidance,
+} from '../../guidance-presenter.js'
 import { parseCommaSeparatedValues } from '../../helpers/parse-comma-values.js'
 import { createCheckProgressPresenter } from './_check-progress-presenter.js'
 import { CliExitError } from '../../helpers/cli-exit-error.js'
@@ -31,11 +35,13 @@ function writeStructuredRecord(format: Exclude<OutputFormat, 'text'>, record: un
  *
  * @param format - CLI output format
  * @param skipChecks - Check ids bypassed with `--skip-checks`, rendered as skipped by that flag
+ * @param skipHooks - Hook phase selectors skipped with `--skip-hooks`
  * @returns Progress sink
  */
 function makeArchiveProgressRenderer(
   format: OutputFormat,
   skipChecks: ReadonlySet<string>,
+  skipHooks: ReadonlySet<string>,
 ): {
   onProgress: (event: CheckProgressEvent) => void
 } {
@@ -44,6 +50,7 @@ function makeArchiveProgressRenderer(
     streamName: 'change-archive',
     stream: format === 'text' ? process.stderr : process.stdout,
     skipChecks,
+    skipHooks,
   })
   return {
     onProgress: (event) => {
@@ -122,7 +129,7 @@ JSON/TOON output schema:
 
           const { config, kernel } = await resolveCliContext({ configPath: opts.config })
           const fmt = parseFormat(opts.format)
-          const progressRenderer = makeArchiveProgressRenderer(fmt, skipChecks)
+          const progressRenderer = makeArchiveProgressRenderer(fmt, skipChecks, skipHookPhases)
 
           const result = await kernel.changes.archive.execute(
             {
@@ -164,38 +171,76 @@ JSON/TOON output schema:
             })
           }
         } catch (err) {
-          if (err instanceof SpecOverlapError && opts.format === 'text') {
-            const specList = err.entries
-              .map(
-                (e) =>
-                  `  ${e.specId} — also targeted by: ${e.changes
-                    .filter((c) => c.name !== name)
-                    .map((c) => `${c.name} (${c.state})`)
-                    .join(', ')}`,
-              )
-              .join('\n')
-            process.stderr.write(
-              `error: cannot archive — spec overlap detected:\n${specList}\n` +
-                (err.skippable
-                  ? '\nUse --skip-checks spec.overlap to proceed despite overlap.\n'
-                  : ''),
-            )
+          if (isReconciledOperationBlocked(err)) {
+            const fmt = parseFormat(opts.format)
+            if (fmt === 'text') {
+              process.stderr.write(`${reconciledRepairGuideLines(err).join('\n')}\n`)
+            } else {
+              writeStructuredRecord(fmt, {
+                stream: 'change-archive',
+                event: {
+                  type: 'complete',
+                  result: {
+                    result: 'failure',
+                    name,
+                    ...projectReconciledOperationBlocked(err),
+                  },
+                },
+              })
+            }
             throw new CliExitError(1)
           }
-          if (err instanceof CheckPredicateFailedError && opts.format === 'text') {
+          if (isCheckPredicateFailed(err) && opts.format === 'text') {
+            if (err.checkId === 'spec.overlap' && Array.isArray(err.details?.entries)) {
+              const entries = err.details.entries as readonly {
+                readonly specId: string
+                readonly changes: readonly { readonly name: string; readonly state: string }[]
+              }[]
+              const specList = entries
+                .map(
+                  (e) =>
+                    `  ${e.specId} — also targeted by: ${e.changes
+                      .filter((c) => c.name !== name)
+                      .map((c) => `${c.name} (${c.state})`)
+                      .join(', ')}`,
+                )
+                .join('\n')
+              process.stderr.write(
+                `error: cannot archive — spec overlap detected:\n${specList}\n` +
+                  (err.skippable === true ? `\n${skippableCheckHint('spec.overlap')}\n` : ''),
+              )
+              throw new CliExitError(1)
+            }
+            const cpCommand = resolveCliWorkflowCommand(null, err.action)
+            const cpGuidance = resolveCliWorkflowGuidance(null, err.action)
             const checkHint =
               err.skippable === true
                 ? (resolveCliErrorHint(
                     err.checkId,
                     { command: 'change.archive' },
                     { isSkippable: true },
-                  ) ?? `Retry with --skip-checks ${err.checkId} if an exception is granted`)
-                : undefined
+                  ) ?? skippableCheckHint(err.checkId))
+                : resolveCliErrorHint(
+                    err.checkId,
+                    { command: 'change.archive' },
+                    { isSkippable: false },
+                  )
+            const detailLines = describeCheckFailure(err).map((line) => `  detail:  ${line}`)
             const lines = [
               `error: ${err.message}`,
               `  check:   ${err.label} (${err.checkId})`,
-              ...(err.command ? [`  command: ${err.command}`] : []),
-              ...(checkHint !== undefined ? [`  bypass:  ${checkHint}`] : []),
+              ...(err.from !== undefined && err.to !== undefined
+                ? [`  hop:     ${err.from} → ${err.to}`]
+                : []),
+              ...detailLines,
+              ...(cpCommand !== null
+                ? [`  command: ${cpCommand}`]
+                : cpGuidance !== undefined
+                  ? [`  guidance: ${cpGuidance}`]
+                  : []),
+              ...(checkHint !== undefined
+                ? [`  ${err.skippable === true ? 'bypass' : 'hint'}:  ${checkHint}`]
+                : []),
             ]
             process.stderr.write(`${lines.join('\n')}\n`)
             throw new CliExitError(1)

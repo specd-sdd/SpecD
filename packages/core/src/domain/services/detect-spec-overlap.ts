@@ -52,12 +52,22 @@ export interface SpecOverlapPeerSummary {
   readonly overlappingSpecIds: readonly string[]
 }
 
+/** Overlap entry summary for `spec.overlap` details. */
+export interface SpecOverlapEntrySummary {
+  /** Spec id shared by multiple active changes. */
+  readonly specId: string
+  /** Active changes targeting this spec. */
+  readonly changes: readonly OverlapChange[]
+}
+
 /** Detection payload for archive `spec.overlap`. */
 export interface SpecOverlapDetectionSummary {
   /** True when this change shares specs with another active change. */
   readonly blocked: boolean
   /** Named peers with overlapping spec ids when blocked. */
   readonly peers: readonly SpecOverlapPeerSummary[]
+  /** Overlap entries shaped for host rendering when blocked. */
+  readonly entries: readonly SpecOverlapEntrySummary[]
 }
 
 /**
@@ -75,7 +85,7 @@ export function specOverlapDetectionForChange(
     entry.changes.some((peer) => peer.name === changeName),
   )
   if (relevant.length === 0) {
-    return { blocked: false, peers: [] }
+    return { blocked: false, peers: [], entries: [] }
   }
 
   const byPeer = new Map<string, string[]>()
@@ -95,5 +105,10 @@ export function specOverlapDetectionForChange(
       overlappingSpecIds,
     }))
 
-  return { blocked: true, peers }
+  const entries: SpecOverlapEntrySummary[] = relevant.map((entry) => ({
+    specId: entry.specId,
+    changes: entry.changes,
+  }))
+
+  return { blocked: true, peers, entries }
 }

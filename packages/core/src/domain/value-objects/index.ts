@@ -29,6 +29,7 @@ export {
 } from './invalidation-policy.js'
 export {
   type Sha256Digest,
+  type SpecApprovalFingerprint,
   type ArtifactFingerprintAlgorithm,
   type TextNormalizationAlgorithm,
   type BinaryNormalizationAlgorithm,

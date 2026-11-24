@@ -13,6 +13,8 @@ import {
 } from '../../../src/domain/services/lifecycle-verdict.js'
 import { evaluateLifecycle } from '../../../src/application/services/lifecycle-evaluation.js'
 import {
+  approveSpecAction,
+  startVerificationAction,
   fail,
   pass,
   skip,
@@ -402,7 +404,8 @@ describe('evaluateLifecycle', () => {
         (check) => check.id === 'approval.spec' && check.outcome === 'fail',
       ),
     ).toBe(true)
-    expect(verdict.nextAction.command).toBe('specd changes approve spec')
+    expect(verdict.nextAction.intent).toBeNull()
+    expect(verdict.nextAction.action).toEqual({ kind: 'approve-spec' })
     expect(verdict.nextAction.targetStep).toBe('ready')
   })
 
@@ -412,8 +415,8 @@ describe('evaluateLifecycle', () => {
     const verdict = evaluate(change, makeSchema(), {
       approvals: { spec: true, signoff: false },
     })
-    expect(verdict.nextAction.command).toBe('/specd-design')
-    expect(verdict.nextAction.command).not.toBe('specd changes approve spec')
+    expect(verdict.nextAction.intent).toBe('design')
+    expect(verdict.nextAction.action).toBeUndefined()
   })
 
   it('treats skipped dependencies as satisfied for next-artifact resolution', () => {
@@ -506,7 +509,7 @@ describe('evaluateLifecycle', () => {
     expect(verdict.blockers.some((blocker) => blocker.code === 'OVERLAP_CONFLICT')).toBe(false)
     expect(verdict.nextHop.targetStep).toBe('designing')
     expect(verdict.nextAction.targetStep).toBe('designing')
-    expect(verdict.nextAction.command).toBe('/specd-design')
+    expect(verdict.nextAction.intent).toBe('design')
   })
 
   it('does not treat CLI-only aliases allow-overlap or allow-out-of-scope as domain bypass flags', () => {
@@ -523,7 +526,7 @@ describe('evaluateLifecycle', () => {
 
     const withAlias = evaluate(change, schema, {
       requestedTarget: 'designing',
-      bypassFlags: [
+      skippedCheckIds: [
         'allow-overlap',
         '--allow-overlap',
         'allow-out-of-scope',
@@ -534,7 +537,7 @@ describe('evaluateLifecycle', () => {
     expect(withAlias.blockers.some((blocker) => blocker.code === 'OVERLAP_CONFLICT')).toBe(true)
   })
 
-  it('omits skippable OVERLAP_CONFLICT when the canonical spec.overlap bypass is supplied', () => {
+  it('omits skippable OVERLAP_CONFLICT when the canonical spec.overlap id is supplied and ignores flag syntax', () => {
     const change = makeChange()
     const overlapFail: CheckResult = {
       id: 'spec.overlap',
@@ -547,30 +550,28 @@ describe('evaluateLifecycle', () => {
     const schema = makeSchema({ workflow: [makeWorkflowStep('designing')] })
     const bypassed = evaluate(change, schema, {
       requestedTarget: 'designing',
-      bypassFlags: ['spec.overlap'],
+      skippedCheckIds: ['spec.overlap'],
       checksByTarget: { designing: [overlapFail] },
     })
     expect(bypassed.blockers.some((blocker) => blocker.code === 'OVERLAP_CONFLICT')).toBe(false)
     expect('warnings' in bypassed).toBe(false)
-    expect(bypassed.availableSteps.find((step) => step.step === 'designing')?.isPermitted).toBe(
-      true,
-    )
+    const bypassedStep = bypassed.availableSteps.find((step) => step.step === 'designing')
+    expect(bypassedStep?.isPermitted).toBe(true)
 
-    const fullFlagBypassed = evaluate(change, schema, {
+    const flagSyntaxNotBypassed = evaluate(change, schema, {
       requestedTarget: 'designing',
-      bypassFlags: ['--skip-checks spec.overlap'],
+      skippedCheckIds: ['--skip-checks spec.overlap'],
       checksByTarget: { designing: [overlapFail] },
     })
-    expect(fullFlagBypassed.blockers.some((blocker) => blocker.code === 'OVERLAP_CONFLICT')).toBe(
-      false,
-    )
-    expect('warnings' in fullFlagBypassed).toBe(false)
     expect(
-      fullFlagBypassed.availableSteps.find((step) => step.step === 'designing')?.isPermitted,
+      flagSyntaxNotBypassed.blockers.some((blocker) => blocker.code === 'OVERLAP_CONFLICT'),
     ).toBe(true)
+    expect(
+      flagSyntaxNotBypassed.availableSteps.find((step) => step.step === 'designing')?.available,
+    ).toBe(false)
   })
 
-  it('projects non-skippable OVERLAP_CONFLICT without bypassFlag when schema sets skippable: false', () => {
+  it('projects non-skippable OVERLAP_CONFLICT when schema sets skippable: false', () => {
     const change = makeChange()
     const overlapFail: CheckResult = {
       id: 'spec.overlap',
@@ -591,13 +592,13 @@ describe('evaluateLifecycle', () => {
     })
     const verdict = evaluate(change, hardenedSchema, {
       requestedTarget: 'designing',
-      bypassFlags: ['spec.overlap', '--skip-checks spec.overlap'],
+      skippedCheckIds: ['spec.overlap', '--skip-checks spec.overlap'],
       checksByTarget: { designing: [overlapFail] },
     })
     const overlapBlocker = verdict.blockers.find((blocker) => blocker.code === 'OVERLAP_CONFLICT')
     expect(overlapBlocker).toBeDefined()
     expect(overlapBlocker?.isSkippable).toBe(false)
-    expect(overlapBlocker?.bypassFlag).toBeUndefined()
+    expect('bypassFlag' in (overlapBlocker ?? {})).toBe(false)
   })
 
   it('projects skippability for custom plugin checks from bindingsByTarget and archiveBindings', () => {
@@ -635,7 +636,8 @@ describe('evaluateLifecycle', () => {
     const blocker = verdict.blockers.find((b) => b.code === 'SECURITY_FINDINGS')
     expect(blocker).toBeDefined()
     expect(blocker?.isSkippable).toBe(true)
-    expect(blocker?.bypassFlag).toBe('--skip-checks @sec.scan')
+    expect(blocker?.checkId).toBe('@sec.scan')
+    expect('bypassFlag' in (blocker ?? {})).toBe(false)
   })
 
   it('treats complete-with-drift as complete for lifecycle interpretation', () => {
@@ -776,7 +778,7 @@ describe('evaluateLifecycle', () => {
 
     const verdict = evaluate(change, makeSchema())
     expect(verdict.nextAction.targetStep).toBe('designing')
-    expect(verdict.nextAction.command).toBe('/specd-design')
+    expect(verdict.nextAction.intent).toBe('design')
   })
 
   it('hides verifying from availableTransitions when gated tasks are incomplete', () => {
@@ -800,11 +802,11 @@ describe('evaluateLifecycle', () => {
 
     expect(verdict.validTransitions).toContain('verifying')
     expect(verdict.availableTransitions).not.toContain('verifying')
-    expect(verdict.nextAction.command).toBe('/specd-implement')
+    expect(verdict.nextAction.intent).toBe('implement')
     expect(verdict.nextAction.targetStep).toBe('implementing')
   })
 
-  it('includes verifying and recommends /specd-verify when gated tasks are complete', () => {
+  it('includes verifying and recommends the `verify` intent when gated tasks are complete', () => {
     const change = makeChange()
     change.transition('designing', testActor)
     change.transition('ready', testActor)
@@ -818,11 +820,11 @@ describe('evaluateLifecycle', () => {
     })
 
     expect(verdict.availableTransitions).toContain('verifying')
-    expect(verdict.nextAction.command).toBe('/specd-verify')
+    expect(verdict.nextAction.intent).toBe('verify')
     expect(verdict.nextAction.targetStep).toBe('verifying')
   })
 
-  it('given designing with ready available, when evaluate runs, then nextAction targets ready with /specd-design', () => {
+  it('given designing with ready available, when evaluate runs, then nextAction targets ready with the `design` intent', () => {
     const change = makeChange()
     change.transition('designing', testActor)
     change.setArtifact(makeArtifact('proposal', 'complete'))
@@ -843,7 +845,7 @@ describe('evaluateLifecycle', () => {
 
     expect(verdict.availableTransitions).toContain('ready')
     expect(verdict.nextAction.targetStep).toBe('ready')
-    expect(verdict.nextAction.command).toBe('/specd-design')
+    expect(verdict.nextAction.intent).toBe('design')
   })
 
   it('given designing with incomplete design artifacts, when evaluate runs, then nextAction stays designing', () => {
@@ -866,10 +868,10 @@ describe('evaluateLifecycle', () => {
 
     expect(verdict.availableTransitions).not.toContain('ready')
     expect(verdict.nextAction.targetStep).toBe('designing')
-    expect(verdict.nextAction.command).toBe('/specd-design')
+    expect(verdict.nextAction.intent).toBe('design')
   })
 
-  it('given verifying with done available, when evaluate runs, then nextAction targets done with /specd-verify', () => {
+  it('given verifying with done available, when evaluate runs, then nextAction targets done with the `verify` intent', () => {
     const change = makeChange()
     change.transition('designing', testActor)
     change.transition('ready', testActor)
@@ -880,10 +882,10 @@ describe('evaluateLifecycle', () => {
 
     expect(verdict.availableTransitions).toContain('done')
     expect(verdict.nextAction.targetStep).toBe('done')
-    expect(verdict.nextAction.command).toBe('/specd-verify')
+    expect(verdict.nextAction.intent).toBe('verify')
   })
 
-  it('given archivable, when evaluate runs, then nextAction targets archiving with /specd-archive', () => {
+  it('given archivable, when evaluate runs, then nextAction targets archiving with the `archive` intent', () => {
     const change = makeChange()
     change.transition('designing', testActor)
     change.transition('ready', testActor)
@@ -895,7 +897,7 @@ describe('evaluateLifecycle', () => {
     const verdict = evaluate(change, makeSchema())
 
     expect(verdict.nextAction.targetStep).toBe('archiving')
-    expect(verdict.nextAction.command).toBe('/specd-archive')
+    expect(verdict.nextAction.intent).toBe('archive')
   })
 
   it('given archivable with archiving blocked, when evaluate runs, then nextAction stays archivable', () => {
@@ -915,7 +917,7 @@ describe('evaluateLifecycle', () => {
 
     expect(verdict.nextAction.targetStep).toBe('archivable')
     expect(verdict.nextAction.reason).toBe('Remaining blockers prevent archive')
-    expect(verdict.nextAction.command).toBe('/specd-archive')
+    expect(verdict.nextAction.intent).toBe('archive')
   })
 
   it('given failed impl.filesResolved, when blockers are projected, then bypassFlag is absent', () => {
@@ -941,12 +943,12 @@ describe('evaluateLifecycle', () => {
 
     const blocker = verdict.blockers.find((entry) => entry.code === 'IMPLEMENTATION_STATE')
     expect(blocker).toBeDefined()
-    expect(blocker?.bypassFlag).toBeUndefined()
+    expect('bypassFlag' in (blocker ?? {})).toBe(false)
     expect(blocker?.isSkippable).toBe(false)
     expect(blocker?.checkId).toBe('impl.filesResolved')
   })
 
-  it('given failed impl.linksInScope, when blockers are projected, then bypassFlag is --skip-checks impl.linksInScope', () => {
+  it('given failed impl.linksInScope, when blockers are projected, then isSkippable and checkId are set without bypassFlag', () => {
     const change = makeChange()
     change.transition('designing', testActor)
     change.transition('ready', testActor)
@@ -969,7 +971,7 @@ describe('evaluateLifecycle', () => {
 
     const blocker = verdict.blockers.find((entry) => entry.code === 'IMPLEMENTATION_STATE')
     expect(blocker).toBeDefined()
-    expect(blocker?.bypassFlag).toBe('--skip-checks impl.linksInScope')
+    expect('bypassFlag' in (blocker ?? {})).toBe(false)
     expect(blocker?.isSkippable).toBe(true)
     expect(blocker?.checkId).toBe('impl.linksInScope')
   })
@@ -991,8 +993,8 @@ describe('evaluateLifecycle', () => {
       expect.arrayContaining(['implementing', 'verifying']),
     )
     expect(verdict.nextAction.targetStep).toBe('archivable')
-    expect(verdict.nextAction.command).toBe('/specd-archive')
-    expect(verdict.nextAction.command).not.toBe('/specd-implement')
+    expect(verdict.nextAction.intent).toBe('archive')
+    expect(verdict.nextAction.intent).not.toBe('implement')
   })
 
   it('given done with archivable blocked, when evaluate runs, then nextAction stays on done', () => {
@@ -1044,7 +1046,7 @@ describe('evaluateLifecycle', () => {
 
     expect(verdict.availableTransitions).not.toContain('archivable')
     expect(verdict.nextAction.targetStep).toBe('done')
-    expect(verdict.nextAction.command).toBe('/specd-verify')
+    expect(verdict.nextAction.intent).toBe('verify')
     expect(verdict.nextAction.reason).toMatch(/archivable/i)
   })
 
@@ -1111,6 +1113,30 @@ describe('evaluateLifecycle', () => {
     expect(
       verdict.checksByTarget.verifying?.some((check) => check.id === 'workflow.taskCompletion'),
     ).toBe(true)
+  })
+
+  it('given workflow rows declared out of canonical order, then status display order stays canonical', () => {
+    const change = makeChange()
+    change.transition('designing', testActor)
+    change.transition('ready', testActor)
+    change.transition('implementing', testActor)
+    const schema = makeSchema({
+      workflow: [
+        makeWorkflowStep('verifying'),
+        makeWorkflowStep('implementing'),
+        makeWorkflowStep('ready'),
+      ],
+    })
+
+    const verdict = evaluate(change, schema)
+
+    expect(verdict.availableSteps.map((step) => step.step)).toEqual([
+      'ready',
+      'implementing',
+      'verifying',
+    ])
+    expect(verdict.validTransitions).toContain('verifying')
+    expect(verdict.availableTransitions).toContain('verifying')
   })
 
   it('given workflow omits implementing, when evaluate runs from ready, then availableSteps has no implementing extras row', () => {
@@ -1191,50 +1217,241 @@ describe('canonical validity guidance', () => {
       validity: validity({ verification: 'stale' }),
     })
     expect(verdict.nextHop.targetStep).toBe('implementing')
-    expect(verdict.nextAction.command).toBe('/specd-implement')
+    expect(verdict.nextAction.intent).toBe('implement')
   })
 
-  it('routes required stale spec approval to design ahead of preserve', () => {
+  describe('stale spec approval after committed recovery', () => {
+    const staleValidity = () =>
+      validity({
+        specApproval: 'stale',
+        blockers: [{ code: 'APPROVAL_STALE', message: 'Spec approval is stale' }],
+      })
+
+    it('recommends design while design artifacts are incomplete', () => {
+      const change = makeChange()
+      change.transition('designing', testActor)
+      const schema = makeSchema()
+      const verdict = evaluateLifecycle(change, schema, {
+        approvals: { spec: true, signoff: false },
+        checksByTarget: {},
+        validity: staleValidity(),
+      })
+      expect(verdict.nextHop.targetStep).toBe('designing')
+      expect(verdict.nextAction.intent).toBe('design')
+      expect(verdict.nextAction.action).toBeUndefined()
+      expect(verdict.blockers.map((blocker) => blocker.code)).toContain('APPROVAL_STALE')
+    })
+
+    it('recommends ready once design artifacts are complete', () => {
+      const change = makeChange()
+      change.transition('designing', testActor)
+      const schema = makeSchema()
+      const verdict = evaluateLifecycle(change, schema, {
+        approvals: { spec: true, signoff: false },
+        checksByTarget: { ready: [pass('protocol.edge')] },
+        validity: staleValidity(),
+      })
+      expect(verdict.nextHop.targetStep).toBe('ready')
+      expect(verdict.nextAction.intent).toBe('design')
+    })
+
+    it('asks for a fresh approval in ready and never designing', () => {
+      const change = makeChange()
+      change.transition('designing', testActor)
+      change.transition('ready', testActor)
+      const schema = makeSchema()
+      const staleFail = fail(
+        'approval.spec',
+        'APPROVAL_STALE',
+        'Spec approval is stale',
+        { gate: 'spec' },
+        undefined,
+        undefined,
+        approveSpecAction(),
+      )
+      const verdict = evaluateLifecycle(change, schema, {
+        approvals: { spec: true, signoff: false },
+        checksByTarget: { implementing: [pass('protocol.edge'), staleFail] },
+        validity: staleValidity(),
+      })
+      expect(verdict.nextHop.targetStep).toBe('ready')
+      expect(verdict.nextHop.reason).not.toMatch(/approv|gate|consent|sign-?off/i)
+      expect(verdict.nextAction.intent).toBeNull()
+      expect(verdict.nextAction.action).toEqual(approveSpecAction())
+    })
+  })
+
+  describe('verification currency is owned by verification.current', () => {
+    const staleFail = (changeName: string) =>
+      fail(
+        'verification.current',
+        'VERIFICATION_STALE',
+        'Verification evidence is stale',
+        undefined,
+        undefined,
+        undefined,
+        startVerificationAction(changeName),
+      )
+
+    it('blocks verifying to done and renews verification in place', () => {
+      const change = makeChange()
+      change.transition('designing', testActor)
+      change.transition('ready', testActor)
+      change.transition('implementing', testActor)
+      change.transition('verifying', testActor)
+      const schema = makeSchema()
+      const verdict = evaluateLifecycle(change, schema, {
+        checksByTarget: { done: [pass('protocol.edge'), staleFail(change.name)] },
+        validity: validity({
+          verification: 'stale',
+          blockers: [{ code: 'VERIFICATION_STALE', message: 'Verification is stale' }],
+        }),
+      })
+      expect(verdict.availableTransitions).not.toContain('done')
+      expect(verdict.nextHop.targetStep).toBe('verifying')
+      expect(verdict.nextAction.intent).toBe('verify')
+      expect(verdict.nextAction.action?.kind).toBe('start-verification')
+    })
+
+    it('blocks done to archivable and stays in done', () => {
+      const change = makeChange()
+      change.transition('designing', testActor)
+      change.transition('ready', testActor)
+      change.transition('implementing', testActor)
+      change.transition('verifying', testActor)
+      change.transition('done', testActor)
+      const schema = makeSchema()
+      const verdict = evaluateLifecycle(change, schema, {
+        checksByTarget: { archivable: [pass('protocol.edge'), staleFail(change.name)] },
+        validity: validity({
+          verification: 'stale',
+          blockers: [{ code: 'VERIFICATION_STALE', message: 'Verification is stale' }],
+        }),
+      })
+      expect(verdict.availableTransitions).not.toContain('archivable')
+      expect(verdict.nextHop.targetStep).toBe('done')
+      expect(verdict.nextAction.intent).toBe('verify')
+      expect(verdict.nextAction.action?.kind).toBe('start-verification')
+    })
+  })
+
+  it('reports generic INVALID_TRANSITION from ready to a parking state', () => {
+    const change = makeChange()
+    change.transition('designing', testActor)
+    change.transition('ready', testActor)
+    const verdict = evaluate(change, makeSchema(), { requestedTarget: 'pending-spec-approval' })
+    const blocker = verdict.blockers.find((entry) => entry.code === 'INVALID_TRANSITION')
+    expect(blocker).toBeDefined()
+    const other = evaluate(change, makeSchema(), { requestedTarget: 'signed-off' }).blockers.find(
+      (entry) => entry.code === 'INVALID_TRANSITION',
+    )
+    expect(blocker?.message.replace('pending-spec-approval', '<to>')).toBe(
+      other?.message.replace('signed-off', '<to>'),
+    )
+  })
+
+  it('keeps a change out of forward progress while non-task review is pending under preserve', () => {
+    const change = makeChange()
+    change.transition('designing', testActor)
+    change.transition('ready', testActor)
+    change.transition('implementing', testActor)
+    change.setArtifact(makeArtifact('proposal', 'pending-review'))
+    const schema = makeSchema()
+    const verdict = evaluate(change, schema, {
+      validity: validity({
+        artifactReviewRequired: true,
+        recovery: null,
+        blockers: [{ code: 'ARTIFACT_REVIEW_REQUIRED', message: 'Artifact files require review' }],
+      }),
+    })
+    expect(verdict.review.required).toBe(true)
+    expect(verdict.nextHop.targetStep).not.toBe('verifying')
+    expect(['designing', 'implementing']).toContain(verdict.nextHop.targetStep)
+    expect(verdict.nextAction.intent).not.toBe('archive')
+  })
+
+  it('domain nextHop is identical with and without the validity verdict', () => {
     const change = makeChange()
     change.transition('designing', testActor)
     change.transition('ready', testActor)
     change.transition('implementing', testActor)
     const schema = makeSchema()
-    const verdict = evaluateLifecycle(change, schema, {
-      checksByTarget: {},
+    const input = { checksByTarget: { verifying: [pass('protocol.edge')] } }
+    const withValidity = evaluateLifecycleVerdict(change, schema, {
+      ...input,
       validity: validity({
         specApproval: 'stale',
+        signoff: 'stale',
+        verification: 'stale',
         artifactReviewRequired: true,
-        recovery: { cause: 'spec-approval', from: 'implementing', to: 'designing' },
-        blockers: [{ code: 'APPROVAL_STALE', message: 'Spec approval is stale' }],
       }),
     })
-    expect(verdict.nextHop.targetStep).toBe('designing')
-    expect(verdict.nextAction.command).toBe('/specd-design')
-    expect(verdict.blockers.map((blocker) => blocker.code)).toContain('APPROVAL_STALE')
+    const without = evaluateLifecycleVerdict(change, schema, input)
+    expect(withValidity.nextHop).toEqual(without.nextHop)
+    expect(withValidity.availableTransitions).toEqual(without.availableTransitions)
   })
 
-  it('blocks the forward hop and renews verification in place', () => {
+  it('domain nextHop ignores reconciled validity in verifying with stale verification', () => {
     const change = makeChange()
     change.transition('designing', testActor)
     change.transition('ready', testActor)
     change.transition('implementing', testActor)
     change.transition('verifying', testActor)
     const schema = makeSchema()
-    const verdict = evaluateLifecycle(change, schema, {
-      checksByTarget: {
-        done: [pass('protocol.edge')],
-      },
+    const input = { checksByTarget: { done: [pass('protocol.edge')] } }
+    const withValidity = evaluateLifecycleVerdict(change, schema, {
+      ...input,
       validity: validity({
         verification: 'stale',
         artifactReviewRequired: true,
-        recovery: null,
-        blockers: [{ code: 'VERIFICATION_STALE', message: 'Verification is stale' }],
+        specApproval: 'stale',
+        signoff: 'stale',
       }),
     })
-    expect(verdict.availableTransitions).not.toContain('done')
-    expect(verdict.nextHop.targetStep).toBe('verifying')
-    expect(verdict.nextAction.command).toBe('/specd-verify')
+    const without = evaluateLifecycleVerdict(change, schema, input)
+    expect(withValidity.nextHop).toEqual(without.nextHop)
+    expect(withValidity.availableTransitions).toEqual(without.availableTransitions)
+    expect(withValidity.validTransitions).toEqual(without.validTransitions)
+  })
+
+  it('required review under explicit preserve routes guidance to design and leaves state unchanged', () => {
+    const created: ChangeEvent = {
+      type: 'created',
+      at: new Date('2024-01-01T00:00:00Z'),
+      by: testActor,
+      specIds: ['default:auth/login'],
+      schemaName: '@specd/schema-std',
+      schemaVersion: 1,
+    }
+    const change = new Change({
+      name: 'my-change',
+      createdAt: new Date('2024-01-01T00:00:00Z'),
+      specIds: ['default:auth/login'],
+      schemaName: '@specd/schema-std',
+      schemaVersion: 1,
+      history: [created],
+      invalidationPolicy: { artifacts: 'downstream', workflow: 'preserve' },
+    })
+    change.transition('designing', testActor)
+    change.transition('ready', testActor)
+    change.transition('implementing', testActor)
+    change.setArtifact(makeArtifact('proposal', 'pending-review'))
+    const historyLength = change.history.length
+
+    const verdict = evaluate(change, makeSchema(), {
+      validity: validity({
+        artifactReviewRequired: true,
+        recovery: null,
+        blockers: [{ code: 'ARTIFACT_REVIEW_REQUIRED', message: 'Artifact files require review' }],
+      }),
+    })
+
+    expect(verdict.review.required).toBe(true)
+    expect(verdict.nextAction.intent).toBe('design')
+    expect(verdict.nextAction.targetStep).toBe('designing')
+    expect(change.state).toBe('implementing')
+    expect(change.history).toHaveLength(historyLength)
+    expect(change.invalidationPolicy.workflow).toBe('preserve')
   })
 
   it('preserves failed step-skip check evidence in checksByTarget while keeping shortcut unavailable', () => {
@@ -1294,7 +1511,7 @@ describe('canonical validity guidance', () => {
     })
 
     expect(verdict.nextHop.targetStep).toBe('verifying')
-    expect(verdict.nextAction.command).not.toBe('/specd-design')
+    expect(verdict.nextAction.intent).not.toBe('design')
 
     expect(verdict.availableTransitions).toContain('designing')
     expect(verdict.availableTransitions).toContain('verifying')

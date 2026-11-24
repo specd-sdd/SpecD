@@ -810,7 +810,7 @@ A manual invalidation can override one invocation without changing the stored po
 specd changes invalidate my-change --reason "API changed" --target specs --artifact-policy surgical
 ```
 
-Required stale spec approval still returns the change to `designing` when the state is later than `designing`. Required stale sign-off returns it to `done` only when the state is later than `done`. Those returns outrank `workflow`. Verification staleness never moves the lifecycle. See [Validity and verification](workflow.md#validity-and-verification).
+Required stale spec approval still returns the change to `designing` when the state is later than `ready`; in `ready` the change stays put and consent is renewed there. Required stale sign-off returns it to `done` only when the state is later than `done`. Those returns outrank `workflow`. Verification staleness never moves the lifecycle. See [Validity and verification](workflow.md#validity-and-verification).
 
 ---
 

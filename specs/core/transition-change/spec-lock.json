@@ -20,8 +20,10 @@
   ],
   "implementation": [
     {
-      "file": "core:src/domain/errors/happy-path-next-unavailable-error.ts",
-      "symbols": ["HappyPathNextUnavailableError"]
+      "file": "core:src/application/use-cases/transition-change.ts"
+    },
+    {
+      "file": "core:src/application/errors/reconciled-operation-blocked-error.ts"
     }
   ],
   "optimizations": {

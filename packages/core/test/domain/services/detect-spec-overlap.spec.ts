@@ -152,6 +152,7 @@ describe('specOverlapDetectionForChange', () => {
     expect(specOverlapDetectionForChange('alpha', report)).toEqual({
       blocked: false,
       peers: [],
+      entries: [],
     })
   })
 })

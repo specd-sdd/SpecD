@@ -3,6 +3,7 @@ import { ResolveChangeSchema } from '../../../src/application/services/resolve-c
 import { Change } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
+import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { InvalidateChange } from '../../../src/application/use-cases/invalidate-change.js'
 import { ReconcileChangeValidity } from '../../../src/application/use-cases/reconcile-change-validity.js'
 import { ValidityFingerprintService } from '../../../src/application/services/validity-fingerprint-service.js'
@@ -19,10 +20,10 @@ import {
   makeChangeRepository,
   makeActorResolver,
   makeSchemaProvider,
+  makeSpecApprovalFingerprint,
   makeSchema,
   makeArtifactType,
   makeWorkflowStep,
-  makeSpecApprovalFingerprint,
   testActor,
 } from './helpers.js'
 
@@ -153,6 +154,49 @@ describe('InvalidateChange', () => {
       undefined,
       approvals,
     )
+  }
+
+  /** Makes every artifact file readable with stable content so fingerprints can be collected. */
+  function stubReadableArtifacts(repo: ReturnType<typeof makeChangeRepository>): void {
+    vi.spyOn(repo, 'artifact').mockImplementation(
+      async (_change, filename) => new SpecArtifact(filename, `content of ${filename}`),
+    )
+  }
+
+  /** Records a spec approval whose fingerprint matches the change's current evidence. */
+  async function recordValidSpecApproval(
+    change: Change,
+    repo: ReturnType<typeof makeChangeRepository>,
+    activeSchema: Schema,
+  ): Promise<void> {
+    stubReadableArtifacts(repo)
+    const service = new ValidityFingerprintService({
+      changes: repo,
+      hasher: new NodeContentHasher(),
+      binaryHasher: new NodeBinaryContentHasher(),
+      schemaProvider: makeSchemaProvider(activeSchema),
+    })
+    const { fingerprint } = await service.specApprovalFingerprint(change)
+    if (fingerprint === null) throw new Error('spec approval fingerprint unavailable')
+    change.recordSpecApproval('LGTM', fingerprint, testActor)
+  }
+
+  /** Records a sign-off whose fingerprint matches the change's current evidence. */
+  async function recordValidSignoff(
+    change: Change,
+    repo: ReturnType<typeof makeChangeRepository>,
+    activeSchema: Schema,
+  ): Promise<void> {
+    stubReadableArtifacts(repo)
+    const service = new ValidityFingerprintService({
+      changes: repo,
+      hasher: new NodeContentHasher(),
+      binaryHasher: new NodeBinaryContentHasher(),
+      schemaProvider: makeSchemaProvider(activeSchema),
+    })
+    const { fingerprint } = await service.completeFingerprint(change)
+    if (fingerprint === null) throw new Error('sign-off fingerprint unavailable')
+    change.recordSignoff('Ship it', fingerprint, testActor)
   }
 
   it('throws ChangeNotFoundError when change does not exist', async () => {
@@ -308,13 +352,9 @@ describe('InvalidateChange', () => {
   describe('approval guard', () => {
     it('blocks invalidation when change has active spec approval', async () => {
       const change = makeChangeWithDAG('c1')
-      change.recordSpecApproval(
-        'LGTM',
-        makeSpecApprovalFingerprint(change.specIds, { proposal: 'sha256:p' }),
-        testActor,
-      )
       const repo = makeChangeRepository([change])
-      const uc = createInvalidate(repo)
+      await recordValidSpecApproval(change, repo, schema)
+      const uc = createInvalidate(repo, schema, { spec: true, signoff: false })
       await expect(
         uc.execute({
           name: 'c1',
@@ -324,7 +364,9 @@ describe('InvalidateChange', () => {
         }),
       ).rejects.toMatchObject({
         code: 'INVALIDATE_REQUIRES_FORCE',
-        message: expect.stringContaining('revoke the reported gate(s)'),
+        message: expect.stringContaining(
+          'Revoking the reported gate(s) requires explicit confirmation',
+        ),
       })
       await expect(
         uc.execute({
@@ -338,13 +380,9 @@ describe('InvalidateChange', () => {
 
     it('allows invalidation with force when change has active approval', async () => {
       const change = makeChangeWithDAG('c1')
-      change.recordSpecApproval(
-        'LGTM',
-        makeSpecApprovalFingerprint(change.specIds, { proposal: 'sha256:p' }),
-        testActor,
-      )
       const repo = makeChangeRepository([change])
-      const uc = createInvalidate(repo)
+      await recordValidSpecApproval(change, repo, schema)
+      const uc = createInvalidate(repo, schema, { spec: true, signoff: false })
       const result = await uc.execute({
         name: 'c1',
         reason: 'forced',
@@ -352,17 +390,13 @@ describe('InvalidateChange', () => {
         policyOverride: { artifacts: 'surgical' },
         force: true,
       })
-      expect(result.change.state).toBe('implementing')
+      expect(result.change.state).toBe('designing')
     })
 
     it('returns to designing when forced revocation affects required spec approval', async () => {
       const change = makeChangeWithDAG('c1')
-      change.recordSpecApproval(
-        'LGTM',
-        makeSpecApprovalFingerprint(change.specIds, { proposal: 'sha256:p' }),
-        testActor,
-      )
       const repo = makeChangeRepository([change])
+      await recordValidSpecApproval(change, repo, schema)
       const uc = createInvalidate(repo, schema, { spec: true, signoff: true })
       const result = await uc.execute({
         name: 'c1',
@@ -387,13 +421,33 @@ describe('InvalidateChange', () => {
       expect(result.reason).toBe('forced')
     })
 
-    it('does not require force for already-stale historical approval evidence', async () => {
+    it('does not require force for a persisted-valid consent that is stale per fingerprint', async () => {
       const change = makeChangeWithDAG('c1')
+      const repo = makeChangeRepository([change])
+      stubReadableArtifacts(repo)
+      // Recorded against evidence that no longer matches the current artifact hashes.
       change.recordSpecApproval(
         'LGTM',
-        makeSpecApprovalFingerprint(change.specIds, { proposal: 'sha256:p' }),
+        makeSpecApprovalFingerprint(change.specIds, { 'proposal.md': 'sha256:' + '0'.repeat(64) }),
         testActor,
       )
+      expect(change.specApproval?.status).toBe('valid')
+
+      const result = await createInvalidate(repo, schema, { spec: true, signoff: false }).execute({
+        name: change.name,
+        reason: 'review',
+        targets: [{ artifactId: 'design' }],
+        policyOverride: { artifacts: 'surgical', workflow: 'preserve' },
+      })
+
+      expect(result.reason).toBe('review')
+      expect(result.change.specApproval?.status).not.toBe('valid')
+    })
+
+    it('does not require force for already-stale historical approval evidence', async () => {
+      const change = makeChangeWithDAG('c1')
+      const staleRepo = makeChangeRepository([change])
+      await recordValidSpecApproval(change, staleRepo, schema)
       change.markApprovalInvalid('spec', 'stale', {
         at: new Date(),
         by: testActor,
@@ -401,7 +455,7 @@ describe('InvalidateChange', () => {
         reason: 'Already stale',
         differences: [],
       })
-      const result = await createInvalidate(makeChangeRepository([change]), schema, {
+      const result = await createInvalidate(staleRepo, schema, {
         spec: true,
         signoff: false,
       }).execute({
@@ -422,8 +476,9 @@ describe('InvalidateChange', () => {
       change.transition('verifying', testActor)
       change.transition('done', testActor)
       change.transition('archivable', testActor)
-      change.recordSignoff('Ship it', {}, testActor)
-      const result = await createInvalidate(makeChangeRepository([change]), schema, {
+      const repo = makeChangeRepository([change])
+      await recordValidSignoff(change, repo, schema)
+      const result = await createInvalidate(repo, schema, {
         spec: false,
         signoff: true,
       }).execute({
@@ -440,7 +495,9 @@ describe('InvalidateChange', () => {
         to: 'done',
       })
       expect(result.change.state).toBe('done')
-      expect(result.nextAction).toMatchObject({ targetStep: 'done', command: '/specd-verify' })
+      // The invalidated design artifact is pending review, which wins over renewing sign-off.
+      expect(result.nextAction).toMatchObject({ targetStep: 'designing', intent: 'design' })
+      expect(result.nextAction.action).toBeUndefined()
     })
   })
 
@@ -461,8 +518,9 @@ describe('InvalidateChange', () => {
       change.transition('verifying', testActor)
       change.transition('done', testActor)
       change.transition('archivable', testActor)
-      change.recordSignoff('Ship it', {}, testActor)
-      return createInvalidate(makeChangeRepository([change]), activeSchema, {
+      const repo = makeChangeRepository([change])
+      await recordValidSignoff(change, repo, activeSchema)
+      return createInvalidate(repo, activeSchema, {
         spec: false,
         signoff: true,
       }).execute({
@@ -479,16 +537,18 @@ describe('InvalidateChange', () => {
 
       expect(result.automaticReturn).toMatchObject({ to: 'done' })
       // The invalidated design artifact is pending review, so guidance sends the user to design.
-      expect(result.nextAction.command).toBe('/specd-design')
-      expect(result.nextAction.command).not.toBe('/specd-verify')
-      expect(result.nextAction.command).not.toContain('verification start')
+      expect(result.nextAction.intent).toBe('design')
+      expect(result.nextAction.intent).not.toBe('verify')
+      expect(result.nextAction.action).toBeUndefined()
       expect(result.nextAction.reason).toContain('returned the change to done')
     })
 
-    it('still routes to verification when verifying is enabled', async () => {
+    it('routes to design when verifying is enabled and the invalidated design is pending review', async () => {
       const result = await forcedSignoffWithdrawal(withVerifying(false))
 
-      expect(result.nextAction.command).toBe('/specd-verify')
+      expect(result.automaticReturn).toMatchObject({ to: 'done' })
+      expect(result.nextAction.intent).toBe('design')
+      expect(result.nextAction.action).toBeUndefined()
     })
   })
 

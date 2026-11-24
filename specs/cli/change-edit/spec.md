@@ -36,9 +36,11 @@ The `--remove-spec` flag is not subject to ownership checks — removing a spec 
 
 The command SHALL delegate scope and policy edits to `EditChange` and MUST NOT invalidate approvals or move lifecycle state itself.
 
-Output SHALL report `scopeChanged` separately from actual validity changes, which approval or verification projections became stale or revoked, which artifact files require review, canonical blockers and next action, and any automatic return committed by reconciliation. With a required stale spec approval, it SHALL report `designing` even when the workflow policy is `preserve`. Without that gate, a preserved state remains visible together with the forward-progress blocker.
+Output SHALL report `scopeChanged` separately from actual validity changes, which approval or verification projections became stale or revoked, which artifact files require review, canonical blockers and next action, and any automatic return committed by reconciliation. With a required stale spec approval in a state after `ready`, it SHALL report `designing` even when the workflow policy is `preserve`; in `ready` it SHALL report `ready` with the stale approval and no automatic return. Without that gate, a preserved state remains visible together with the forward-progress blocker.
 
 The command SHALL warn that approval was invalidated only when Core reports a committed projection change. A scope edit that leaves the approved canonical spec set and all fingerprinted inputs unchanged MUST NOT emit that warning. Any retained legacy `invalidated` field is deprecated and reflects actual validity change, not merely scope mutation.
+
+Blockers returned by Core are rendered through the same CLI blocker projection as `changes status` and `changes invalidate`. In text mode each blocker is printed as `! <CODE> — <label>: <message>` (the ` — <label>` part is omitted when the blocker carries no label), followed by an indented `bypass: <flag>` line only for a skippable blocker whose bypass flag resolves. In JSON and TOON each blocker is projected through the CLI blocker projection (`code`, `message`, and, when present, `label`, `checkId`, `details`, `action`, `bypassFlag`); the raw Core `isSkippable` field is never emitted.
 
 Description-only and policy-only edits MUST NOT be described as approval invalidation unless core reports a separately detected fresh drift.
 
@@ -46,8 +48,8 @@ Description-only and policy-only edits MUST NOT be described as approval invalid
 
 On success, output depends on `--format`:
 
-- `text` (default): prints a human-readable success message to stdout showing the updated change name, spec IDs, and workspaces. If approval invalidation occurred, a warning is also printed to stderr.
-- `json` or `toon`: outputs `{ result: "ok", name, specIds, workspaces, invalidated, state }` (encoded in the respective format); `specIds` and `workspaces` are arrays, one whole name per element.
+- `text` (default): prints a human-readable success message to stdout showing the updated change name, spec IDs, and workspaces, followed by the effective policy, projection changes, automatic return, blockers (in the same form as `changes status`, see "Approval invalidation") and next action when Core reports them. The next action prints `target:`, `command:` (`(none)` when null) and `reason:` lines, and, when `command` is `null` and Core's next action carries `guidance`, an additional indented `guidance: <text>` line before `reason:` (as in `changes status`, `changes invalidate` and `changes verification`). If a validity change occurred, a warning is also printed to stderr.
+- `json` or `toon`: outputs `{ result: "ok", name, specIds, workspaces, invalidated, scopeChanged, validityChanged, state }` plus, when Core reports them, `blockers` (only when non-empty, each projected through the CLI blocker projection with `label`, `checkId`, `details`, `action` and `bypassFlag`, never raw `isSkippable`), `nextAction`, `effectivePolicy`, `projectionChanges` and `automaticReturn` (encoded in the respective format); `specIds` and `workspaces` are arrays, one whole name per element.
 
 ### Requirement: Error cases
 

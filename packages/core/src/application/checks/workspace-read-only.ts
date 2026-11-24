@@ -56,7 +56,10 @@ class WorkspaceReadOnlyCheck extends WorkflowCheck {
    */
   override async execute(ctx: CheckExecutionContext) {
     const facts = await loadReadyPredicateFacts(this._deps, ctx.change, ctx.schema)
-    return runWorkspaceReadOnly({ ownershipBySpecId: facts.ownershipBySpecId })
+    return runWorkspaceReadOnly({
+      ownershipBySpecId: facts.ownershipBySpecId,
+      changeName: ctx.change.name,
+    })
   }
 }
 

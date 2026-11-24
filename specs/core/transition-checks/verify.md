@@ -4,16 +4,16 @@
 
 ### Requirement: Check identity and result
 
-#### Scenario: Check result carries remediation command
+#### Scenario: Check result carries host-neutral action
 
-- **GIVEN** a check returning `outcome: 'fail'` with `command: 'pnpm audit:fix'`
+- **GIVEN** a plugin check returning `outcome: 'fail'` with `action: { kind: '@audit.fix', guidance: 'Run the audit fixer' }`
 - **WHEN** evaluating check results
-- **THEN** the `CheckResult` preserves the `command` string for CLI reporting
+- **THEN** the `CheckResult` preserves the host-neutral `action` descriptor for delivery adapters
 
 #### Scenario: Check with skippable binding bypassed by user injects synthetic skip
 
 - **GIVEN** a transition step whose binding declares `skippable: true`
-- **WHEN** the user supplies its check ID to `--skip-checks`
+- **WHEN** the caller supplies its check ID in `skipChecks`
 - **THEN** the check is not executed
 - **AND** a synthetic `{ outcome: 'skip', details: { bypassedByUser: true } }` is recorded
 
@@ -36,8 +36,8 @@
 #### Scenario: Execute does not take a global snapshot bag
 
 - **WHEN** `execute` is invoked
-- **THEN** its argument is `CheckExecutionContext` (change, schema, attempt, baked `approvals`, resolved `config`, `skipChecks`, and `checkRegistry`)
-- **AND** it does not accept `PredicateSnapshots`
+- **THEN** its argument is `CheckExecutionContext` (change, schema, attempt, resolved `config`, `validity`, and the optional `approvals`, `effectiveStatusByArtifact`, `skipHookPhases`, `passMemo`, `onCheckProgress`)
+- **AND** it contains no bypass booleans and does not accept `PredicateSnapshots`
 
 #### Scenario: CountTasks memo lives on passMemo not the check instance
 
@@ -221,7 +221,8 @@
 
 - **GIVEN** a schema declaration that sets `skippable: true` for a Category C check whose code-defined binding is non-skippable and permits overrides
 - **WHEN** the check fails in `TransitionChange` and in `GetStatus`
-- **THEN** `CheckPredicateFailedError.skippable` is `true`, `--skip-checks <checkId>` is accepted, and the status blocker advertises `--skip-checks <checkId>`
+- **THEN** `CheckPredicateFailedError.skippable` is `true`, the check id is accepted as a skipped check, and the status blocker carries `isSkippable: true` and `checkId`
+- **AND** the blocker carries no CLI `bypassFlag`
 
 #### Scenario: archiveChecks disabled removes the check from the archive operation only
 
@@ -342,7 +343,7 @@
 - **WHEN** `GetStatus` evaluates the same edge
 - **THEN** `allowed` does not wait on those hooks
 
-#### Scenario: Skip-hooks still runs predicates
+#### Scenario: skipHookPhases all still runs predicates
 
 - **GIVEN** `skipHookPhases` contains `all`
 - **AND** `workflow.taskCompletion` would fail
@@ -357,9 +358,9 @@
 - **GIVEN** a requested pair not in `listWorkflowTransitions(from, schema, approvals)`
 - **AND** other matching predicates that would also fail
 - **WHEN** `TransitionChange` evaluates the attempt (execute mode)
-- **THEN** `protocol.edge` fails first with `INVALID_TRANSITION`
+- **THEN** `protocol.edge` fails first with `INVALID_TRANSITION` and `details: { from, to }`
 - **AND** no other predicate's `execute` is called
-- **AND** the thrown error is `InvalidStateTransitionError` with reason `invalid-transition`
+- **AND** the thrown error is `CheckPredicateFailedError` for `protocol.edge`
 
 #### Scenario: Status collects every predicate for an illegal edge
 
@@ -487,41 +488,50 @@
 - **WHEN** `GetStatus` runs
 - **THEN** `validTransitions` still includes `verifying`
 - **AND** `availableTransitions` does not include `verifying`
-- **AND** `nextAction` still recommends `/specd-implement`
+- **AND** `nextAction.intent` is `'implement'`
 
-#### Scenario: Complete tasks recommend verify skill
+#### Scenario: Complete tasks recommend verify intent
 
 - **GIVEN** a change in `implementing` with all gated tasks complete
 - **AND** `workflow.requires` for `verifying` is satisfied
 - **WHEN** `GetStatus` runs
 - **THEN** `availableTransitions` includes `verifying`
-- **AND** `nextAction` recommends `/specd-verify` not `/specd-implement`
+- **AND** `nextAction.intent` is `'verify'` not `'implement'`
 
-#### Scenario: Failed spec gate recommends approve not pending
+#### Scenario: Failed spec gate recommends approve-spec not pending
 
 - **GIVEN** a change in `ready` with spec gate on and no spec approval
 - **WHEN** `GetStatus` runs
-- **THEN** `nextAction` recommends `specd changes approve spec`
+- **THEN** `nextAction.action` is `{ kind: 'approve-spec' }` and `nextAction.intent` is `null`
 - **AND** it does not recommend a transition to `pending-spec-approval`
+
+#### Scenario: Stale spec approval in ready asks for a fresh approval
+
+- **GIVEN** a change in `ready` with spec gate on and a stale or revoked spec approval that has not been renewed
+- **WHEN** reconciliation and `GetStatus` run
+- **THEN** reconciliation commits no recovery to `designing` and the change stays in `ready`
+- **THEN** `nextAction.action` is `{ kind: 'approve-spec' }` and `nextAction.intent` is `null`
+- **AND** `nextAction.targetStep` is `ready`, not `designing`
 
 #### Scenario: Backward hops listed but not happy-path nextAction
 
 - **GIVEN** a change in `done`
 - **WHEN** `GetStatus` runs
 - **THEN** `availableTransitions` includes `implementing` and `verifying`
-- **AND** `nextAction` recommends archive or signoff-approve, not the implement skill
+- **AND** `nextAction.intent` is `'archive'` or `nextAction.action?.kind` is `'approve-signoff'`, not `'implement'`
 
-#### Scenario: Archive blocker carries bypassFlag only for skippable bindings
+#### Scenario: Archive blocker carries isSkippable and checkId from the resolved binding
 
 - **GIVEN** a change in `archivable` blocked by `spec.overlap` whose resolved binding is skippable
 - **WHEN** `GetStatus` projects blockers
-- **THEN** the blocker has `bypassFlag` `--skip-checks spec.overlap`
+- **THEN** the blocker has `isSkippable: true` and `checkId: 'spec.overlap'`
+- **AND** the blocker carries no CLI `bypassFlag`
 
-#### Scenario: Locked or schema-hardened archive blocker has no bypassFlag
+#### Scenario: Locked or schema-hardened archive blocker is not skippable
 
 - **GIVEN** a blocker from `workspace.readOnly`, or from `spec.overlap` with `skippable: false` in the schema
 - **WHEN** `GetStatus` projects blockers
-- **THEN** the blocker carries no `bypassFlag`
+- **THEN** the blocker has `isSkippable: false`, still carries its `checkId` and `label`, and no CLI `bypassFlag`
 
 ### Requirement: No shared snapshot bag
 
@@ -592,14 +602,91 @@
 
 #### Scenario: Parked approval is reported before protocol edge failure
 
-- **GIVEN** a historic parked approval state receives a non-drain target
-- **WHEN** transition checks are evaluated
-- **THEN** the public repair reason is the matching approval requirement
+- **GIVEN** a change in `pending-spec-approval` with the spec gate on and no approval
+- **WHEN** transition checks are evaluated for `implementing`
+- **THEN** `approval.spec` is applicable and fails with `APPROVAL_REQUIRED`
+- **AND** the public repair reason is the matching approval requirement
 
 #### Scenario: Production composition supplies overlap detection
 
 - **WHEN** status or archive composition resolves its workflow check registry
 - **THEN** the registry receives the overlap detector dependency
+
+### Requirement: Approval bindings cover legacy parking sources
+
+#### Scenario: approval.spec applies on every legacy spec source
+
+- **GIVEN** the binding table
+- **WHEN** `boundFromStates('approval.spec')` is read
+- **THEN** it contains `ready`, `pending-spec-approval`, and `spec-approved`
+- **AND** an attempt from `spec-approved` to `implementing` along `forward` matches the binding
+
+#### Scenario: approval.signoff applies on every legacy signoff source
+
+- **GIVEN** the binding table
+- **WHEN** `boundFromStates('approval.signoff')` is read
+- **THEN** it contains `done`, `pending-signoff`, and `signed-off`
+- **AND** an attempt from `signed-off` to `archivable` along `forward` matches the binding
+
+#### Scenario: Retreating from a parked state is not gated
+
+- **GIVEN** a change in `pending-signoff` with no sign-off
+- **WHEN** transition checks are evaluated for `done` and for `designing`
+- **THEN** `approval.signoff` does not apply and does not block either hop
+
+#### Scenario: Missing approval on a parking state blocks the exit
+
+- **GIVEN** a change in `signed-off` with the signoff gate on and no active sign-off
+- **WHEN** transition checks are evaluated for `archivable`
+- **THEN** `approval.signoff` fails with `APPROVAL_REQUIRED` and carries `action: { kind: 'approve-signoff' }`
+
+### Requirement: Verification currency bounds every verification-requiring exit
+
+#### Scenario: Stale verification blocks done to archivable
+
+- **GIVEN** a change in `done` whose schema enables `verifying` and whose completed verification is stale
+- **WHEN** `GetStatus` evaluates the forward candidates
+- **THEN** `verification.current` fails for `archivable` with `VERIFICATION_STALE` and `action: { kind: 'start-verification', params: { changeName } }`
+- **AND** `archivable` is absent from `availableTransitions` and `nextAction.targetStep` is `done`
+
+#### Scenario: Verification binding rows follow the table
+
+- **WHEN** `boundFromStates('verification.current')` is read
+- **THEN** it includes `verifying`, `done`, `pending-signoff`, and `signed-off`
+
+#### Scenario: Disabled verifying skips the exit check
+
+- **GIVEN** a schema that disables `verifying`
+- **WHEN** `verification.current` is evaluated for `done` to `archivable`
+- **THEN** it reports `skip` and does not block the transition
+
+### Requirement: Check failures carry their own structured details
+
+#### Scenario: workflow.requires computes blockedBy itself
+
+- **GIVEN** artifact `design` has effective status `pending-parent-artifact-review` because `specs` is `pending-review`
+- **WHEN** `workflow.requires` fails
+- **THEN** `details` is `{ artifactId: 'design', status: 'pending-parent-artifact-review', blockedBy: { artifactId: 'specs', status: 'pending-review' } }`
+- **AND** the use case did not compute `blockedBy`
+
+#### Scenario: deps.consistent lists every mismatch
+
+- **GIVEN** three specs whose extracted and persisted `dependsOn` disagree
+- **WHEN** `deps.consistent` fails
+- **THEN** `details.mismatches` has three entries, each with `specId`, `extracted`, and `persisted`
+
+#### Scenario: workspace.readOnly and spec.overlap carry their payloads
+
+- **GIVEN** a change with two specs in readOnly workspaces and overlap with two peers
+- **WHEN** `workspace.readOnly` and `spec.overlap` fail
+- **THEN** `details.specs` lists both affected specs with their workspaces
+- **AND** `details.entries` lists every overlapping spec with its peer changes
+
+#### Scenario: Details are host-neutral
+
+- **GIVEN** any built-in check failing with details
+- **WHEN** its `message` and `details` are inspected
+- **THEN** none contains a CLI flag, command, or slash command
 
 ### Requirement: Host-neutral impl.linksInScope message
 
@@ -608,4 +695,61 @@
 - **GIVEN** a change with confirmed implementation links targeting specs outside `change.specIds`
 - **WHEN** `detectImplLinksInScope` runs
 - **THEN** `blocked` is `true` and `outOfScopeSpecIds` lists the out-of-scope spec IDs
-- **AND** `message` does not contain `--allow-out-of-scope`
+- **AND** `message` contains none of `--allow-out-of-scope`, `allowOutOfScope`, `--skip-checks`, or `Re-run with`
+
+### Requirement: Check-declared host-neutral actions
+
+#### Scenario: approval.spec emits approve-spec when approval is missing
+
+- **GIVEN** a change in `ready` with spec approval gate enabled and no spec approval
+- **WHEN** `approval.spec` fails with `APPROVAL_REQUIRED`
+- **THEN** `CheckResult.action` is `{ kind: 'approve-spec' }`
+- **AND** no CLI command string or flag appears in `action`, `message`, or `details`
+
+#### Scenario: approval.spec emits approve-spec when approval is stale
+
+- **GIVEN** a change in `ready` with spec approval gate enabled and a stale or revoked spec approval
+- **WHEN** `approval.spec` fails with `APPROVAL_STALE`
+- **THEN** `CheckResult.action` is `{ kind: 'approve-spec' }`
+- **AND** no `redesign-spec` action kind exists
+
+#### Scenario: approval.signoff emits approve-signoff on failure
+
+- **GIVEN** a change in `done` with sign-off gate enabled and no active or a stale sign-off
+- **WHEN** `approval.signoff` fails
+- **THEN** `CheckResult.action` is `{ kind: 'approve-signoff' }`
+- **AND** no CLI command string or flag appears in `action` or `message`
+
+#### Scenario: verification.current emits an informational action instead of details.command
+
+- **GIVEN** a change whose verification evidence is missing, in progress, or stale
+- **WHEN** `verification.current` fails
+- **THEN** `CheckResult.action` is `{ kind: 'start-verification', params: { changeName }, supersedesIntent: false }`
+- **AND** `details` does not contain a CLI `command` string
+
+#### Scenario: verification.current without validity asks for a status refresh
+
+- **GIVEN** a change for which no validity verdict is available
+- **WHEN** `verification.current` fails with `VERIFICATION_VALIDITY_UNAVAILABLE`
+- **THEN** `CheckResult.action` is `{ kind: 'refresh-status', params: { changeName }, supersedesIntent: false }`
+
+#### Scenario: Check and CustomCheckDefinition declare no static action
+
+- **GIVEN** the `Check` and `CustomCheckDefinition` interfaces
+- **WHEN** a plugin check is registered
+- **THEN** neither interface declares `action` or `command`
+- **AND** a remediation can only be declared on the `CheckResult` the check returns on failure
+
+#### Scenario: Plugin action kinds follow the namespace convention
+
+- **GIVEN** a plugin check `@security.code-scan` failing with `action: { kind: '@security.fix', guidance: 'Run the scanner fix mode' }`
+- **WHEN** a host receives the action without a mapping for that kind
+- **THEN** the host falls back to `action.guidance` and never invents command syntax
+- **AND** core does not validate or reject a non-built-in kind that lacks the `@plugin.id` prefix
+
+#### Scenario: Gate bindings stay on ready and done
+
+- **GIVEN** the built-in check bindings
+- **WHEN** the applicability of `approval.spec` and `approval.signoff` is listed
+- **THEN** `approval.spec` applies from `ready` and `approval.signoff` applies from `done` to `archivable`
+- **AND** the only additional approval rows are the legacy parking sources `pending-spec-approval`, `spec-approved`, `pending-signoff`, and `signed-off`

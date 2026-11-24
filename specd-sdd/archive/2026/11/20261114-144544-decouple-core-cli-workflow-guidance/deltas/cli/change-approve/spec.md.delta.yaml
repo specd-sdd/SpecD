@@ -1,0 +1,33 @@
+- op: modified
+  description: 'Spec approval from a legacy parking state records consent without transitioning'
+  selector:
+    type: section
+    matches: 'Requirement: Approve spec behaviour'
+  content: |
+    `approve spec` invokes `ApproveSpec`. It is valid when the change is in a binding `from` state for `approval.spec` (`ready`, plus the legacy parking states `pending-spec-approval` and `spec-approved`). On success the change stays in its current state with the consent recorded; the success output (text and JSON) MUST include a `state:` line / `state` field with that unchanged current state and MUST NOT print a transition, and from a legacy parking state the user continues with a normal transition to `implementing`. Help text MUST use bound-`from` language, with `ready` as the current example.
+
+- op: modified
+  description: 'Signoff from a legacy parking state records consent without transitioning'
+  selector:
+    type: section
+    matches: 'Requirement: Approve signoff behaviour'
+  content: |
+    `approve signoff` invokes `ApproveSignoff`. It is valid when the change is in a binding `from` state for `approval.signoff` (`done`, plus the legacy parking states `pending-signoff` and `signed-off`). On success the change stays in its current state with the consent recorded; the success output (text and JSON) MUST include a `state:` line / `state` field with that unchanged current state and MUST NOT print a transition, and from a legacy parking state the user continues with a normal transition to `archivable`. Help text MUST use bound-`from` language, with `done` as the current example.
+
+- op: modified
+  description: 'Help JSON schema documents the approval evidence'
+  selector:
+    type: section
+    matches: '^Requirement: Command signatures$'
+  content: |
+    ```
+    specd change approve spec <name> --reason <text> [--format text|json|toon]
+    specd change approve signoff <name> --reason <text> [--format text|json|toon]
+    ```
+
+    - `spec` / `signoff` — required sub-verb selecting which approval gate to exercise
+    - `<name>` — required positional; the name of the change to approve
+    - `--reason <text>` — required; a human-readable explanation for the approval decision
+    - `--format text|json|toon` — optional; output format, defaults to `text`
+
+    The `--help` JSON output schema MUST list every field of the structured success and failure records, including the `approval` evidence block, `state`, and `nextAction.intent`, `nextAction.action`, and `nextAction.guidance` alongside `command`. The failure error payload additions (`state`, `blockers`, `nextAction`) live under the error `metadata` object, and the help text MUST say so rather than describing them as top-level payload fields. Blocker entries MUST list `code`, `message`, `label`, `checkId`, `details`, `action`, and `bypassFlag`, and the `nextAction` shape MUST list `command`, `intent`, `action`, `guidance`, `actionType`, and `reason`. Text failure output MUST print a `guidance:` line for a next action without a command mapping. Text failure output MUST print the `error:` line first and then the `state:`, blocker and next-action lines; blockers MUST print with their label in the same form as status (`! <CODE> — <label>: <message>`). Enriching a failure with `state`, `blockers` and `nextAction` metadata is best effort: assigning them onto an error whose properties are read-only (getter-only) MUST NOT throw and MUST NOT mask the original error.

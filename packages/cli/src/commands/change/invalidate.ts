@@ -4,6 +4,11 @@ import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import {
+  blockerTextLines,
+  projectCliBlocker,
+  projectCliNextActionRecord,
+} from '../../guidance-presenter.js'
+import {
   parseArtifactPolicyFlag,
   parseWorkflowPolicyFlag,
   resolveInvalidationOverride,
@@ -88,6 +93,8 @@ Target syntax:
         const artifactPolicy = parseArtifactPolicyFlag(opts.artifactPolicy, opts.format)
         const workflowPolicy = parseWorkflowPolicyFlag(opts.workflowPolicy, opts.format)
         try {
+          // Validate the output format before the mutating use case runs.
+          const fmt = parseFormat(opts.format)
           const { kernel } = await resolveCliContext({ configPath: opts.config })
 
           const targets = opts.target.map((t) => {
@@ -107,8 +114,6 @@ Target syntax:
             ...(opts.force !== undefined ? { force: opts.force } : {}),
           })
 
-          const fmt = parseFormat(opts.format)
-
           const policy = describeEffectivePolicy(result.effectivePolicy)
           const projectionChanges = publicProjectionChanges(
             'projectionChanges' in result ? result.projectionChanges : undefined,
@@ -117,7 +122,11 @@ Target syntax:
             'automaticReturn' in result ? result.automaticReturn : undefined,
           )
           const blockers = 'blockers' in result ? result.blockers : []
-          const nextAction = 'nextAction' in result ? result.nextAction : undefined
+          const rawNextAction = 'nextAction' in result ? result.nextAction : undefined
+          const nextAction =
+            rawNextAction !== undefined
+              ? projectCliNextActionRecord(rawNextAction, blockers)
+              : undefined
 
           if (fmt === 'text') {
             const lines: string[] = []
@@ -192,13 +201,16 @@ Target syntax:
             if (blockers.length > 0) {
               lines.push('blockers:')
               for (const blocker of blockers) {
-                lines.push(`  ! ${blocker.code}: ${blocker.message}`)
+                lines.push(...blockerTextLines(blocker))
               }
             }
             if (nextAction !== undefined) {
               lines.push('next action:')
               lines.push(`  target:  ${nextAction.targetStep}`)
               lines.push(`  command: ${nextAction.command ?? '(none)'}`)
+              if (nextAction.command === null && nextAction.guidance !== undefined) {
+                lines.push(`  guidance: ${nextAction.guidance}`)
+              }
               lines.push(`  reason:  ${nextAction.reason}`)
             }
 
@@ -211,7 +223,7 @@ Target syntax:
                 reason: result.reason,
                 effectivePolicy: result.effectivePolicy,
                 affected: result.affected,
-                ...(blockers.length > 0 ? { blockers } : {}),
+                ...(blockers.length > 0 ? { blockers: blockers.map(projectCliBlocker) } : {}),
                 ...(nextAction !== undefined ? { nextAction } : {}),
                 ...(projectionChanges.length > 0 ? { projectionChanges } : {}),
                 ...(automaticReturn !== undefined ? { automaticReturn } : {}),
@@ -223,7 +235,7 @@ Target syntax:
           if (err instanceof InvalidateRequiresForceError) {
             for (const recovery of err.recoveries) {
               process.stderr.write(
-                `warning: valid ${recovery.gate} consent would be revoked; recovery target: ${recovery.target}. Re-run with --force.\n`,
+                `warning: valid ${recovery.gate} consent would be revoked; recovery target: ${recovery.target}\n`,
               )
             }
           }

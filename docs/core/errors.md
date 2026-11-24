@@ -38,7 +38,7 @@ try {
 
 ### Host-Neutral Error Messages & Delivery Hints
 
-`@specd/core` error messages MUST remain host-neutral: they describe the domain or validation condition without embedding CLI flags (such as `--force`, `--next`, `--target`, `--set`, or `--allow-out-of-scope`) or CLI commands (such as `specd specs show ...`).
+`@specd/core` error messages MUST remain host-neutral: they describe the domain or validation condition without embedding CLI flags (such as `--force`, `--next`, `--target`, `--set`, or `--allow-out-of-scope`), CLI commands (such as `specd specs show ...`), or agent slash commands (such as `/specd-verify`). Recovery commands live in the CLI hints, resolved from the error code and its structured metadata (for example `VERIFICATION_STALE` plus `changeName`).
 
 Instead, errors expose a machine-readable `code` plus structured metadata (via getters such as `state`, `specId`, `fieldPath`, or `recoveries`). Delivery adapters translate `(code, invokedCommand, metadata)` into host-appropriate remediation hints—for example, `@specd/cli` resolves hints centrally in `packages/cli/src/error-hints.ts` (`CLI_ERROR_HINTS` + `CLI_ERROR_HINT_RULES` via `resolveCliErrorHint`) and renders them through `handleError` as a separate `hint` line on stderr or top-level `hint` field in `json`/`toon` output.
 
@@ -158,7 +158,7 @@ import { VerificationInProgressError } from '@specd/core'
 
 **Code:** `'VERIFICATION_STALE'`
 
-Thrown by sign-off when completed evidence is stale or contains legacy-unknown implementation data. Run `/specd-verify` to create current evidence. This is distinct from evidence never having existed.
+Thrown by sign-off when completed evidence is stale or contains legacy-unknown implementation data. The verification evidence must be renewed before sign-off can proceed. This is distinct from evidence never having existed.
 
 ```typescript
 import { VerificationStaleError } from '@specd/core'
@@ -178,7 +178,7 @@ Thrown when `InvalidateChange` would revoke a currently `valid` spec approval, a
 import { InvalidateRequiresForceError } from '@specd/core'
 ```
 
-**Additional properties:** `recoveries`, an ordered list of `{ gate, target }` pairs selected by Core, plus the compatibility projection `gates`. A spec pair targets `designing`; a sign-off pair targets `done`. Delivery adapters must render these pairs rather than hard-code a recovery state.
+**Additional properties:** `recoveries`, an ordered list of `{ gate, target }` pairs selected by Core, plus the compatibility projection `gates`. From states after `ready`, a spec pair targets `designing`; from `ready` the target is the current state (no return). A sign-off pair targets `done`. Delivery adapters must render these pairs rather than hard-code a recovery state.
 
 **Thrown by:** `InvalidateChange`.
 
@@ -445,27 +445,56 @@ import { InvalidStateTransitionError, type TransitionFailureReason } from '@spec
 
 type TransitionFailureReason =
   | { type: 'invalid-transition' }
-  | { type: 'incomplete-artifact'; artifactId: string }
   | {
-      type: 'incomplete-tasks'
+      type: 'incomplete-artifact'
       artifactId: string
-      incomplete: number
-      complete: number
-      total: number
+      status?: string
+      blockedBy?: { artifactId: string; status: string }
     }
-  | { type: 'approval-required'; gate: 'spec' | 'signoff' }
 
 // Messages vary by reason:
 // "Cannot transition from 'ready' to 'implementing'"                              (no reason / invalid-transition)
 // "Cannot transition from 'ready' to 'implementing': artifact 'specs' is not complete"  (incomplete-artifact)
-// "Cannot transition from 'implementing' to 'verifying': tasks has incomplete items (3/30 tasks complete)"  (incomplete-tasks)
-// "Cannot transition from 'ready' to 'implementing': change is waiting for human spec approval"  (approval-required/spec)
-// "Cannot transition from 'done' to 'archivable': change is waiting for human signoff"  (approval-required/signoff)
 ```
 
-`approval-required` is used when the requested **delivery** transition (`ready → implementing` or `done → archivable`) is blocked until a human records consent with `ApproveSpec` / `ApproveSignoff`. The change stays in `ready` / `done`. Historic in-flight changes still in `pending-spec-approval` / `pending-signoff` can produce the same reason on non-redesign targets. `designing` remains available as the escape hatch for redesign.
+**Thrown by:** `ApproveSpec`, `ApproveSignoff`, `ArchiveRepository.archive()` when the change is not in an archivable state and `force` is not set, and entity-level `Change.transition()` validation.
 
-**Thrown by:** `TransitionChange`, `ApproveSpec`, `ApproveSignoff`, `ArchiveChange`, and directly by `ArchiveRepository.archive()` when the change is not in an archivable state and `force` is not set.
+---
+
+### CheckPredicateFailedError
+
+**Code:** the failed check's own `checkCode` (for example `'APPROVAL_REQUIRED'` or `'DEPS_INCONSISTENT'`); `'CHECK_FAILED'` is only the fallback when the check supplies no code.
+
+Thrown by `TransitionChange` and `ArchiveChange` when a transition or archive predicate check fails.
+
+```typescript
+import { CheckPredicateFailedError } from '@specd/core'
+
+// Properties:
+// err.checkId: string           e.g. 'approval.spec', 'workflow.requires', 'deps.consistent', 'spec.overlap'
+// err.label: string             gerund check label (e.g. 'Checking dependencies')
+// err.checkCode: string         domain code (e.g. 'APPROVAL_REQUIRED', 'DEPS_INCONSISTENT')
+// err.message: string           human-readable failure summary
+// err.action?: CheckAction      optional typed remediation action
+// err.details?: Record<string, unknown>  structured check-owned failure payload
+// err.skippable?: boolean       optional; whether --skip-checks <checkId> can bypass this check
+// err.from?: ChangeState        optional attempted source state
+// err.to?: ChangeState          optional attempted target state
+```
+
+Structured `details` payloads by built-in check:
+
+- `protocol.edge`: `{ from, to }`
+- `workflow.requires`: `{ artifactId, status?, blockedBy? }`
+- `workflow.taskCompletion`: `{ artifactId, incomplete, complete, total, byArtifact }` or `{ reason, artifactId, byArtifact }`
+- `impl.filesResolved`: `{ files }`
+- `impl.linksInScope`: `{ outOfScopeSpecIds }`
+- `deps.consistent`: `{ mismatches: [{ specId, extracted, persisted }], specIds }`
+- `spec.overlap`: `{ entries?, peers? }`
+- `workspace.readOnly`: `{ specs, specIds }`
+- `schema.nameMatch`: `{ changeName?, changeSchemaName, schemaName }`
+
+**Thrown by:** `TransitionChange`, `ArchiveChange`.
 
 ---
 
@@ -925,45 +954,46 @@ Thrown when an operation would modify a spec or code in a `readOnly` workspace. 
 
 ## Error codes reference
 
-| Code                                | Class                                  | Layer       |
-| ----------------------------------- | -------------------------------------- | ----------- |
-| `CHANGE_NOT_FOUND`                  | `ChangeNotFoundError`                  | Application |
-| `CHANGE_ALREADY_EXISTS`             | `ChangeAlreadyExistsError`             | Application |
-| `FINGERPRINT_INPUT_ERROR`           | `FingerprintInputError`                | Application |
-| `VERIFICATION_ATTEMPT_NOT_FOUND`    | `VerificationAttemptNotFoundError`     | Application |
-| `VERIFICATION_FINGERPRINT_MISMATCH` | `VerificationFingerprintMismatchError` | Application |
-| `VERIFICATION_NOT_FOUND`            | `VerificationNotFoundError`            | Application |
-| `INVALIDATE_REQUIRES_FORCE`         | `InvalidateRequiresForceError`         | Application |
-| `INVALID_CREATE_CHANGE_INPUT`       | `InvalidCreateChangeInputError`        | Application |
-| `APPROVAL_GATE_DISABLED`            | `ApprovalGateDisabledError`            | Application |
-| `SCHEMA_NOT_FOUND`                  | `SchemaNotFoundError`                  | Application |
-| `ALREADY_INITIALISED`               | `AlreadyInitialisedError`              | Application |
-| `ARTIFACT_NOT_FOUND`                | `ArtifactNotFoundError`                | Application |
-| `PARSER_NOT_REGISTERED`             | `ParserNotRegisteredError`             | Application |
-| `SPEC_NOT_IN_CHANGE`                | `SpecNotInChangeError`                 | Application |
-| `SCHEMA_MISMATCH`                   | `SchemaMismatchError`                  | Application |
-| `SPEC_NOT_FOUND`                    | `SpecNotFoundError`                    | Application |
-| `WORKSPACE_NOT_FOUND`               | `WorkspaceNotFoundError`               | Application |
-| `INVALID_STATE_TRANSITION`          | `InvalidStateTransitionError`          | Domain      |
-| `APPROVAL_REQUIRED`                 | `ApprovalRequiredError`                | Domain      |
-| `HOOK_FAILED`                       | `HookFailedError`                      | Domain      |
-| `ARTIFACT_CONFLICT`                 | `ArtifactConflictError`                | Domain      |
-| `DELTA_APPLICATION`                 | `DeltaApplicationError`                | Domain      |
-| `INVALID_SPEC_PATH`                 | `InvalidSpecPathError`                 | Domain      |
-| `INVALID_SPEC_ID`                   | `InvalidSpecIdError`                   | Domain      |
-| `INVALID_SPEC_PATTERN`              | `InvalidSpecPatternError`              | Domain      |
-| `INVALID_SPEC_LOCK`                 | `InvalidSpecLockError`                 | Domain      |
-| `INVALID_CHANGE`                    | `InvalidChangeError`                   | Domain      |
-| `ARTIFACT_NOT_OPTIONAL`             | `ArtifactNotOptionalError`             | Domain      |
-| `SCHEMA_VALIDATION_ERROR`           | `SchemaValidationError`                | Domain      |
-| `CONFIG_VALIDATION_ERROR`           | `ConfigValidationError`                | Domain      |
-| `CORRUPTED_MANIFEST`                | `CorruptedManifestError`               | Domain      |
-| `UNSUPPORTED_MANIFEST_VERSION`      | `UnsupportedManifestVersionError`      | Domain      |
-| `METADATA_VALIDATION_ERROR`         | `MetadataValidationError`              | Domain      |
-| `DEPENDS_ON_OVERWRITE`              | `DependsOnOverwriteError`              | Domain      |
-| `HOOK_NOT_FOUND`                    | `HookNotFoundError`                    | Domain      |
-| `STEP_NOT_VALID`                    | `StepNotValidError`                    | Domain      |
-| `PATH_TRAVERSAL`                    | `PathTraversalError`                   | Domain      |
-| `UNSUPPORTED_PATTERN_ERROR`         | `UnsupportedPatternError`              | Domain      |
-| `MISSING_DEFAULT_WORKSPACE`         | `MissingDefaultWorkspaceError`         | Domain      |
-| `ARTIFACT_PARSE_ERROR`              | `ArtifactParseError`                   | Domain      |
+| Code                                    | Class                                  | Layer       |
+| --------------------------------------- | -------------------------------------- | ----------- |
+| `CHANGE_NOT_FOUND`                      | `ChangeNotFoundError`                  | Application |
+| `CHANGE_ALREADY_EXISTS`                 | `ChangeAlreadyExistsError`             | Application |
+| `FINGERPRINT_INPUT_ERROR`               | `FingerprintInputError`                | Application |
+| `VERIFICATION_ATTEMPT_NOT_FOUND`        | `VerificationAttemptNotFoundError`     | Application |
+| `VERIFICATION_FINGERPRINT_MISMATCH`     | `VerificationFingerprintMismatchError` | Application |
+| `VERIFICATION_NOT_FOUND`                | `VerificationNotFoundError`            | Application |
+| `INVALIDATE_REQUIRES_FORCE`             | `InvalidateRequiresForceError`         | Application |
+| `INVALID_CREATE_CHANGE_INPUT`           | `InvalidCreateChangeInputError`        | Application |
+| `APPROVAL_GATE_DISABLED`                | `ApprovalGateDisabledError`            | Application |
+| `SCHEMA_NOT_FOUND`                      | `SchemaNotFoundError`                  | Application |
+| `ALREADY_INITIALISED`                   | `AlreadyInitialisedError`              | Application |
+| `ARTIFACT_NOT_FOUND`                    | `ArtifactNotFoundError`                | Application |
+| `PARSER_NOT_REGISTERED`                 | `ParserNotRegisteredError`             | Application |
+| `SPEC_NOT_IN_CHANGE`                    | `SpecNotInChangeError`                 | Application |
+| `SCHEMA_MISMATCH`                       | `SchemaMismatchError`                  | Application |
+| `SPEC_NOT_FOUND`                        | `SpecNotFoundError`                    | Application |
+| `WORKSPACE_NOT_FOUND`                   | `WorkspaceNotFoundError`               | Application |
+| `INVALID_STATE_TRANSITION`              | `InvalidStateTransitionError`          | Domain      |
+| `<checkCode>` (`CHECK_FAILED` fallback) | `CheckPredicateFailedError`            | Domain      |
+| `APPROVAL_REQUIRED`                     | `ApprovalRequiredError`                | Domain      |
+| `HOOK_FAILED`                           | `HookFailedError`                      | Domain      |
+| `ARTIFACT_CONFLICT`                     | `ArtifactConflictError`                | Domain      |
+| `DELTA_APPLICATION`                     | `DeltaApplicationError`                | Domain      |
+| `INVALID_SPEC_PATH`                     | `InvalidSpecPathError`                 | Domain      |
+| `INVALID_SPEC_ID`                       | `InvalidSpecIdError`                   | Domain      |
+| `INVALID_SPEC_PATTERN`                  | `InvalidSpecPatternError`              | Domain      |
+| `INVALID_SPEC_LOCK`                     | `InvalidSpecLockError`                 | Domain      |
+| `INVALID_CHANGE`                        | `InvalidChangeError`                   | Domain      |
+| `ARTIFACT_NOT_OPTIONAL`                 | `ArtifactNotOptionalError`             | Domain      |
+| `SCHEMA_VALIDATION_ERROR`               | `SchemaValidationError`                | Domain      |
+| `CONFIG_VALIDATION_ERROR`               | `ConfigValidationError`                | Domain      |
+| `CORRUPTED_MANIFEST`                    | `CorruptedManifestError`               | Domain      |
+| `UNSUPPORTED_MANIFEST_VERSION`          | `UnsupportedManifestVersionError`      | Domain      |
+| `METADATA_VALIDATION_ERROR`             | `MetadataValidationError`              | Domain      |
+| `DEPENDS_ON_OVERWRITE`                  | `DependsOnOverwriteError`              | Domain      |
+| `HOOK_NOT_FOUND`                        | `HookNotFoundError`                    | Domain      |
+| `STEP_NOT_VALID`                        | `StepNotValidError`                    | Domain      |
+| `PATH_TRAVERSAL`                        | `PathTraversalError`                   | Domain      |
+| `UNSUPPORTED_PATTERN_ERROR`             | `UnsupportedPatternError`              | Domain      |
+| `MISSING_DEFAULT_WORKSPACE`             | `MissingDefaultWorkspaceError`         | Domain      |
+| `ARTIFACT_PARSE_ERROR`                  | `ArtifactParseError`                   | Domain      |

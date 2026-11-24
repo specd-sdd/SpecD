@@ -6,8 +6,7 @@
   "dependsOn": ["cli:entrypoint", "core:change", "core:transition-checks"],
   "implementation": [
     {
-      "file": "cli:src/commands/change/approve.ts",
-      "symbols": ["registerChangeApprove"]
+      "file": "cli:src/commands/change/approve.ts"
     }
   ]
 }

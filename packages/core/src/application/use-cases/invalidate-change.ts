@@ -5,8 +5,11 @@ import { type SchemaProvider } from '../ports/schema-provider.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { InvalidInvalidateTargetError } from '../errors/invalid-invalidate-target-error.js'
 import { InvalidateRequiresForceError } from '../errors/invalidate-requires-force-error.js'
+import { type ValidityFingerprint } from '../../domain/value-objects/validity-fingerprint.js'
 import { type Schema } from '../../domain/value-objects/schema.js'
 import {
+  isArtifactInvalidationPolicy,
+  isWorkflowInvalidationPolicy,
   resolveInvalidationPolicy,
   type InvalidationPolicy,
   type InvalidationPolicyOverride,
@@ -17,11 +20,17 @@ import {
   type ArtifactReviewTarget,
   type ValidityBlocker,
   selectAutomaticRecovery,
+  collectChangeReviewTargets,
 } from '../../domain/services/change-validity.js'
 import { type ForceInvalidationRecovery } from '../errors/invalidate-requires-force-error.js'
 import { type ReconcileChangeValidity } from './reconcile-change-validity.js'
 import { type NextAction } from './get-status.js'
 import { evaluateLifecycle } from '../services/lifecycle-evaluation.js'
+import { evaluateLegalTargets } from '../services/execute-matching-predicates.js'
+import { TRANSITION_BINDINGS } from '../../domain/services/check-bindings.js'
+import { type CheckRegistry } from '../../domain/services/check-registry.js'
+import { projectArtifacts, toEffectiveStatusMap } from '../../domain/services/lifecycle-verdict.js'
+import { type CheckBinding } from '../../domain/services/transition-checks.js'
 import { type ChangeValidityVerdict } from '../../domain/services/change-validity.js'
 
 /** A single target identifying an artifact (and optionally a specific file within it). */
@@ -77,6 +86,8 @@ export class InvalidateChange {
   private readonly _reconcile: ReconcileChangeValidity
   private readonly _resolveChangeSchema: ResolveChangeSchema
   private readonly _approvals: { readonly spec: boolean; readonly signoff: boolean }
+  private readonly _transitionBindings: readonly CheckBinding[]
+  private readonly _checkRegistry?: CheckRegistry
 
   /**
    * Creates a new `InvalidateChange` use case.
@@ -89,6 +100,8 @@ export class InvalidateChange {
    * @param approvals - Configured approval gates, used to route the post-invalidation next action
    * @param approvals.spec - Whether spec approval is enabled
    * @param approvals.signoff - Whether sign-off approval is enabled
+   * @param transitionBindings - Composed transition check bindings for post-recovery evaluation
+   * @param checkRegistry - Optional check registry for open check catalog and governance
    */
   constructor(
     changes: ChangeRepository,
@@ -100,6 +113,8 @@ export class InvalidateChange {
       spec: false,
       signoff: false,
     },
+    transitionBindings: readonly CheckBinding[] = TRANSITION_BINDINGS,
+    checkRegistry?: CheckRegistry,
   ) {
     this._changes = changes
     this._actor = actor
@@ -107,6 +122,10 @@ export class InvalidateChange {
     this._reconcile = reconcile
     this._resolveChangeSchema = resolveChangeSchema ?? new ResolveChangeSchema(schemaProvider)
     this._approvals = approvals
+    this._transitionBindings = transitionBindings
+    if (checkRegistry !== undefined) {
+      this._checkRegistry = checkRegistry
+    }
   }
 
   /**
@@ -115,6 +134,8 @@ export class InvalidateChange {
    * @param input - The invalidation command
    * @returns The persisted change and affected set report
    * @throws {ChangeNotFoundError} If no change with the given name exists
+   * @throws {SchemaNotFoundError} If the change's schema reference cannot be resolved
+   * @throws {SchemaProviderIdentityMismatchError} If the resolved schema provider returns a schema whose canonical name differs from the change's schema reference
    * @throws {InvalidInvalidateTargetError} If policy/target shape or target selectors are invalid
    * @throws {InvalidateRequiresForceError} If active consent gates would be revoked without `force`
    */
@@ -142,11 +163,6 @@ export class InvalidateChange {
       effectivePolicy.artifacts === 'none' || effectivePolicy.artifacts === 'global'
         ? []
         : resolveTargets(change, input.targets ?? [], schema.artifacts())
-    const revoke = consentToRevoke(change)
-    if (revoke.length > 0 && input.force !== true) {
-      throw new InvalidateRequiresForceError(forceRecoveries(change, revoke))
-    }
-
     const targets: ArtifactReviewTarget[] =
       effectivePolicy.artifacts === 'global'
         ? globalTargets(change, schema)
@@ -158,16 +174,32 @@ export class InvalidateChange {
           }))
 
     const actor = await this._actor.identity()
-    const reconciled = await this._reconcile.execute({
-      name: input.name,
-      actor,
-      intent: {
+    // The force guard reads the change after the reconciler's pre-pass, so a consent already
+    // stale per fingerprint has recovered by itself and needs no `force`. The guard and the
+    // invalidation share one serialized mutation.
+    const reconciled = await this._reconcile.mutate({ name: input.name, actor }, async (ctx) => {
+      const valid = validConsent(ctx.change)
+      // Only gates enabled in the configured approvals are guarded and previewed; the reconciler
+      // treats a disabled gate as not required, so its consent is revoked silently and moves nothing.
+      const revoke = valid.filter((gate) => this._approvals[gate])
+      const disabled = valid.filter((gate) => !this._approvals[gate])
+      if (revoke.length > 0 && input.force !== true) {
+        throw new InvalidateRequiresForceError(
+          forceRecoveries(
+            ctx.change,
+            revoke,
+            effectivePolicy,
+            previewArtifactReviewRequired(ctx.change, schema, targets, ctx.fingerprint),
+          ),
+        )
+      }
+      await ctx.reconcileAfter({
         type: 'manual-invalidation',
         reason: input.reason,
         policy: effectivePolicy,
         targets,
-        revoke: input.force === true ? revoke : [],
-      },
+        revoke: input.force === true ? [...revoke, ...disabled] : disabled,
+      })
     })
 
     return {
@@ -184,12 +216,14 @@ export class InvalidateChange {
       projectionChanges: reconciled.projectionChanges,
       automaticReturn: reconciled.automaticReturn,
       blockers: reconciled.verdict.blockers,
-      nextAction: invalidationNextAction(
+      nextAction: await invalidationNextAction(
         reconciled.change,
         schema,
         this._approvals,
         reconciled.verdict,
         reconciled.automaticReturn,
+        this._transitionBindings,
+        this._checkRegistry,
       ),
     }
   }
@@ -197,8 +231,8 @@ export class InvalidateChange {
 
 /**
  * Projects canonical recovery without reconstructing invalidation policy in adapters.
- * The command comes from lifecycle guidance for the recovered state under the change's
- * schema, so a disabled `verifying` step never yields a verification command.
+ * The guidance comes from evaluating forward checks of the recovered state under the
+ * change's schema, so a disabled `verifying` step never yields a verification intent.
  *
  * @param change - Reconciled change
  * @param schema - The change's sovereign schema
@@ -207,20 +241,34 @@ export class InvalidateChange {
  * @param approvals.signoff - Whether sign-off approval is enabled
  * @param verdict - Canonical validity verdict after reconciliation
  * @param recovery - Automatic lifecycle return, when one was committed
- * @returns Core-owned next action
+ * @param transitionBindings - Composed transition check bindings
+ * @param checkRegistry - Optional check registry for open check catalog and governance
+ * @returns Core-owned host-neutral next action
  */
-function invalidationNextAction(
+async function invalidationNextAction(
   change: Change,
   schema: Schema,
   approvals: { readonly spec: boolean; readonly signoff: boolean },
   verdict: ChangeValidityVerdict,
   recovery: AutomaticRecovery | null,
-): NextAction {
+  transitionBindings: readonly CheckBinding[],
+  checkRegistry?: CheckRegistry,
+): Promise<NextAction> {
   if (recovery !== null) {
+    const effectiveStatusByArtifact = toEffectiveStatusMap(projectArtifacts(change, schema))
+    const legalTargets = await evaluateLegalTargets(transitionBindings, {
+      change,
+      schema,
+      approvals,
+      effectiveStatusByArtifact,
+      validity: verdict,
+      ...(checkRegistry !== undefined ? { checkRegistry } : {}),
+    })
     const lifecycle = evaluateLifecycle(change, schema, {
       approvals,
       validity: verdict,
-      checksByTarget: {},
+      checksByTarget: legalTargets.checksByTarget,
+      bindingsByTarget: legalTargets.bindingsByTarget,
     })
     return {
       ...lifecycle.nextAction,
@@ -231,7 +279,7 @@ function invalidationNextAction(
     targetStep: change.state,
     actionType: 'cognitive',
     reason: 'Review the reported blockers before advancing',
-    command: null,
+    intent: null,
   }
 }
 
@@ -247,6 +295,14 @@ function validateCommandShape(
   targets: readonly InvalidateTargetInput[] | undefined,
 ): string[] {
   const errors: string[] = []
+
+  if (!isArtifactInvalidationPolicy(effectivePolicy.artifacts)) {
+    errors.push(`unsupported artifact policy value '${String(effectivePolicy.artifacts)}'`)
+  }
+  if (!isWorkflowInvalidationPolicy(effectivePolicy.workflow)) {
+    errors.push(`unsupported workflow policy value '${String(effectivePolicy.workflow)}'`)
+  }
+  if (errors.length > 0) return errors
 
   if (effectivePolicy.artifacts === 'none' || effectivePolicy.artifacts === 'global') {
     if (targets !== undefined && targets.length > 0) {
@@ -332,12 +388,15 @@ function resolveTargets(
 }
 
 /**
- * Consent to revoke.
+ * Valid consent gates.
  *
- * @param change - change
- * @returns consent to revoke result
+ * Callers pass the change after the reconciler's pre-pass, so projection status already
+ * reflects fingerprint staleness; only consent that is still valid can be revoked.
+ *
+ * @param change - Change snapshot after reconciliation
+ * @returns Consent gates whose record is still valid (enabled or not)
  */
-function consentToRevoke(change: Change): ('spec' | 'signoff')[] {
+function validConsent(change: Change): ('spec' | 'signoff')[] {
   const gates: ('spec' | 'signoff')[] = []
   if (change.specApproval?.status === 'valid') gates.push('spec')
   if (change.signoff?.status === 'valid') gates.push('signoff')
@@ -345,26 +404,59 @@ function consentToRevoke(change: Change): ('spec' | 'signoff')[] {
 }
 
 /**
- * Selects the recovery target independently for every valid gate requiring confirmation.
+ * Previews the reconciler's `artifactReviewRequired` verdict for a forced invalidation.
+ *
+ * Mirrors the reconciler's review targets: non-task artifacts the request marks for review,
+ * plus non-task files already drifted (flagged, or whose current hash differs from the validated
+ * one) or pending review, which stay required even under artifact policy `none`.
+ *
+ * @param change - Current change snapshot
+ * @param schema - The change's sovereign schema
+ * @param targets - Review targets the request marks (empty for `none`)
+ * @param fingerprint - Fresh validity fingerprint from the reconciler pre-pass, when available
+ * @returns Whether the reconciler will report required artifact review
+ */
+function previewArtifactReviewRequired(
+  change: Change,
+  schema: Schema,
+  targets: readonly ArtifactReviewTarget[],
+  fingerprint: ValidityFingerprint | null,
+): boolean {
+  const taskArtifacts = new Set(
+    schema.artifacts().flatMap((artifact) => (artifact.hasTasks ? [artifact.id] : [])),
+  )
+  if (targets.some((target) => !taskArtifacts.has(target.artifactId))) return true
+  const found = collectChangeReviewTargets(change, fingerprint, taskArtifacts)
+  return found.drifted.length > 0 || found.pending.length > 0
+}
+
+/**
+ * Previews the single combined recovery the reconciler would commit for the whole set of
+ * revoked gates (spec consent outranks sign-off, which outranks workflow redesign). Every
+ * affected gate is listed with the target of that one recovery, or the current state when
+ * no move would be committed.
  *
  * @param change - Current change snapshot
  * @param gates - Valid consent gates that would be revoked
+ * @param policy - Effective invalidation policy the reconciler will commit
+ * @param artifactReviewRequired - Whether the request marks artifacts for review
  * @returns Exact gate/target pairs for adapter reporting
  */
 function forceRecoveries(
   change: Change,
   gates: readonly ('spec' | 'signoff')[],
+  policy: InvalidationPolicy,
+  artifactReviewRequired: boolean,
 ): ForceInvalidationRecovery[] {
-  return gates.map((gate) => {
-    const recovery = selectAutomaticRecovery(
-      change.state,
-      { artifacts: 'none', workflow: 'preserve' },
-      gate === 'spec' ? 'revoked' : 'not-required',
-      gate === 'signoff' ? 'revoked' : 'not-required',
-      false,
-    )
-    return { gate, target: recovery?.to ?? change.state }
-  })
+  const recovery = selectAutomaticRecovery(
+    change.state,
+    policy,
+    gates.includes('spec') ? 'revoked' : 'not-required',
+    gates.includes('signoff') ? 'revoked' : 'not-required',
+    artifactReviewRequired,
+  )
+  const target = recovery?.to ?? change.state
+  return gates.map((gate) => ({ gate, target }))
 }
 
 /**

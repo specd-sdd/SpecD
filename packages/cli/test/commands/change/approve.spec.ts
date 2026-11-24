@@ -50,7 +50,9 @@ afterEach(() => vi.restoreAllMocks())
 describe('change approve spec', () => {
   it('prints confirmation on successful spec approval', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.approveSpec.execute.mockResolvedValue(undefined)
+    kernel.changes.approveSpec.execute.mockResolvedValue(
+      makeMockChange({ name: 'my-change', state: 'ready' }),
+    )
 
     const program = makeProgram()
     registerChangeApprove(program.command('change'))
@@ -116,7 +118,7 @@ describe('change approve spec', () => {
       implementationTracking: { trackedFiles: [], links: [] },
     })
     kernel.changes.approveSpec.execute.mockResolvedValue(
-      makeMockChange({ name: 'my-change', state: 'spec-approved' }),
+      makeMockChange({ name: 'my-change', state: 'pending-spec-approval' }),
     )
 
     const program = makeProgram()
@@ -134,12 +136,15 @@ describe('change approve spec', () => {
 
     expect(kernel.changes.approveSpec.execute).toHaveBeenCalled()
     expect(stdout()).toContain('approved spec for my-change')
+    expect(stdout()).toContain('state:       pending-spec-approval')
     expect(stdout()).not.toContain('moved to pending')
   })
 
   it('outputs JSON on successful spec approval', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.approveSpec.execute.mockResolvedValue(undefined)
+    kernel.changes.approveSpec.execute.mockResolvedValue(
+      makeMockChange({ name: 'my-change', state: 'ready' }),
+    )
 
     const program = makeProgram()
     registerChangeApprove(program.command('change'))
@@ -158,8 +163,50 @@ describe('change approve spec', () => {
 
     const parsed = JSON.parse(stdout())
     expect(parsed.result).toBe('ok')
+    expect(typeof parsed.state).toBe('string')
     expect(parsed.gate).toBe('spec')
     expect(parsed.name).toBe('my-change')
+  })
+
+  it('adds the host-neutral next action projection to a structured approval failure', async () => {
+    const { kernel, stdout, stderr } = setup()
+    kernel.changes.approveSpec.execute.mockRejectedValue(
+      Object.assign(new Error('Spec approval gate is not satisfied'), {
+        specd: true,
+        code: 'APPROVAL_GATE_DISABLED',
+      }),
+    )
+    kernel.changes.status.execute.mockResolvedValue({
+      change: { name: 'my-change', state: 'ready' },
+      blockers: [],
+      nextAction: {
+        targetStep: 'ready',
+        actionType: 'mechanical',
+        reason: 'blocked',
+        intent: null,
+        action: { kind: '@acme.review', guidance: 'Ask the reviewer' },
+      },
+    })
+    const program = makeProgram()
+    registerChangeApprove(program.command('change'))
+    await program
+      .parseAsync([
+        'node',
+        'specd',
+        'change',
+        'approve',
+        'spec',
+        'my-change',
+        '--reason',
+        'ok',
+        '--format',
+        'json',
+      ])
+      .catch(() => {})
+    const raw = `${stdout()}${stderr()}`
+    expect(raw).toContain('"command":null')
+    expect(raw).toContain('Ask the reviewer')
+    expect(raw).not.toMatch(/specd-/)
   })
 
   it('exits with error when --reason is missing', async () => {
@@ -213,7 +260,7 @@ describe('change approve spec', () => {
         targetStep: 'designing',
         actionType: 'cognitive',
         reason: 'Renew design consent',
-        command: '/specd-design',
+        intent: 'design',
       },
     })
     const program = makeProgram()
@@ -225,7 +272,8 @@ describe('change approve spec', () => {
 
     expect(kernel.changes.status.execute).toHaveBeenCalledWith({ name: 'my-change' })
     expect(stderr()).toContain('state: designing')
-    expect(stderr()).toContain('blocker: APPROVAL_STALE')
+    expect(stderr()).toContain('! APPROVAL_STALE: Spec approval is stale')
+    expect(stderr()).not.toContain('blocker:')
     expect(stderr()).toContain('next action: /specd-design')
   })
 })
@@ -263,7 +311,9 @@ describe('change approve — unknown sub-verb', () => {
 describe('change approve signoff', () => {
   it('prints confirmation on successful signoff', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.approveSignoff.execute.mockResolvedValue(undefined)
+    kernel.changes.approveSignoff.execute.mockResolvedValue(
+      makeMockChange({ name: 'my-change', state: 'done' }),
+    )
 
     const program = makeProgram()
     registerChangeApprove(program.command('change'))
@@ -352,7 +402,9 @@ describe('change approve signoff', () => {
 
   it('outputs JSON on successful signoff', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.approveSignoff.execute.mockResolvedValue(undefined)
+    kernel.changes.approveSignoff.execute.mockResolvedValue(
+      makeMockChange({ name: 'my-change', state: 'done' }),
+    )
 
     const program = makeProgram()
     registerChangeApprove(program.command('change'))
@@ -371,6 +423,7 @@ describe('change approve signoff', () => {
 
     const parsed = JSON.parse(stdout())
     expect(parsed.result).toBe('ok')
+    expect(typeof parsed.state).toBe('string')
     expect(parsed.gate).toBe('signoff')
     expect(parsed.name).toBe('my-change')
   })

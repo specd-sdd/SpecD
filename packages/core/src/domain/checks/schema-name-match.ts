@@ -11,6 +11,7 @@ import {
 export interface SchemaNameMatchFacts {
   readonly schemaName: string
   readonly changeSchemaName: string
+  readonly changeName?: string
 }
 
 /**
@@ -27,6 +28,11 @@ export function runSchemaNameMatch(facts: SchemaNameMatchFacts): CheckResult {
     'schema.nameMatch',
     'SCHEMA_MISMATCH',
     `Schema '${facts.schemaName}' does not match change schema '${facts.changeSchemaName}'`,
+    {
+      ...(facts.changeName !== undefined ? { changeName: facts.changeName } : {}),
+      changeSchemaName: facts.changeSchemaName,
+      schemaName: facts.schemaName,
+    },
   )
 }
 
@@ -48,7 +54,11 @@ export function run(facts: SchemaNameMatchFacts): CheckResult {
  */
 function execute(ctx: CheckExecutionContext): Promise<CheckResult> {
   return Promise.resolve(
-    run({ schemaName: ctx.schema.name(), changeSchemaName: ctx.change.schemaName }),
+    run({
+      schemaName: ctx.schema.name(),
+      changeSchemaName: ctx.change.schemaName,
+      changeName: ctx.change.name,
+    }),
   )
 }
 

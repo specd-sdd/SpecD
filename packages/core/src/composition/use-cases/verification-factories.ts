@@ -247,6 +247,7 @@ export function resolveInvalidateVerificationDeps(
     actor: resolver.getActorResolver(),
     reconcileChangeValidity: resolver.getReconcileChangeValidity(),
     resolveChangeSchema: resolver.getResolveChangeSchema(),
+    approvals: resolver.config.approvals,
   }
 }
 

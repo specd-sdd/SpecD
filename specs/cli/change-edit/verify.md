@@ -97,10 +97,11 @@ Scenarios:
 
 #### Scenario: Output reflects canonical gate recovery
 
-- **GIVEN** a scope edit makes required spec consent stale under preserve
+- **GIVEN** a scope edit makes required spec consent stale under preserve in a state after `ready`
 - **WHEN** the command succeeds
 - **THEN** it reports the committed `designing` state, affected evidence, and artifact review
 - **AND** policy-only edits do not claim invalidation without a reported drift
+- **AND** the same edit in `ready` reports `ready` with the stale approval and no automatic return
 
 #### Scenario: Ungated preserve reports blocker without invented return
 
@@ -124,7 +125,7 @@ Scenarios:
 
 - **GIVEN** an ungated preserve scope edit returns a nonempty blocker list and `/specd-design` or in-place review next action from Core
 - **WHEN** the default text presenter renders the successful result
-- **THEN** stdout names every returned blocker code and the exact Core-owned next-action command
+- **THEN** stdout names every returned blocker code, in the form `! <CODE> — <label>: <message>`, and the exact Core-owned next-action command
 - **AND** it does not infer a different recovery from lifecycle state
 
 ### Requirement: Output on success
@@ -142,6 +143,26 @@ Scenarios:
 - **THEN** output has `result: "ok"`, updated `specIds` and `workspaces`, `scopeChanged: true`, and `validityChanged: true`
 - **AND** the compatibility `invalidated` field is true and committed state is `designing`
 - **AND** blockers, next action, projection changes, and automatic return match the Core result
+
+#### Scenario: Text output prints blockers in the status form
+
+- **GIVEN** an edit returns a skippable blocker with `label` and `checkId` and a non-skippable blocker without `label`
+- **WHEN** the default text presenter renders the successful result
+- **THEN** stdout contains `! <CODE> — <label>: <message>` for the first blocker followed by an indented `bypass: --skip-checks <checkId>` line
+- **AND** the second blocker is printed as `! <CODE>: <message>` with no `bypass:` line
+
+#### Scenario: JSON output projects blockers through the CLI blocker projection
+
+- **GIVEN** an edit returns a blocker with `isSkippable: true`, `label`, `checkId`, `details` and `action`
+- **WHEN** the command runs with `--format json`
+- **THEN** the blocker entry carries `code`, `message`, `label`, `checkId`, `details`, `action` and `bypassFlag`
+- **AND** it does not carry `isSkippable`
+
+#### Scenario: Text output prints guidance when the next action has no command
+
+- **GIVEN** an edit returns a next action with `command: null` and a host-neutral `guidance` text
+- **WHEN** the default text presenter renders the successful result
+- **THEN** stdout shows `command: (none)` followed by an indented `guidance: <text>` line
 
 ### Requirement: Error cases
 
@@ -184,6 +205,6 @@ Scenarios:
 
 #### Scenario: Invalid invalidation policy
 
-- **WHEN** `specd change edit my-change --invalidation-policy sugical` is run
-- **THEN** the command exits with code 1 with the `InvalidInputError` message from `EditChange`
+- **WHEN** `specd change edit my-change --artifact-policy sugical` is run
+- **THEN** the command exits with code 1 printing the offending value and the allowed values
 - **AND** no changes are made to the change

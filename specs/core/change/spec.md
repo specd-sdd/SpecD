@@ -84,7 +84,7 @@ Skill-aligned retry hops from `done`, `signed-off`, or `archivable` to `implemen
 - `signed-off → implementing`, `signed-off → verifying`
 - `archivable → implementing`, `archivable → verifying`
 
-`VALID_TRANSITIONS['ready']` MUST be `implementing` and `designing` only (no `pending-spec-approval`). `VALID_TRANSITIONS['done']` MUST include `archivable`, `designing`, `implementing`, and `verifying` (no `pending-signoff`). Drain: `pending-spec-approval` MAY still go to `spec-approved` or `designing`; `pending-signoff` MAY still go to `signed-off` or `designing`.
+`VALID_TRANSITIONS['ready']` MUST be `implementing` and `designing` only (no `pending-spec-approval`). `VALID_TRANSITIONS['done']` MUST include `archivable`, `designing`, `implementing`, and `verifying` (no `pending-signoff`). Legacy parking states exit through the same delivery edges as the step they park in front of, and MUST NOT lead into another legacy state: `VALID_TRANSITIONS['pending-spec-approval']` MUST be `implementing` and `designing` (it MUST NOT include `spec-approved`), and `VALID_TRANSITIONS['pending-signoff']` MUST be `archivable`, `designing`, and `done` (it MUST NOT include `signed-off`). The forward exit MUST be listed first. `spec-approved` and `signed-off` keep their existing exits, but no transition leads into them, so only historic manifests can still hold those states. Gate enforcement on these exits belongs to the bound approval checks (see [`core:transition-checks`](../transition-checks/spec.md)); the lifecycle table MUST NOT encode an approval requirement.
 
 The `implementing ↔ verifying` loop may repeat any number of times. The transition `implementing → verifying` is only valid when all tasks in the `tasks` artifact are complete (enforced as the `workflow.taskCompletion` check; see [`core:transition-checks`](../transition-checks/spec.md)). The transition `verifying → implementing` is valid only for implementation-only failures: the current artifacts still describe the intended behavior and the required fix fits within the already-defined tasks. If verification concludes that the artifacts themselves must be revised, or that new tasks are required before implementation can resume, the change returns to `designing` instead.
 
@@ -244,7 +244,7 @@ The aggregated `state` on `ChangeArtifact` is materialized from file states and 
 
 `skipped` is only valid for `optional: true` artifacts. Attempting to skip a non-optional artifact throws an error.
 
-The `skipped` state must be set explicitly by an actor — human or agent via a CLI command. The agent must be instructed (via the schema `instruction` or skill definition) to call that command when it decides not to produce an optional artifact. The specific CLI command is defined in the CLI spec.
+The `skipped` state must be set explicitly by an actor — human or agent through a delivery adapter. The agent must be instructed (via the schema `instruction` or the delivery host's workflow guidance) to invoke the skip operation when it decides not to produce an optional artifact. The specific delivery-level command is defined in the delivery adapter's spec, not here.
 
 `ChangeArtifact.markComplete(key, hash)` takes two arguments — the file key and the content hash — and delegates to the corresponding `ArtifactFile.markComplete(hash)`. A successful completion sets the file state to `complete`, updates `validatedHash`, and recomputes the parent artifact state. `ChangeArtifact.markSkipped()` marks ALL files in the artifact as `skipped`. These may only be called by the `ValidateArtifacts` and skip use cases respectively. No other code path may set these values.
 
@@ -285,19 +285,19 @@ The event table below includes legacy artifact-hash-only approval records and br
 
 Event types:
 
-| Type                  | Additional fields                                          | When appended                                                                |
-| --------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `created`             | `specIds`, `schemaName`, `schemaVersion`                   | Once, when the change is first created                                       |
-| `transitioned`        | `from: ChangeState`, `to: ChangeState`                     | Each lifecycle state transition                                              |
-| `spec-approved`       | `reason: string`, `artifactHashes: Record<string, string>` | When the spec approval gate is passed                                        |
-| `signed-off`          | `reason: string`, `artifactHashes: Record<string, string>` | When the signoff gate is passed                                              |
-| `invalidated`         | `cause`, `message`, `affectedArtifacts`                    | When scope or artifact review invalidates prior approvals                    |
-| `drafted`             | `reason?: string`                                          | When a change is moved to `drafts/`                                          |
-| `restored`            | _(none beyond common fields)_                              | When a drafted change is moved back to `changes/`                            |
-| `artifact-skipped`    | `artifactId: string`, `reason?: string`                    | When an optional artifact is explicitly marked as not produced               |
-| `artifacts-synced`    | `typesAdded`, `typesRemoved`, `filesAdded`, `filesRemoved` | When artifact sync reconciles the artifact map against schema                |
-| `description-updated` | `description: string`                                      | When the change description is updated via `EditChange` with `--description` |
-| `discarded`           | `reason: string`, `supersededBy?: string[]`                | When a change is permanently abandoned                                       |
+| Type                  | Additional fields                                          | When appended                                                  |
+| --------------------- | ---------------------------------------------------------- | -------------------------------------------------------------- |
+| `created`             | `specIds`, `schemaName`, `schemaVersion`                   | Once, when the change is first created                         |
+| `transitioned`        | `from: ChangeState`, `to: ChangeState`                     | Each lifecycle state transition                                |
+| `spec-approved`       | `reason: string`, `artifactHashes: Record<string, string>` | When the spec approval gate is passed                          |
+| `signed-off`          | `reason: string`, `artifactHashes: Record<string, string>` | When the signoff gate is passed                                |
+| `invalidated`         | `cause`, `message`, `affectedArtifacts`                    | When scope or artifact review invalidates prior approvals      |
+| `drafted`             | `reason?: string`                                          | When a change is moved to `drafts/`                            |
+| `restored`            | _(none beyond common fields)_                              | When a drafted change is moved back to `changes/`              |
+| `artifact-skipped`    | `artifactId: string`, `reason?: string`                    | When an optional artifact is explicitly marked as not produced |
+| `artifacts-synced`    | `typesAdded`, `typesRemoved`, `filesAdded`, `filesRemoved` | When artifact sync reconciles the artifact map against schema  |
+| `description-updated` | `description: string`                                      | When the change description is updated via `EditChange`        |
+| `discarded`           | `reason: string`, `supersededBy?: string[]`                | When a change is permanently abandoned                         |
 
 `invalidated.cause` is explicit and machine-readable:
 
@@ -405,7 +405,7 @@ This separation ensures the entity does not need schema knowledge in order to an
 - whether an artifact is effectively blocked by an upstream parent
 - which lifecycle hop is protocol-legal next (`VALID_TRANSITIONS`) and which of those hops pass blocking predicates (`availableTransitions`)
 - whether a requested forward leave of `ready` / `done` is blocked by an in-place approval check
-- which blocker or domain `nextHop` should be surfaced (`evaluateLifecycle` attaches `nextAction.command`)
+- which blocker or domain `nextHop` should be surfaced (`evaluateLifecycle` attaches the host-neutral `nextAction.intent` and optional check-declared `nextAction.action`; core never emits a command string)
 
 Schema `workflow[]` lookup rows MUST NOT be treated as the set of participating states.
 
@@ -422,7 +422,11 @@ Artifact review SHALL follow `invalidation.artifacts`:
 
 Artifacts whose schema type has `hasTasks: true` SHALL be excluded from drift-driven reopening and from propagation originating in another artifact. Explicit task review remains permitted.
 
-Lifecycle movement SHALL follow `invalidation.workflow`: `preserve` retains the current state and `redesign` requests a return to `designing`. The aggregate MUST NOT infer approval-gate recovery from this policy. A central reconciler supplies the final recovery decision, where required stale spec approval returns to `designing`, required stale sign-off returns a later state to `done`, and spec recovery has priority when both gates are invalid. Recovery MUST NOT advance a change that is already earlier than its target.
+Lifecycle movement SHALL follow `invalidation.workflow`: `preserve` retains the current state and `redesign` requests a return to `designing`. The aggregate MUST NOT infer approval-gate recovery from this policy. A central reconciler supplies the final recovery decision, where required stale spec approval returns to `designing`, required stale sign-off returns a later state to `done`, and spec recovery has priority when both gates are invalid. One reconciliation commits at most one recovery, highest priority first (spec consent, then sign-off, then workflow redesign); a further recovery that applies to the recovered state is committed by the next reconciliation, never in the same pass. For example, with required sign-off stale, policy `workflow: redesign`, non-task drift, and the spec gate off, an `archivable` change returns to `done` first and then, on the next status or reconcile, from `done` to `designing`. Recovery MUST NOT advance a change that is already earlier than its target.
+
+Spec-consent recovery is requested only from states after `ready`. `ready` is the state where the `approval.spec` check blocks forward progress and where consent is renewed, so a stale or revoked spec consent in `ready` (whether it was recovered from a later state earlier or became stale there) does not request a return to `designing`; the change stays in `ready` until consent is renewed. Without this exemption a consent already recovered to `designing` could never be renewed, because every reconciliation in `ready` would return the change to `designing` again. This exemption does not affect sign-off recovery or the `workflow: redesign` recovery.
+
+Every state later than a recovery's target (except `ready` for spec-consent recovery, see above) is a valid recovery source for that cause, including the legacy parking states: a stale or revoked sign-off returns `pending-signoff` and `signed-off` to `done`, and a stale or revoked spec approval returns `pending-spec-approval` and `spec-approved` to `designing`. A recovery MUST NOT fail because its source is a legacy parking state.
 
 Invalidation SHALL append audit evidence without deleting or rewriting prior events. Applying the same invalidity and recovery more than once SHALL be idempotent.
 

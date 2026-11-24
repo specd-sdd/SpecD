@@ -2,21 +2,23 @@
 
 ## Purpose
 
-Unifying lifecycle validation, artifact status, and repair diagnostics into a single source of truth is critical to preventing "liar context" and ensuring consistent system behavior. Domain lifecycle interpretation is a set of plain functions (`evaluateLifecycleVerdict`, `projectArtifacts`, `findBlockingParent`) that combine the change's persisted state with schema-defined workflow rules. Application `evaluateLifecycle` attaches public `nextAction.command`. There is no `LifecycleEngine` class.
+Unifying lifecycle validation, artifact status, and repair diagnostics into a single source of truth is critical to preventing "liar context" and ensuring consistent system behavior. Domain lifecycle interpretation is a set of plain functions (`evaluateLifecycleVerdict`, `projectArtifacts`, `findBlockingParent`) that combine the change's persisted state with schema-defined workflow rules. Application `evaluateLifecycle` attaches the public host-neutral `nextAction` (`intent` and optional check-declared `action`); delivery mechanisms render commands from it. There is no `LifecycleEngine` class.
 
 ## Requirements
 
 ### Requirement: Stateless domain lifecycle verdict
 
-Lifecycle interpretation in the domain layer MUST be implemented as plain exported functions in `domain/services/lifecycle-verdict.ts`, not as a class:
+Lifecycle interpretation in the domain layer MUST be implemented as plain exported functions (exported through `domain/services/lifecycle-verdict.ts`), not as a class:
 
 - `evaluateLifecycleVerdict(change, schema, options)` — projects predicate `CheckResult`s, effective artifact statuses, blockers, review summary, and `nextHop`.
 - `projectArtifacts(source, schema)` — pure DAG effective-status projection (no I/O).
-- `findBlockingParent(...)` — recursive parent-review helper for artifact status.
+- `findBlockingParent(...)` — recursive parent-review helper for artifact status; implemented in `domain/services/find-blocking-parent.ts` and re-exported from `lifecycle-verdict.ts`.
 
 There MUST NOT be a `LifecycleEngine` class, constructor, injected debug port, or compatibility alias (`LifecycleEngineOptions`). Domain services MAY call `Logger.debug` from [`default:_global/logging`](../../../_global/logging/spec.md) for diagnostics only.
 
-The public domain return type is `LifecycleDomainVerdict`. It MUST NOT include `nextAction.command` or any CLI/skill command string. Commands are application-owned (see Requirement: Application lifecycle guidance).
+The public domain return type is `LifecycleDomainVerdict`. It MUST NOT include `command`, `bypassFlag`, or any CLI/skill command string. Host-neutral action intents are resolved in the application layer (Requirement: Application lifecycle guidance).
+
+The verdict option that lists check ids the caller bypassed MUST be named `skippedCheckIds` (a list of host-neutral check identifiers such as `spec.overlap` or `@plugin.check`). The domain MUST NOT parse, strip, or accept CLI flag syntax (`--skip-checks`, `--allow-overlap`) in that option; delivery hosts translate their flags to check ids before calling core.
 
 ### Requirement: Centralized validation logic
 
@@ -62,15 +64,18 @@ Consequently:
 
 ### Requirement: Machine-readable blockers
 
-For every condition that prevents a transition or marks an artifact as incomplete, the verdict function MUST provide a structured `Blocker` object containing:
+For every condition that prevents a transition or marks an artifact as incomplete, the verdict function MUST provide a structured `LifecycleBlocker` object containing:
 
 - `code`: A unique machine-readable identifier.
 - `message`: A human-readable description.
-- `isSkippable`: Boolean indicating if the blocker can be bypassed via a CLI flag or configuration.
-- `bypassFlag`: (Optional) The name of the flag that bypasses this blocker (e.g., `--skip-checks spec.overlap`). Projected bypass flags use the canonical `--skip-checks <checkId>` form; CLI aliases such as `--allow-overlap` and `--allow-out-of-scope` are accepted inputs, not projected values. `isSkippable` and `bypassFlag` SHALL come from the resolved binding of the failing check (from `LifecycleVerdictInput.resolvedBindings` when supplied by the caller, or resolved from `schema` against the built-in binding specifications when omitted); when the resolved binding has `skippable: false`, `isSkippable` MUST be `false` and `bypassFlag` MUST be omitted.
+- `isSkippable`: Boolean indicating if the blocker can be bypassed through the orchestrator check-bypass input.
+- `checkId`: (Optional) The check identifier that produced this blocker when projected from a predicate. `isSkippable` SHALL come from the resolved binding of the failing check (from `LifecycleVerdictInput.resolvedBindings` when supplied by the caller, or resolved from `schema` against the built-in binding specifications when omitted); when the resolved binding has `skippable: false`, `isSkippable` MUST be `false`. Blockers MUST NOT carry CLI `bypassFlag` strings.
+- `action`: (Optional) The host-neutral `CheckAction` propagated unchanged from the failing `CheckResult` when present.
 - `affectedArtifacts` (optional): Detail identifying the specific artifact IDs and files.
 
-If a blocker is skippable and the corresponding bypass is active in the verdict input, the function MUST omit that blocker from `blockers` (it MUST NOT remain as a transition blocker). `LifecycleDomainVerdict` has no `warnings` field; active bypass MUST NOT invent a warning channel.
+If a blocker is skippable and its `checkId` is listed in `skippedCheckIds`, the function MUST omit that blocker from `blockers` (it MUST NOT remain as a transition blocker). `LifecycleDomainVerdict` has no `warnings` field; active bypass MUST NOT invent a warning channel.
+
+Verification validity blockers (`VERIFICATION_STALE`, `VERIFICATION_REQUIRED`, `VERIFICATION_IN_PROGRESS`, `VERIFICATION_VALIDITY_UNAVAILABLE`), which are emitted by the `verification.current` check and projected by the verdict, MUST express remediation as `action: CheckAction` (`start-verification` or `refresh-status`, each with `params.changeName`) and MUST NOT carry `details.command` or any CLI command string.
 
 **Mandatory Blocker Codes:**
 
@@ -79,7 +84,7 @@ If a blocker is skippable and the corresponding bypass is active in the verdict 
 - `REVIEW_REQUIRED`: An artifact was invalidated or downgraded and requires review (state: `pending-review`).
 - `PENDING_PARENT_REVIEW`: An artifact is blocked because one of its upstream dependencies requires review.
 - `INCOMPLETE_TASKS`: An artifact contains unfinished checklist items (e.g., `- [ ]`).
-- `OVERLAP_CONFLICT`: Live overlap with **other active** changes from archive `spec.overlap` (GetStatus runs those predicates when `state === 'archivable'`). MUST NOT be emitted only because `review.reason` is `'spec-overlap-conflict'` (victim of another archive; that is review + `/specd-design`).
+- `OVERLAP_CONFLICT`: Live overlap with **other active** changes from archive `spec.overlap` (GetStatus runs those predicates when `state === 'archivable'`). MUST NOT be emitted only because `review.reason` is `'spec-overlap-conflict'` (victim of another archive; that is review + design).
 - `INVALID_TRANSITION`: The requested target is not in `listWorkflowTransitions(change.state, schema, approvals)` from the current state.
 - `APPROVAL_REQUIRED`: A bound approval predicate failed (stay in `ready` / `done`).
 
@@ -91,7 +96,7 @@ For file-level blockers (drift, review, parent review), the `affectedArtifacts` 
 - Every forward/backward or position comparison inside lifecycle verdict code (including verification boundaries and optional-step walks) SHALL derive from `resolveWorkflowPipeline(schema, approvals)` and `isWorkflowStepEnabled`; hardcoded lifecycle state lists MUST NOT be used.
 - Protocol participation and legal transitions SHALL be computed via `listWorkflowTransitions(change.state, schema, approvals)`. An omitted canonical row defaults to enabled.
 - `isReady`: Whether all required artifacts for the step are logically complete/skipped. MUST be projected from `workflow.requires` check results when those results are present — MUST NOT independently re-walk `requires` to emit a second blocker code for the same artifact. When those results are present, `blockingArtifacts` MUST come from the failed `workflow.requires` `details.artifactId` (empty when that check passed or skipped), not a second independent `requires` walk. Required artifacts that are `missing` or `in-progress` both use `INCOMPLETE_ARTIFACT`. When `checksByTarget` is empty or lacks an entry for a transition, `transitionBlockers` for that transition MAY use the DAG-only `requires` walk (same artifact readiness as `projectArtifacts`) without running hop predicates.
-- `isPermitted`: Whether `protocol.edge` allows the pair as determined by `isWorkflowTransitionLegal(from, to, schema, approvals)`. Disabled steps are never permitted. For `IMPLEMENTATION_STATE`, only `impl.linksInScope` failures are skippable (`--skip-checks impl.linksInScope`); `impl.filesResolved` failures are not.
+- `isPermitted`: Whether `protocol.edge` allows the pair as determined by `isWorkflowTransitionLegal(from, to, schema, approvals)`. Disabled steps are never permitted. For `IMPLEMENTATION_STATE`, only `impl.linksInScope` failures are skippable (the resolved binding declares `skippable: true`; delivery hosts translate that capability and the `checkId` into their own bypass syntax); `impl.filesResolved` failures are not.
 
 `checksByTarget` MUST contain the complete result of the shared candidate evaluator for each target, including normal transition predicates and every applicable `step-skip` predicate for bypassed optional steps. `availableTransitions` MUST include only targets whose complete candidate result is allowed. Lifecycle verdict code MUST NOT reconstruct a parallel bypass decision from topology alone.
 
@@ -101,7 +106,7 @@ Based on that evaluation plus change-level review blockers, `evaluateLifecycleVe
 - `nextHop.actionType` — `cognitive` or `mechanical`.
 - `nextHop.reason` — human prose explaining why that hop is recommended.
 
-`nextHop` MUST NOT include `command`. Skill/CLI command strings are resolved in the application layer (Requirement: Application lifecycle guidance).
+`nextHop` MUST NOT include `command`, `intent`, or any CLI or agent-command string. Host-neutral intents are resolved in the application layer (Requirement: Application lifecycle guidance) and delivery hosts render commands from them.
 
 **Optional-step recommendation policy:**
 
@@ -135,22 +140,39 @@ When `change.state` is `archiving`:
 - If the most recent `archive-failed` event has `commitStarted: true` and batch restore did not complete, `nextHop` MUST recommend manual review and transition to `designing` (`targetStep: designing`) rather than retrying archive blindly.
 - If no blocking restore failure is recorded, `nextHop` MAY recommend retrying archive (`targetStep: archiving`) or transitioning to `designing` when artifact revision is required.
 
+### Requirement: Next hop derives from candidate evaluation
+
+The domain `nextHop` MUST be derived only from the review summary, the predicate-filtered `availableTransitions`, the active pipeline, and the transition topology. It MUST NOT read approval projections (`activeSpecApproval`, `activeSignoff`), the `approvals` gates, or `boundFromStates` to decide whether to stay in place. A recommendation that stays in the current state because the forward candidate is not in `availableTransitions` (for example while `approval.spec` fails) is the generic "remaining blockers" outcome, and the failed check explains it through `hopFailures`. At `ready` that outcome is `targetStep: ready`, `actionType: 'mechanical'`, with a reason that names remaining blockers and no approval wording.
+
+For any drain-only state, the verdict MUST apply one rule without naming individual drain states: when `nextWorkflowStep(state, schema, approvals)` is non-null and present in `availableTransitions`, recommend it as a mechanical hop; otherwise stay in the current state. It MUST NOT recommend another drain state.
+
+When a requested target is not legal for the current state, the verdict MUST report generic `INVALID_TRANSITION` from the topology. It MUST NOT keep dedicated messages keyed on target names such as `pending-spec-approval`, `spec-approved`, `pending-signoff`, or `signed-off`.
+
+A single derivation of the verification boundary MUST serve every consumer: `isAtOrAfterVerificationBoundary(state, schema, approvals)`. Reconciliation and verification invalidation MUST call it and MUST NOT keep their own lists of boundary states.
+
+Stale or revoked spec consent and stale or revoked sign-off are NOT inputs of the domain `nextHop`. Recovery for them is committed by reconciliation before projection: spec consent in a state after `ready` returns the change to `designing` (in `ready` no recovery is committed because `approval.spec` blocks leaving `ready` and consent is renewed there), sign-off returns a change later than `done` to `done`. After that commit the `nextHop` is computed by the ordinary rules above (`designing` while design artifacts are incomplete, `ready` once they are complete, and in place while the forward candidate is blocked), and the remediation is declared by the failed `approval.spec` / `approval.signoff` check of the hop the recommendation waits on. Neither the domain `nextHop` nor the transitions it recommends from MAY read any part of the reconciled validity verdict, and no application step may re-apply a hold on top of it. Verification currency is owned by the `verification.current` check (bound to every verification-requiring exit, see `core:transition-checks`), which removes the blocked targets from `availableTransitions` and declares `start-verification`, so the recommendation stays in place without a special case. Pending non-task artifact review is owned by the review summary derived from the change's artifact files (`review.required`, `REVIEW_REQUIRED` / `ARTIFACT_DRIFT` blockers), which already routes the recommendation; the reconciler persists those file states before the verdict is computed.
+
+Because stale spec consent leaves the projection in place until a new approval is recorded, a change in `designing` with complete design artifacts MUST recommend `ready`, and a change in `ready` MUST recommend staying in `ready` with the `approve-spec` action declared by `approval.spec`; neither state MAY keep recommending `designing` on account of the stale projection.
+
 ### Requirement: Application lifecycle guidance
 
-Application code MUST map a domain `nextHop` plus change context into a public `NextAction` (`targetStep`, `actionType`, `reason`, `command`) in `application/services/lifecycle-guidance.ts`:
+Application code MUST map a domain `nextHop` plus change context into a public `LifecycleNextAction` (`targetStep`, `actionType`, `reason`, `intent`, and optional `action`) in `application/services/lifecycle-guidance.ts`, without embedding CLI command strings, flags, or agent slash commands:
 
-- `resolveLifecycleCommand(nextHop, context)` returns the skill or CLI entry that owns the recommended work.
-- Command resolution SHALL use the already selected `nextHop.targetStep`; it MUST NOT recompute a different target via `nextWorkflowStep`. When intermediate steps are disabled or optional-and-bypassable, `phaseCommand` resolves the command owning the selected target rather than falling into fixed-sequence loops.
-- The happy-path command matrix (for example `/specd-design`, `/specd-implement`, `/specd-verify`, `/specd-archive`, `specd changes approve spec`, `specd changes approve signoff`) MUST live here, not in domain services.
-- When the current state is `done` or `signed-off` and `nextHop.targetStep` is `archivable` (or `archivable` is in `availableTransitions`), `command` MUST be `/specd-archive`.
-- Verification-renewal commands (`/specd-verify`, `specd changes verification start <name>`) MUST only be recommended when `verifying` is enabled in the change schema. When `verifying` is disabled, a blocked `done` (or later) state MUST resolve its command from the actual blocker (for example sign-off, artifact review, or tasks) and MUST NOT route to `/specd-verify`.
-- Guidance MUST decide which states belong to the verification boundary and which skill owns a target from `resolveWorkflowPipeline(schema, approvals)` and `isWorkflowStepEnabled`; it MUST NOT use hardcoded lifecycle state lists.
-- When `review.reason` is `'spec-overlap-conflict'`, `command` MUST be `/specd-design`. MUST NOT advertise a `spec.overlap` bypass (`--skip-checks spec.overlap` or its `--allow-overlap` alias) for that victim path.
-- When public blockers include live `OVERLAP_CONFLICT` from archive predicates while `state === 'archivable'`, `command` MUST remain `/specd-archive` and `targetStep` MUST remain `archivable`.
+- `LifecycleActionIntent` is strictly a workflow phase: `'design' | 'implement' | 'verify' | 'archive'`. It MUST NOT enumerate gates, approvals, or check-specific remediations.
+- `resolveLifecycleIntent(change, nextHop, review, availableTransitions, approvals, schema, validity, hopFailures)` returns `{ intent: LifecycleActionIntent | null; action?: CheckAction }`. `hopFailures` is the ordered list of failed predicate `CheckResult`s of the hop the recommendation is waiting on (the target of `nextHop`, or the forward candidate that kept `nextHop` in place), in resolved-binding order.
+- **Check-declared action precedence (deterministic):** only `hopFailures` are considered. The first failed result whose `action` is defined becomes `nextAction.action`; later failures MUST NOT override it. Failures of other hops, other candidates, or review-only blockers MUST NOT contribute an action. When the selected action does not declare `supersedesIntent: false` (default `true`), `nextAction.intent` MUST be `null`. When it declares `supersedesIntent: false` (for example `start-verification`), `nextAction.intent` keeps the phase value owning the target and the action stays informational for hosts.
+- `lifecycle-guidance.ts` MUST NOT reference `approval.spec`, `approval.signoff`, `verification.current`, `boundFromStates`, `activeSpecApproval`, `activeSignoff`, `validity.specApproval`, `validity.signoff`, `pending-spec-approval`, `pending-signoff`, or match on `nextHop.reason` text. Gate, stale-consent, and verification remediation (`nextAction.action`) come exclusively from check-declared `CheckAction`s. Guidance MAY read the reconciled validity facts `verification`, `artifactReviewRequired`, and `recovery`, and the `review` summary, only to choose the phase intent (`'verify'` when verification is stale, absent, or attempt-active at or after the verification boundary with no committed recovery and `verifying` enabled; `'design'` for required review, meaning `review.required` or the reconciled `artifactReviewRequired` (the two are derived independently and either one suffices), or a workflow-redesign recovery; the `'verify'` condition is evaluated first, so stale, absent or attempt-active verification at or after the verification boundary outranks required review); they MUST NOT derive any action from them. A change found in a legacy `pending-*` state resolves to the phase intent of its pipeline position.
+- Intent resolution SHALL use the already selected `nextHop.targetStep`; it MUST NOT recompute a different target via `nextWorkflowStep`. When intermediate steps are disabled or optional-and-bypassable, phase resolution resolves the intent owning the selected target rather than falling into fixed-sequence loops.
+- When the current state is `done` or `signed-off` and `nextHop.targetStep` is `archivable` (or `archivable` is in `availableTransitions`) and no `hopFailures` action applies, `intent` MUST be `'archive'`.
+- `'verify'` MUST only be recommended when `verifying` is enabled in the change schema. When `verifying` is disabled, a blocked `done` (or later) state MUST resolve its guidance from the actual failing check action (for example `action: { kind: 'approve-signoff' }`) or from `'design'` / `'implement'` / `'archive'`, and MUST NOT route to `'verify'`.
+- Guidance MUST decide which steps are active, which states belong to the verification boundary, and which drain states exist from `resolveWorkflowPipeline(schema, approvals)` and `isWorkflowStepEnabled`. The only fixed vocabulary it MAY keep is a small set of declarative lookup tables (for example one keyed by the current state and one keyed by the hop target) that map a lifecycle state or hop target to one of the four fixed phase intents (`design`, `implement`, `verify`, `archive`); those tables MUST NOT encode schema-dependent facts (enabled steps, boundaries, optional bypasses). Any remaining branching MUST be derived from topology facts (state, `nextHop.targetStep`, `verifying` enablement, drain-state exits) and MUST NOT re-encode the table contents.
+- `intent` is `null` only when the phase has no applicable intent: (a) the selected action does not declare `supersedesIntent: false`; (b) a legacy `pending-*` drain state whose exit `nextWorkflowStep(state, schema, approvals)` is `null` (for example `implementing` disabled); or (c) a blocked `ready` (hop stays in place) whose failures declare no action. A blocked change in a legacy `pending-*` state with an existing exit whose hop declares no action MUST still resolve the phase intent of the exit's target, not `null`.
+- When `review.reason` is `'spec-overlap-conflict'`, `intent` MUST be `'design'`.
+- When public blockers include live `OVERLAP_CONFLICT` from archive predicates while `state === 'archivable'` and it is the ONLY public blocker (no other blocker remains), `intent` MUST remain `'archive'` and `targetStep` MUST remain `archivable`. `GetStatus` applies this override after guidance and it replaces the guidance result, so no check-declared `action` is carried in that case; the overlap blocker stays visible in `blockers`. When other blockers exist (for example stale verification or an unresolved review), `GetStatus` MUST keep the guidance result unchanged so that `nextAction` points at the real next step (for stale verification: `intent: 'verify'`; the `start-verification` action stays on the verification blocker and `nextAction.action` is not set, because only the failed predicates of the selected hop can supply it and the archive operation is not a hop) and no overlap-bypass advice is implied.
 
-`application/services/lifecycle-evaluation.ts` MUST expose `evaluateLifecycle(change, schema, options)` that calls `evaluateLifecycleVerdict` then attaches `nextAction` via lifecycle guidance. Use cases that need full public lifecycle answers (`GetStatus`, `TransitionChange` when projecting guidance) MUST consume `evaluateLifecycle`, not the domain functions directly.
+`application/services/lifecycle-evaluation.ts` MUST expose `evaluateLifecycle(change, schema, options)` that calls `evaluateLifecycleVerdict`, derives `hopFailures` from the verdict's `checksByTarget`, then attaches `nextAction` via lifecycle guidance. Use cases that need full public lifecycle answers (`GetStatus`, `TransitionChange` when projecting guidance, `InvalidateChange`) MUST consume `evaluateLifecycle`, not the domain functions directly.
 
-DAG-only consumers (`ValidateArtifacts`, `GetArtifactInstruction`) MAY call `evaluateLifecycleVerdict` with empty `checksByTarget` when they need only `projectArtifacts` / `nextArtifact` and MUST NOT attach commands.
+DAG-only consumers (`ValidateArtifacts`, `GetArtifactInstruction`) MAY call `evaluateLifecycleVerdict` with empty `checksByTarget` when they need only `projectArtifacts` / `nextArtifact` and MUST NOT attach intents or actions.
 
 ### Requirement: Archiving escape transitions in lifecycle verdict
 

@@ -159,7 +159,7 @@ describe('InvalidateVerification', () => {
       expect(result.automaticReturn).toBeNull()
       expect(result.nextAction).toMatchObject({
         targetStep: state,
-        command: '/specd-verify',
+        intent: 'verify',
       })
     },
   )
@@ -173,6 +173,6 @@ describe('InvalidateVerification', () => {
 
     expect(result.change.state).toBe('done')
     expect(result.automaticReturn).toMatchObject({ from: 'archivable', to: 'done' })
-    expect(result.nextAction).toMatchObject({ targetStep: 'done', command: '/specd-verify' })
+    expect(result.nextAction).toMatchObject({ targetStep: 'done', intent: 'verify' })
   })
 })

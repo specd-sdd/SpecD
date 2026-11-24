@@ -64,6 +64,27 @@ Scenarios:
 - **AND** it resolves exactly one decorated identity for the logical operation
 - **AND** reconciliation, the projection, and all appended events receive that same value
 
+#### Scenario: Eligible states come from the check bindings
+
+- **GIVEN** `approval.spec` is bound as a transition source from `ready`, `pending-spec-approval`, and `spec-approved`
+- **WHEN** `ApproveSpec` decides whether the current state accepts consent
+- **THEN** the decision uses the binding `from` states of `approval.spec`
+- **AND** a change in any other state fails with `InvalidStateTransitionError`
+
+#### Scenario: Consent in a parking state never transitions
+
+- **GIVEN** a historic change in `spec-approved` with no recorded approval and an eligible artifact fingerprint
+- **WHEN** approval is recorded
+- **THEN** the approval is recorded
+- **AND** no `transitioned` event is appended and the state is still `spec-approved`
+
+#### Scenario: Stale consent in a parking state is recovered before it is renewed
+
+- **GIVEN** a historic change in `spec-approved` with a stale approval
+- **WHEN** `ApproveSpec` runs
+- **THEN** the reconciler first commits the return to `designing`
+- **AND** the request fails with `InvalidStateTransitionError` until the change is back in `ready`
+
 ### Requirement: Canonical pre-approval reconciliation
 
 #### Scenario: Newly detected drift prevents approval
@@ -105,7 +126,8 @@ Scenarios:
 - **GIVEN** `ApproveSpec` is constructed with `approvals.spec: true`
 - **GIVEN** the change is in `pending-spec-approval` state
 - **WHEN** `execute({ name, reason })` is called
-- **THEN** the change transitions to `spec-approved`
+- **THEN** a valid spec approval is recorded
+- **AND** the change remains in `pending-spec-approval`
 
 #### Scenario: Sovereign schema resolution in gate guard
 

@@ -1,3 +1,16 @@
+import {
+  type AutomaticRecovery,
+  type ChangeValidityVerdict,
+  type CheckAction,
+  type Kernel,
+  type LifecycleActionIntent,
+} from '@specd/sdk'
+
+/** `GetStatus.validity` projection, which carries the verdict in its delivery-adapter shape. */
+type StatusValidityProjection = NonNullable<
+  Awaited<ReturnType<Kernel['changes']['status']['execute']>>['validity']
+>
+
 /** One fingerprint difference safe to print: identity of the input, not its bytes or digest. */
 export interface PublicFingerprintDifference {
   readonly scope: string
@@ -21,12 +34,16 @@ export interface PublicAutomaticReturn {
   readonly to: string
 }
 
-/** Canonical next action reported by Core. */
+/** Canonical next action projected for CLI output. */
 export interface PublicNextAction {
   readonly targetStep: string
   readonly actionType: string
   readonly reason: string
   readonly command: string | null
+  /** Host-neutral guidance, present only when `command` is `null`. */
+  readonly guidance?: string
+  readonly intent?: LifecycleActionIntent | null
+  readonly action?: CheckAction
 }
 
 /** One unreadable or missing fingerprint input surfaced for status display. */
@@ -145,25 +162,27 @@ export function publicFingerprintIssues(issues: unknown): readonly PublicFingerp
  * @param value - `GetStatus.validity` or another reconciler verdict
  * @returns The public view, or `undefined` when no verdict was returned
  */
-export function publicValidity(value: unknown): PublicValidity | undefined {
+export function publicValidity(
+  value: Partial<ChangeValidityVerdict> | StatusValidityProjection | undefined,
+): PublicValidity | undefined {
   if (typeof value !== 'object' || value === null) return undefined
-  const record = value as {
+  const record: {
     specApproval?: unknown
     signoff?: unknown
     verification?: unknown
-    recovery?: unknown
-    blockers?: unknown
-    projectionChanges?: unknown
-    affectedArtifacts?: unknown
-    fingerprintIssues?: unknown
-  }
+    recovery?: AutomaticRecovery | null
+    blockers?: readonly unknown[]
+    projectionChanges?: readonly unknown[]
+    affectedArtifacts?: readonly unknown[]
+    fingerprintIssues?: readonly unknown[]
+  } = value
   return {
     ...(typeof record.specApproval === 'string' ? { specApproval: record.specApproval } : {}),
     ...(typeof record.signoff === 'string' ? { signoff: record.signoff } : {}),
     ...(typeof record.verification === 'string' ? { verification: record.verification } : {}),
     ...(record.recovery === null
       ? { recovery: null }
-      : isAutomaticReturn(record.recovery)
+      : record.recovery !== undefined
         ? { recovery: record.recovery }
         : {}),
     ...(Array.isArray(record.blockers)
@@ -413,26 +432,12 @@ export function publicProjectionChanges(changes: unknown): readonly PublicProjec
  * @param value - `automaticReturn` field
  * @returns The return, `null` when Core reported none, or `undefined` when absent
  */
-export function readAutomaticReturn(value: unknown): PublicAutomaticReturn | null | undefined {
+export function readAutomaticReturn(
+  value: AutomaticRecovery | null | undefined,
+): PublicAutomaticReturn | null | undefined {
   if (value === undefined) return undefined
   if (value === null) return null
-  return isAutomaticReturn(value) ? value : undefined
-}
-
-/**
- * Is automatic return.
- *
- * @param value - value
- * @returns is automatic return result
- */
-function isAutomaticReturn(value: unknown): value is PublicAutomaticReturn {
-  if (typeof value !== 'object' || value === null) return false
-  const record = value as { cause?: unknown; from?: unknown; to?: unknown }
-  return (
-    typeof record.cause === 'string' &&
-    typeof record.from === 'string' &&
-    typeof record.to === 'string'
-  )
+  return { cause: value.cause, from: value.from, to: value.to }
 }
 
 /**

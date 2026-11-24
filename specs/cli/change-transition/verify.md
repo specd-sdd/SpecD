@@ -75,17 +75,15 @@
 
 #### Scenario: Next flag fails in pending spec approval state
 
-- **GIVEN** the change is in `pending-spec-approval` state
+- **GIVEN** the change is in `pending-spec-approval` state with the spec gate on and no approval
 - **WHEN** `specd change transition my-change --next` is run
-- **THEN** the command exits with code 1
-- **AND** stderr contains an `error:` message explaining that the change is waiting for human spec approval
+- **THEN** the command targets `implementing`, exits with code 1, and stderr explains that spec approval is required
 
 #### Scenario: Next flag fails in pending signoff state
 
-- **GIVEN** the change is in `pending-signoff` state
+- **GIVEN** the change is in `pending-signoff` state with the signoff gate on and no signoff
 - **WHEN** `specd change transition my-change --next` is run
-- **THEN** the command exits with code 1
-- **AND** stderr contains an `error:` message explaining that the change is waiting for human signoff
+- **THEN** the command targets `archivable`, exits with code 1, and stderr explains that signoff is required
 
 #### Scenario: Next flag fails in archivable state
 
@@ -126,7 +124,7 @@
 
 - **GIVEN** change `checkout-retry` needs in-place verification
 - **WHEN** transition renders its repair guide
-- **THEN** the command contains `checkout-retry`
+- **THEN** the command projected by the CLI guidance presenter contains `checkout-retry`
 - **AND** no literal `<name>` placeholder is emitted
 
 #### Scenario: Committed recovery is not rendered as an edge error
@@ -135,6 +133,32 @@
 - **WHEN** the originally requested edge becomes inapplicable
 - **THEN** output shows the committed blockers and next action
 - **AND** does not describe the failure solely as an invalid protocol edge
+
+#### Scenario: Committed recovery renders a repair guide from ReconciledOperationBlockedError
+
+- **GIVEN** `TransitionChange` fails with `ReconciledOperationBlockedError` after committing an automatic return to `designing`, with a skippable blocker and a next action mapped to a command
+- **WHEN** `specd change transition my-change implementing` renders the failure in text mode
+- **THEN** output shows the committed state, the blocker with its label and `checkId`, a `bypass:` line, and the projected next-action `command:` and reason
+- **AND** output contains no invalid-edge error line
+- **AND** in json mode the record carries `state`, `automaticReturn`, projected blockers (no raw `isSkippable`) and `nextAction` with `intent`, `action`, `command` and `guidance`
+
+#### Scenario: Every skippable blocker gets a bypass line
+
+- **GIVEN** a failed transition whose fresh status carries two skippable blockers with `checkId` `impl.linksInScope` and `spec.overlap`
+- **WHEN** the repair guide is rendered in text mode
+- **THEN** one `bypass:` line is printed per skippable blocker, matching each blocker's `bypassFlag` in json output
+
+#### Scenario: Skippable deps.consistent gets the generic bypass hint
+
+- **GIVEN** a failed transition on `deps.consistent` that is skippable
+- **WHEN** the CLI resolves hints
+- **THEN** the generic bypass hint is rendered and the dependency-extraction hint is not
+
+#### Scenario: Repair guide projects bypass flag from isSkippable and checkId
+
+- **GIVEN** a failed transition followed by `GetStatus` returning a blocker with `isSkippable: true` and `checkId: 'impl.linksInScope'`
+- **WHEN** `specd change transition my-change verifying` renders its repair guide
+- **THEN** the CLI projects `--skip-checks impl.linksInScope` from `isSkippable` and `checkId` via the guidance presenter
 
 ### Requirement: Delegates refresh policy to TransitionChange
 
@@ -213,10 +237,11 @@
 
 #### Scenario: CheckPredicateFailedError renders Repair Guide with command and bypass
 
-- **GIVEN** a failed skippable check `@security.code-scan` with command `'pnpm audit:fix'`
+- **GIVEN** a failed skippable check `@security.code-scan` with action `{ kind: '@security.fix', guidance: 'pnpm audit:fix' }`
 - **WHEN** the command exits with failure
 - **THEN** the CLI Repair Guide renders the check label and error code
-- **AND** displays `command: pnpm audit:fix`
+- **AND** displays `guidance: pnpm audit:fix`
+- **AND** does not display `command: pnpm audit:fix`
 - **AND** displays `bypass: Retry with --skip-checks @security.code-scan if an exception is granted`
 
 #### Scenario: Mandatory check failure does not offer bypass in Repair Guide
@@ -224,6 +249,47 @@
 - **GIVEN** a failed mandatory check `protocol.edge`
 - **WHEN** the command renders the Repair Guide
 - **THEN** no `bypass:` line is printed
+
+#### Scenario: Built-in failures render context from details
+
+- **GIVEN** `CheckPredicateFailedError` for `workflow.requires` with `details.artifactId: 'design'` and `details.blockedBy: { artifactId: 'specs', status: 'pending-review' }` while attempting `ready → implementing`
+- **WHEN** the command renders the Repair Guide
+- **THEN** it shows the attempted transition, the check label and code, and names `design` blocked by `specs`
+
+#### Scenario: Missing approval shows the projected approval command
+
+- **GIVEN** `CheckPredicateFailedError` for `approval.spec` with `action.kind: 'approve-spec'`
+- **WHEN** the command renders the Repair Guide
+- **THEN** it shows `command: specd changes approve spec` projected by the presenter
+- **AND** no bypass is offered because the check is not skippable
+
+#### Scenario: Guidance-only check action falls back to the next-action command
+
+- **GIVEN** a failed check whose action is `{ kind: '@security.fix', guidance: 'pnpm audit:fix' }` and a fresh status `nextAction` that projects `command: /specd-verify`
+- **WHEN** the command renders the Repair Guide
+- **THEN** it prints `guidance: pnpm audit:fix` for the check action
+- **AND** it also prints `command: /specd-verify` projected from the next action, so both lines appear together
+
+#### Scenario: Repair guide prints the failed check diagnostic code
+
+- **GIVEN** a `CheckPredicateFailedError` with code `WORKFLOW_REQUIRES_FAILED` whose blocker is absent from the fresh status
+- **WHEN** the command renders the Repair Guide
+- **THEN** the failed check's diagnostic code `WORKFLOW_REQUIRES_FAILED` is printed
+
+#### Scenario: Failing status read does not mask the original transition error
+
+- **GIVEN** a transition fails with an error type that normally renders a repair guide, either `InvalidStateTransitionError` or `CheckPredicateFailedError`, and reading the fresh status for the repair guide also fails
+- **WHEN** the command handles the failure in text, json or toon mode
+- **THEN** only the original transition error is printed, for both error types
+- **AND** no repair guide, projected blockers or `nextAction` are rendered
+- **AND** in json and toon modes the failure record carries only the standard error fields and none of the repair-guide fields (`blockers`, `nextAction`, `state` or validity)
+- **AND** the exit code is 1
+
+#### Scenario: Structured failure blockers are projected
+
+- **GIVEN** a failed transition with a skippable blocker carrying `isSkippable: true` and `checkId`
+- **WHEN** the command renders json or toon output
+- **THEN** the blocker carries `label`, `checkId`, and `bypassFlag` and no raw `isSkippable`
 
 ### Requirement: Incomplete tasks error
 
@@ -391,4 +457,5 @@
 
 - **GIVEN** `impl.linksInScope` fails as a skippable check during `change transition`
 - **WHEN** `specd change transition` renders the failure
-- **THEN** the CLI renders `--skip-checks impl.linksInScope` (and `--allow-out-of-scope` alias) guidance via the centralized hint-resolution helper
+- **THEN** the CLI renders `Retry with --skip-checks impl.linksInScope if an exception is granted` via the centralized hint-resolution helper
+- **AND** the hint does not mention `--allow-out-of-scope`

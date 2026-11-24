@@ -4,6 +4,11 @@ import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
 import { collect } from '../../helpers/collect.js'
 import {
+  blockerTextLines,
+  projectCliBlocker,
+  projectCliNextActionRecord,
+} from '../../guidance-presenter.js'
+import {
   parseArtifactPolicyFlag,
   parseWorkflowPolicyFlag,
   resolveInvalidationOverride,
@@ -45,12 +50,52 @@ export function registerChangeEdit(parent: Command): void {
       `
 JSON/TOON output schema:
   {
-    result: "ok"
-    name: string
-    specIds: string[]
-    workspaces: string[]
-    invalidated: boolean
-    state: string
+    result: "ok"  // always "ok" on success
+    name: string  // change name
+    specIds: string[]  // spec IDs now targeted by the change, one whole ID per element
+    workspaces: string[]  // workspaces derived from specIds
+    invalidated: boolean  // whether approval invalidation occurred
+    scopeChanged: boolean  // whether the edit changed the change's spec scope
+    validityChanged: boolean  // whether the edit changed any lifecycle validity projection
+    state: string  // lifecycle state after the edit
+    blockers?: Array<{  // present only when blockers exist: conditions blocking forward progress
+      code: string  // stable blocker code
+      message: string  // human-readable explanation
+      label?: string  // short check label
+      checkId?: string  // id of the check that produced the blocker
+      action?: { kind: string, params?: object }  // structured recovery action, when core provides one
+      bypassFlag?: string  // CLI flag that bypasses the blocker, when it is skippable
+      details?: Record<string, unknown>  // blocker-specific structured details
+    }>
+    nextAction?: {  // present when core reports a recommended next step
+      targetStep: string  // lifecycle step the action moves toward
+      actionType: string  // kind of action (cognitive or mechanical)
+      reason: string  // why this action is recommended
+      command: string | null  // command or skill to run, or null when only guidance applies
+      guidance?: string  // advice shown when command is null
+      intent: 'design'|'implement'|'verify'|'archive'|null  // workflow intent, or null when none applies
+      action?: { kind: string, params?: object }  // structured action, when core provides one
+    }
+    effectivePolicy?: {  // present when core reports the persisted invalidation policy
+      artifacts: string  // artifact invalidation dimension: none|surgical|downstream|global
+      workflow: string  // workflow invalidation dimension: preserve|redesign
+    }
+    projectionChanges?: Array<{  // present only when a validity projection changed
+      projection: string  // projection that changed
+      from: string  // previous projection status
+      to: string  // new projection status
+      cause: string  // why the projection changed
+      differences: Array<{  // hash-free fingerprint differences
+        scope: string  // fingerprint scope
+        key: string  // differing key
+        kind: string  // kind of difference
+      }>
+    }>
+    automaticReturn?: {  // present when core reported an automatic lifecycle return
+      cause: string  // why the change returned automatically
+      from: string  // state the change left
+      to: string  // state the change returned to
+    } | null  // null when core reported no automatic return
   }
 `,
     )
@@ -101,7 +146,12 @@ JSON/TOON output schema:
           const scopeChanged = 'scopeChanged' in result ? result.scopeChanged : false
           const validityChanged = 'validityChanged' in result ? result.validityChanged : invalidated
           const blockers = 'blockers' in result ? result.blockers : []
-          const nextAction = 'nextAction' in result ? result.nextAction : undefined
+          const projectedBlockers = blockers.map(projectCliBlocker)
+          const rawNextAction = 'nextAction' in result ? result.nextAction : undefined
+          const nextAction =
+            rawNextAction !== undefined
+              ? projectCliNextActionRecord(rawNextAction, blockers)
+              : undefined
           const projectionChanges = publicProjectionChanges(
             'projectionChanges' in result ? result.projectionChanges : undefined,
           )
@@ -166,7 +216,7 @@ JSON/TOON output schema:
                 scopeChanged,
                 validityChanged,
                 state: change.state,
-                ...(blockers.length > 0 ? { blockers } : {}),
+                ...(blockers.length > 0 ? { blockers: projectedBlockers } : {}),
                 ...(nextAction !== undefined ? { nextAction } : {}),
                 ...(effectivePolicy !== undefined ? { effectivePolicy } : {}),
                 ...(projectionChanges.length > 0 ? { projectionChanges } : {}),
@@ -191,25 +241,27 @@ JSON/TOON output schema:
  */
 function appendEditGuidance(
   lines: string[],
-  blockers: readonly { readonly code: string; readonly message: string }[],
+  blockers: readonly Parameters<typeof blockerTextLines>[0][],
   nextAction:
     | {
         readonly targetStep: string
         readonly command: string | null
+        readonly guidance?: string | undefined
         readonly reason: string
       }
     | undefined,
 ): void {
   if (blockers.length > 0) {
     lines.push('blockers:')
-    for (const blocker of blockers) {
-      lines.push(`  ! ${blocker.code}: ${blocker.message}`)
-    }
+    for (const blocker of blockers) lines.push(...blockerTextLines(blocker))
   }
   if (nextAction !== undefined) {
     lines.push('next action:')
     lines.push(`  target:  ${nextAction.targetStep}`)
     lines.push(`  command: ${nextAction.command ?? '(none)'}`)
+    if (nextAction.command === null && nextAction.guidance !== undefined) {
+      lines.push(`  guidance: ${nextAction.guidance}`)
+    }
     lines.push(`  reason:  ${nextAction.reason}`)
   }
 }

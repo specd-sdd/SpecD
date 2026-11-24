@@ -150,9 +150,9 @@ If `review.required` is `false`, suggest based on `nextAction.targetStep`:
 | `implementing` / `spec-approved` | `/specd-implement <name>` (`spec-approved` is drain-only)                   |
 | `verifying`                      | `/specd-verify <name>`                                                      |
 | `done` / `signed-off`            | If signoff on and unsatisfied: human `approve signoff`. Else `/specd-archive <name>` when the hop is `archivable`; otherwise `/specd-verify <name>` |
-| `pending-signoff`                | Drain only: `specd changes approve signoff <name> --reason ...`             |
+| `pending-signoff`                | Drain only: approve with `specd changes approve signoff <name> --reason ...` while consent is missing; otherwise follow `nextAction` |
 | `archivable`                     | `/specd-archive <name>`                                                     |
-| `pending-spec-approval`          | Drain only: `specd changes approve spec <name> --reason ...`                |
+| `pending-spec-approval`          | Drain only: approve with `specd changes approve spec <name> --reason ...` while consent is missing; otherwise follow `nextAction` |
 
 **Stop — do not continue.**
 

@@ -1,5 +1,6 @@
 import { run as runSpecOverlap } from '../../domain/checks/spec-overlap.js'
 import { type Change } from '../../domain/entities/change.js'
+import { type SpecOverlapEntrySummary } from '../../domain/services/detect-spec-overlap.js'
 import {
   type Check,
   type CheckExecutionContext,
@@ -18,6 +19,8 @@ export interface SpecOverlapDetection {
     readonly changeName: string
     readonly overlappingSpecIds: readonly string[]
   }[]
+  /** Overlap entries shaped for host rendering when known. */
+  readonly entries?: readonly SpecOverlapEntrySummary[]
 }
 
 /** Ports for `spec.overlap` I/O. */
@@ -75,6 +78,9 @@ class SpecOverlapCheck extends WorkflowCheck {
       ...(detection.message !== undefined ? { specOverlapMessage: detection.message } : {}),
       ...(detection.peers !== undefined && detection.peers.length > 0
         ? { specOverlapPeers: detection.peers }
+        : {}),
+      ...(detection.entries !== undefined && detection.entries.length > 0
+        ? { specOverlapEntries: detection.entries }
         : {}),
     })
   }

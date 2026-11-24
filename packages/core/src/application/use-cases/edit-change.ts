@@ -26,7 +26,6 @@ import { assertInvalidationPolicyOverride } from './_shared/assert-invalidation-
 import { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
 import { type RefreshImplementationTracking } from './refresh-implementation-tracking.js'
 import { type ReconcileChangeValidity } from './reconcile-change-validity.js'
-import { InvalidCompositionFactoryArgumentsError } from '../../domain/errors/invalid-composition-factory-arguments-error.js'
 
 /** Result returned by the {@link EditChange} use case. */
 export interface EditChangeResult {
@@ -88,7 +87,7 @@ export class EditChange {
    * @param listWorkspaces - The project orchestrator
    * @param actor - Resolver for the actor identity
    * @param schemaProvider - Provider for the active schema DAG
-   * @param refreshImplementationTracking - Optional refresh handler for implementation tracking cleanup
+   * @param refreshImplementationTracking - Optional (`undefined` when unavailable) refresh handler for implementation tracking cleanup
    * @param reconcile - Canonical reconciler for scope edits
    * @param resolveChangeSchema - Shared change schema resolver
    */
@@ -97,8 +96,8 @@ export class EditChange {
     listWorkspaces: ListWorkspaces,
     actor: ActorResolver,
     schemaProvider: SchemaProvider,
-    refreshImplementationTracking?: RefreshImplementationTracking,
-    reconcile?: ReconcileChangeValidity,
+    refreshImplementationTracking: RefreshImplementationTracking | undefined,
+    reconcile: ReconcileChangeValidity,
     resolveChangeSchema?: ResolveChangeSchema,
   ) {
     this._changes = changes
@@ -106,9 +105,6 @@ export class EditChange {
     this._actor = actor
     this._schemaProvider = schemaProvider
     this._refresh = refreshImplementationTracking
-    if (reconcile === undefined) {
-      throw new InvalidCompositionFactoryArgumentsError('EditChange', 'reconcile is required')
-    }
     this._reconcile = reconcile
     this._resolveChangeSchema = resolveChangeSchema ?? new ResolveChangeSchema(schemaProvider)
   }
@@ -234,7 +230,7 @@ export class EditChange {
     const resolveActor = async (): Promise<Awaited<ReturnType<ActorResolver['identity']>>> =>
       (actor ??= await this._actor.identity())
 
-    const { result: persisted, change: initialChange } = await this._changes.mutate(
+    const { change: updatedChange } = await this._changes.mutate(
       input.name,
       async (freshChange) => {
         if (hasDescriptionChange) {
@@ -245,29 +241,11 @@ export class EditChange {
           freshChange.invalidationPolicy = resolvedPolicy
         }
 
-        return { invalidated: false, removedSpecIds: [] as string[] }
+        return undefined
       },
     )
 
-    let updatedChange = initialChange
-    if (persisted.invalidated && persisted.removedSpecIds.length > 0) {
-      await this._changes.unscaffold(updatedChange, persisted.removedSpecIds)
-    }
-
-    if (persisted.invalidated) {
-      await this._changes.scaffold(updatedChange, (specId) =>
-        this._specExists(workspaceMap, specId),
-      )
-      if (this._refresh !== undefined) {
-        await this._refresh.execute({ name: input.name })
-        const reloaded = await this._changes.get(input.name)
-        if (reloaded !== null) {
-          updatedChange = reloaded
-        }
-      }
-    }
-
-    return editResult(updatedChange, persisted.invalidated, resolvedPolicy)
+    return editResult(updatedChange, false, resolvedPolicy)
   }
 
   /**
@@ -354,47 +332,6 @@ export class EditChange {
   }
 
   /**
-   * Tells whether applying the request to the persisted change would alter nothing.
-   *
-   * A request whose resulting `specIds`, description and invalidation policy equal the persisted
-   * ones persists nothing and resolves no actor. A removal of a spec that is not in the change is
-   * never a no-op: the mutation must run so it fails with `SpecNotInChangeError`.
-   *
-   * @param change - The persisted change snapshot
-   * @param input - The edit request
-   * @param invalidationPolicy - The validated policy from the request, if any
-   * @param addSpecIds - Normalized spec IDs to add
-   * @param removeSpecIds - Normalized, de-duplicated spec IDs to remove
-   * @returns `true` when nothing would change
-   */
-  private _isNoOp(
-    change: Change,
-    input: EditChangeInput,
-    invalidationPolicy: InvalidationPolicy | undefined,
-    addSpecIds: readonly string[] | undefined,
-    removeSpecIds: readonly string[] | undefined,
-  ): boolean {
-    if (input.description !== undefined && input.description !== (change.description ?? '')) {
-      return false
-    }
-    if (invalidationPolicy !== undefined && invalidationPolicy !== change.invalidationPolicy) {
-      return false
-    }
-    const specIds = [...change.specIds]
-    for (const id of removeSpecIds ?? []) {
-      const idx = specIds.indexOf(id)
-      if (idx === -1) return false
-      specIds.splice(idx, 1)
-    }
-    for (const id of addSpecIds ?? []) {
-      if (!specIds.includes(id)) specIds.push(id)
-    }
-    return (
-      specIds.length === change.specIds.length && specIds.every((id, i) => id === change.specIds[i])
-    )
-  }
-
-  /**
    * Checks whether a spec exists in its workspace repository.
    *
    * @param workspaces - Orchestrated workspace map
@@ -469,7 +406,7 @@ function editNextAction(
       targetStep: recovery.to,
       actionType: 'cognitive',
       reason: `Validity changed and returned the change to ${recovery.to}`,
-      command: recovery.to === 'designing' ? '/specd-design' : '/specd-verify',
+      intent: recovery.to === 'designing' ? 'design' : 'verify',
     }
   }
   return {
@@ -478,6 +415,6 @@ function editNextAction(
     reason: validityChanged
       ? 'Review validity blockers before advancing'
       : 'Change metadata updated',
-    command: null,
+    intent: null,
   }
 }

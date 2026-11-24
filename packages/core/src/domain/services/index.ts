@@ -103,6 +103,14 @@ export {
   type RuleEvaluatorParser,
 } from './rule-evaluator.js'
 export {
+  type AutomaticRecovery,
+  type ChangeValidityVerdict,
+  type ArtifactReviewTarget,
+  type ProjectionChange,
+  type ValidityBlocker,
+  type FingerprintInputFailure,
+} from './change-validity.js'
+export {
   detectSpecOverlap,
   specOverlapDetectionForChange,
   type SpecOverlapDetectionSummary,
@@ -132,10 +140,17 @@ export {
   checkMatches,
   CHECK_LABELS,
   checkLabel,
+  approveSpecAction,
+  approveSignoffAction,
+  startVerificationAction,
+  refreshStatusAction,
+  type BuiltInCheckActionKind,
+  type CheckAction,
   type CheckId,
   type BuiltinCheckId,
   type CustomCheckDefinition,
   type CheckKind,
+  type CheckOutcome,
   type CheckResult,
   type CheckApplicability,
   type TransitionAlong,

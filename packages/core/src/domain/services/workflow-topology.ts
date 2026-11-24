@@ -40,13 +40,36 @@ const CANONICAL_PIPELINE: readonly ChangeState[] = [
   'archiving',
 ]
 
-/** Drain-only parking states that are never part of the pipeline. */
-const DRAIN_STATES: readonly ChangeState[] = [
-  'pending-spec-approval',
-  'spec-approved',
-  'pending-signoff',
-  'signed-off',
-]
+/**
+ * Drain-only parking states that are never part of the pipeline. Each sits just after its
+ * pipeline anchor; the offset is used for position comparison only.
+ */
+const DRAIN_ANCHORS: Readonly<Partial<Record<ChangeState, DrainAnchor>>> = {
+  'pending-spec-approval': { anchor: 'ready', offset: 0.25 },
+  'spec-approved': { anchor: 'ready', offset: 0.5 },
+  'pending-signoff': { anchor: 'done', offset: 0.25 },
+  'signed-off': { anchor: 'done', offset: 0.5 },
+}
+
+/** Where a drain-only parking state sits relative to the active pipeline. */
+export interface DrainAnchor {
+  /** Pipeline state the drain state follows. */
+  readonly anchor: ChangeState
+  /** Fractional offset after the anchor, used for position comparison only. */
+  readonly offset: number
+}
+
+const DRAIN_STATES: readonly ChangeState[] = Object.keys(DRAIN_ANCHORS) as ChangeState[]
+
+/**
+ * Returns the pipeline anchor of a drain-only parking state.
+ *
+ * @param state - Lifecycle state
+ * @returns The anchor and offset, or `null` when the state is not a drain state
+ */
+export function drainAnchorOf(state: ChangeState): DrainAnchor | null {
+  return DRAIN_ANCHORS[state] ?? null
+}
 
 /**
  * Returns whether a state is a drain-only parking state.
@@ -54,7 +77,7 @@ const DRAIN_STATES: readonly ChangeState[] = [
  * @param state - Lifecycle state
  * @returns true for pending/approved parking states
  */
-function isDrainState(state: ChangeState): boolean {
+export function isDrainState(state: ChangeState): boolean {
   return DRAIN_STATES.includes(state)
 }
 
@@ -271,15 +294,10 @@ export function nextWorkflowStep(
   schema: Schema,
   approvals: ApprovalGates,
 ): ChangeState | null {
-  if (
-    from === 'archivable' ||
-    from === 'archiving' ||
-    from === 'pending-spec-approval' ||
-    from === 'pending-signoff'
-  ) {
+  if (from === 'archivable' || from === 'archiving') {
     return null
   }
-  if (from === 'spec-approved' || from === 'signed-off') {
+  if (DRAIN_STATES.includes(from)) {
     // Drain states leave through their first legal non-redesign exit, or nowhere.
     const forward = listWorkflowTransitions(from, schema, approvals).find(
       (step) => step !== 'designing',

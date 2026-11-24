@@ -1139,6 +1139,21 @@ describe('buildSchema', () => {
       )
     })
 
+    it.each(['constructor', 'toString', '__proto__'])(
+      "rejects a check declared from the inherited object key '%s'",
+      (from) => {
+        const data = minimalData([
+          {
+            ...step('implementing'),
+            checks: [{ id: 'workflow.taskCompletion', from }],
+          },
+        ])
+
+        expect(() => buildSchema('#test', data, new Map())).toThrow(SchemaValidationError)
+        expect(() => buildSchema('#test', data, new Map())).toThrow(`invalid from state '${from}'`)
+      },
+    )
+
     it('allows modifying onFailure and skippable when check has an existing binding and allowBindingOverride is true', () => {
       const registry = new CheckRegistry()
       registry.register(

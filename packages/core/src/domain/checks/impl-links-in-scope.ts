@@ -10,6 +10,7 @@ import {
 export interface ImplLinksInScopeFacts {
   readonly linksInScopeBlocked: boolean
   readonly linksInScopeMessage?: string
+  readonly outOfScopeSpecIds?: readonly string[]
 }
 
 /**
@@ -27,6 +28,9 @@ export function runImplLinksInScope(facts: ImplLinksInScopeFacts): CheckResult {
     'impl.linksInScope',
     'IMPLEMENTATION_STATE',
     facts.linksInScopeMessage ?? 'Implementation links would update sidecars out of scope',
+    facts.outOfScopeSpecIds !== undefined
+      ? { outOfScopeSpecIds: facts.outOfScopeSpecIds }
+      : undefined,
   )
 }
 

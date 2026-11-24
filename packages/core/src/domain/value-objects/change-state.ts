@@ -24,20 +24,21 @@ export type ChangeState =
  * transition to. Transitions not listed here are invalid.
  *
  * Pending and approved parking states remain drain-only for in-flight
- * changes. New work stays in `ready` / `done` until recorded approval
- * unblocks the delivery edge. Automatic recovery uses the separate
+ * changes and exit directly through delivery edges without entering another
+ * legacy parking state. New work stays in `ready` / `done` until recorded
+ * approval unblocks the delivery edge. Automatic recovery uses the separate
  * {@link RECOVERY_ONLY_TRANSITIONS} topology.
  */
 export const VALID_TRANSITIONS: Record<ChangeState, readonly ChangeState[]> = {
   drafting: ['designing'],
   designing: ['ready', 'designing'],
   ready: ['implementing', 'designing'],
-  'pending-spec-approval': ['spec-approved', 'designing'],
+  'pending-spec-approval': ['implementing', 'designing'],
   'spec-approved': ['implementing', 'designing'],
   implementing: ['verifying', 'designing'],
   verifying: ['implementing', 'done', 'designing'],
   done: ['archivable', 'designing', 'implementing', 'verifying'],
-  'pending-signoff': ['signed-off', 'designing', 'done'],
+  'pending-signoff': ['archivable', 'designing', 'done'],
   'signed-off': ['archivable', 'designing', 'implementing', 'verifying'],
   archivable: ['archiving', 'designing', 'implementing', 'verifying'],
   archiving: ['archivable', 'designing'],
@@ -56,7 +57,6 @@ export type RecoveryTransitionTable = Readonly<
  */
 export const RECOVERY_ONLY_TRANSITIONS: RecoveryTransitionTable = {
   'spec-approval': {
-    ready: 'designing',
     'pending-spec-approval': 'designing',
     'spec-approved': 'designing',
     implementing: 'designing',
@@ -80,6 +80,7 @@ export const RECOVERY_ONLY_TRANSITIONS: RecoveryTransitionTable = {
     archiving: 'designing',
   },
   signoff: {
+    'pending-signoff': 'done',
     'signed-off': 'done',
     archivable: 'done',
     archiving: 'done',
@@ -94,10 +95,12 @@ export const HAPPY_PATH_NEXT: Partial<Record<ChangeState, ChangeState>> = {
   drafting: 'designing',
   designing: 'ready',
   ready: 'implementing',
+  'pending-spec-approval': 'implementing',
   'spec-approved': 'implementing',
   implementing: 'verifying',
   verifying: 'done',
   done: 'archivable',
+  'pending-signoff': 'archivable',
   'signed-off': 'archivable',
 }
 

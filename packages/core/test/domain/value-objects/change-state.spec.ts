@@ -30,7 +30,7 @@ describe('ChangeState', () => {
       ['designing', 'designing'],
       ['ready', 'implementing'],
       ['ready', 'designing'],
-      ['pending-spec-approval', 'spec-approved'],
+      ['pending-spec-approval', 'implementing'],
       ['pending-spec-approval', 'designing'],
       ['spec-approved', 'implementing'],
       ['spec-approved', 'designing'],
@@ -43,8 +43,9 @@ describe('ChangeState', () => {
       ['done', 'designing'],
       ['done', 'implementing'],
       ['done', 'verifying'],
-      ['pending-signoff', 'signed-off'],
+      ['pending-signoff', 'archivable'],
       ['pending-signoff', 'designing'],
+      ['pending-signoff', 'done'],
       ['signed-off', 'archivable'],
       ['signed-off', 'designing'],
       ['signed-off', 'implementing'],
@@ -72,14 +73,16 @@ describe('ChangeState', () => {
       expect(isValidTransition('archiving', 'done')).toBe(false)
     })
 
-    it('HAPPY_PATH_NEXT maps delivery hops and omits pending/archivable', () => {
+    it('HAPPY_PATH_NEXT maps delivery hops including pending parking exits and omits archivable', () => {
       expect(HAPPY_PATH_NEXT.drafting).toBe('designing')
       expect(HAPPY_PATH_NEXT.implementing).toBe('verifying')
+      expect(HAPPY_PATH_NEXT['pending-spec-approval']).toBe('implementing')
       expect(HAPPY_PATH_NEXT['signed-off']).toBe('archivable')
-      expect(HAPPY_PATH_NEXT['pending-spec-approval']).toBeUndefined()
-      expect(HAPPY_PATH_NEXT['pending-signoff']).toBeUndefined()
+      expect(HAPPY_PATH_NEXT['pending-signoff']).toBe('archivable')
       expect(HAPPY_PATH_NEXT.archivable).toBeUndefined()
       expect(HAPPY_PATH_NEXT.archiving).toBeUndefined()
+      expect(isValidTransition('pending-spec-approval', 'spec-approved')).toBe(false)
+      expect(isValidTransition('pending-signoff', 'signed-off')).toBe(false)
     })
 
     it('archiving allows transition to archivable and designing', () => {
@@ -154,6 +157,7 @@ describe('ChangeState', () => {
   describe('RECOVERY_ONLY_TRANSITIONS', () => {
     it('contains sign-off returns without advertising them as manual edges', () => {
       expect(RECOVERY_ONLY_TRANSITIONS.signoff).toEqual({
+        'pending-signoff': 'done',
         'signed-off': 'done',
         archivable: 'done',
         archiving: 'done',

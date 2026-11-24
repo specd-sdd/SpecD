@@ -2,6 +2,7 @@ import { type Change } from '../entities/change.js'
 import { type ChangeValidityVerdict } from '../services/change-validity.js'
 import {
   CHECK_LABELS,
+  approveSignoffAction,
   fail,
   pass,
   skip,
@@ -32,13 +33,24 @@ export function run(facts: ApprovalSignoffFacts): CheckResult {
     status === 'valid' || (status === undefined && facts.change.activeSignoff !== undefined)
   if (!signed) {
     if (status === 'stale' || status === 'revoked') {
-      return fail('approval.signoff', 'APPROVAL_STALE', 'Signoff is stale', { gate: 'signoff' })
+      return fail(
+        'approval.signoff',
+        'APPROVAL_STALE',
+        'Signoff is stale',
+        { gate: 'signoff' },
+        undefined,
+        undefined,
+        approveSignoffAction(),
+      )
     }
     return fail(
       'approval.signoff',
       'APPROVAL_REQUIRED',
       'Signoff is required before entering archivable',
       { gate: 'signoff' },
+      undefined,
+      undefined,
+      approveSignoffAction(),
     )
   }
   const verification = facts.validity?.verification

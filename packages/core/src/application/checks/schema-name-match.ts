@@ -40,6 +40,7 @@ class SchemaNameMatchCheck extends WorkflowCheck {
       runSchemaNameMatch({
         schemaName: ctx.schema.name(),
         changeSchemaName: ctx.change.schemaName,
+        changeName: ctx.change.name,
       }),
     )
   }

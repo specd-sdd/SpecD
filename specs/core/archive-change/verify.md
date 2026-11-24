@@ -37,11 +37,12 @@
 
 #### Scenario: ArchiveChange constructor does not take RunStepHooks
 
-- **GIVEN** `archiveBindings` from `createWorkflowCheckRegistry`
+- **GIVEN** `archiveBindings` and `transitionBindings` from `createWorkflowCheckRegistry`, and the baked `approvals`
 - **WHEN** `ArchiveChange` is constructed
-- **THEN** it uses those bindings for archive predicates and effects
+- **THEN** it uses `archiveBindings` for archive predicates and effects and `transitionBindings` / `approvals` for committed-recovery guidance
 - **AND** the constructor does not accept `RunStepHooks`
 - **AND** `ArchiveChangeDeps` does not include `runStepHooks`
+- **AND** `resolveArchiveChangeDeps` supplies `reconcile` and `resolveChangeSchema`
 
 #### Scenario: Base bindings are never executed directly
 
@@ -120,7 +121,7 @@
 
 - **GIVEN** a change that is not in `archivable` or `archiving` state
 - **WHEN** `ArchiveChange.execute` is called
-- **THEN** `InvalidStateTransitionError` is thrown from `assertArchivable()`
+- **THEN** `InvalidStateTransitionError` is thrown from the archivable state guard (the inline check after reconciliation; `assertArchivable()` applies inside the serialized mutation)
 - **AND** no hooks are executed and no files are modified
 
 #### Scenario: Pre-archive hooks run while change remains archivable
@@ -174,7 +175,15 @@
 - **GIVEN** fresh preflight commits gate recovery that makes archive inapplicable
 - **WHEN** archive stops
 - **THEN** the recovery remains persisted and the failure includes canonical blockers and next action
+- **AND** the next action is projected by `evaluateLifecycle` over the committed state with real forward-candidate check results
 - **AND** it is not reduced to a generic invalid-state error
+
+#### Scenario: Archive recovery to done never routes to verify when verifying is disabled
+
+- **GIVEN** a schema that disables `verifying` and a sign-off gate that is on with stale sign-off
+- **WHEN** archive commits recovery to `done` and stops
+- **THEN** `nextAction.action` is `{ kind: 'approve-signoff' }` and `nextAction.intent` is never `'verify'`
+- **AND** the use case did not hard-code the intent from the committed state name
 
 #### Scenario: Every archive construction path requires reconciliation
 
@@ -204,6 +213,21 @@
 - **WHEN** `ArchiveChange.execute` runs
 - **THEN** archive fails for missing verification
 
+#### Scenario: Verification stale after pre-archive hooks fails through the check
+
+- **GIVEN** a change in `archivable` with current verification and a pre-archive hook that changes verification inputs
+- **WHEN** `ArchiveChange.execute` runs and the post-hook reconcile leaves validity blocking archive
+- **THEN** the archive predicates are re-run first
+- **AND** `CheckPredicateFailedError` is thrown for `verification.current` with the `start-verification` action
+- **AND** no generic `InvalidStateTransitionError` is thrown
+
+#### Scenario: Blocked validity without a failing predicate throws an invalid-state error
+
+- **GIVEN** post-hook reconcile leaves an artifact pending review and every archive predicate passes
+- **WHEN** `ArchiveChange.execute` runs
+- **THEN** `InvalidStateTransitionError` is thrown from the current state to `archiving` and nothing is archived
+- **AND** `ReconciledOperationBlockedError` is not used because no recovery was committed
+
 ### Requirement: ReadOnly workspace guard
 
 #### Scenario: Archive rejected when change contains readOnly specs
@@ -211,9 +235,11 @@
 - **GIVEN** a change in `archivable` state with `specIds` including `platform:auth/tokens`
 - **AND** the `platform` workspace has `readOnly` ownership
 - **WHEN** `ArchiveChange.execute` is called
-- **THEN** `ReadOnlyWorkspaceError` is thrown
-- **AND** the error message lists the affected specs and workspaces
+- **THEN** `CheckPredicateFailedError` is thrown for `workspace.readOnly`
+- **AND** `details.specs` lists `{ specId: 'platform:auth/tokens', workspace: 'platform' }`
+- **AND** the message is exactly the prescribed format: `Change "<name>" contains specs from readOnly workspaces:`, a blank line, one `  - <specId>  →  workspace "<workspace>" (readOnly)` line per affected spec, a blank line, then `Writing deltas into protected specs is not allowed.`
 - **AND** no hooks are executed and no spec files are written
+- **AND** the change remains in `archivable`
 
 #### Scenario: Archive proceeds when all specs are in owned workspaces
 
@@ -231,7 +257,7 @@
 
 - **GIVEN** a change that is not in `archivable` state
 - **WHEN** `ArchiveChange.execute` is called
-- **THEN** `InvalidStateTransitionError` is thrown (from `assertArchivable`)
+- **THEN** `InvalidStateTransitionError` is thrown (from the archivable state guard)
 - **AND** the readOnly guard is never reached
 
 #### Scenario: Enter ready fails the same readOnly runner
@@ -261,8 +287,8 @@
 - **GIVEN** a change `alpha` in `archivable` state targeting `core:config`
 - **AND** another active change `beta` also targets `core:config`
 - **WHEN** `ArchiveChange.execute({ name: 'alpha' })` is called without bypassing `spec.overlap`
-- **THEN** `SpecOverlapError` is thrown
-- **AND** the error message includes `core:config` and `beta`
+- **THEN** `CheckPredicateFailedError` is thrown for `spec.overlap`
+- **AND** `details.entries` and the message include `core:config` and `beta`
 - **AND** no files are modified and no hooks are executed
 
 #### Scenario: Archive overlap applies each peer policy and records exact affected scope
@@ -338,7 +364,7 @@
 
 - **GIVEN** `alpha` overlaps `beta` and also contains a spec from a `readOnly` workspace
 - **WHEN** `execute({ name: 'alpha', skipChecks: ['spec.overlap'] })` runs
-- **THEN** `ReadOnlyWorkspaceError` is thrown
+- **THEN** `CheckPredicateFailedError` is thrown for `workspace.readOnly`
 - **AND** no peer is invalidated and no file is written
 
 #### Scenario: Retry from archiving applies the same bypass
@@ -351,7 +377,7 @@
 
 - **GIVEN** `alpha` overlaps `beta` on `core:config`
 - **WHEN** `ArchiveChange.execute({ name: 'alpha' })` is called without bypassing `spec.overlap`
-- **THEN** `SpecOverlapError` is thrown
+- **THEN** `CheckPredicateFailedError` is thrown for `spec.overlap`
 - **AND** its message names `core:config` and `beta`
 - **AND** its message contains no `--skip-checks` or `--allow-overlap` text
 - **AND** `skippable` reflects the resolved `spec.overlap` binding
@@ -890,6 +916,65 @@
 - **THEN** debug logs include the failure step, `commitStarted` when applicable, and the spec ID or artifact being processed
 - **AND** when `commitStarted` is true, debug logs include batch restore outcome and whether lifecycle rolled back to `archivable`
 
+#### Scenario: Orphan detection logs its outcome in every case
+
+- **WHEN** orphan detection runs with debug logging enabled
+- **THEN** a log with outcome `none-found` is emitted when the manifest is absent for a spec
+- **AND** a log is emitted when an orphan backup is found, stating whether it is matching (auto-restored) or foreign (abort)
+
+#### Scenario: Unreadable manifest is logged and aborts the archive
+
+- **GIVEN** an orphan manifest that exists but cannot be read for a reason other than absence (for example permissions)
+- **WHEN** orphan detection runs with debug logging enabled
+- **THEN** a log with outcome `unreadable` is emitted for the spec before the error is thrown
+- **AND** the archive aborts with `ArchiveOrphanBackupError` whose message states that the manifest cannot be read, `foreignChangeName` is `false`, and no snapshot is taken so the existing backup is never overwritten
+
+#### Scenario: Unknown workspace is logged and skipped
+
+- **GIVEN** a spec whose workspace is unknown to the snapshot adapter
+- **WHEN** orphan detection runs with debug logging enabled
+- **THEN** a log with outcome `skipped-unknown-workspace` is emitted for the spec and no orphan check is performed for it
+
+#### Scenario: Corrupt orphan manifest abort is logged
+
+- **GIVEN** an orphan backup whose manifest cannot be parsed
+- **WHEN** orphan detection aborts the archive
+- **THEN** a debug log records the corrupt manifest abort with the spec ID before the error is thrown
+
+#### Scenario: Null manifest is a corrupt manifest
+
+- **GIVEN** an orphan backup whose manifest content is valid JSON but not an object (for example `null`)
+- **WHEN** orphan detection runs
+- **THEN** it throws `ArchiveOrphanBackupError` with `foreignChangeName` false and a message stating that the manifest is corrupt and logs the abort before throwing
+- **AND** the backup is not classified as foreign
+
+#### Scenario: Manifest without changeName is a corrupt manifest
+
+- **GIVEN** an orphan backup whose manifest is a JSON object with no string `changeName`
+- **WHEN** orphan detection runs
+- **THEN** it throws `ArchiveOrphanBackupError` with `foreignChangeName` false and a message stating that the manifest is corrupt and logs the abort before throwing
+- **AND** the backup is not classified as foreign and the error message does not contain `undefined`
+
+#### Scenario: Snapshot adapter restore, cleanup and created-file logs carry the change name
+
+- **WHEN** the batch snapshot adapter records a created file, restores a batch or cleans up backups with debug logging enabled
+- **THEN** the restore start, per-spec restore failure, restore completion and cleanup logs carry the change name given in the `changeName` argument of `restoreBatch` or `cleanup`
+- **AND** the created-file log carries the change name of the batch manifest
+
+#### Scenario: Preflight failure log distinguishes plan preparation from full-batch preflight
+
+- **GIVEN** archive plan preparation fails, or full-batch preflight fails after a successful plan
+- **WHEN** the failure is logged
+- **THEN** the two cases use distinct log messages and carry a `phase` field (`plan` and `preflight` respectively)
+- **AND** the log does not carry a hardcoded `ARCHIVE_PREFLIGHT` code
+
+#### Scenario: Before-persist completion is logged only without a fatal failure
+
+- **GIVEN** a before-persist effect that fails with a fail-fast failure mode
+- **WHEN** `ArchiveChange.execute` handles it
+- **THEN** no `before-persist effects completed` log is emitted for that effect
+- **AND** when the effect completes without a fatal failure the completion log is emitted
+
 ### Requirement: Tracked implementation review guard
 
 #### Scenario: Open tracked implementation file blocks archive
@@ -938,8 +1023,26 @@
 #### Scenario: File outside target workspace codeRoot fails archive
 
 - **GIVEN** a confirmed implementation link points to a raw file path outside the target workspace `codeRoot`
+- **AND** `impl.linksInScope` is not bypassed
 - **WHEN** archive materializes links
-- **THEN** archive fails instead of writing an invalid canonical sidecar entry
+- **THEN** `CheckPredicateFailedError` is thrown for `impl.linksInScope` with code `IMPLEMENTATION_STATE`
+- **AND** its `skippable` equals the resolved archive binding of `impl.linksInScope`
+- **AND** no invalid canonical sidecar entry is written
+
+#### Scenario: Bypassed out-of-codeRoot link is omitted from the sidecar
+
+- **GIVEN** a confirmed implementation link points outside the target workspace `codeRoot`
+- **WHEN** `execute({ name, skipChecks: ['impl.linksInScope'] })` materializes links
+- **THEN** archive does not fail for that link
+- **AND** that link is not written to the `spec-lock.json` sidecar
+- **AND** the other confirmed links are still materialized
+
+#### Scenario: Unknown-workspace link fails archive unless bypassed
+
+- **GIVEN** a confirmed implementation link whose `specId` implies a workspace that is not configured
+- **WHEN** archive materializes links without bypassing `impl.linksInScope`
+- **THEN** `CheckPredicateFailedError` is thrown for `impl.linksInScope` with `skippable` taken from the resolved archive binding
+- **AND** when `impl.linksInScope` is bypassed through `skipChecks` the link is omitted from the sidecar and archive does not fail
 
 #### Scenario: Archive discards nonexistent spec candidate without creating orphan sidecar
 
@@ -997,13 +1100,13 @@
 
 ### Requirement: Typed errors for archive failures
 
-#### Scenario: Dependency mismatch throws ArchiveDependencyMismatchError
+#### Scenario: Dependency mismatch fails deps.consistent
 
 - **GIVEN** a change with `dependsOn: ['core:storage']`
 - **AND** the extracted metadata from artifacts has `dependsOn: ['core:new-dep']`
 - **WHEN** `ArchiveChange` is executed
-- **THEN** `ArchiveDependencyMismatchError` is thrown
-- **AND** the error includes both the extracted and persisted dependencies
+- **THEN** `CheckPredicateFailedError` is thrown for `deps.consistent`
+- **AND** `details.mismatches` includes both the extracted and persisted dependencies for every mismatching spec
 
 #### Scenario: Missing artifact throws ArchiveArtifactMissingError
 
@@ -1011,11 +1114,11 @@
 - **WHEN** `ArchiveChange` is executed
 - **THEN** `ArchiveArtifactMissingError` is thrown
 
-#### Scenario: Open implementation file throws ArchiveImplementationStateError
+#### Scenario: Open implementation file fails impl.filesResolved
 
 - **GIVEN** a change with implementation files that are currently marked as open in the detector
 - **WHEN** `ArchiveChange` is executed
-- **THEN** `ArchiveImplementationStateError` is thrown
+- **THEN** `CheckPredicateFailedError` is thrown for `impl.filesResolved` with the open files in `details.files`
 
 #### Scenario: Unknown change throws ChangeNotFoundError
 
@@ -1047,10 +1150,10 @@
 
 #### Scenario: Plugin check failure throws CheckPredicateFailedError
 
-- **GIVEN** a plugin check `@security.code-scan` bound to archive that fails with code `SECURITY_FINDINGS`
+- **GIVEN** a plugin check `@security.code-scan` bound to archive that fails with code `SECURITY_FINDINGS` and an action
 - **WHEN** `ArchiveChange.execute` runs
-- **THEN** `CheckPredicateFailedError` is thrown carrying the check id, label, code `SECURITY_FINDINGS`, message, command, and details
-- **AND** it is not an `ArchiveImplementationStateError`
+- **THEN** `CheckPredicateFailedError` is thrown carrying the check id, label, code `SECURITY_FINDINGS`, message, `action`, and details
+- **AND** it carries no `command` property
 
 #### Scenario: Plugin failure carries the resolved skippability
 
@@ -1064,19 +1167,27 @@
 - **WHEN** `ArchiveChange.execute` runs
 - **THEN** the thrown `CheckPredicateFailedError` has code `CHECK_FAILED`
 
-#### Scenario: Built-in failures keep their dedicated errors
+#### Scenario: Built-in failures use the generic check error
 
 - **GIVEN** `workspace.readOnly`, `deps.consistent`, `impl.filesResolved`, `spec.overlap`, or `verification.current` fails
 - **WHEN** `ArchiveChange.execute` runs
-- **THEN** the dedicated error for that check is thrown, not `CheckPredicateFailedError`
+- **THEN** `CheckPredicateFailedError` is thrown for that check, with the details defined by its per-code contract
+- **AND** no dedicated error class is thrown and the use case contains no switch on the check id
+
+#### Scenario: Stale verification fails archive through the generic error
+
+- **GIVEN** a change in `archivable` whose verification evidence is stale and `verification.current` is bound to archive
+- **WHEN** `ArchiveChange.execute` runs
+- **THEN** `CheckPredicateFailedError` is thrown for `verification.current` with its `start-verification` action
+- **AND** `ArchiveImplementationStateError` is not thrown
 
 ### Requirement: Archive checks share runners and wrap remaining preflight
 
-#### Scenario: deps.consistent throws ArchiveDependencyMismatchError
+#### Scenario: deps.consistent on archive fails with the mismatch details
 
 - **GIVEN** extracted `dependsOn` disagrees with the sealed persisted set
 - **WHEN** operation `archive` evaluates `deps.consistent`
-- **THEN** `ArchiveDependencyMismatchError` is thrown
+- **THEN** `CheckPredicateFailedError` is thrown with every mismatch in `details.mismatches`
 - **AND** the same runner is `runDepsConsistent`
 - **AND** enter-`ready` used that runner against `change.specDependsOn` when a publication-plan snapshot existed
 
@@ -1084,7 +1195,7 @@
 
 - **GIVEN** a publication preflight failure that is not name/archivable/overlap/readOnly/deps/impl
 - **WHEN** `ArchiveChange` runs after archive predicates allow the operation
-- **THEN** it fails with `ArchivePreflightError` or `ArchiveArtifactMissingError`
+- **THEN** it fails with `ArchiveArtifactMissingError` or another typed preflight error from the merge/publish steps
 - **AND** that failure is not a registered `archive.publication` check
 
 #### Scenario: Plugin archive check runs after the built-in predicates
@@ -1126,6 +1237,14 @@
 - **GIVEN** the schema declares `archiveChecks: [{ id: '@qa.extended-lint', disabled: true }]` for a registered check with no archive binding
 - **WHEN** archive runs
 - **THEN** no binding exists for it and the archive is unaffected
+
+#### Scenario: Merge-time deps.consistent re-run carries from, to, and binding skippability
+
+- **GIVEN** the pre-merge `deps.consistent` predicate passes but the merge-time re-run against sidecar `finalDependsOn` finds a mismatch
+- **WHEN** `ArchiveChange.execute` runs
+- **THEN** `CheckPredicateFailedError` is thrown for `deps.consistent` with every mismatch in `details.mismatches`
+- **AND** the error carries the attempted `from` and `to` (`archiving`)
+- **AND** its `skippable` equals the resolved `deps.consistent` binding's skippability
 
 ### Requirement: Effective archive bindings and skip validation
 

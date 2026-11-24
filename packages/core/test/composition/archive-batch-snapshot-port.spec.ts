@@ -84,7 +84,7 @@ describe('resolveArchiveBatchSnapshotPort', () => {
     await port.snapshot(specId, 'change')
     await fs.writeFile(created, '# OAuth\n', 'utf8')
     await port.recordCreatedFile(specId, 'spec.md')
-    await port.restoreBatch([specId], [specId])
+    await port.restoreBatch([specId], [specId], 'change')
 
     await expect(fs.access(created)).rejects.toThrow()
   })

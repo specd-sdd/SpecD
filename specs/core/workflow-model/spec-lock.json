@@ -17,8 +17,10 @@
   ],
   "implementation": [
     {
-      "file": "core:src/domain/services/build-schema.ts",
-      "symbols": ["buildSchema"]
+      "file": "core:src/composition/use-cases/workflow-check-registry.ts"
+    },
+    {
+      "file": "core:src/domain/services/detect-spec-overlap.ts"
     }
   ],
   "optimizations": {

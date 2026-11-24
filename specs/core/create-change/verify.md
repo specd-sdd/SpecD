@@ -61,29 +61,22 @@
 #### Scenario: Persisted dependency state seeds dependencies at creation time
 
 - **GIVEN** `CreateChange.execute` is called with a spec that already exists in a repository
-- **AND** that repository returns persisted dependencies from `readPersistedDependsOn(spec)`
+- **AND** that repository returns persisted state from `readPersistedState(spec)`
 - **WHEN** the change is constructed
-- **THEN** the change seeds `specDependsOn` for that spec from that semantic persisted state
-
-#### Scenario: Legacy metadata seeds when persisted semantic state is absent
-
-- **GIVEN** `CreateChange.execute` is called with a persisted spec whose repository returns no semantic persisted dependency state
-- **AND** `metadata.json.dependsOn` exists for that spec
-- **WHEN** the change is constructed
-- **THEN** the change seeds `specDependsOn` from `metadata.json.dependsOn`
-
-#### Scenario: Stale metadata still seeds as legacy fallback
-
-- **GIVEN** `CreateChange.execute` is called with a persisted spec whose repository returns no semantic persisted dependency state
-- **AND** `metadata.json.dependsOn` exists for that spec but the metadata is marked stale
-- **WHEN** the change is constructed
-- **THEN** the change still seeds `specDependsOn` from the persisted metadata dependency list
+- **THEN** the change seeds `specDependsOn` for that spec from the `dependsOn` of that persisted state
 
 #### Scenario: New spec starts without seeded dependency entry
 
 - **GIVEN** `CreateChange.execute` is called with a spec ID that does not yet exist in the repository
 - **WHEN** the change is constructed
 - **THEN** no seeded dependency entry is required for that spec at creation time
+
+#### Scenario: Absent persisted state seeds no dependency entry
+
+- **GIVEN** `CreateChange.execute` is called with a spec that exists in its repository but has no persisted state
+- **WHEN** the change is constructed
+- **THEN** no `specDependsOn` entry is seeded for that spec
+- **AND** `metadata.json.dependsOn` is not consulted
 
 ### Requirement: Input contract
 

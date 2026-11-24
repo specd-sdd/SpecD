@@ -84,9 +84,9 @@ export function resolveArchiveBatchSnapshotPort(
       const port = await resolveSnapshot()
       return port.snapshot(specId, changeName)
     },
-    restoreBatch: async (specIds, publishOrder) => {
+    restoreBatch: async (specIds, publishOrder, changeName) => {
       const port = await resolveSnapshot()
-      return port.restoreBatch(specIds, publishOrder)
+      return port.restoreBatch(specIds, publishOrder, changeName)
     },
     detectOrphans: async (specIds, changeName) => {
       const port = await resolveSnapshot()
@@ -96,9 +96,9 @@ export function resolveArchiveBatchSnapshotPort(
       const port = await resolveSnapshot()
       return port.recordCreatedFile(specId, filename)
     },
-    cleanup: async (specIds) => {
+    cleanup: async (specIds, changeName) => {
       const port = await resolveSnapshot()
-      return port.cleanup(specIds)
+      return port.cleanup(specIds, changeName)
     },
   }
 }
@@ -121,6 +121,10 @@ export interface ArchiveChangeDeps {
   readonly resolveChangeSchema?: ResolveChangeSchema
   /** Executable check registry used to resolve effective archive bindings and validate skips. */
   readonly checkRegistry?: CheckRegistry
+  /** Registry transition checks used to project guidance for a committed recovery. */
+  readonly transitionBindings?: readonly import('../../domain/services/transition-checks.js').CheckBinding[]
+  /** Configured approval gates used to project guidance for a committed recovery. */
+  readonly approvals?: { readonly spec: boolean; readonly signoff: boolean }
 }
 
 export function resolveArchiveChangeDeps(resolver: CompositionResolver): ArchiveChangeDeps {
@@ -154,6 +158,8 @@ export function resolveArchiveChangeDeps(resolver: CompositionResolver): Archive
     contentHasher: resolver.getContentHasher(),
     reconcile: resolver.getReconcileChangeValidity(),
     resolveChangeSchema: resolver.getResolveChangeSchema(),
+    transitionBindings: registry.transitionBindings,
+    approvals: resolver.config.approvals,
     ...(registry.checkRegistry !== undefined ? { checkRegistry: registry.checkRegistry } : {}),
   }
 }
@@ -197,6 +203,8 @@ function createArchiveChangeFromNormalized(
       reconcile,
       resolveChangeSchema,
       checkRegistry,
+      transitionBindings,
+      approvals,
     } = input.deps
 
     return new ArchiveChange(
@@ -216,6 +224,8 @@ function createArchiveChangeFromNormalized(
       reconcile,
       resolveChangeSchema,
       checkRegistry,
+      transitionBindings,
+      approvals,
     )
   }
 

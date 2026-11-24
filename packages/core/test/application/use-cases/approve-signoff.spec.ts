@@ -250,6 +250,11 @@ describe('ApproveSignoff', () => {
       await expect(uc.execute({ name: change.name, reason: 'ship' })).rejects.toBeInstanceOf(
         VerificationStaleError,
       )
+      const error = await uc.execute({ name: change.name, reason: 'ship' }).catch((e: unknown) => e)
+      expect(error).toBeInstanceOf(VerificationStaleError)
+      expect((error as VerificationStaleError).code).toBe('VERIFICATION_STALE')
+      expect((error as VerificationStaleError).changeName).toBe(change.name)
+      expect((error as VerificationStaleError).message).not.toMatch(/specd |--|\/specd-/)
     })
 
     it('uses VerificationStaleError for legacy-unknown completed evidence', async () => {
@@ -360,7 +365,7 @@ describe('ApproveSignoff', () => {
   })
 
   describe('given the signoff gate is enabled and change is in pending-signoff', () => {
-    it('appends sign-off and drain transition without removing the pending history', async () => {
+    it('appends sign-off without transitioning or removing the pending history', async () => {
       const change = makePendingSignoffChange('legacy-signoff-history')
       const historyBefore = [...change.history]
       const repo = makeChangeRepository([change])
@@ -371,10 +376,7 @@ describe('ApproveSignoff', () => {
       })
 
       expect(result.history.slice(0, historyBefore.length)).toEqual(historyBefore)
-      expect(result.history.slice(-2).map((event) => event.type)).toEqual([
-        'signed-off',
-        'transitioned',
-      ])
+      expect(result.history.slice(-1).map((event) => event.type)).toEqual(['signed-off'])
       expect(
         result.history.some(
           (event) => event.type === 'transitioned' && event.to === 'pending-signoff',
@@ -397,7 +399,7 @@ describe('ApproveSignoff', () => {
       expect(result.activeSignoff?.reason).toBe('implementation approved')
     })
 
-    it('transitions the change to signed-off', async () => {
+    it('keeps the change in pending-signoff without an implicit transition', async () => {
       const change = makePendingSignoffChange('my-change')
       const repo = makeChangeRepository([change])
       vi.spyOn(repo, 'artifact').mockResolvedValue(null)
@@ -408,7 +410,7 @@ describe('ApproveSignoff', () => {
         reason: 'ok',
       })
 
-      expect(result.state).toBe('signed-off')
+      expect(result.state).toBe('pending-signoff')
     })
 
     it('computes artifact hashes from loaded artifacts', async () => {
@@ -436,7 +438,8 @@ describe('ApproveSignoff', () => {
         reason: 'ok',
       })
 
-      expect(repo.store.get('my-change')?.state).toBe('signed-off')
+      expect(repo.store.get('my-change')?.state).toBe('pending-signoff')
+      expect(repo.store.get('my-change')?.activeSignoff?.reason).toBe('ok')
     })
 
     it('persists through ChangeRepository.mutate', async () => {

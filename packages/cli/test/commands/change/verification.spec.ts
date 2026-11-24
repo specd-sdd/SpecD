@@ -291,7 +291,7 @@ describe('changes verification', () => {
           targetStep: 'done',
           actionType: 'cognitive',
           reason: 'Repeat verification',
-          command: '/specd-verify',
+          intent: 'verify',
           privateAction: 'secret',
         },
         privateSentinel: 'secret',
@@ -343,6 +343,7 @@ describe('changes verification', () => {
         actionType: 'cognitive',
         reason: 'Repeat verification',
         command: '/specd-verify',
+        intent: 'verify',
       })
       expect(rendered).not.toContain('private')
       expect(rendered).not.toContain('secret')
@@ -366,7 +367,7 @@ describe('changes verification', () => {
           targetStep: 'done',
           actionType: 'cognitive',
           reason: 'Verification evidence is stale',
-          command: '/specd-verify',
+          intent: 'verify',
         },
       })
 
@@ -410,6 +411,117 @@ describe('changes verification', () => {
     },
   )
 
+  it('appends the overlap bypass suffix to the next action reason on invalidate', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.invalidateVerification.execute.mockResolvedValue({
+      change: { name: 'my-change', state: 'archivable' },
+      verification: { id: 'verification-2', status: 'stale', fingerprint },
+      invalidated: true,
+      reason: 'inputs changed',
+      signoffChanged: false,
+      automaticReturn: null,
+      blockers: [
+        {
+          code: 'OVERLAP_CONFLICT',
+          message: 'Overlap detected',
+          checkId: 'spec.overlap',
+          isSkippable: true,
+        },
+      ],
+      nextAction: {
+        targetStep: 'archivable',
+        actionType: 'cognitive',
+        reason: 'Archive the change.',
+        intent: 'archive',
+      },
+    })
+
+    const program = makeProgram()
+    registerChangeVerification(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'verification',
+      'invalidate',
+      'my-change',
+      '--reason',
+      'inputs changed',
+      '--format',
+      'json',
+    ])
+
+    const parsed = JSON.parse(stdout())
+    expect(parsed.nextAction.reason).toBe(
+      'Archive the change. Use --skip-checks spec.overlap to archive anyway.',
+    )
+  })
+
+  it.each(['text', 'json'] as const)(
+    'renders blocker remediation with the real change name, and guidance without a name, in %s',
+    async (format) => {
+      const { kernel, stdout } = setup()
+      kernel.changes.invalidateVerification.execute.mockResolvedValue({
+        change: { name: 'checkout-retry', state: 'done' },
+        verification: { id: 'verification-2', status: 'stale', fingerprint },
+        invalidated: true,
+        reason: 'inputs changed',
+        signoffChanged: false,
+        automaticReturn: null,
+        blockers: [
+          {
+            code: 'VERIFICATION_STALE',
+            message: 'Verification is stale',
+            action: { kind: 'start-verification', params: { changeName: 'checkout-retry' } },
+          },
+          {
+            code: 'VERIFICATION_REQUIRED',
+            message: 'Verification is required',
+            action: { kind: 'start-verification', guidance: 'Start a new verification attempt' },
+          },
+        ],
+        nextAction: {
+          targetStep: 'done',
+          actionType: 'cognitive',
+          reason: 'stale',
+          intent: null,
+          action: { kind: 'start-verification', guidance: 'Start a new verification attempt' },
+        },
+      })
+
+      const program = makeProgram()
+      registerChangeVerification(program.command('change'))
+      await program.parseAsync([
+        'node',
+        'specd',
+        'change',
+        'verification',
+        'invalidate',
+        'checkout-retry',
+        '--reason',
+        'inputs changed',
+        '--format',
+        format,
+      ])
+      const out = stdout()
+      expect(out).not.toContain('<name>')
+      if (format === 'text') {
+        expect(out).toContain('command: specd changes verification start checkout-retry')
+        expect(out).toContain('guidance: Start a new verification attempt')
+      } else {
+        const parsed = JSON.parse(out) as {
+          blockers: { command?: string; guidance?: string }[]
+          nextAction: { command: string | null; guidance?: string }
+        }
+        expect(parsed.blockers[0]?.command).toBe('specd changes verification start checkout-retry')
+        expect(parsed.blockers[1]?.command).toBeUndefined()
+        expect(parsed.blockers[1]?.guidance).toBe('Start a new verification attempt')
+        expect(parsed.nextAction.command).toBeNull()
+        expect(parsed.nextAction.guidance).toBe('Start a new verification attempt')
+      }
+    },
+  )
+
   it('exits 1 through the shared error path and omits digest metadata', async () => {
     const { kernel, stdout, stderr } = setup()
     kernel.changes.completeVerification.execute.mockRejectedValue(new MismatchError())
@@ -430,7 +542,10 @@ describe('changes verification', () => {
       .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
-    expect(stderr()).toContain('repeat verification work')
+    const err = stderr()
+    expect(err).toContain('repeat verification work')
+    expect(err.indexOf('error: ')).toBeGreaterThanOrEqual(0)
+    expect(err.indexOf('repeat verification work')).toBeGreaterThan(err.indexOf('error: '))
     expect(stdout()).toContain('VERIFICATION_FINGERPRINT_MISMATCH')
     expect(stdout()).not.toContain(HASH)
     expect(kernel.changes.completeVerification.execute).toHaveBeenCalledTimes(1)
@@ -449,5 +564,57 @@ describe('changes verification', () => {
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain('error:')
     expect(kernel.changes.startVerification.execute).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('verification invalidate blocker projection', () => {
+  it('includes action in JSON blockers and omits command for unmapped plugin kinds', async () => {
+    const { kernel, stdout } = setup()
+    const pluginAction = { kind: '@security.code-scan', guidance: 'Run the security scan' }
+    const startAction = { kind: 'start-verification', params: { changeName: 'feat' } }
+    kernel.changes.invalidateVerification.execute.mockResolvedValue({
+      change: { name: 'feat', state: 'done' },
+      verification: { id: 'verification-2', status: 'stale', fingerprint },
+      invalidated: true,
+      reason: 'inputs changed',
+      signoffChanged: false,
+      automaticReturn: null,
+      blockers: [
+        { code: 'VERIFICATION_STALE', message: 'stale', action: startAction },
+        { code: 'PLUGIN_BLOCK', message: 'plugin', action: pluginAction },
+        { code: 'PLAIN', message: 'no action' },
+      ],
+      nextAction: { targetStep: 'done', actionType: 'cognitive', reason: 'x', intent: 'verify' },
+    })
+    const program = makeProgram()
+    registerChangeVerification(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'verification',
+      'invalidate',
+      'feat',
+      '--reason',
+      'inputs changed',
+      '--format',
+      'json',
+    ])
+    const parsed = JSON.parse(stdout()) as {
+      blockers: Record<string, unknown>[]
+      nextAction: { command: string; intent: string }
+    }
+    expect(parsed.blockers[0]).toMatchObject({
+      action: startAction,
+      command: 'specd changes verification start feat',
+    })
+    expect(parsed.blockers[1]).toMatchObject({
+      action: pluginAction,
+      guidance: 'Run the security scan',
+    })
+    expect('command' in parsed.blockers[1]!).toBe(false)
+    expect('action' in parsed.blockers[2]!).toBe(false)
+    expect('guidance' in parsed.blockers[2]!).toBe(false)
+    expect(parsed.nextAction).toMatchObject({ command: '/specd-verify', intent: 'verify' })
   })
 })

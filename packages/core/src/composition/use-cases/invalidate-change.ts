@@ -5,6 +5,9 @@ import { type ResolveChangeSchema } from '../../application/services/resolve-cha
 import { InvalidateChange } from '../../application/use-cases/invalidate-change.js'
 import { type ReconcileChangeValidity } from '../../application/use-cases/reconcile-change-validity.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
+import { type CheckRegistry } from '../../domain/services/check-registry.js'
+import { type CheckBinding } from '../../domain/services/transition-checks.js'
+import { resolveWorkflowCheckRegistry } from './workflow-check-registry.js'
 import {
   createCompositionResolver,
   type CompositionResolver,
@@ -28,6 +31,10 @@ export interface InvalidateChangeDeps {
   readonly reconcile: ReconcileChangeValidity
   /** Configured approval gates used to route the post-invalidation next action. */
   readonly approvals?: { readonly spec: boolean; readonly signoff: boolean }
+  /** Composed transition check bindings for post-recovery evaluation. */
+  readonly transitionBindings?: readonly CheckBinding[]
+  /** Check registry for open check resolution and governance. */
+  readonly checkRegistry?: CheckRegistry
 }
 
 /**
@@ -37,6 +44,7 @@ export interface InvalidateChangeDeps {
  * @returns The resolved dependencies for `InvalidateChange`
  */
 export function resolveInvalidateChangeDeps(resolver: CompositionResolver): InvalidateChangeDeps {
+  const registry = resolveWorkflowCheckRegistry(resolver)
   return {
     changes: resolver.getChangeRepository(),
     actor: resolver.getActorResolver(),
@@ -44,6 +52,8 @@ export function resolveInvalidateChangeDeps(resolver: CompositionResolver): Inva
     resolveChangeSchema: resolver.getResolveChangeSchema(),
     reconcile: resolver.getReconcileChangeValidity(),
     approvals: resolver.config.approvals,
+    transitionBindings: registry.transitionBindings,
+    ...(registry.checkRegistry !== undefined ? { checkRegistry: registry.checkRegistry } : {}),
   }
 }
 
@@ -95,7 +105,16 @@ function createInvalidateChangeFromNormalized(
   input: FactoryInput<InvalidateChangeDeps, CompositionResolutionOptions>,
 ): InvalidateChange {
   if (input.kind === 'deps') {
-    const { changes, actor, schemaProvider, reconcile, resolveChangeSchema, approvals } = input.deps
+    const {
+      changes,
+      actor,
+      schemaProvider,
+      reconcile,
+      resolveChangeSchema,
+      approvals,
+      transitionBindings,
+      checkRegistry,
+    } = input.deps
     return new InvalidateChange(
       changes,
       actor,
@@ -103,6 +122,8 @@ function createInvalidateChangeFromNormalized(
       reconcile,
       resolveChangeSchema,
       approvals,
+      transitionBindings,
+      checkRegistry,
     )
   }
 

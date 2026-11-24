@@ -21,6 +21,8 @@ The command MUST maintain backward compatibility with legacy flags by translatin
 
 The CLI adapter MUST pass the compiled `skipChecks` array directly to `TransitionChangeInput.skipChecks`.
 
+The `--help` JSON output schema MUST list the fields of the structured failure record, including `error`, `hint`, `state`, `validity`, `verification`, blocker `bypassFlag`, and `nextAction.intent`, `nextAction.action`, and `nextAction.guidance` alongside `command`. Blocker entries MUST list `code`, `message`, `label`, `checkId`, `details`, `action`, and `bypassFlag`, and the `nextAction` shape MUST list `command`, `intent`, `action`, `guidance`, `actionType`, and `reason`, with no raw `isSkippable`.
+
 ### Requirement: Next-transition resolution
 
 When the command is invoked with `--next`, it SHALL pass `to: 'next'` to `TransitionChange.execute`. The CLI MUST NOT resolve the target itself through a local from→to table.
@@ -29,19 +31,21 @@ Core resolves `'next'` to the closest subsequent enabled step via `nextWorkflowS
 
 Optional-step shortcut recommendation belongs to `GetStatus.nextAction`: callers that want the recommended shortcut use the explicit target projected there. `--next` remains a deterministic one-hop operation over the enabled topology.
 
-When Core rejects `to: 'next'` (no happy-path hop: at least `pending-spec-approval`, `pending-signoff`, `archivable`, `archiving`), the command MUST exit with code 1 and print an explanatory `error:` message to stderr.
+When Core rejects `to: 'next'` (no happy-path hop: `archivable`, `archiving`), the command MUST exit with code 1 and print an explanatory `error:` message to stderr. From a legacy parking state, `next` resolves to its delivery edge (`implementing` or `archivable`) and the bound approval check decides whether it proceeds.
 
 ### Requirement: CLI-rendered transition error hints
 
-When `HappyPathNextUnavailableError` (`HAPPY_PATH_NEXT_UNAVAILABLE`) or a skippable `impl.linksInScope` failure is surfaced by `change transition`, the command SHALL use the centralized CLI hint-resolution helper (`change.transition` context) to render `--next` context and `--skip-checks impl.linksInScope` / `--allow-out-of-scope` hints, rather than relying on CLI flags embedded in `@specd/core` messages.
+When `HappyPathNextUnavailableError` (`HAPPY_PATH_NEXT_UNAVAILABLE`) or a skippable `impl.linksInScope` failure is surfaced by `change transition`, the command SHALL use the centralized CLI hint-resolution helper (`change.transition` context) to render `--next` context and the generic bypass hint `Retry with --skip-checks <id> if an exception is granted` (with `<id>` replaced by the failing check id, for example `impl.linksInScope`), rather than relying on CLI flags embedded in `@specd/core` messages. The hint MUST be identical in form for every skippable check; it MUST NOT add check-specific variants. The `deps.consistent` hint (re-run dependency extraction or update the change dependencies) applies only when the blocker is not skippable; a skippable `deps.consistent` blocker receives the generic bypass hint instead. The hint MUST NOT add check-specific variants beyond that and MUST NOT mention the `--allow-out-of-scope` alias (which keeps working as input).
 
 ### Requirement: Validity-aware transition guidance
 
-Before resolving `next`, and when a requested transition fails after fresh reconciliation, the command SHALL consume the canonical `GetStatus` or `TransitionChange` result rather than reconstructing gate or verification rules.
+Before resolving `next`, and when a requested transition fails after fresh reconciliation, the command SHALL consume the canonical `GetStatus` or `TransitionChange` result rather than reconstructing gate or verification rules. When rendering the repair guide in text mode, the CLI SHALL project `--skip-checks <checkId>` bypass hints from `blocker.isSkippable` and `blocker.checkId`, and SHALL project `nextAction.command` from Core's `nextAction.intent` (and optional `action`) via the centralized CLI guidance presenter.
 
-If reconciliation committed an automatic return, output SHALL show the new state, invalidated evidence, reason, and current next action. Required stale spec approval routes through `designing` and `ready`; stale sign-off alone routes to `done`; stale verification at required boundaries recommends the verification skill in place. Earlier-phase stale verification remains context and MUST NOT cause the CLI to suggest verification prematurely.
+If reconciliation committed an automatic return, output SHALL show the new state, invalidated evidence, reason, and current next action. Required stale spec approval in a state after `ready` routes through `designing` and `ready`, while in `ready` the change stays and consent is renewed there; stale sign-off alone routes to `done`; stale verification at required boundaries recommends the verification skill in place. Earlier-phase stale verification remains context and MUST NOT cause the CLI to suggest verification prematurely.
 
 The CLI MUST NOT retry the original transition automatically after recovery, choose an alternate transition, expose verification-attempt restart flags, or accept `verifying → verifying`. Entry to `verifying` reports readiness checks without claiming baseline capture. Exit to `done` reports `verification.current` through the generic check output. A failure does not claim verification completion or transition success; it reports the actual reconciled state and in-place verification guidance. Transitions never start or complete an attempt.
+
+When `TransitionChange` fails with `ReconciledOperationBlockedError` (reconciliation committed an automatic return before the requested edge could run), the command MUST render it as a repair guide, never as an invalid-edge error line. The text output SHALL show the committed state, the committed blockers projected through the CLI blocker projection (label, `checkId`, action, `bypassFlag`; never raw `isSkippable`), and the projected next action (the `command:` or `guidance:` line plus the reason). In json and toon modes the failure record SHALL carry `state`, `automaticReturn`, the projected blockers and the projected `nextAction` (`intent`, `action`, `command`, `guidance`).
 
 ### Requirement: Delegates refresh policy to TransitionChange
 
@@ -105,17 +109,22 @@ If hook progress was rendered before the failure, the failure output MUST still 
 
 ### Requirement: Invalid transition error
 
-The command MUST catch `CheckPredicateFailedError` and map it onto the CLI Text Repair Guide.
+The command MUST catch `CheckPredicateFailedError` for every failed check (built-in, plugin, or schema-embedded) and map it onto the CLI Text Repair Guide. There are no check-specific error classes to handle.
 When this error is caught:
 
-- The CLI SHALL render the failure message, diagnostic code, and the check's gerund label.
-- If the check definition or result specifies a remediation `command`, the Repair Guide MUST present it under the `command:` field.
-- If the failed check allows bypass (`skippable: true`), the Repair Guide MUST suggest the exact bypass syntax: `Retry with --skip-checks <id> if an exception is granted`.
+- The CLI SHALL render the failure message, the failed check's own diagnostic code taken from the caught error (even when the fresh status no longer carries that blocker), the check's gerund label, and the attempted transition (`from` / `to`) as context.
+- The CLI SHALL render check-specific context by `checkId` and `code` from `details` through the CLI presenter (for example the blocking artifact and its blocking parent for `workflow.requires`, the task counts for `workflow.taskCompletion`, every mismatch for `deps.consistent`, the affected specs for `workspace.readOnly`).
+- If the failed check result declared an `action`, the Repair Guide MUST present the command projected from it by the guidance presenter under the `command:` field. When the action has no command mapping (an unknown kind, or only `guidance`), the Repair Guide MUST print the action's host-neutral guidance on a separate `guidance:` line and MUST NOT place guidance prose under `command:`. In that case, if the fresh status `nextAction` projects a command, the Repair Guide MUST print BOTH the check action's `guidance:` line AND the next-action command under `command:`; the next-action command MUST NOT replace or suppress the check's guidance line.
+- If the failed check allows bypass (`skippable: true`), the Repair Guide MUST suggest the exact bypass syntax: `Retry with --skip-checks <id> if an exception is granted`. In text mode, every skippable blocker listed in the repair guide MUST get its own `bypass:` line (one per skippable blocker), matching the per-blocker `bypassFlag` carried in json and toon output.
 - If the check is mandatory (`skippable: false`), no bypass option SHALL be offered.
+- When the command fails with `CheckNotSkippableError`, the repair guide MUST render the CLI hint resolved for that code and the offending `checkId` (for a `hook.*` check, the `--skip-hooks` hint) in text mode and in the `hint` field of json and toon output.
+- In json and toon modes the failure record MUST carry an `error` object with `code`, `message` and, when known, `checkId`, so machine consumers can tell why the transition failed even when the fresh status no longer carries the blocker; a skippable `CheckPredicateFailedError` MUST also produce the bypass `hint`.
+- In json and toon modes, the structured failure blockers MUST be projected through the CLI blocker projection (`label`, `checkId`, `details`, `action`, `bypassFlag`), never spread raw from Core, so raw `isSkippable` is never emitted.
+- When reading the fresh status fails while rendering a repair guide, the command MUST NOT mask the original transition error: it prints only that original error through the standard error path (text, json and toon) and renders no repair guide and no structured repair record (no projected blockers, `nextAction` or validity fields); the exit code stays 1.
 
 ### Requirement: Incomplete tasks error
 
-If transitioning toward a step whose `workflow.taskCompletion` predicate fails (typically `implementing → verifying`) and any gated artifact has incomplete task items, the command exits with code 1 and prints an `error:` message to stderr naming the blocking artifact. Status for that same change MUST already have omitted `verifying` from `availableTransitions`.
+If transitioning toward a step whose `workflow.taskCompletion` predicate fails (typically `implementing → verifying`) and any gated artifact has incomplete task items, the command exits with code 1 and prints an `error:` message to stderr naming the blocking artifact and the task counts from the check `details`. Status for that same change MUST already have omitted `verifying` from `availableTransitions`.
 
 ### Requirement: Check progress rendering
 
@@ -139,7 +148,7 @@ When Core re-evaluates predicates after hooks, the CLI SHALL render that second 
 
 ### Requirement: Unsatisfied requires error
 
-If the target workflow step has `requires` and any required artifact is not `complete` or `skipped`, the command exits with code 1 and prints an `error:` message to stderr.
+If the target workflow step has `requires` and any required artifact is not `complete` or `skipped`, the `workflow.requires` check fails, the command exits with code 1, and prints an `error:` message to stderr naming the blocking artifact (and its blocking parent when `details.blockedBy` is present).
 
 ## Constraints
 

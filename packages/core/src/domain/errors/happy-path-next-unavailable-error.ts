@@ -37,10 +37,6 @@ export class HappyPathNextUnavailableError extends SpecdError {
  */
 export function happyPathNextMessage(state: ChangeState): string {
   switch (state) {
-    case 'pending-spec-approval':
-      return 'cannot advance to next state: change is waiting for human spec approval'
-    case 'pending-signoff':
-      return 'cannot advance to next state: change is waiting for human signoff'
     case 'archivable':
       return 'cannot advance to next state: archiving is not a lifecycle transition'
     case 'archiving':

@@ -10,11 +10,12 @@ import { type ActorResolver } from '../ports/actor-resolver.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { ResolveChangeSchema } from '../services/resolve-change-schema.js'
 import { evaluateTransitionCandidate } from '../services/evaluate-transition-candidate.js'
+import { evaluateLegalTargets } from '../services/execute-matching-predicates.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { HappyPathNextUnavailableError } from '../../domain/errors/happy-path-next-unavailable-error.js'
 import { InvalidStateTransitionError } from '../../domain/errors/invalid-state-transition-error.js'
 import { CheckPredicateFailedError } from '../../domain/errors/check-predicate-failed-error.js'
-import { findBlockingParent, projectArtifacts } from '../../domain/services/lifecycle-verdict.js'
+import { projectArtifacts } from '../../domain/services/lifecycle-verdict.js'
 import { evaluateLifecycle } from '../services/lifecycle-evaluation.js'
 import { validateSkipChecks } from '../services/validate-skip-checks.js'
 import {
@@ -112,11 +113,14 @@ const SKILL_HOP_TARGETS: ReadonlySet<ChangeState> = new Set(['implementing', 've
  *
  * Approval is a predicate on the requested delivery edge. New work stays in
  * `ready` / `done` until `ApproveSpec` / `ApproveSignoff` records consent.
- * Pending parking states are drain-only for in-flight changes.
  *
  * Predicates and effects run via composed `Check` instances (`execute(ctx)`).
  * `skipHookPhases` skips effects only — predicates still run.
  * `source.post` runs only when `along === 'forward'` (binding applicability).
+ *
+ * Every failed predicate (including unmet required artifacts and incomplete tasks)
+ * surfaces as a `CheckPredicateFailedError` carrying the check id, `details`, the
+ * check-declared `action`, and `skippable` from the resolved binding.
  */
 export class TransitionChange {
   private readonly _changes: ChangeRepository
@@ -138,9 +142,10 @@ export class TransitionChange {
    * @param refreshImplementationTracking - Primitive for optional pre-transition refresh
    * @param approvals - Whether approval gates are active in the project configuration
    * @param transitionBindings - Composed transition check bindings
-   * @param reconcile - Canonical reconciler. When supplied, recovery is committed before checks and the designing hop does not broadly invalidate artifacts.
+   * @param reconcile - Canonical reconciler (required at runtime). Recovery is committed before checks and the designing hop does not broadly invalidate artifacts.
    * @param checkRegistry - Optional CheckRegistry for open check catalog and governance resolution.
    * @param resolveChangeSchema - Optional shared resolver for sovereign change schemas.
+   * @throws {InvalidCompositionFactoryArgumentsError} If `reconcile` is not supplied
    */
   constructor(
     changes: ChangeRepository,
@@ -189,7 +194,9 @@ export class TransitionChange {
    * @param onProgress - Optional callback for progress events
    * @returns The transition result with the updated change
    * @throws {ChangeNotFoundError} If no change with the given name exists
-   * @throws {InvalidStateTransitionError} If the transition is not permitted, requires are unsatisfied, or incomplete tasks remain
+   * @throws {SchemaNotFoundError} If the change's schema reference cannot be resolved
+   * @throws {SchemaProviderIdentityMismatchError} If the resolved schema provider returns a schema whose canonical name differs from the change's schema reference
+   * @throws {InvalidStateTransitionError} For a committed movement with no automatic return, or when the entity's own transition check rejects the edge inside the persisted mutation; an illegal edge or unmet predicate is otherwise reported as CheckPredicateFailedError
    * @throws {CheckNotSkippableError} If an unskippable or effect check is supplied to skipChecks
    * @throws {UnknownCheckError} If an unregistered check is supplied to skipChecks
    * @throws {CheckPredicateFailedError} If a predicate check fails
@@ -221,11 +228,10 @@ export class TransitionChange {
           schemaName: change.schemaName,
           schemaVersion: change.schemaVersion,
         })
-        throw committedRecoveryError(
+        throw await this._committedRecoveryError(
           input.name,
           change,
           recoverySchema,
-          this._approvals,
           reconciled.automaticReturn,
           reconciled.verdict,
         )
@@ -253,13 +259,8 @@ export class TransitionChange {
       requestedTarget = input.to
     }
 
-    if (fromState === 'designing' && requestedTarget === 'designing') {
-      return { change }
-    }
-
     const actor = await this._actor.identity()
 
-    this._assertDrainAndGateTargets(fromState, requestedTarget)
     const projectedArtifacts = projectArtifacts(change, schema)
     const effectiveStatusByArtifact = toEffectiveStatusMap(projectedArtifacts)
     const { attempt, along } = transitionAttemptFor(
@@ -296,6 +297,12 @@ export class TransitionChange {
         ...(this._checkRegistry !== undefined ? { checkRegistry: this._checkRegistry } : {}),
       }),
     ]
+
+    // A bypass is validated even for the `designing -> designing` no-op so a bogus id is rejected
+    // instead of being silently ignored.
+    if (fromState === 'designing' && requestedTarget === 'designing') {
+      return { change }
+    }
 
     const skip = input.skipHookPhases ?? new Set<HookPhaseSelector>()
     const skipHookPhases = [...skip]
@@ -341,8 +348,6 @@ export class TransitionChange {
         candidate.bindings,
         fromState,
         effectiveTarget,
-        change,
-        schema,
         onProgress,
       )
     }
@@ -375,11 +380,10 @@ export class TransitionChange {
       validity = afterHooks.verdict
       if (change.state !== fromState) {
         if (afterHooks.automaticReturn !== null) {
-          throw committedRecoveryError(
+          throw await this._committedRecoveryError(
             input.name,
             change,
             schema,
-            this._approvals,
             afterHooks.automaticReturn,
             afterHooks.verdict,
           )
@@ -406,8 +410,6 @@ export class TransitionChange {
           rerunCandidate.bindings,
           fromState,
           effectiveTarget,
-          change,
-          schema,
           onProgress,
         )
       }
@@ -469,59 +471,7 @@ export class TransitionChange {
   }
 
   /**
-   * Drain-only pending hops and gate-not-required for new pending targets.
-   *
-   * @param fromState - Current state
-   * @param requestedTarget - Requested persist target
-   * @throws InvalidStateTransitionError when the hop is not a drain-only pending hop
-   */
-  private _assertDrainAndGateTargets(fromState: ChangeState, requestedTarget: ChangeState): void {
-    const isSpecDrain =
-      fromState === 'pending-spec-approval' &&
-      (requestedTarget === 'designing' || requestedTarget === 'spec-approved')
-    const isSignoffDrain =
-      fromState === 'pending-signoff' &&
-      (requestedTarget === 'designing' || requestedTarget === 'signed-off')
-
-    if (fromState === 'pending-spec-approval' && !isSpecDrain) {
-      throw new InvalidStateTransitionError(fromState, requestedTarget, {
-        type: 'approval-required',
-        gate: 'spec',
-      })
-    }
-
-    if (fromState === 'pending-signoff' && !isSignoffDrain) {
-      throw new InvalidStateTransitionError(fromState, requestedTarget, {
-        type: 'approval-required',
-        gate: 'signoff',
-      })
-    }
-
-    if (
-      (requestedTarget === 'pending-spec-approval' || requestedTarget === 'spec-approved') &&
-      !this._approvals.spec &&
-      !isSpecDrain
-    ) {
-      throw new InvalidStateTransitionError(fromState, requestedTarget, {
-        type: 'gate-not-required',
-        gate: 'spec',
-      })
-    }
-
-    if (
-      (requestedTarget === 'pending-signoff' || requestedTarget === 'signed-off') &&
-      !this._approvals.signoff &&
-      !isSignoffDrain
-    ) {
-      throw new InvalidStateTransitionError(fromState, requestedTarget, {
-        type: 'gate-not-required',
-        gate: 'signoff',
-      })
-    }
-  }
-
-  /**
-   * Throws for failed predicates. An `abort` failure maps to its canonical error;
+   * Throws for failed predicates. An `abort` failure throws one {@link CheckPredicateFailedError};
    * when every failure is `onFailure: 'collect'`, one {@link CheckPredicateFailedError}
    * for the first collected failure lists all of them in `details.failures`.
    *
@@ -529,18 +479,14 @@ export class TransitionChange {
    * @param bindings - Effective bindings used to read each failure policy
    * @param fromState - Source state
    * @param effectiveTarget - Persist target
-   * @param change - Change under evaluation
-   * @param schema - Active schema
    * @param onProgress - Optional progress callback
-   * @throws SpecdError mapped from the failed checks
+   * @throws {CheckPredicateFailedError} Mapped from the failed checks
    */
   private _throwPredicateFailures(
     checks: readonly CheckResult[],
     bindings: readonly CheckBinding[],
     fromState: ChangeState,
     effectiveTarget: ChangeState,
-    change: Change,
-    schema: Awaited<ReturnType<SchemaProvider['get']>>,
     onProgress?: OnTransitionProgress,
   ): void {
     const failures = checks.filter((check) => check.outcome === 'fail')
@@ -553,7 +499,17 @@ export class TransitionChange {
     const abortFailure = failures.find((check) => !collects(check))
     if (abortFailure !== undefined) {
       this._emitFailureProgress(abortFailure, onProgress)
-      this._mapFailedPredicate(abortFailure, fromState, effectiveTarget, change, schema, bindings)
+      const matchingBinding = bindings.find((b) => b.check.id === abortFailure.id)
+      throw new CheckPredicateFailedError(
+        abortFailure.id,
+        abortFailure.label,
+        abortFailure.code ?? 'CHECK_FAILED',
+        abortFailure.message ?? `Check '${abortFailure.id}' failed`,
+        abortFailure.action,
+        abortFailure.details,
+        matchingBinding?.skippable === true,
+        { from: fromState, to: effectiveTarget },
+      )
     }
 
     this._emitFailureProgress(first, onProgress)
@@ -563,7 +519,7 @@ export class TransitionChange {
       first.label,
       first.code ?? 'CHECK_FAILED',
       first.message ?? `Check '${first.id}' failed`,
-      first.command,
+      first.action,
       {
         ...first.details,
         failures: failures.map((failure) => ({
@@ -571,91 +527,13 @@ export class TransitionChange {
           label: failure.label,
           code: failure.code ?? 'CHECK_FAILED',
           message: failure.message ?? `Check '${failure.id}' failed`,
-          ...(failure.command !== undefined ? { command: failure.command } : {}),
+          ...(failure.action !== undefined ? { action: failure.action } : {}),
           ...(failure.details !== undefined ? { details: failure.details } : {}),
         })),
       },
       matchingBinding?.skippable === true,
+      { from: fromState, to: effectiveTarget },
     )
-  }
-
-  /**
-   * Maps the first failed predicate to the unified CheckPredicateFailedError or structural protocol errors.
-   *
-   * @param failed - Failed check
-   * @param fromState - Source state
-   * @param effectiveTarget - Persist target
-   * @param change - Change under evaluation
-   * @param schema - Active schema
-   * @param bindings - Resolved bindings of the evaluated attempt (source of `skippable`)
-   * @throws SpecdError mapped from the failed check
-   * @returns Never; always throws
-   */
-  private _mapFailedPredicate(
-    failed: CheckResult,
-    fromState: ChangeState,
-    effectiveTarget: ChangeState,
-    change: Change,
-    schema: Awaited<ReturnType<SchemaProvider['get']>>,
-    bindings: readonly CheckBinding[],
-  ): never {
-    switch (failed.id) {
-      case 'protocol.edge':
-        throw new InvalidStateTransitionError(fromState, effectiveTarget, {
-          type: 'invalid-transition',
-        })
-      case 'workflow.requires': {
-        const artifactId = detailString(failed.details, 'artifactId') ?? 'unknown'
-        const status = detailString(failed.details, 'status')
-        const blockedBy =
-          status === 'pending-parent-artifact-review'
-            ? findBlockingParent(change, schema, artifactId)
-            : null
-        throw new InvalidStateTransitionError(fromState, effectiveTarget, {
-          type: 'incomplete-artifact',
-          artifactId,
-          ...(status !== undefined ? { status } : {}),
-          ...(blockedBy !== null ? { blockedBy } : {}),
-        })
-      }
-      case 'workflow.taskCompletion': {
-        const artifactId = detailString(failed.details, 'artifactId') ?? 'unknown'
-        if (detailString(failed.details, 'reason') === 'missing-task-capability') {
-          throw new InvalidStateTransitionError(fromState, effectiveTarget, {
-            type: 'missing-task-capability',
-            artifactId,
-          })
-        }
-        throw new InvalidStateTransitionError(fromState, effectiveTarget, {
-          type: 'incomplete-tasks',
-          artifactId,
-          incomplete: detailNumber(failed.details, 'incomplete') ?? 0,
-          complete: detailNumber(failed.details, 'complete') ?? 0,
-          total: detailNumber(failed.details, 'total') ?? 0,
-        })
-      }
-      case 'approval.spec':
-      case 'approval.signoff': {
-        const gate = failed.id === 'approval.spec' ? 'spec' : 'signoff'
-        throw new InvalidStateTransitionError(fromState, effectiveTarget, {
-          type: 'approval-required',
-          gate,
-        })
-      }
-      default: {
-        const matchingBinding = bindings.find((b) => b.check.id === failed.id)
-        const skippable = matchingBinding?.skippable === true
-        throw new CheckPredicateFailedError(
-          failed.id,
-          failed.label,
-          failed.code ?? 'CHECK_FAILED',
-          failed.message ?? `Check '${failed.id}' failed`,
-          failed.command,
-          failed.details,
-          skippable,
-        )
-      }
-    }
   }
 
   /**
@@ -717,44 +595,53 @@ export class TransitionChange {
       }
     }
   }
-}
 
-/**
- * Builds the typed diagnostic for an already-committed validity recovery.
- *
- * @param changeName - Reconciled change name
- * @param change - Change as persisted after recovery
- * @param schema - Change schema, used to route the next action through the topology
- * @param approvals - Approval-gate snapshot
- * @param recovery - Recovery committed by the reconciler
- * @param verdict - Canonical post-recovery validity verdict
- * @returns Typed error carrying repair guidance
- */
-function committedRecoveryError(
-  changeName: string,
-  change: Change,
-  schema: Awaited<ReturnType<SchemaProvider['get']>>,
-  approvals: ApprovalGates,
-  recovery: AutomaticRecovery,
-  verdict: ChangeValidityVerdict,
-): ReconciledOperationBlockedError {
-  const lifecycle = evaluateLifecycle(change, schema, {
-    approvals,
-    validity: verdict,
-    checksByTarget: {},
-  })
-  const nextAction: NextAction = {
-    ...lifecycle.nextAction,
-    reason: `Validity reconciliation returned the change to ${recovery.to}`,
+  /**
+   * Builds a {@link ReconciledOperationBlockedError} from the recovered state's evaluated
+   * forward checks so `nextAction` carries check-declared remediation actions.
+   *
+   * @param changeName - Reconciled change name
+   * @param change - Change as persisted after recovery
+   * @param schema - Change schema, used to route the next action through the topology
+   * @param recovery - Recovery committed by the reconciler
+   * @param verdict - Canonical post-recovery validity verdict
+   * @returns Typed error carrying repair guidance
+   */
+  private async _committedRecoveryError(
+    changeName: string,
+    change: Change,
+    schema: Awaited<ReturnType<SchemaProvider['get']>>,
+    recovery: AutomaticRecovery,
+    verdict: ChangeValidityVerdict,
+  ): Promise<ReconciledOperationBlockedError> {
+    const effectiveStatusByArtifact = toEffectiveStatusMap(projectArtifacts(change, schema))
+    const legalTargets = await evaluateLegalTargets(this._transitionBindings, {
+      change,
+      schema,
+      approvals: this._approvals,
+      effectiveStatusByArtifact,
+      validity: verdict,
+      ...(this._checkRegistry !== undefined ? { checkRegistry: this._checkRegistry } : {}),
+    })
+    const lifecycle = evaluateLifecycle(change, schema, {
+      approvals: this._approvals,
+      validity: verdict,
+      checksByTarget: legalTargets.checksByTarget,
+      bindingsByTarget: legalTargets.bindingsByTarget,
+    })
+    const nextAction: NextAction = {
+      ...lifecycle.nextAction,
+      reason: `Validity reconciliation returned the change to ${recovery.to}`,
+    }
+    return new ReconciledOperationBlockedError({
+      operation: 'transition',
+      changeName,
+      state: change.state,
+      automaticReturn: recovery,
+      blockers: verdict.blockers,
+      nextAction,
+    })
   }
-  return new ReconciledOperationBlockedError({
-    operation: 'transition',
-    changeName,
-    state: change.state,
-    automaticReturn: recovery,
-    blockers: verdict.blockers,
-    nextAction,
-  })
 }
 
 /**

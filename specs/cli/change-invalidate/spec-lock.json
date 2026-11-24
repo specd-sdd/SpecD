@@ -11,8 +11,7 @@
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/change/invalidate.ts",
-      "symbols": ["registerChangeInvalidate"]
+      "file": "cli:src/commands/change/invalidate.ts"
     }
   ]
 }

@@ -18,9 +18,10 @@
 - **GIVEN** a non-task file is in `pending-review` with no required stale spec consent
 - **WHEN** active status reconciles the change
 - **THEN** `review.required` is `true` with reason `artifact-review-required`
-- **AND** workflow `preserve` retains the current-phase review route and blocks forward progress
+- **AND** workflow `preserve` retains the current lifecycle state (no automatic return) and blocks forward progress, while `nextAction` recommends the design skill for the review (`intent: 'design'`, `targetStep: 'designing'`)
 - **AND** workflow `redesign` routes to committed `designing`
-- **AND** required stale spec consent routes to `designing` regardless of preserve
+- **AND** required stale spec consent in a state after `ready` routes to `designing` regardless of preserve
+- **AND** stale spec consent in `ready` commits no recovery and the change stays in `ready`
 
 #### Scenario: Task-only content change does not open artifact review
 
@@ -86,7 +87,7 @@ Scenarios:
 - **GIVEN** a change exists only under `drafts/`
 - **WHEN** `execute({ name })` is called
 - **THEN** `availableTransitions` is empty
-- **AND** `nextAction.command` does not recommend transition or validate commands
+- **AND** `nextAction.intent` is `null` and `nextAction.action` is undefined
 
 #### Scenario: Active name returns change not draftView
 
@@ -113,7 +114,7 @@ Scenarios:
 
 - **GIVEN** a drafted change with `proposal` in `pending-review`
 - **WHEN** `execute({ name })` is called
-- **THEN** `result.artifacts` includes the `proposal` entry with that state
+- **THEN** `result.artifactStatuses` includes the `proposal` entry with that state
 - **AND** `result.draftView` is defined
 
 ### Requirement: Implementation status projection
@@ -231,21 +232,23 @@ Scenarios:
 - **GIVEN** a change in `archivable` and a schema declaring `archiveChecks: [{ id: spec.overlap, skippable: false }]`
 - **AND** another active change overlaps its specs
 - **WHEN** `GetStatus` projects blockers
-- **THEN** `OVERLAP_CONFLICT` is present without `bypassFlag`
+- **THEN** `OVERLAP_CONFLICT` is present with `isSkippable: false`
+- **AND** the blocker carries no `bypassFlag`
 - **AND** `nextAction.reason` does not suggest a bypass
 
 #### Scenario: Locked archive check carries no bypass flag
 
 - **GIVEN** a change in `archivable` that contains a spec from a `readOnly` workspace
 - **WHEN** `GetStatus` projects blockers
-- **THEN** the `workspace.readOnly` blocker has no `bypassFlag`
+- **THEN** the `workspace.readOnly` blocker has `isSkippable: false` and no `bypassFlag`
 
 #### Scenario: Plugin archive check follows its resolved skippability
 
 - **GIVEN** a plugin check bound to `scope: 'archive'` that fails for an `archivable` change
 - **WHEN** its resolved binding is skippable
-- **THEN** the blocker carries `bypassFlag: '--skip-checks @plugin.check'`
-- **AND** when it is not skippable the blocker carries no `bypassFlag`
+- **THEN** the blocker carries `isSkippable: true` and `checkId: '@plugin.check'`
+- **AND** when it is not skippable the blocker carries `isSkippable: false`
+- **AND** the blocker carries no `bypassFlag` in either case
 
 #### Scenario: Archive predicates run without user bypass
 
@@ -320,14 +323,35 @@ Scenarios:
 
 - **GIVEN** ungated artifact drift with workflow `preserve`
 - **WHEN** status projects review and lifecycle context
-- **THEN** review is required in the current skill and forward progress is blocked
-- **AND** required stale spec consent instead routes to `designing`
+- **THEN** review is required, the lifecycle state is retained without an automatic return, and forward progress is blocked
+- **AND** `nextAction` recommends the design skill for the review (`intent: 'design'`, `targetStep: 'designing'`)
+- **AND** required stale spec consent in a state after `ready` instead commits a return to `designing`
+
+#### Scenario: Stale spec consent in ready stays in ready
+
+- **GIVEN** a change in `ready` with the spec gate on and a stale or revoked spec approval
+- **WHEN** active status reconciles the change
+- **THEN** no recovery to `designing` is committed and the change remains in `ready`
+- **AND** `blockers` includes `APPROVAL_REQUIRED` or `APPROVAL_STALE` carrying `action: { kind: 'approve-spec' }`
+- **AND** `nextAction.action` is `{ kind: 'approve-spec' }`
 
 #### Scenario: Redesign policy routes review to design
 
 - **GIVEN** non-task drift under workflow `redesign`
 - **WHEN** lifecycle context is projected
 - **THEN** review route and committed state point to `designing`
+
+#### Scenario: Blocked ready without check action has no intent
+
+- **GIVEN** a change in `ready` whose forward hop fails a check that declares no `action`
+- **WHEN** `GetStatus.execute()` projects `nextAction`
+- **THEN** `nextAction.targetStep` is `ready`, `nextAction.intent` is `null`, and `nextAction.action` is undefined
+
+#### Scenario: Stale verification at archivable chooses the verify phase
+
+- **GIVEN** a change in `archivable` with `verifying` enabled and reconciled validity reporting stale verification with no committed recovery
+- **WHEN** `GetStatus.execute()` projects `nextAction`
+- **THEN** `nextAction.intent` is `'verify'`
 
 ### Requirement: Graceful degradation when schema resolution fails
 
@@ -440,19 +464,21 @@ Scenarios:
 
 - **GIVEN** a failed `impl.filesResolved` check with code `IMPLEMENTATION_STATE`
 - **WHEN** `GetStatus` merges blockers from checks
-- **THEN** the blocker carries no `bypassFlag` and is not skippable
+- **THEN** the blocker is not skippable and carries no CLI `bypassFlag`
 
 #### Scenario: Links-in-scope IMPLEMENTATION_STATE keeps out-of-scope bypass
 
 - **GIVEN** a failed `impl.linksInScope` check with code `IMPLEMENTATION_STATE`
 - **WHEN** `GetStatus` merges blockers from checks
-- **THEN** the blocker is skippable with `bypassFlag` `--skip-checks impl.linksInScope`
+- **THEN** the blocker has `isSkippable: true` and `checkId: 'impl.linksInScope'`
+- **AND** carries no CLI `bypassFlag`
 
-#### Scenario: Schema-declared skippability drives the bypass flag
+#### Scenario: Schema-declared skippability drives isSkippable on the blocker
 
 - **GIVEN** a schema that declares a Category C check with `skippable: true` on the evaluated step, overriding a non-skippable code default that permits overrides
 - **WHEN** that check fails and `GetStatus` merges blockers
-- **THEN** the blocker is skippable with `bypassFlag` `--skip-checks <checkId>`
+- **THEN** the blocker has `isSkippable: true` and `checkId` matching that check
+- **AND** carries no CLI `bypassFlag`
 
 #### Scenario: Invalidation overlap is review not OVERLAP_CONFLICT blocker
 
@@ -461,23 +487,37 @@ Scenarios:
 - **WHEN** `GetStatus.execute()` identifies blockers
 - **THEN** `blockers` does not include code `OVERLAP_CONFLICT`
 - **AND** `review.message` is human prose about archived overlapping specs
-- **AND** `nextAction.command` is `/specd-design`
+- **AND** `nextAction.intent` is `'design'`
 
 #### Scenario: Archivable status runs archive predicates
 
 - **GIVEN** a change in `archivable` whose specs overlap another active change
 - **WHEN** `GetStatus.execute()` is called
 - **THEN** `spec.overlap.execute` fails
-- **AND** `blockers` includes skippable `OVERLAP_CONFLICT` with `bypassFlag` `--skip-checks spec.overlap`
+- **AND** `blockers` includes `OVERLAP_CONFLICT` with `isSkippable: true` and `checkId: 'spec.overlap'`
 
 #### Scenario: Archivable live overlap does not advertise Ready to archive
 
-- **GIVEN** a change in `archivable` with a public `OVERLAP_CONFLICT` blocker
+- **GIVEN** a change in `archivable` whose only public blocker is `OVERLAP_CONFLICT`
 - **WHEN** `GetStatus.execute()` projects `nextAction`
-- **THEN** `nextAction.command` is `/specd-archive`
+- **THEN** `nextAction.intent` is `'archive'`
 - **AND** `nextAction.targetStep` is `archivable`
 - **AND** `nextAction.reason` is not `Ready to archive`
-- **AND** `nextAction.reason` names overlap and `--skip-checks spec.overlap`
+- **AND** `nextAction.reason` names live overlap without embedding `--skip-checks`
+
+#### Scenario: Failed gate check action reaches blocker and nextAction
+
+- **GIVEN** a change in `ready` with spec gate on and no spec approval
+- **WHEN** `GetStatus.execute()` projects blockers and nextAction
+- **THEN** the `APPROVAL_REQUIRED` blocker carries `action: { kind: 'approve-spec' }`
+- **AND** `nextAction.action` is `{ kind: 'approve-spec' }` and `nextAction.intent` is `null`
+
+#### Scenario: Verification blocker carries start-verification
+
+- **GIVEN** a change in `done` whose verification evidence is stale
+- **WHEN** `GetStatus.execute()` projects blockers
+- **THEN** the verification blocker carries `action: { kind: 'start-verification', params: { changeName } }`
+- **AND** it carries no `details.command`
 
 #### Scenario: CountTasks memo is per evaluation pass
 
@@ -485,6 +525,106 @@ Scenarios:
 - **WHEN** `GetStatus.execute()` runs twice with different task file contents
 - **THEN** each execute counts tasks afresh
 - **AND** the check instance does not reuse a previous CountTasks result
+
+#### Scenario: Validity blocker and spec check failure merge into one blocker
+
+- **GIVEN** the validity verdict reports a spec consent blocker (`APPROVAL_REVOKED`) and the `approval.spec` check fails
+- **WHEN** `GetStatus.execute()` identifies blockers
+- **THEN** `blockers` contains a single spec-consent entry
+- **AND** that entry carries the check's message, label, `checkId: 'approval.spec'` and `action`
+
+#### Scenario: Revoked sign-off yields one blocker
+
+- **GIVEN** the validity verdict reports `SIGNOFF_REVOKED` and the `approval.signoff` check fails with `APPROVAL_STALE`
+- **WHEN** `GetStatus.execute()` identifies blockers
+- **THEN** `blockers` contains exactly one sign-off consent entry, whatever the code difference between the two sides
+- **AND** that entry carries `checkId: 'approval.signoff'` and the `approve-signoff` action
+
+#### Scenario: Signed-off change with absent verification yields one verification blocker
+
+- **GIVEN** a signed-off change in `done` with no completed verification
+- **AND** the validity verdict reports `VERIFICATION_REQUIRED`, the `verification.current` check fails with `VERIFICATION_REQUIRED` and `approval.signoff` fails with `VERIFICATION_REQUIRED` (`details.gate` `'signoff'`)
+- **WHEN** `GetStatus.execute()` identifies blockers
+- **THEN** `blockers` contains exactly one verification blocker, with `checkId: 'verification.current'`
+
+#### Scenario: Signed-off change with stale verification yields one verification blocker
+
+- **GIVEN** a signed-off change whose verification evidence is stale, so `verification.current` and `approval.signoff` both fail with `VERIFICATION_STALE`
+- **WHEN** `GetStatus.execute()` identifies blockers
+- **THEN** `blockers` contains exactly one verification blocker, with `checkId: 'verification.current'`
+
+#### Scenario: Signed-off change with in-progress verification yields one verification blocker
+
+- **GIVEN** a signed-off change with an active verification attempt, so `verification.current` and `approval.signoff` both fail with `VERIFICATION_IN_PROGRESS`
+- **WHEN** `GetStatus.execute()` identifies blockers
+- **THEN** `blockers` contains exactly one verification blocker, with `checkId: 'verification.current'`
+
+#### Scenario: Merged blocker adopts the dropped validity blocker action
+
+- **GIVEN** the validity verdict reports `VERIFICATION_STALE` carrying a `start-verification` action and the `verification.current` check fails with no `action`
+- **WHEN** `GetStatus.execute()` identifies blockers
+- **THEN** `blockers` contains a single verification blocker with `checkId: 'verification.current'`
+- **AND** it carries the `start-verification` action of the dropped validity blocker
+
+#### Scenario: Same check failing on several targets is skippable only if skippable on all
+
+- **GIVEN** the same check id fails on two targets with the same code and message, and its resolved binding is skippable on one target and not skippable on the other
+- **WHEN** `GetStatus.execute()` identifies blockers
+- **THEN** the single merged blocker has `isSkippable: false`
+
+#### Scenario: Different messages of the same check keep their own skippability
+
+- **GIVEN** the same check id fails on two targets with different messages, and its resolved binding is skippable on one target and locked on the other
+- **WHEN** `GetStatus.execute()` identifies blockers
+- **THEN** `blockers` contains two separate blockers, one per message
+- **AND** the blocker of the skippable target has `isSkippable: true` and the blocker of the locked target has `isSkippable: false`
+
+#### Scenario: Verdict blocker without a failing predicate takes no archive skippability
+
+- **GIVEN** the validity verdict reports a blocker carrying a `checkId` and no failing predicate exists for that check on any transition target
+- **AND** the same check id is skippable in the archive bindings
+- **WHEN** `GetStatus.execute()` identifies blockers
+- **THEN** the verdict blocker does not take its `isSkippable` from the archive bindings and keeps its own `isSkippable` (`false` when absent)
+
+#### Scenario: Same check failing on transition and archive is skippable only if skippable in both
+
+- **GIVEN** a change in `archivable` where the same check fails on a transition target and in the archive checks with the same code and message
+- **AND** its transition binding is skippable and its archive binding is locked (not skippable)
+- **WHEN** `GetStatus.execute()` identifies blockers
+- **THEN** the single merged blocker has `isSkippable: false`
+- **AND** with the transition binding locked and the archive binding skippable the merged blocker also has `isSkippable: false`
+
+#### Scenario: Per-artifact review codes are never merged
+
+- **GIVEN** the validity verdict reports `ARTIFACT_REVIEW_REQUIRED` and a check of another family fails
+- **WHEN** `GetStatus.execute()` identifies blockers
+- **THEN** `ARTIFACT_REVIEW_REQUIRED` remains a separate blocker
+
+#### Scenario: Sign-off verification failure is kept when verification.current does not fail
+
+- **GIVEN** `approval.signoff` fails with a `VERIFICATION_*` code and no `verification.current` failure exists
+- **WHEN** `GetStatus.execute()` identifies blockers
+- **THEN** the `approval.signoff` verification failure is kept as the verification blocker
+
+#### Scenario: Stale spec consent and failing sign-off stay two blockers
+
+- **GIVEN** the validity verdict reports a stale spec approval and the `approval.signoff` check fails with `APPROVAL_STALE`
+- **WHEN** `GetStatus.execute()` identifies blockers
+- **THEN** `blockers` contains one spec-consent entry and one sign-off consent entry, because they belong to different families
+
+#### Scenario: VERIFICATION_VALIDITY_UNAVAILABLE stays unmerged
+
+- **GIVEN** the `verification.current` check fails with `VERIFICATION_VALIDITY_UNAVAILABLE` while the validity verdict reports a verification blocker
+- **WHEN** `GetStatus.execute()` identifies blockers
+- **THEN** both blockers are present
+
+#### Scenario: Live overlap with stale verification keeps the verify next action
+
+- **GIVEN** a change in `archivable` with `verifying` enabled and stale verification, whose archive predicates also report live `OVERLAP_CONFLICT`
+- **WHEN** `GetStatus.execute()` projects `nextAction`
+- **THEN** `blockers` contains both the verification blocker and `OVERLAP_CONFLICT`
+- **AND** `nextAction.intent` is `'verify'`, `nextAction.action` is not set, and the `start-verification` action remains on the verification blocker
+- **AND** `nextAction.reason` does not describe an overlap bypass
 
 ### Requirement: Approval, verification, and fingerprint status projection
 

@@ -27,14 +27,20 @@ import {
   type LifecycleStepVerdict,
   projectArtifacts,
 } from '../../domain/services/lifecycle-verdict.js'
-import { evaluateLifecycle } from '../services/lifecycle-evaluation.js'
+import { evaluateLifecycle, type LifecycleActionIntent } from '../services/lifecycle-evaluation.js'
 import {
   resolveEffectiveBindings,
+  type CheckAction,
+  type CheckAttempt,
   type CheckBinding,
   type CheckResult,
   type TaskCompletionCounts,
 } from '../../domain/services/transition-checks.js'
 import { type CheckRegistry } from '../../domain/services/check-registry.js'
+import {
+  bindingMatches,
+  transitionAttempt,
+} from '../../domain/services/evaluate-transition-predicates.js'
 import { Logger } from '../logger.js'
 import {
   buildCheckExecutionContext,
@@ -265,10 +271,10 @@ export interface Blocker {
   readonly code: string
   /** Human-readable explanation of the blocker. */
   readonly message: string
-  /** Whether the blocker can be bypassed via a CLI flag or configuration. */
+  /** Whether the blocker can be bypassed via configuration or check skip. */
   readonly isSkippable: boolean
-  /** CLI flag that skips this blocker when the predicate is skippable. */
-  readonly bypassFlag?: string
+  /** Host-neutral remediation action declared by the failed check or validity blocker. */
+  readonly action?: CheckAction
   /** Gerund label from the failed check when projected from a predicate. */
   readonly label?: string
   /** Check id that produced this blocker when projected from a predicate. */
@@ -285,8 +291,10 @@ export interface NextAction {
   readonly actionType: 'cognitive' | 'mechanical'
   /** Human-readable rationale for the recommendation. */
   readonly reason: string
-  /** The recommended CLI command or skill to run. */
-  readonly command: string | null
+  /** Host-neutral workflow phase intent, or `null` when superseded or inapplicable. */
+  readonly intent: LifecycleActionIntent | null
+  /** Optional check-declared remediation action. */
+  readonly action?: CheckAction
 }
 
 /** Materialized approval status exposed by GetStatus. */
@@ -408,6 +416,51 @@ function schemaResolutionBlocker(error: Error | undefined): Blocker {
       'Schema resolution failed; lifecycle transitions are unavailable until the schema is restored.',
     isSkippable: false,
   }
+}
+
+/** Condition families shared by validity blockers and gate-check failures. */
+type ConditionFamily = 'spec-consent' | 'signoff-consent' | 'verification'
+
+const VERIFICATION_CODES: ReadonlySet<string> = new Set([
+  'VERIFICATION_REQUIRED',
+  'VERIFICATION_IN_PROGRESS',
+  'VERIFICATION_STALE',
+])
+
+/**
+ * Resolves the condition family of a checkId-less validity blocker code.
+ *
+ * @param code - Validity blocker code
+ * @returns The family, or `undefined` for per-artifact and per-spec codes
+ */
+function validityFamily(code: string): ConditionFamily | undefined {
+  if (code === 'APPROVAL_REQUIRED' || code === 'APPROVAL_STALE' || code === 'APPROVAL_REVOKED') {
+    return 'spec-consent'
+  }
+  if (code === 'SIGNOFF_REQUIRED' || code === 'SIGNOFF_STALE' || code === 'SIGNOFF_REVOKED') {
+    return 'signoff-consent'
+  }
+  return VERIFICATION_CODES.has(code) ? 'verification' : undefined
+}
+
+/**
+ * Resolves the condition family a gate-check failure describes. `approval.signoff`
+ * names its consent codes `APPROVAL_*`; its `VERIFICATION_*` failures describe the
+ * verification family. `VERIFICATION_VALIDITY_UNAVAILABLE` and per-artifact codes
+ * belong to no family.
+ *
+ * @param checkId - Id of the failing check
+ * @param code - Failure code reported by the check
+ * @returns The family, or `undefined` when the failure never merges
+ */
+function checkFamily(checkId: string, code: string): ConditionFamily | undefined {
+  const consent =
+    code === 'APPROVAL_REQUIRED' || code === 'APPROVAL_STALE' || code === 'APPROVAL_REVOKED'
+  if (checkId === 'approval.spec' && consent) return 'spec-consent'
+  if (checkId === 'approval.signoff' && consent) return 'signoff-consent'
+  if (checkId === 'verification.current' && VERIFICATION_CODES.has(code)) return 'verification'
+  if (checkId === 'approval.signoff' && VERIFICATION_CODES.has(code)) return 'verification'
+  return undefined
 }
 
 /**
@@ -562,7 +615,7 @@ export class GetStatus {
       targetStep: change.state,
       actionType: 'cognitive',
       reason: 'Proceed to next lifecycle step',
-      command: null,
+      intent: null,
     }
     let validTransitions: readonly ChangeState[] = VALID_TRANSITIONS[change.state]
     let availableTransitions: readonly ChangeState[] = []
@@ -586,7 +639,7 @@ export class GetStatus {
         reason: isIdentityMismatch
           ? 'Provider returned the wrong schema identity'
           : 'Schema resolution failed; lifecycle transitions are unavailable until the schema is restored.',
-        command: null,
+        intent: null,
       }
       for (const [type, artifact] of change.artifacts) {
         const files: ArtifactFileStatus[] = [...artifact.files.values()].map((file) => ({
@@ -728,6 +781,7 @@ export class GetStatus {
       legalTargets.bindingsByTarget,
       archiveChecks,
       effectiveArchiveBindings,
+      (target) => transitionAttempt(change.state, target, schema, this._approvals),
     )
     nextAction = this._nextActionAfterArchiveOverlap(verdict.nextAction, blockers)
     validTransitions = verdict.validTransitions
@@ -738,24 +792,12 @@ export class GetStatus {
     checksByTarget = verdict.checksByTarget
     checks = verdict.checks
 
-    // If nextAction has no command, project remediation command from failing check if present
-    if (nextAction.command === null) {
-      const failingCheckWithCommand = checks.find(
-        (c) => c.outcome === 'fail' && c.command !== undefined,
-      )
-      if (failingCheckWithCommand?.command) {
-        nextAction = {
-          ...nextAction,
-          command: failingCheckWithCommand.command,
-        }
-      }
-    }
-
     Logger.debug('GetStatus projected evaluateLifecycle verdict', {
       change: change.name,
       blockerCodes: verdict.blockers.map((blocker) => blocker.code),
       reviewReason: verdict.review.reason,
-      nextAction: verdict.nextAction.command,
+      nextActionIntent: verdict.nextAction.intent,
+      nextActionKind: verdict.nextAction.action?.kind,
     })
 
     const lifecycle: LifecycleContext = {
@@ -835,7 +877,7 @@ export class GetStatus {
         targetStep: change.state,
         actionType: 'cognitive',
         reason: 'Client revision is current',
-        command: null,
+        intent: null,
       },
       schemaWarnings: [],
     }
@@ -947,7 +989,7 @@ export class GetStatus {
         targetStep: draftView.state,
         actionType: 'cognitive',
         reason: 'Change is drafted; restore before lifecycle transitions',
-        command: null,
+        intent: null,
       },
       schemaWarnings,
     }
@@ -956,13 +998,21 @@ export class GetStatus {
   /**
    * Merges review blockers with failed predicates from every protocol-legal target.
    * Flattening is required so incomplete `verifying` tasks still surface while
-   * `nextAction` remains `/specd-implement`.
+   * `nextAction` keeps the `implement` intent.
+   *
+   * Skippability is keyed by check id AND message: a blocker takes the skippability of its own
+   * binding, and only blockers with the same check id and the same message merge, ANDing their
+   * skippability across targets and across transition/archive contexts. A verdict blocker with a
+   * check id and no failing transition predicate keeps its own `isSkippable` (`false` when absent);
+   * it never borrows from archive bindings.
    *
    * @param reviewBlockers - Verdict review/requested-target blockers
    * @param checksByTarget - Predicate results per protocol-legal target
    * @param bindingsByTarget - Resolved bindings per target (derived policy)
    * @param archiveChecks - Archive-scope predicates when `state === 'archivable'`
    * @param archiveBindings - Effective archive bindings (derived policy for archive checks)
+   * @param attemptFor - Builds the transition attempt of a target so skippability is read from the
+   * binding that applies to that target, not from the first binding sharing the check id
    * @returns Deduplicated public blockers
    */
   private _mergeBlockers(
@@ -971,6 +1021,7 @@ export class GetStatus {
     bindingsByTarget: Readonly<Partial<Record<ChangeState, readonly CheckBinding[]>>>,
     archiveChecks: readonly CheckResult[] = [],
     archiveBindings: readonly CheckBinding[] = this._archiveBindings,
+    attemptFor?: (target: ChangeState) => Extract<CheckAttempt, { scope: 'transition' }>,
   ): Blocker[] {
     // Skippability comes from the resolved bindings of the target the failure belongs to
     // (schema-composed), or from the archive bindings for archive checks.
@@ -980,12 +1031,14 @@ export class GetStatus {
     const candidates: {
       check: CheckResult
       bindings: readonly CheckBinding[]
+      target?: ChangeState
       source: 'transition' | 'archive'
     }[] = [
       ...Object.entries(checksByTarget).flatMap(([target, rows]) =>
         (rows ?? []).map((check) => ({
           check,
           bindings: bindingsByTarget[target as ChangeState] ?? this._transitionBindings,
+          target: target as ChangeState,
           source: 'transition' as const,
         })),
       ),
@@ -995,42 +1048,86 @@ export class GetStatus {
         source: 'archive' as const,
       })),
     ]
+    const skipKey = (id: string, message: string): string => `${id}\u0000${message}`
     const transitionSkippable = new Map<string, boolean>()
     const archiveSkippable = new Map<string, boolean>()
+    const archiveIdSkippable = new Map<string, boolean>()
+    // A merged blocker is skippable only when it is skippable on every target it appears on,
+    // so verdicts combine as AND (a missing entry is the identity).
     if (archiveChecks.length > 0) {
       for (const binding of archiveBindings) {
-        archiveSkippable.set(
+        archiveIdSkippable.set(
           binding.check.id,
-          (archiveSkippable.get(binding.check.id) ?? false) || binding.skippable === true,
+          (archiveIdSkippable.get(binding.check.id) ?? true) && binding.skippable === true,
         )
       }
     }
-    for (const { check, bindings, source } of candidates) {
+    for (const { check, bindings, source, target: candidateTarget } of candidates) {
       if (check.outcome !== 'fail') continue
-      const skippable = bindings.find((b) => b.check.id === check.id)?.skippable === true
-      const target = source === 'archive' ? archiveSkippable : transitionSkippable
-      target.set(check.id, (target.get(check.id) ?? false) || skippable)
+      const attempt =
+        source === 'transition' && candidateTarget !== undefined && attemptFor !== undefined
+          ? attemptFor(candidateTarget)
+          : undefined
+      const sameCheck = bindings.filter((b) => b.check.id === check.id)
+      const applicable =
+        attempt === undefined
+          ? undefined
+          : sameCheck.find((b) => bindingMatches(b, attempt, attempt.along))
+      const skippable = (applicable ?? sameCheck[0])?.skippable === true
+      const map = source === 'archive' ? archiveSkippable : transitionSkippable
+      const key = skipKey(check.id, check.message ?? `Check '${check.id}' failed`)
+      const seed = source === 'archive' ? (archiveIdSkippable.get(check.id) ?? true) : true
+      map.set(key, (map.get(key) ?? seed) && skippable)
     }
 
-    const merged = new Map<string, Blocker>()
+    // Condition families with at least one check failure (from the predicates or from
+    // check-derived verdict blockers). A family with a check failure owns its condition:
+    // every checkId-less validity blocker of that family is dropped, whatever its code.
+    const families = new Set<ConditionFamily>()
+    let hasVerificationCurrent = false
+    const noteFailure = (checkId: string, code: string): void => {
+      const family = checkFamily(checkId, code)
+      if (family !== undefined) families.add(family)
+      if (checkId === 'verification.current' && family !== undefined) hasVerificationCurrent = true
+    }
+    for (const { check } of candidates) {
+      if (check.outcome === 'fail' && check.code !== undefined) noteFailure(check.id, check.code)
+    }
     for (const blocker of reviewBlockers) {
-      // The lifecycle verdict pre-computes bypass hints; resolved bindings are authoritative.
+      if (blocker.checkId !== undefined) noteFailure(blocker.checkId, blocker.code)
+    }
+    // An `approval.signoff` VERIFICATION_* failure yields to `verification.current`.
+    const yieldsToVerification = (checkId: string, code: string): boolean =>
+      hasVerificationCurrent && checkId === 'approval.signoff' && VERIFICATION_CODES.has(code)
+    // Actions of dropped validity blockers, adopted when the winning check declares none.
+    const droppedActions = new Map<ConditionFamily, CheckAction>()
+
+    const merged = new Map<string, Blocker>()
+    const absorbed = new Map<string, string>()
+    for (const blocker of reviewBlockers) {
+      if (blocker.checkId === undefined) {
+        const family = validityFamily(blocker.code)
+        if (family !== undefined && families.has(family)) {
+          if (blocker.action !== undefined && !droppedActions.has(family)) {
+            droppedActions.set(family, blocker.action)
+          }
+          continue
+        }
+      } else if (yieldsToVerification(blocker.checkId, blocker.code)) {
+        continue
+      }
+      // Verdict blockers are transition-origin: only a failing transition predicate with the
+      // same check id and message decides skippability; archive bindings never apply.
       const resolved =
         blocker.checkId !== undefined
-          ? (archiveSkippable.get(blocker.checkId) ?? transitionSkippable.get(blocker.checkId))
+          ? transitionSkippable.get(skipKey(blocker.checkId, blocker.message))
           : undefined
       const isSkippable = resolved ?? blocker.isSkippable ?? false
-      const bypassFlag =
-        resolved === undefined
-          ? blocker.bypassFlag
-          : resolved
-            ? `--skip-checks ${blocker.checkId}`
-            : undefined
-      merged.set(`${blocker.code}:${blocker.message}`, {
+      merged.set(`${blocker.checkId ?? ''}\u0000${blocker.code}:${blocker.message}`, {
         code: blocker.code,
         message: blocker.message,
         isSkippable,
-        ...(bypassFlag !== undefined ? { bypassFlag } : {}),
+        ...(blocker.action !== undefined ? { action: blocker.action } : {}),
         ...(blocker.label !== undefined ? { label: blocker.label } : {}),
         ...(blocker.checkId !== undefined ? { checkId: blocker.checkId } : {}),
       })
@@ -1038,18 +1135,57 @@ export class GetStatus {
 
     for (const { check, source } of candidates) {
       if (check.outcome !== 'fail' || check.code === undefined) continue
+      if (yieldsToVerification(check.id, check.code)) continue
       const message = check.message ?? `Check '${check.id}' failed`
-      const key = `${check.code}:${message}`
-      if (merged.has(key)) continue
+      const text = `${check.code}:${message}`
+      const ownKey = `${check.id}\u0000${text}`
+      // A check merges with a blocker carrying the same check id. A family check also merges with
+      // the first checkId-less validity blocker of the same code:message; a failure without a
+      // family (per-artifact or per-spec codes) never absorbs into a checkId-less blocker.
+      const family = checkFamily(check.id, check.code)
+      const anonymousKey = `\u0000${text}`
+      const absorbedBy = absorbed.get(anonymousKey)
+      const key = merged.has(ownKey)
+        ? ownKey
+        : family !== undefined &&
+            merged.has(anonymousKey) &&
+            (absorbedBy === undefined || absorbedBy === check.id)
+          ? anonymousKey
+          : undefined
+      const action = check.action ?? (family !== undefined ? droppedActions.get(family) : undefined)
+      const existing = key === undefined ? undefined : merged.get(key)
+      if (key !== undefined && existing !== undefined) {
+        if (key === anonymousKey) absorbed.set(anonymousKey, check.id)
+        // A validity blocker without a remediation adopts the matching check's declared action.
+        const ownSkippable =
+          (source === 'archive' ? archiveSkippable : transitionSkippable).get(
+            skipKey(check.id, message),
+          ) === true
+        // A blocker present in both contexts is skippable only when skippable in both.
+        const nextSkippable = key === ownKey ? existing.isSkippable && ownSkippable : undefined
+        if (
+          (existing.action === undefined && action !== undefined) ||
+          (nextSkippable !== undefined && nextSkippable !== existing.isSkippable)
+        ) {
+          merged.set(key, {
+            ...existing,
+            ...(existing.action === undefined && action !== undefined ? { action } : {}),
+            ...(nextSkippable !== undefined ? { isSkippable: nextSkippable } : {}),
+          })
+        }
+        continue
+      }
       const isSkippable =
-        (source === 'archive' ? archiveSkippable : transitionSkippable).get(check.id) === true
-      merged.set(key, {
+        (source === 'archive' ? archiveSkippable : transitionSkippable).get(
+          skipKey(check.id, message),
+        ) === true
+      merged.set(ownKey, {
         code: check.code,
         message,
         isSkippable,
         label: check.label,
         checkId: check.id,
-        ...(isSkippable ? { bypassFlag: `--skip-checks ${check.id}` } : {}),
+        ...(action !== undefined ? { action } : {}),
       })
     }
 
@@ -1062,27 +1198,25 @@ export class GetStatus {
    *
    * @param nextAction - Application next-action projection
    * @param blockers - Merged public blockers including archive predicates
-   * @returns Next action with overlap-aware reason when live overlap is present
+   * @returns Next action with overlap-aware reason when live overlap is the only blocker;
+   * the guidance action unchanged when any other blocker exists
    */
   private _nextActionAfterArchiveOverlap(
     nextAction: NextAction,
     blockers: readonly Blocker[],
   ): NextAction {
     const overlap = blockers.find((blocker) => blocker.code === 'OVERLAP_CONFLICT')
-    if (overlap === undefined) {
+    if (
+      overlap === undefined ||
+      !blockers.every((blocker) => blocker.code === 'OVERLAP_CONFLICT')
+    ) {
       return nextAction
     }
-    // Never invent a bypass: when the resolved binding is not skippable there is none to offer.
-    const bypass = overlap.bypassFlag
-    const reason =
-      bypass === undefined || overlap.message.includes(bypass)
-        ? overlap.message
-        : `${overlap.message} Use ${bypass} to archive anyway.`
     return {
       targetStep: 'archivable',
       actionType: 'mechanical',
-      reason,
-      command: '/specd-archive',
+      reason: overlap.message,
+      intent: 'archive',
     }
   }
 

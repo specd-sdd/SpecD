@@ -21,7 +21,6 @@ import {
   CheckPredicateFailedError,
   InvalidStateTransitionError,
   OverlapEntry,
-  SpecOverlapError,
   UnknownCheckError,
 } from '@specd/sdk'
 import { registerChangeArchive } from '../../../src/commands/change/archive.js'
@@ -605,9 +604,16 @@ describe('change archive', () => {
     it('suggests the canonical bypass when the overlap is skippable', async () => {
       const { kernel, stderr } = setup()
       kernel.changes.archive.execute.mockRejectedValue(
-        new SpecOverlapError([
-          new OverlapEntry('core:config', [{ name: 'beta', state: 'designing' }]),
-        ]),
+        new CheckPredicateFailedError(
+          'spec.overlap',
+          'Checking spec overlap',
+          'OVERLAP_CONFLICT',
+          'Specs overlap with other active changes',
+          undefined,
+          { entries: [new OverlapEntry('core:config', [{ name: 'beta', state: 'designing' }])] },
+          true,
+          { from: 'archivable', to: 'archiving' },
+        ),
       )
       const program = makeProgram()
       registerChangeArchive(program.command('change'))
@@ -615,7 +621,9 @@ describe('change archive', () => {
       expect(process.exit).toHaveBeenCalledWith(1)
       expect(stderr()).toContain('core:config')
       expect(
-        stderr().trimEnd().endsWith('Use --skip-checks spec.overlap to proceed despite overlap.'),
+        stderr()
+          .trimEnd()
+          .endsWith('Retry with --skip-checks spec.overlap if an exception is granted'),
       ).toBe(true)
       expect(stderr()).not.toContain('--allow-overlap')
     })
@@ -623,11 +631,15 @@ describe('change archive', () => {
     it('suggests no bypass when the overlap is not skippable', async () => {
       const { kernel, stderr } = setup()
       kernel.changes.archive.execute.mockRejectedValue(
-        new SpecOverlapError(
-          [new OverlapEntry('core:config', [{ name: 'beta', state: 'designing' }])],
-          {
-            skippable: false,
-          },
+        new CheckPredicateFailedError(
+          'spec.overlap',
+          'Checking spec overlap',
+          'OVERLAP_CONFLICT',
+          'Specs overlap with other active changes',
+          undefined,
+          { entries: [new OverlapEntry('core:config', [{ name: 'beta', state: 'designing' }])] },
+          false,
+          { from: 'archivable', to: 'archiving' },
         ),
       )
       const program = makeProgram()
@@ -639,12 +651,19 @@ describe('change archive', () => {
       expect(stderr()).not.toContain('--allow-overlap')
     })
 
-    it('reports SpecOverlapError through the structured error record in json mode', async () => {
+    it('reports overlap CheckPredicateFailedError through the structured error record in json mode', async () => {
       const { kernel, stdout, stderr } = setup()
       kernel.changes.archive.execute.mockRejectedValue(
-        new SpecOverlapError([
-          new OverlapEntry('core:config', [{ name: 'beta', state: 'designing' }]),
-        ]),
+        new CheckPredicateFailedError(
+          'spec.overlap',
+          'Checking spec overlap',
+          'OVERLAP_CONFLICT',
+          'Specs overlap with other active changes',
+          undefined,
+          { entries: [new OverlapEntry('core:config', [{ name: 'beta', state: 'designing' }])] },
+          true,
+          { from: 'archivable', to: 'archiving' },
+        ),
       )
       const program = makeProgram()
       registerChangeArchive(program.command('change'))
@@ -652,7 +671,7 @@ describe('change archive', () => {
         .parseAsync(['node', 'specd', 'change', 'archive', 'feat', '--format', 'json'])
         .catch(() => {})
       expect(process.exit).toHaveBeenCalledWith(1)
-      expect(`${stdout()}${stderr()}`).toContain('SPEC_OVERLAP')
+      expect(`${stdout()}${stderr()}`).toContain('OVERLAP_CONFLICT')
     })
 
     function pluginFailure(skippable: boolean): CheckPredicateFailedError {
@@ -661,13 +680,33 @@ describe('change archive', () => {
         'Scanning code',
         'SECURITY_FINDINGS',
         '2 findings',
-        'pnpm audit:fix',
+        { kind: '@security.audit-fix', guidance: 'pnpm audit:fix' },
         { count: 2 },
         skippable,
       )
     }
 
-    it('prints the check, command and a bypass line for a skippable plugin failure', async () => {
+    it('renders the start-verification command for a stale-verification archive failure', async () => {
+      const { kernel, stderr } = setup()
+      kernel.changes.archive.execute.mockRejectedValue(
+        new CheckPredicateFailedError(
+          'verification.current',
+          'Checking verification freshness',
+          'VERIFICATION_STALE',
+          'Verification evidence is stale',
+          { kind: 'start-verification', params: { changeName: 'feat' } },
+          undefined,
+          false,
+        ),
+      )
+      const program = makeProgram()
+      registerChangeArchive(program.command('change'))
+      await program.parseAsync(['node', 'specd', 'change', 'archive', 'feat']).catch(() => {})
+      expect(process.exit).toHaveBeenCalledWith(1)
+      expect(stderr()).toContain('command: specd changes verification start feat')
+    })
+
+    it('prints the check, guidance and a bypass line for a skippable plugin failure', async () => {
       const { kernel, stderr } = setup()
       kernel.changes.archive.execute.mockRejectedValue(pluginFailure(true))
       const program = makeProgram()
@@ -676,7 +715,8 @@ describe('change archive', () => {
       expect(process.exit).toHaveBeenCalledWith(1)
       const output = stderr()
       expect(output).toContain('check:   Scanning code (@security.code-scan)')
-      expect(output).toContain('command: pnpm audit:fix')
+      expect(output).toContain('guidance: pnpm audit:fix')
+      expect(output).not.toContain('command: pnpm audit:fix')
       expect(output).toContain(
         'bypass:  Retry with --skip-checks @security.code-scan if an exception is granted',
       )
@@ -722,8 +762,10 @@ describe('change archive', () => {
       registerChangeArchive(textProgram.command('change'))
       await textProgram.parseAsync(['node', 'specd', 'change', 'archive', 'feat']).catch(() => {})
       expect(process.exit).toHaveBeenCalledWith(1)
-      expect(textStderr()).toContain('--skip-checks impl.linksInScope')
-      expect(textStderr()).toContain('--allow-out-of-scope')
+      expect(textStderr()).toContain(
+        'Retry with --skip-checks impl.linksInScope if an exception is granted',
+      )
+      expect(textStderr()).not.toContain('--allow-out-of-scope')
 
       vi.clearAllMocks()
       const { kernel: jsonKernel, stdout: jsonStdout } = setup()
@@ -736,8 +778,9 @@ describe('change archive', () => {
       expect(process.exit).toHaveBeenCalledWith(1)
       const payload = JSON.parse(jsonStdout()) as { code: string; hint?: string }
       expect(payload.code).toBe('IMPLEMENTATION_STATE')
-      expect(payload.hint).toContain('--skip-checks impl.linksInScope')
-      expect(payload.hint).toContain('--allow-out-of-scope')
+      expect(payload.hint).toBe(
+        'Retry with --skip-checks impl.linksInScope if an exception is granted',
+      )
     })
 
     it('still exits 1 naming the state when the change is not archivable', async () => {
@@ -898,5 +941,88 @@ describe('change archive', () => {
     expect(line1Idx).toBeGreaterThan(startIdx)
     expect(line2Idx).toBeGreaterThan(line1Idx)
     expect(doneIdx).toBeGreaterThan(line2Idx)
+  })
+})
+
+describe('change archive check failure details', () => {
+  async function archiveFailing(err: CheckPredicateFailedError): Promise<string> {
+    const { kernel, stderr } = setup()
+    kernel.changes.archive.execute.mockRejectedValue(err)
+    const program = makeProgram()
+    registerChangeArchive(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'archive', 'feat']).catch(() => {})
+    expect(process.exit).toHaveBeenCalledWith(1)
+    return stderr()
+  }
+
+  it('lists deps.consistent mismatches and the repair hint', async () => {
+    const output = await archiveFailing(
+      new CheckPredicateFailedError(
+        'deps.consistent',
+        'Checking dependency consistency',
+        'DEPS_MISMATCH',
+        'Dependencies differ from persisted metadata',
+        undefined,
+        {
+          mismatches: [
+            { specId: 'core:core/a', extracted: ['core:core/b'], persisted: [] },
+            { specId: 'core:core/c', extracted: [], persisted: ['core:core/d'] },
+          ],
+        },
+        false,
+        { from: 'archivable', to: 'archiving' },
+      ),
+    )
+    expect(output).toContain('check:   Checking dependency consistency (deps.consistent)')
+    expect(output).toContain('hop:     archivable → archiving')
+    expect(output).toContain('detail:  core:core/a: extracted [core:core/b] vs persisted []')
+    expect(output).toContain('detail:  core:core/c: extracted [] vs persisted [core:core/d]')
+    expect(output).toContain('hint:  Re-run dependency extraction')
+    expect(output).not.toContain('bypass:')
+  })
+
+  it('lists workspace.readOnly specs without a bypass', async () => {
+    const output = await archiveFailing(
+      new CheckPredicateFailedError(
+        'workspace.readOnly',
+        'Checking workspace ownership',
+        'READ_ONLY_WORKSPACE',
+        'Change targets readOnly workspaces',
+        undefined,
+        { specs: [{ specId: 'ext:ext/spec', workspace: 'ext' }] },
+        false,
+      ),
+    )
+    expect(output).toContain('check:   Checking workspace ownership (workspace.readOnly)')
+    expect(output).toContain('detail:  ext:ext/spec -> workspace "ext" (readOnly)')
+    expect(output).not.toContain('bypass:')
+    expect(output).not.toContain('--skip-checks')
+  })
+
+  it('renders a duck-typed (name-only) error like the real class, including bypass', async () => {
+    const real = new CheckPredicateFailedError(
+      '@security.code-scan',
+      'Scanning code',
+      'SECURITY_FINDINGS',
+      '2 findings',
+      { kind: '@security.audit-fix', guidance: 'pnpm audit:fix' },
+      { count: 2 },
+      true,
+    )
+    const duck = Object.assign(new Error(real.message), {
+      name: 'CheckPredicateFailedError',
+      checkId: real.checkId,
+      label: real.label,
+      checkCode: real.checkCode,
+      action: real.action,
+      details: real.details,
+      skippable: real.skippable,
+    })
+    const realOut = await archiveFailing(real)
+    vi.restoreAllMocks()
+    const duckOut = await archiveFailing(duck as unknown as CheckPredicateFailedError)
+    expect(realOut).toContain('check:   Scanning code (@security.code-scan)')
+    expect(realOut).toContain('bypass:')
+    expect(duckOut).toBe(realOut)
   })
 })

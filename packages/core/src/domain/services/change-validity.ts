@@ -8,6 +8,7 @@ import {
 } from '../entities/change.js'
 import { type ChangeState } from '../value-objects/change-state.js'
 import { type InvalidationPolicy } from '../value-objects/invalidation-policy.js'
+import { startVerificationAction, type CheckAction } from './transition-checks.js'
 import {
   compareSpecApprovalFingerprints,
   compareValidityFingerprints,
@@ -43,6 +44,7 @@ export interface ValidityBlocker {
     | 'VERIFICATION_IN_PROGRESS'
     | 'VERIFICATION_STALE'
   readonly message: string
+  readonly action?: CheckAction
   readonly details?: Readonly<Record<string, unknown>>
 }
 
@@ -157,7 +159,7 @@ export function evaluateChangeValidity(
     signoff,
     verification,
     fingerprintIssues: facts.fingerprintFailures,
-    blockers: buildBlockers(facts, reviewTargets, specApproval, signoff, verification),
+    blockers: buildBlockers(change.name, facts, reviewTargets, specApproval, signoff, verification),
     recovery: selectAutomaticRecovery(
       change.state,
       policy,
@@ -188,7 +190,9 @@ export function selectAutomaticRecovery(
   signoff: ApprovalField,
   artifactReviewRequired: boolean,
 ): AutomaticRecovery | null {
-  if (isBrokenConsent(specApproval) && isAfter(state, 'designing')) {
+  // `ready` is where `approval.spec` blocks forward progress and consent is renewed, so a broken
+  // consent there does not return the change to `designing` again (it could never be renewed).
+  if (isBrokenConsent(specApproval) && isAfter(state, 'designing') && state !== 'ready') {
     return { cause: 'spec-approval', from: state, to: 'designing' }
   }
   if (isBrokenConsent(signoff) && isAfter(state, 'done')) {
@@ -201,9 +205,57 @@ export function selectAutomaticRecovery(
 }
 
 /**
+ * Collects the non-task artifact files that need review for a change snapshot.
+ *
+ * Shared by the validity reconciler and the forced-invalidation preview so both derive the
+ * same drifted and pending-review targets. A file is drifted when flagged or when its current
+ * fingerprint hash differs from the validated hash; skipped files and task artifacts are ignored.
+ *
+ * @param change - Change snapshot to scan
+ * @param fingerprint - Fresh validity fingerprint, when available
+ * @param taskArtifacts - Artifact ids that hold tasks and are excluded
+ * @returns Drifted and pending-review targets
+ */
+export function collectChangeReviewTargets(
+  change: Change,
+  fingerprint: ValidityFingerprint | null,
+  taskArtifacts: ReadonlySet<string>,
+): { readonly drifted: ArtifactReviewTarget[]; readonly pending: ArtifactReviewTarget[] } {
+  const drifted: ArtifactReviewTarget[] = []
+  const pending: ArtifactReviewTarget[] = []
+  for (const [typeId, artifact] of change.artifacts) {
+    if (taskArtifacts.has(typeId)) continue
+    for (const file of artifact.files.values()) {
+      if (file.status === 'skipped') continue
+      const hash = fingerprint?.artifacts.files[`${typeId}:${file.key}`]
+      const hashDrift =
+        file.validatedHash !== undefined && hash !== undefined && hash !== file.validatedHash
+      if (file.hasDrift || hashDrift) {
+        drifted.push({
+          artifactId: typeId,
+          fileKey: file.key,
+          filename: file.filename,
+          origin: 'drift',
+        })
+        continue
+      }
+      if (file.status === 'pending-review') {
+        pending.push({
+          artifactId: typeId,
+          fileKey: file.key,
+          filename: file.filename,
+          origin: 'direct',
+        })
+      }
+    }
+  }
+  return { drifted, pending }
+}
+
+/**
  * Non task review targets.
  *
- * @param facts - facts
+ * @param facts - Validity facts
  * @returns non task review targets result
  */
 function nonTaskReviewTargets(facts: ChangeValidityFacts): ArtifactReviewTarget[] {
@@ -224,7 +276,7 @@ function nonTaskReviewTargets(facts: ChangeValidityFacts): ArtifactReviewTarget[
  *
  * @param projection - projection
  * @param current - current
- * @param facts - facts
+ * @param facts - Validity facts
  * @param scope - scope
  * @param changes - changes
  * @returns project approval result
@@ -254,7 +306,7 @@ function projectApproval(
  * Project signoff.
  *
  * @param current - current
- * @param facts - facts
+ * @param facts - Validity facts
  * @param changes - changes
  * @returns project signoff result
  */
@@ -280,7 +332,7 @@ function projectSignoff(
  * Project verification.
  *
  * @param change - change
- * @param facts - facts
+ * @param facts - Validity facts
  * @param changes - changes
  * @returns project verification result
  */
@@ -307,7 +359,7 @@ function projectVerification(
  * Artifact differences.
  *
  * @param expected - expected
- * @param facts - facts
+ * @param facts - Validity facts
  * @returns artifact differences result
  */
 function specApprovalDifferences(
@@ -333,7 +385,7 @@ function specApprovalDifferences(
  * @param expected - expected stored fingerprint
  * @param expected.artifacts - expected artifact fingerprint
  * @param expected.implementation - expected implementation fingerprint, or null when unknown
- * @param facts - facts
+ * @param facts - Validity facts
  * @returns fingerprint differences, or null when the stored fingerprint still matches
  */
 function compareStoredValidity(
@@ -418,7 +470,7 @@ function unreadableDifferences(
  * Cause for.
  *
  * @param differences - differences
- * @param facts - facts
+ * @param facts - Validity facts
  * @param scope - scope
  * @returns cause for result
  */
@@ -468,7 +520,7 @@ function approvalField(
  * Verification field.
  *
  * @param change - change
- * @param facts - facts
+ * @param facts - Validity facts
  * @param projected - projected
  * @returns verification field result
  */
@@ -490,7 +542,8 @@ function verificationField(
 /**
  * Build blockers.
  *
- * @param facts - facts
+ * @param changeName - Active change name
+ * @param facts - Validity facts
  * @param reviewTargets - review targets
  * @param specApproval - spec approval
  * @param signoff - signoff
@@ -498,6 +551,7 @@ function verificationField(
  * @returns build blockers result
  */
 function buildBlockers(
+  changeName: string,
   facts: ChangeValidityFacts,
   reviewTargets: readonly ArtifactReviewTarget[],
   specApproval: ApprovalField,
@@ -534,14 +588,22 @@ function buildBlockers(
   pushConsentBlocker(blockers, 'SIGNOFF', signoff)
   if (facts.verificationRequired) {
     if (verification === 'absent' || verification === 'not-required') {
-      blockers.push({ code: 'VERIFICATION_REQUIRED', message: 'Verification is required' })
+      blockers.push({
+        code: 'VERIFICATION_REQUIRED',
+        message: 'Verification is required',
+        action: startVerificationAction(changeName),
+      })
     } else if (verification === 'attempt-active') {
-      blockers.push({ code: 'VERIFICATION_IN_PROGRESS', message: 'Verification is in progress' })
+      blockers.push({
+        code: 'VERIFICATION_IN_PROGRESS',
+        message: 'Verification is in progress',
+        action: startVerificationAction(changeName),
+      })
     } else if (verification === 'stale') {
       blockers.push({
         code: 'VERIFICATION_STALE',
         message: 'Verification is stale',
-        details: { command: 'specd changes verification start <name>' },
+        action: startVerificationAction(changeName),
       })
     }
   }

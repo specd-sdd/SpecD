@@ -70,7 +70,9 @@ function implementingChange(validatedHash: string): Change {
   return change
 }
 
-function signedOffChange(state: 'signed-off' | 'archivable' | 'archiving'): Change {
+function signedOffChange(
+  state: 'pending-signoff' | 'signed-off' | 'archivable' | 'archiving',
+): Change {
   const at = new Date('2026-01-01T00:00:00.000Z')
   const history = [
     {
@@ -84,7 +86,7 @@ function signedOffChange(state: 'signed-off' | 'archivable' | 'archiving'): Chan
     {
       type: 'transitioned' as const,
       from: 'drafting' as const,
-      to: 'signed-off' as const,
+      to: state === 'pending-signoff' ? ('pending-signoff' as const) : ('signed-off' as const),
       at,
       by: testActor,
     },
@@ -293,6 +295,115 @@ describe('ReconcileChangeValidity', () => {
       expect(second.changed).toBe(false)
     },
   )
+})
+
+describe('ReconcileChangeValidity recovery from parking states', () => {
+  const schema = makeSchema([makeArtifactType('proposal')])
+
+  function reconcilerFor(
+    change: Change,
+    approvals: { spec: boolean; signoff: boolean },
+  ): ReconcileChangeValidity {
+    const repo = new Repo([change])
+    return new ReconcileChangeValidity({
+      changes: repo,
+      resolveChangeSchema: new ResolveChangeSchema(makeSchemaProvider(schema)),
+      actor: { identity: async () => testActor },
+      refreshImplementationTracking: {
+        execute: async () => {
+          throw new Error('refresh should not run')
+        },
+      } as unknown as RefreshImplementationTracking,
+      fingerprint: new ValidityFingerprintService({
+        changes: repo,
+        hasher,
+        binaryHasher: new NodeBinaryContentHasher(),
+        schemaProvider: makeSchemaProvider(schema),
+      }),
+      approvals,
+    })
+  }
+
+  it('recovers a stale sign-off in pending-signoff to done without throwing', async () => {
+    const change = signedOffChange('pending-signoff')
+    expect(change.state).toBe('pending-signoff')
+    const result = await reconcilerFor(change, { spec: false, signoff: true }).execute({
+      name: change.name,
+    })
+    expect(result.automaticReturn).toEqual({
+      cause: 'signoff',
+      from: 'pending-signoff',
+      to: 'done',
+    })
+    expect(result.change.state).toBe('done')
+  })
+
+  it('recovers a stale approval in pending-spec-approval to designing', async () => {
+    const at = new Date('2026-01-01T00:00:00.000Z')
+    const change = new Change({
+      name: 'stale-spec-approval',
+      createdAt: at,
+      specIds: ['core:change'],
+      schemaName: 'test-schema',
+      schemaVersion: 1,
+      history: [
+        {
+          type: 'created',
+          at,
+          by: testActor,
+          specIds: ['core:change'],
+          schemaName: 'test-schema',
+          schemaVersion: 1,
+        },
+        { type: 'transitioned', from: 'drafting', to: 'pending-spec-approval', at, by: testActor },
+      ],
+      artifacts: new Map([
+        [
+          'proposal',
+          new ChangeArtifact({
+            type: 'proposal',
+            requires: [],
+            files: new Map([
+              [
+                'proposal',
+                new ArtifactFile({
+                  key: 'proposal',
+                  filename: 'proposal.md',
+                  status: 'complete',
+                  validatedHash: hasher.hash(content),
+                }),
+              ],
+            ]),
+          }),
+        ],
+      ]),
+      invalidationPolicy: { artifacts: 'surgical', workflow: 'preserve' },
+    })
+    change.recordSpecApproval(
+      'Approved',
+      {
+        version: 1,
+        specIds: ['core:change'],
+        artifacts: {
+          version: 1,
+          algorithm: 'artifact-pre-hash-v1',
+          files: { 'proposal:proposal': `sha256:${'0'.repeat(64)}` },
+        },
+      },
+      testActor,
+      at,
+    )
+    expect(change.state).toBe('pending-spec-approval')
+    const result = await reconcilerFor(change, { spec: true, signoff: false }).execute({
+      name: change.name,
+    })
+    expect(result.automaticReturn).toEqual({
+      cause: 'spec-approval',
+      from: 'pending-spec-approval',
+      to: 'designing',
+    })
+    expect(result.change.state).toBe('designing')
+  })
 })
 
 describe('ReconcileChangeValidity verification topology', () => {

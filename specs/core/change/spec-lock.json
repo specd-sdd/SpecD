@@ -17,20 +17,13 @@
   ],
   "implementation": [
     {
-      "file": "core:src/domain/services/change-validity.ts",
-      "symbols": ["ValidityBlocker", "ChangeValidityVerdict", "evaluateChangeValidity"]
+      "file": "core:src/domain/value-objects/change-state.ts"
     },
     {
-      "file": "core:test/domain/services/change-validity.spec.ts"
+      "file": "core:src/domain/errors/happy-path-next-unavailable-error.ts"
     },
     {
-      "file": "core:test/application/use-cases/helpers.ts"
-    },
-    {
-      "file": "core:test/domain/services/lifecycle-engine.spec.ts"
-    },
-    {
-      "file": "core:test/domain/services/lifecycle-verdict.spec.ts"
+      "file": "core:src/domain/errors/invalid-state-transition-error.ts"
     }
   ],
   "optimizations": {

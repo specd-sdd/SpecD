@@ -77,19 +77,19 @@ roll the lifecycle back yourself.
   forward progress.
 - New design decisions and artifact authoring still go to `/specd-design`.
 
-If not in `ready` or `implementing` or `spec-approved`, this is the wrong skill.
+If not in `ready`, `pending-spec-approval`, `spec-approved`, or `implementing`, this is the wrong skill.
 Redirect based on the **next action:** `target` recommendation.
 
 **Stop — do not continue.**
 
-If in `ready` and the spec gate is on with no recorded spec approval (status
+If in `ready`, `pending-spec-approval`, or `spec-approved` and the spec gate is on with no recorded spec approval (status
 `lifecycle.approvals.spec` true in the fresh toon status and an `APPROVAL_REQUIRED` blocker, or next action pointing at
-human `approve spec`): **stay in `ready`**. Tell the user to run
+human `approve spec`): **stay in place**. Tell the user to run
 `specd changes approve spec <name> --reason "..."`. Do **not** `transition implementing`.
 
 **Stop — do not continue.**
 
-If in `ready` with spec gate off (or spec already approved) or `spec-approved`, run pre-hooks and transition:
+If in `ready`, `pending-spec-approval`, or `spec-approved` with spec gate off (or spec already approved), run pre-hooks and transition:
 
 <!-- route: target -->
 ```bash

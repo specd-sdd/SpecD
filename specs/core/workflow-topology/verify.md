@@ -9,8 +9,9 @@
 - **GIVEN** the `workflow-topology` domain module
 - **WHEN** its public exports are inspected
 - **THEN** it exports `resolveWorkflowPipeline`, `isWorkflowStepEnabled`, `listWorkflowTransitions`, `isWorkflowTransitionLegal`, `listBypassedWorkflowSteps`, and `nextWorkflowStep` as plain functions
+- **AND** it exports the drain-state accessors `drainAnchorOf` and `isDrainState`
 - **AND** no `WorkflowTopology` class with static methods is exported
-- **AND** internal helpers (raw pipeline construction, forward-target computation, drain normalization) are not exported
+- **AND** internal helpers (raw pipeline construction, forward-target computation) are not exported
 
 ### Requirement: Ordered pipeline construction
 
@@ -142,9 +143,10 @@
 
 - **GIVEN** a change in `pending-signoff` or `pending-spec-approval`
 - **WHEN** `listWorkflowTransitions(state, schema, approvals)` is evaluated
-- **THEN** it returns only the exits `VALID_TRANSITIONS` defines for that exact state
-- **AND** `isWorkflowTransitionLegal('pending-signoff', 'archivable', schema, approvals)` is `false` unless `VALID_TRANSITIONS` admits it
-- **AND** `isWorkflowTransitionLegal('pending-spec-approval', 'implementing', schema, approvals)` is `false` unless `VALID_TRANSITIONS` admits it
+- **THEN** it returns only the exits `VALID_TRANSITIONS` defines for that exact state, filtered by step enablement
+- **AND** `pending-spec-approval` yields `implementing` and `designing`, and `pending-signoff` yields `archivable`, `designing`, and `done`
+- **AND** neither result contains `spec-approved` or `signed-off`
+- **AND** `isWorkflowTransitionLegal('pending-spec-approval', 'verifying', schema, approvals)` is `false`
 
 #### Scenario: Disabled source has no transitions
 
@@ -195,11 +197,10 @@
 #### Scenario: Drain states only return legal next steps
 
 - **GIVEN** a schema where `implementing` is `disabled: true`
-- **WHEN** `nextWorkflowStep('spec-approved', schema, approvals)` is called
-- **THEN** it returns `null`
-- **AND** with `implementing` enabled it returns `'implementing'`
-- **AND** `nextWorkflowStep('signed-off', schema, approvals)` returns `'archivable'`
-- **AND** `nextWorkflowStep('pending-signoff', schema, approvals)` and `nextWorkflowStep('pending-spec-approval', schema, approvals)` return `null`
+- **WHEN** `nextWorkflowStep('spec-approved', schema, approvals)` and `nextWorkflowStep('pending-spec-approval', schema, approvals)` are called
+- **THEN** both return `null`
+- **AND** with `implementing` enabled both return `'implementing'`
+- **AND** `nextWorkflowStep('signed-off', schema, approvals)` and `nextWorkflowStep('pending-signoff', schema, approvals)` return `'archivable'`
 
 #### Scenario: Next step is always a legal transition
 

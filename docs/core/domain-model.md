@@ -84,7 +84,7 @@ type ChangeState =
 
 The permitted transitions are defined in `VALID_TRANSITIONS` (protocol). Almost every active state can transition back to `'designing'` — this is the redesign path that allows rework at any point. From `'archiving'`, recovery transitions to `'archivable'` and `'designing'` are valid while the change is still active; a successful archive removes the change from the active set (archived record, not a lifecycle transition).
 
-Optional approval gates do **not** add edges from `ready` or `done` into parking states. Spec and signoff consent is recorded in place; `pending-spec-approval`, `spec-approved`, `pending-signoff`, and `signed-off` remain for **drain** of in-flight changes. `done`, `signed-off`, and `archivable` may hop to `implementing` or `verifying`.
+Optional approval gates do **not** add edges from `ready` or `done` into parking states. Spec and signoff consent is recorded in place without changing state; `pending-spec-approval`, `spec-approved`, `pending-signoff`, and `signed-off` remain for **drain** of in-flight changes directly onto the delivery edge (`implementing` / `archivable`), gated by `approval.spec` and `approval.signoff`. `done`, `signed-off`, and `archivable` may hop to `implementing` or `verifying`.
 
 Which targets status reports as available is **not** this table alone — `availableTransitions` is the subset of protocol targets whose transition checks currently pass.
 
@@ -101,12 +101,12 @@ Full transition table from `VALID_TRANSITIONS`:
 | `drafting`              | `designing`                                            |
 | `designing`             | `ready`, `designing`                                   |
 | `ready`                 | `implementing`, `designing`                            |
-| `pending-spec-approval` | `spec-approved`, `designing` _(drain only)_            |
+| `pending-spec-approval` | `implementing`, `designing` _(drain only)_             |
 | `spec-approved`         | `implementing`, `designing` _(drain only)_             |
 | `implementing`          | `verifying`, `designing`                               |
 | `verifying`             | `implementing`, `done`, `designing`                    |
 | `done`                  | `archivable`, `designing`, `implementing`, `verifying` |
-| `pending-signoff`       | `signed-off`, `designing` _(drain only)_               |
+| `pending-signoff`       | `archivable`, `designing`, `done` _(drain only)_       |
 | `signed-off`            | `archivable`, `designing`, `implementing`, `verifying` |
 | `archivable`            | `archiving`, `designing`, `implementing`, `verifying`  |
 | `archiving`             | `archivable`, `designing`                              |
@@ -202,7 +202,7 @@ for (const event of change.history) {
 | `'artifact-change'` | Artifact file content changed since the last approval.    |
 | `'redesign'`        | An explicit transition back to `designing` was requested. |
 
-An `invalidated` event clears `activeSpecApproval` and `activeSignoff`. If the change was not already in `designing`, a `transitioned` event rolling back to `designing` is appended immediately after.
+An `invalidated` event clears `activeSpecApproval` and `activeSignoff`. If the change is in a state after `ready` (and not already in `designing`), a `transitioned` event rolling back to `designing` is appended immediately after when the cause is stale or revoked spec consent or a workflow redesign. Stale or revoked spec consent does not request recovery from `ready`: spec consent is renewed there by the `approval.spec` check and `ApproveSpec`. A `workflow-redesign` recovery, however, also applies from `ready` and returns the change to `designing`.
 
 ## ActorIdentity and SYSTEM_ACTOR
 

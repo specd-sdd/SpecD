@@ -51,10 +51,13 @@ async function run(verification?: ChangeValidityVerdict['verification']) {
 }
 
 describe('verification.current', () => {
-  it('binds only to the verifying exit', () => {
+  it('binds to every verification-requiring exit', () => {
     const binding = TRANSITION_BINDING_SPECS.find((spec) => spec.id === 'verification.current')
     expect(binding?.applicability).toEqual([
       { scope: 'transition', from: 'verifying', to: 'done', along: 'forward' },
+      { scope: 'transition', from: 'done', to: 'archivable', along: 'forward' },
+      { scope: 'transition', from: 'pending-signoff', to: 'archivable', along: 'forward' },
+      { scope: 'transition', from: 'signed-off', to: 'archivable', along: 'forward' },
     ])
   })
 
@@ -66,13 +69,26 @@ describe('verification.current', () => {
     expect(unavailable.code).toBe('VERIFICATION_VALIDITY_UNAVAILABLE')
   })
 
-  it('fails absent, in-progress, and stale evidence with the start command', async () => {
+  it('fails absent, in-progress, and stale evidence with start-verification action', async () => {
+    const unavailable = await run()
     const absent = await run('absent')
     const active = await run('attempt-active')
     const stale = await run('stale')
+    expect(unavailable.action).toEqual({
+      kind: 'refresh-status',
+      params: { changeName: 'c1' },
+      supersedesIntent: false,
+    })
     expect(absent.code).toBe('VERIFICATION_REQUIRED')
     expect(active.code).toBe('VERIFICATION_IN_PROGRESS')
     expect(stale.code).toBe('VERIFICATION_STALE')
-    expect(absent.details?.command).toBe('specd changes verification start c1')
+    expect(absent.details).toBeUndefined()
+    expect(absent.action).toEqual({
+      kind: 'start-verification',
+      params: { changeName: 'c1' },
+      supersedesIntent: false,
+    })
+    expect(active.action).toEqual(absent.action)
+    expect(stale.action).toEqual(absent.action)
   })
 })

@@ -1,8 +1,21 @@
 import { type Command } from 'commander'
-import { type Kernel } from '@specd/sdk'
+import {
+  type AutomaticRecovery,
+  type ChangeValidityVerdict,
+  type Kernel,
+  type NextAction,
+} from '@specd/sdk'
 import { output, parseFormat, type OutputFormat } from '../../formatter.js'
 import { cliError, handleError } from '../../handle-error.js'
 import { resolveCliContext } from '../../helpers/cli-context.js'
+import {
+  projectCliBlocker,
+  projectCliNextAction,
+  resolveCliBypassFlag,
+  resolveCliWorkflowCommand,
+  resolveCliWorkflowGuidance,
+  type CliProjectableBlocker,
+} from '../../guidance-presenter.js'
 import {
   fingerprintTextLines,
   publicDifferences,
@@ -62,7 +75,7 @@ interface InvalidateVerificationCliResult {
   readonly reason: string
   readonly signoffChanged: boolean
   readonly automaticReturn: PublicAutomaticReturn | null
-  readonly blockers: readonly { readonly code: string; readonly message: string }[]
+  readonly blockers: readonly CliProjectableBlocker[]
   readonly nextAction: PublicNextAction
 }
 
@@ -228,7 +241,7 @@ function renderComplete(result: CompleteVerificationCliResult, format: OutputFor
 function renderInvalidate(result: InvalidateVerificationCliResult, format: OutputFormat): void {
   const fingerprint = summarizeFingerprint(result.verification.fingerprint) ?? {}
   const automaticReturn = projectAutomaticReturn(result.automaticReturn)
-  const nextAction = projectNextAction(result.nextAction)
+  const nextAction = projectNextAction(result.nextAction, result.blockers)
   const headline = result.invalidated ? 'verification invalidated' : 'verification already stale'
   if (format === 'text') {
     const lines = [
@@ -245,12 +258,29 @@ function renderInvalidate(result: InvalidateVerificationCliResult, format: Outpu
     if (result.blockers.length > 0) {
       lines.push('blockers:')
       for (const blocker of result.blockers) {
-        lines.push(`  ! ${blocker.code}: ${blocker.message}`)
+        lines.push(
+          blocker.label !== undefined
+            ? `  ! ${blocker.code} — ${blocker.label}: ${blocker.message}`
+            : `  ! ${blocker.code}: ${blocker.message}`,
+        )
+        const bypassFlag = resolveCliBypassFlag(blocker)
+        if (bypassFlag !== undefined) lines.push(`    bypass: ${bypassFlag}`)
+        const action = (blocker as { action?: import('@specd/sdk').CheckAction }).action
+        const blockerCommand = resolveCliWorkflowCommand(null, action)
+        const blockerGuidance = resolveCliWorkflowGuidance(null, action)
+        if (blockerCommand !== null) {
+          lines.push(`    command: ${blockerCommand}`)
+        } else if (blockerGuidance !== undefined) {
+          lines.push(`    guidance: ${blockerGuidance}`)
+        }
       }
     }
     lines.push('next action:')
     lines.push(`  target:  ${nextAction.targetStep}`)
     lines.push(`  command: ${nextAction.command ?? '(none)'}`)
+    if (nextAction.command === null && nextAction.guidance !== undefined) {
+      lines.push(`  guidance: ${nextAction.guidance}`)
+    }
     lines.push(`  reason:  ${nextAction.reason}`)
     output(lines.join('\n'), 'text')
     return
@@ -266,10 +296,16 @@ function renderInvalidate(result: InvalidateVerificationCliResult, format: Outpu
       verificationStatus: result.verification.status,
       signoffChanged: result.signoffChanged,
       automaticReturn,
-      blockers: result.blockers.map((blocker) => ({
-        code: blocker.code,
-        message: blocker.message,
-      })),
+      blockers: result.blockers.map((blocker) => {
+        const action = (blocker as { action?: import('@specd/sdk').CheckAction }).action
+        const command = action !== undefined ? resolveCliWorkflowCommand(null, action) : undefined
+        const guidance = resolveCliWorkflowGuidance(null, action)
+        return {
+          ...projectCliBlocker(blocker),
+          ...(command !== undefined && command !== null ? { command } : {}),
+          ...(guidance !== undefined ? { guidance } : {}),
+        }
+      }),
       nextAction,
       fingerprint,
     },
@@ -292,14 +328,22 @@ function projectAutomaticReturn(value: PublicAutomaticReturn | null): PublicAuto
  * Copies only the public next-action fields.
  *
  * @param value - Next-action projection produced by the use case
+ * @param blockers - Blockers used to append the overlap bypass suffix to the reason
  * @returns A CLI-safe next-action projection
  */
-function projectNextAction(value: PublicNextAction): PublicNextAction {
+function projectNextAction(
+  value: PublicNextAction | NextAction,
+  blockers?: readonly CliProjectableBlocker[],
+): PublicNextAction {
+  const projected = projectCliNextAction(value, blockers)
   return {
-    targetStep: value.targetStep,
-    actionType: value.actionType,
-    reason: value.reason,
-    command: value.command,
+    targetStep: projected.targetStep,
+    actionType: projected.actionType,
+    reason: projected.reason,
+    command: projected.command,
+    ...(projected.guidance !== undefined ? { guidance: projected.guidance } : {}),
+    intent: value.intent ?? null,
+    ...(value.action !== undefined ? { action: value.action } : {}),
   }
 }
 
@@ -312,10 +356,8 @@ function projectNextAction(value: PublicNextAction): PublicNextAction {
  */
 function reportVerificationError(err: unknown, format: string | undefined): never {
   if (isMismatchError(err)) {
-    process.stderr.write(
-      'Inspect the changed inputs, run verification start again, repeat verification work, then complete.\n',
-    )
     cliError(err.message, format, 1, 'VERIFICATION_FINGERPRINT_MISMATCH', {
+      hint: 'Inspect the changed inputs, run verification start again, repeat verification work, then complete.',
       metadata: { differences: publicDifferences(err.differences) },
     })
   }
@@ -358,8 +400,8 @@ function readReconciliation(value: unknown): {
 } {
   if (typeof value !== 'object' || value === null) return { lines: [], payload: {} }
   const record = value as {
-    automaticReturn?: unknown
-    verdict?: unknown
+    automaticReturn?: AutomaticRecovery | null
+    verdict?: ChangeValidityVerdict
     projectionChanges?: unknown
   }
   const automaticReturn = readAutomaticReturn(record.automaticReturn)

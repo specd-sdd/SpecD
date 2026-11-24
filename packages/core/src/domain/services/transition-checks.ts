@@ -77,6 +77,71 @@ export function checkLabel(id: string): string {
   return CHECK_LABELS[id as BuiltinCheckId] ?? id
 }
 
+/** Reserved built-in action kinds emitted by core checks. */
+export type BuiltInCheckActionKind =
+  | 'approve-spec'
+  | 'approve-signoff'
+  | 'start-verification'
+  | 'refresh-status'
+
+/** Host-neutral remediation declared by a failing check result. */
+export interface CheckAction {
+  /** Built-in kind, or plugin kind namespaced `@plugin.id`. */
+  readonly kind: BuiltInCheckActionKind | (string & {})
+  /** Structured params; built-in kinds have fixed shapes (`changeName` for verification kinds). */
+  readonly params?: Readonly<Record<string, unknown>>
+  /** Host-neutral prose fallback; MUST NOT contain CLI syntax. */
+  readonly guidance?: string
+  /** Default `true`: replaces the phase intent. `false`: refines it (phase intent kept). */
+  readonly supersedesIntent?: boolean
+}
+
+/**
+ * Builds the host-neutral action for recording human spec approval.
+ *
+ * @returns Check action with kind `approve-spec`
+ */
+export function approveSpecAction(): CheckAction {
+  return { kind: 'approve-spec' }
+}
+
+/**
+ * Builds the host-neutral action for recording human signoff approval.
+ *
+ * @returns Check action with kind `approve-signoff`
+ */
+export function approveSignoffAction(): CheckAction {
+  return { kind: 'approve-signoff' }
+}
+
+/**
+ * Builds the informational host-neutral action for starting verification.
+ *
+ * @param changeName - Target change name
+ * @returns Check action with kind `start-verification` and `supersedesIntent: false`
+ */
+export function startVerificationAction(changeName: string): CheckAction {
+  return {
+    kind: 'start-verification',
+    params: { changeName },
+    supersedesIntent: false,
+  }
+}
+
+/**
+ * Builds the informational host-neutral action for refreshing change status.
+ *
+ * @param changeName - Target change name
+ * @returns Check action with kind `refresh-status` and `supersedesIntent: false`
+ */
+export function refreshStatusAction(changeName: string): CheckAction {
+  return {
+    kind: 'refresh-status',
+    params: { changeName },
+    supersedesIntent: false,
+  }
+}
+
 /** Result of one check on an attempt. */
 export interface CheckResult {
   /** Registry identifier of the check that produced this result. */
@@ -91,8 +156,8 @@ export interface CheckResult {
   readonly code?: string
   /** Human-readable failure summary when `outcome` is `fail`. */
   readonly message?: string
-  /** Suggested CLI remediation command on failure. */
-  readonly command?: string
+  /** Host-neutral remediation action on failure. */
+  readonly action?: CheckAction
   /** Structured extras for diagnostics (spec ids, files, artifact ids). */
   readonly details?: Readonly<Record<string, unknown>>
 }
@@ -288,7 +353,7 @@ export function skip(
  * @param details - Optional structured diagnostics
  * @param kind - Predicate or effect; defaults to `predicate`
  * @param label - Gerund label; defaults to {@link CHECK_LABELS}`[id]`
- * @param command - Optional CLI remediation command
+ * @param action - Optional host-neutral remediation action
  * @returns Result with `outcome` `fail`
  */
 export function fail(
@@ -298,7 +363,7 @@ export function fail(
   details?: Readonly<Record<string, unknown>>,
   kind: CheckKind = 'predicate',
   label: string = CHECK_LABELS[id as BuiltinCheckId] ?? id,
-  command?: string,
+  action?: CheckAction,
 ): CheckResult {
   return {
     id,
@@ -307,7 +372,7 @@ export function fail(
     outcome: 'fail',
     code,
     message,
-    ...(command !== undefined ? { command } : {}),
+    ...(action !== undefined ? { action } : {}),
     ...(details !== undefined ? { details } : {}),
   }
 }
@@ -365,7 +430,7 @@ export interface CheckExecutionContext {
   readonly validity?: ChangeValidityVerdict
   /** Optional sink for `check-progress` while a check’s `execute` runs. */
   readonly onCheckProgress?: OnCheckProgress
-  /** `--skip-hooks` selectors; effects only. */
+  /** Hook phases the caller asked to skip; effects only. */
   readonly skipHookPhases?: readonly string[]
   /** Effective artifact statuses for `workflow.requires`. */
   readonly effectiveStatusByArtifact?: ReadonlyMap<string, ArtifactStatus>
@@ -387,8 +452,6 @@ export interface CustomCheckDefinition {
   readonly id: string
   /** Canonical gerund label for diagnostics and UI logs. */
   readonly label: string
-  /** Default CLI remediation command suggested on failure. */
-  readonly command?: string
   /** Pure evaluation function. */
   execute(ctx: CheckExecutionContext): Promise<CheckResult>
 }
@@ -410,7 +473,7 @@ export interface CheckBindingSpec {
   readonly phase?: EffectPipelinePhase
   /** Effect failure policy. Predicates omit this. */
   readonly onFailure?: EffectOnFailure
-  /** Whether the orchestrator allows bypassing this check via `--skip-checks`. */
+  /** Whether the orchestrator allows bypassing this check through its check-bypass input. */
   readonly skippable?: boolean
   /** Whether schema.yaml is allowed to override onFailure or skippable on this binding. */
   readonly allowBindingOverride?: boolean
@@ -437,10 +500,6 @@ export interface Check {
    * Predicate vs `run:` hook. Required on every check — do not infer from `id`.
    */
   readonly kind: CheckKind
-  /**
-   * Suggested CLI remediation command on failure.
-   */
-  readonly command?: string
   /**
    * Self-sufficient evaluation. Ports live on the instance (`create*`), not on `ctx`.
    *
@@ -482,7 +541,7 @@ export interface CheckBinding {
   readonly phase?: EffectPipelinePhase
   /** Effect failure policy. Predicates omit this. */
   readonly onFailure?: EffectOnFailure
-  /** Whether the orchestrator allows bypassing this check via `--skip-checks`. */
+  /** Whether the orchestrator allows bypassing this check through its check-bypass input. */
   readonly skippable: boolean
   /** Whether schema.yaml is allowed to override onFailure or skippable on this binding. */
   readonly allowBindingOverride: boolean

@@ -25,6 +25,40 @@ describe('detectImplLinksInScope', () => {
     expect(result.blocked).toBe(true)
     expect(result.outOfScopeSpecIds).toEqual(['core:out-of-scope'])
     expect(result.message).toContain('core:out-of-scope')
-    expect(result.message).not.toContain('--allow-out-of-scope')
+    for (const forbidden of [
+      '--allow-out-of-scope',
+      'allowOutOfScope',
+      '--skip-checks',
+      'Re-run with',
+    ]) {
+      expect(result.message).not.toContain(forbidden)
+    }
+  })
+
+  it('lists every out-of-scope spec when there are at most three', () => {
+    const change = {
+      name: 'my-change',
+      specIds: ['core:a'],
+      implementationLinks: ['core:x', 'core:y', 'core:z'].map((specId) => ({ specId })),
+    } as unknown as Change
+
+    const result = detectImplLinksInScope(change)
+    expect(result.message).toContain('3 specs')
+    expect(result.message).toContain('(core:x, core:y, core:z)')
+    expect(result.message).not.toContain('examples:')
+  })
+
+  it('compacts to three examples when more than three specs are out of scope', () => {
+    const change = {
+      name: 'my-change',
+      specIds: ['core:a'],
+      implementationLinks: ['core:w', 'core:x', 'core:y', 'core:z'].map((specId) => ({ specId })),
+    } as unknown as Change
+
+    const result = detectImplLinksInScope(change)
+    expect(result.outOfScopeSpecIds).toEqual(['core:w', 'core:x', 'core:y', 'core:z'])
+    expect(result.message).toContain('4 specs')
+    expect(result.message).toContain('(examples: core:w, core:x, core:y)')
+    expect(result.message).not.toContain('core:z')
   })
 })

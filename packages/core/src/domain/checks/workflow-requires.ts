@@ -1,3 +1,4 @@
+import { findBlockingParent, type ArtifactGraphSource } from '../services/find-blocking-parent.js'
 import {
   CHECK_LABELS,
   fail,
@@ -16,6 +17,7 @@ export interface WorkflowRequiresFacts {
   readonly schema: Schema
   readonly target: ChangeState
   readonly effectiveStatusByArtifact: ReadonlyMap<string, ArtifactStatus>
+  readonly change?: ArtifactGraphSource
 }
 
 /**
@@ -43,7 +45,15 @@ export function run(facts: WorkflowRequiresFacts): CheckResult {
   }
   const status = facts.effectiveStatusByArtifact.get(artifactId) ?? 'missing'
   const { code, message } = requiresFailure(artifactId, status)
-  return fail('workflow.requires', code, message, { artifactId, status })
+  const blockedBy =
+    status === 'pending-parent-artifact-review' && facts.change !== undefined
+      ? findBlockingParent(facts.change, facts.schema, artifactId)
+      : null
+  return fail('workflow.requires', code, message, {
+    artifactId,
+    status,
+    ...(blockedBy !== null ? { blockedBy } : {}),
+  })
 }
 
 /**
@@ -96,6 +106,7 @@ function execute(ctx: CheckExecutionContext): Promise<CheckResult> {
       schema: ctx.schema,
       target: ctx.attempt.to,
       effectiveStatusByArtifact: ctx.effectiveStatusByArtifact ?? new Map(),
+      change: ctx.change,
     }),
   )
 }

@@ -129,16 +129,23 @@ describe('workflow skill templates', () => {
     expect(verify).not.toMatch(/change transition.*pending/)
 
     const implement = readTemplate('skills', 'specd-implement', 'SKILL.md.tpl')
-    expect(implement).toContain('stay in `ready`')
+    expect(implement).toContain('stay in place')
+    expect(implement).toContain('pending-spec-approval')
+    expect(implement).toContain('spec-approved')
     expect(implement).toContain('Do **not** `transition implementing`')
 
     const shared = readTemplate('shared', 'shared.md.tpl')
     expect(shared).toContain('**stays** in `ready` or `done`')
+    expect(shared).toContain(
+      'Approving in a\ndrain state records consent without moving the change.',
+    )
     expect(shared).not.toMatch(/reaches `pending-spec-approval`/)
     expect(shared).toContain('Do **not**\nlist `pending-spec-approval`')
 
     const neu = readTemplate('skills', 'specd-new', 'SKILL.md.tpl')
-    expect(neu).toContain('Drain only:')
+    expect(neu).toContain(
+      'Drain only: approve with `specd changes approve spec <name> --reason ...`',
+    )
     expect(neu).toContain('If spec gate on and unsatisfied')
 
     const design = readTemplate('skills', 'specd-design', 'SKILL.md.tpl')

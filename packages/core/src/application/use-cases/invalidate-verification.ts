@@ -10,7 +10,12 @@ import { type ChangeRepository } from '../ports/change-repository.js'
 import { type NextAction } from './get-status.js'
 import { type ReconcileChangeValidity } from './reconcile-change-validity.js'
 import { type ResolveChangeSchema } from '../services/resolve-change-schema.js'
-import { isWorkflowStepEnabled } from '../../domain/services/workflow-topology.js'
+import { isAtOrAfterVerificationBoundary } from '../../domain/services/lifecycle-verdict.js'
+import { type Schema } from '../../domain/value-objects/schema.js'
+import {
+  isWorkflowStepEnabled,
+  type ApprovalGates,
+} from '../../domain/services/workflow-topology.js'
 
 /** Input for marking completed verification stale. */
 export interface InvalidateVerificationInput {
@@ -36,6 +41,7 @@ export interface InvalidateVerificationDeps {
   readonly actor: ActorResolver
   readonly reconcileChangeValidity: ReconcileChangeValidity
   readonly resolveChangeSchema: ResolveChangeSchema
+  readonly approvals?: ApprovalGates
 }
 
 /**
@@ -75,7 +81,7 @@ export class InvalidateVerification {
       schemaName: current.schemaName,
       schemaVersion: current.schemaVersion,
     })
-    const verifyingEnabled = isWorkflowStepEnabled('verifying', schema)
+    const approvals = this._deps.approvals ?? { spec: false, signoff: false }
     const completed = current.verification.completed
     if (completed === undefined) {
       throw new VerificationNotFoundError(input.name)
@@ -94,7 +100,7 @@ export class InvalidateVerification {
         ),
         automaticReturn: observed.automaticReturn,
         blockers: observed.verdict.blockers,
-        nextAction: nextFrom(observed.change, observed.automaticReturn, verifyingEnabled),
+        nextAction: nextFrom(observed.change, observed.automaticReturn, schema, approvals),
       }
     }
     const committed = await this._deps.reconcileChangeValidity.execute({
@@ -115,7 +121,7 @@ export class InvalidateVerification {
       signoffChanged: committed.projectionChanges.some((change) => change.projection === 'signoff'),
       automaticReturn: committed.automaticReturn,
       blockers: committed.verdict.blockers,
-      nextAction: nextFrom(committed.change, committed.automaticReturn, verifyingEnabled),
+      nextAction: nextFrom(committed.change, committed.automaticReturn, schema, approvals),
     }
   }
 }
@@ -125,39 +131,31 @@ export class InvalidateVerification {
  *
  * @param change - change
  * @param recovery - recovery
- * @param verifyingEnabled - whether the change schema enables verifying
+ * @param schema - Sovereign change schema
+ * @param approvals - Project approval gates
  * @returns next from result
  */
 function nextFrom(
   change: Change,
   recovery: AutomaticRecovery | null,
-  verifyingEnabled: boolean,
+  schema: Schema,
+  approvals: ApprovalGates,
 ): NextAction {
+  const verifyingEnabled = isWorkflowStepEnabled('verifying', schema)
   if (recovery === null) {
     const verificationBoundary =
-      verifyingEnabled &&
-      (change.state === 'verifying' ||
-        change.state === 'done' ||
-        change.state === 'pending-signoff' ||
-        change.state === 'signed-off' ||
-        change.state === 'archivable' ||
-        change.state === 'archiving')
+      verifyingEnabled && isAtOrAfterVerificationBoundary(change.state, schema, approvals)
     return {
       targetStep: change.state,
       actionType: 'mechanical',
       reason: 'Verification evidence is stale',
-      command: verificationBoundary ? '/specd-verify' : null,
+      intent: verificationBoundary ? 'verify' : null,
     }
   }
   return {
     targetStep: recovery.to,
     actionType: 'cognitive',
     reason: 'Verification invalidation required a lifecycle return',
-    command:
-      recovery.to === 'designing'
-        ? '/specd-design'
-        : recovery.to === 'done'
-          ? '/specd-verify'
-          : null,
+    intent: recovery.to === 'designing' ? 'design' : recovery.to === 'done' ? 'verify' : null,
   }
 }

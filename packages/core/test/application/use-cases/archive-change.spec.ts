@@ -8,15 +8,7 @@ import { HookFailedError } from '../../../src/domain/errors/hook-failed-error.js
 import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-state-transition-error.js'
 import { ReconciledOperationBlockedError } from '../../../src/application/errors/reconciled-operation-blocked-error.js'
 import { DeltaApplicationError } from '../../../src/domain/errors/delta-application-error.js'
-import { SpecOverlapError } from '../../../src/domain/errors/spec-overlap-error.js'
-import { ArchiveDependencyMismatchError } from '../../../src/domain/errors/archive-dependency-mismatch-error.js'
 import { ArchiveImplementationStateError } from '../../../src/domain/errors/archive-implementation-state-error.js'
-import {
-  runDepsConsistent,
-  runImplFilesResolved,
-  runImplLinksInScope,
-  runWorkspaceReadOnly,
-} from '../../../src/domain/services/evaluate-transition-predicates.js'
 import * as transitionPredicates from '../../../src/domain/services/evaluate-transition-predicates.js'
 import * as resolveInitialPersistedDependsOnModule from '../../../src/application/use-cases/resolve-initial-persisted-depends-on.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
@@ -62,6 +54,7 @@ import {
   type RunStepHooksInput,
   type RunStepHooksResult,
 } from '../../../src/application/use-cases/run-step-hooks.js'
+import { TRANSITION_BINDINGS } from '../../../src/domain/services/check-bindings.js'
 import {
   makeChange,
   makeChangeRepository,
@@ -408,7 +401,8 @@ describe('ArchiveChange', () => {
       const error = await build(change, enabledVerifying)
         .execute({ name: 'needs-verify' })
         .catch((e: unknown) => e)
-      expect(error).toBeInstanceOf(ArchiveImplementationStateError)
+      expect(error).toBeInstanceOf(CheckPredicateFailedError)
+      expect((error as CheckPredicateFailedError).checkId).toBe('verification.current')
       expect(String(error)).toContain('Completed verification is required')
     })
 
@@ -452,7 +446,8 @@ describe('ArchiveChange', () => {
       )
 
       const error = await uc.execute({ name: 'stale-verify' }).catch((e: unknown) => e)
-      expect(error).toBeInstanceOf(ArchiveImplementationStateError)
+      expect(error).toBeInstanceOf(CheckPredicateFailedError)
+      expect((error as CheckPredicateFailedError).checkId).toBe('verification.current')
       expect(String(error)).toContain('Verification evidence is stale')
       expect(archiveSpy).not.toHaveBeenCalled()
     })
@@ -1091,9 +1086,11 @@ describe('ArchiveChange', () => {
         materializeMetadata,
       )
 
-      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(
-        ArchiveDependencyMismatchError,
-      )
+      await expect(uc.execute({ name: 'my-change' })).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'deps.consistent',
+        checkCode: 'DEPS_INCONSISTENT',
+      })
       expect(resolveInitialSpy).not.toHaveBeenCalled()
       resolveInitialSpy.mockRestore()
     })
@@ -1306,10 +1303,11 @@ describe('ArchiveChange', () => {
         materializeMetadata,
       )
 
-      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(
-        ArchiveDependencyMismatchError,
-      )
-      expect(typeof runDepsConsistent).toBe('function')
+      await expect(uc.execute({ name: 'my-change' })).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'deps.consistent',
+        checkCode: 'DEPS_INCONSISTENT',
+      })
       depsSpy.mockRestore()
       expect(specRepo.saved.has('spec.md')).toBe(false)
       expect((materializeMetadata.execute as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0)
@@ -1419,9 +1417,11 @@ describe('ArchiveChange', () => {
         makeMaterializeMetadata(),
       )
 
-      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(
-        ArchiveDependencyMismatchError,
-      )
+      await expect(uc.execute({ name: 'my-change' })).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'deps.consistent',
+        checkCode: 'DEPS_INCONSISTENT',
+      })
       expect(publishCalls).toEqual([])
       expect(specRepo.saved.has('auth/oauth/spec-lock.json')).toBe(false)
       expect(specRepo.saved.has('auth/shared/spec-lock.json')).toBe(false)
@@ -3336,7 +3336,7 @@ describe('ArchiveChange', () => {
   })
 
   describe('overlap guard', () => {
-    it('throws SpecOverlapError when other changes target the same specs', async () => {
+    it('throws CheckPredicateFailedError for spec.overlap when other changes target the same specs', async () => {
       const archivable = makeArchivableChange('my-change', {
         specIds: ['default:auth/oauth'],
       })
@@ -3370,7 +3370,11 @@ describe('ArchiveChange', () => {
         makeMaterializeMetadata(),
       )
 
-      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(SpecOverlapError)
+      await expect(uc.execute({ name: 'my-change' })).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'spec.overlap',
+        checkCode: 'OVERLAP_CONFLICT',
+      })
     })
 
     it('proceeds when spec.overlap is bypassed despite overlap', async () => {
@@ -3521,10 +3525,7 @@ describe('ArchiveChange', () => {
   })
 
   describe('readOnly workspace guard', () => {
-    it('throws ReadOnlyWorkspaceError when change contains readOnly specs', async () => {
-      const { ReadOnlyWorkspaceError } =
-        await import('../../../src/domain/errors/read-only-workspace-error.js')
-
+    it('throws CheckPredicateFailedError for workspace.readOnly when change contains readOnly specs', async () => {
       const change = makeArchivableChange('my-change', {
         specIds: ['platform:auth/tokens'],
       })
@@ -3549,8 +3550,11 @@ describe('ArchiveChange', () => {
         makeMaterializeMetadata(),
       )
 
-      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(ReadOnlyWorkspaceError)
-      expect(typeof runWorkspaceReadOnly).toBe('function')
+      await expect(uc.execute({ name: 'my-change' })).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'workspace.readOnly',
+        checkCode: 'READ_ONLY_WORKSPACE',
+      })
     })
   })
 
@@ -3570,10 +3574,11 @@ describe('ArchiveChange', () => {
         makeMaterializeMetadata(),
       )
 
-      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(
-        ArchiveImplementationStateError,
-      )
-      expect(typeof runImplFilesResolved).toBe('function')
+      await expect(uc.execute({ name: 'my-change' })).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'impl.filesResolved',
+        checkCode: 'IMPLEMENTATION_STATE',
+      })
     })
 
     it('still fails open tracked files when impl.linksInScope is bypassed', async () => {
@@ -3593,7 +3598,11 @@ describe('ArchiveChange', () => {
 
       await expect(
         uc.execute({ name: 'my-change', skipChecks: ['impl.linksInScope'] }),
-      ).rejects.toThrow(ArchiveImplementationStateError)
+      ).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'impl.filesResolved',
+        checkCode: 'IMPLEMENTATION_STATE',
+      })
     })
 
     it('fails when implementation links target specs outside scope without bypassing impl.linksInScope', async () => {
@@ -3635,10 +3644,11 @@ describe('ArchiveChange', () => {
         '/project',
       )
 
-      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(
-        ArchiveImplementationStateError,
-      )
-      expect(typeof runImplLinksInScope).toBe('function')
+      await expect(uc.execute({ name: 'my-change' })).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'impl.linksInScope',
+        checkCode: 'IMPLEMENTATION_STATE',
+      })
     })
 
     it('publishes out-of-scope implementation sidecars when impl.linksInScope is bypassed', async () => {
@@ -3875,17 +3885,71 @@ describe('ArchiveChange', () => {
         reconcile,
       )
 
-      await expect(uc.execute({ name: 'my-change' })).rejects.toMatchObject({
-        name: ReconciledOperationBlockedError.name,
-        code: 'RECONCILED_OPERATION_BLOCKED',
-        operation: 'archive',
-        state: 'designing',
-        automaticReturn: { cause: 'spec-approval', from: 'archivable', to: 'designing' },
-        nextAction: { targetStep: 'designing', command: '/specd-design' },
+      const caught = (await uc
+        .execute({ name: 'my-change' })
+        .catch((e: unknown) => e)) as ReconciledOperationBlockedError
+      expect(caught).toBeInstanceOf(ReconciledOperationBlockedError)
+      expect(caught.code).toBe('RECONCILED_OPERATION_BLOCKED')
+      expect(caught.operation).toBe('archive')
+      expect(caught.state).toBe('designing')
+      expect(caught.automaticReturn).toEqual({
+        cause: 'spec-approval',
+        from: 'archivable',
+        to: 'designing',
       })
+      // Design artifacts are complete in this schema, so the ordinary rules recommend leaving designing.
+      expect(caught.nextAction).toMatchObject({ targetStep: 'ready', intent: 'design' })
       expect(calls).toBe(1)
       expect(archiveSpy).not.toHaveBeenCalled()
       expect(repo.store.get('my-change')?.state).toBe('designing')
+    })
+
+    it('projects the sign-off action when recovery to done keeps verifying disabled', async () => {
+      const current = makeArchivableChange('my-change')
+      const recovered = makeChange('my-change', { specIds: ['default:auth/oauth'] })
+      for (const state of ['designing', 'ready', 'implementing', 'verifying', 'done'] as const) {
+        recovered.transition(state, testActor)
+      }
+      const repo = makeChangeRepository([current])
+      const archive = makeArchiveRepository()
+      const reconcile = {
+        execute: async () => {
+          repo.store.set('my-change', recovered)
+          return resultFor(recovered, {
+            ...openVerdict,
+            signoff: 'stale',
+            verification: 'not-required',
+            recovery: { cause: 'signoff', from: 'archivable', to: 'done' },
+          })
+        },
+      } as unknown as ReconcileChangeValidity
+      const uc = newArchiveChange(
+        repo,
+        makeListWorkspaces(new Map()),
+        archive,
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema([], [makeWorkflowStep('verifying', { disabled: true })])),
+        makeMaterializeMetadata(),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        reconcile,
+        undefined,
+        TRANSITION_BINDINGS,
+        { spec: false, signoff: true },
+      )
+
+      const caught = (await uc
+        .execute({ name: 'my-change' })
+        .catch((e: unknown) => e)) as ReconciledOperationBlockedError
+      expect(caught).toBeInstanceOf(ReconciledOperationBlockedError)
+      expect(caught.state).toBe('done')
+      expect(caught.nextAction.intent).not.toBe('verify')
+      expect(caught.nextAction.action).toEqual({ kind: 'approve-signoff' })
     })
 
     it('does not transition to archiving when post-hook verification blocks', async () => {
@@ -3930,9 +3994,11 @@ describe('ArchiveChange', () => {
         reconcile,
       )
 
-      await expect(uc.execute({ name: 'my-change' })).rejects.toBeInstanceOf(
-        InvalidStateTransitionError,
-      )
+      await expect(uc.execute({ name: 'my-change' })).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'verification.current',
+        action: { kind: 'start-verification' },
+      })
       expect(calls).toBe(2)
       expect(archiveSpy).not.toHaveBeenCalled()
       expect(mutateSpy).not.toHaveBeenCalled()
@@ -4071,9 +4137,10 @@ describe('ArchiveChange', () => {
         reconcile,
       )
 
-      await expect(uc.execute({ name: 'my-change' })).rejects.toBeInstanceOf(
-        ArchiveImplementationStateError,
-      )
+      await expect(uc.execute({ name: 'my-change' })).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'impl.linksInScope',
+      })
       expect(archiveSpy).not.toHaveBeenCalled()
       expect(repo.store.get('my-change')?.state).toBe('archivable')
     })
@@ -4375,8 +4442,10 @@ describe('ArchiveChange', () => {
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toMatchObject({
-        code: 'INVALID_STATE_TRANSITION',
-        reason: { type: 'incomplete-tasks', artifactId: 'checklist', incomplete: 1 },
+        name: 'CheckPredicateFailedError',
+        checkId: 'workflow.taskCompletion',
+        checkCode: 'INCOMPLETE_TASKS',
+        details: expect.objectContaining({ artifactId: 'checklist', incomplete: 1 }),
       })
       expect(archiveSpy).not.toHaveBeenCalled()
       expect(repo.store.get('my-change')?.state).toBe('archivable')
@@ -4398,7 +4467,6 @@ describe('ArchiveChange — effective archive bindings and skipChecks', () => {
         id,
         label: 'Scanning plugin',
         kind: 'predicate',
-        command: 'fix-it',
         execute: async () =>
           opts.outcome === 'fail' && opts.noCode === true
             ? ({
@@ -4416,7 +4484,7 @@ describe('ArchiveChange — effective archive bindings and skipChecks', () => {
                   { count: 2 },
                   'predicate',
                   'Scanning plugin',
-                  'fix-it',
+                  { kind: '@acme.fix-it', guidance: 'fix-it' },
                 )
               : passResult(id, 'predicate', 'Scanning plugin'),
       },
@@ -4656,9 +4724,11 @@ describe('ArchiveChange — effective archive bindings and skipChecks', () => {
         await uc.execute({ name: 'my-change' })
         expect.unreachable()
       } catch (error) {
-        expect(error).toBeInstanceOf(SpecOverlapError)
-        expect((error as SpecOverlapError).skippable).toBe(false)
-        expect((error as SpecOverlapError).message).not.toContain('--skip-checks')
+        expect(error).toBeInstanceOf(CheckPredicateFailedError)
+        const overlap = error as CheckPredicateFailedError
+        expect(overlap.checkId).toBe('spec.overlap')
+        expect(overlap.skippable).toBe(false)
+        expect(overlap.message).not.toContain('--skip-checks')
       }
     })
 
@@ -4668,18 +4738,17 @@ describe('ArchiveChange — effective archive bindings and skipChecks', () => {
         await uc.execute({ name: 'my-change' })
         expect.unreachable()
       } catch (error) {
-        const overlap = error as SpecOverlapError
+        expect(error).toBeInstanceOf(CheckPredicateFailedError)
+        const overlap = error as CheckPredicateFailedError
         expect(overlap.skippable).toBe(true)
         expect(overlap.message).toContain('default:auth/oauth')
-        expect(overlap.entries[0]?.changes.map((peer) => peer.name)).toContain('other-change')
+        expect(overlap.message).toContain('other-change')
         expect(overlap.message).not.toContain('--skip-checks')
         expect(overlap.message).not.toContain('--allow-overlap')
       }
     })
 
     it('does not bypass other failing checks when spec.overlap is bypassed', async () => {
-      const { ReadOnlyWorkspaceError } =
-        await import('../../../src/domain/errors/read-only-workspace-error.js')
       const { uc, repo } = setup({
         changes: [
           makeArchivableChange('my-change', { specIds: ['platform:auth/tokens'] }),
@@ -4692,9 +4761,12 @@ describe('ArchiveChange — effective archive bindings and skipChecks', () => {
           artifacts: [makeArtifactType('specs', { scope: 'spec', delta: true })],
         }),
       })
-      await expect(uc.execute({ name: 'my-change', skipChecks: ['spec.overlap'] })).rejects.toThrow(
-        ReadOnlyWorkspaceError,
-      )
+      await expect(
+        uc.execute({ name: 'my-change', skipChecks: ['spec.overlap'] }),
+      ).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'workspace.readOnly',
+      })
       expect((await repo.get('other-change'))?.state).toBe('drafting')
     })
 
@@ -4739,9 +4811,12 @@ describe('ArchiveChange — effective archive bindings and skipChecks', () => {
         undefined,
         new CheckRegistry(),
       )
-      await expect(uc.execute({ name: 'my-change', skipChecks: ['spec.overlap'] })).rejects.toThrow(
-        ArchiveImplementationStateError,
-      )
+      await expect(
+        uc.execute({ name: 'my-change', skipChecks: ['spec.overlap'] }),
+      ).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'impl.linksInScope',
+      })
       expect((await repo.get('other-change'))?.state).toBe('drafting')
     })
 
@@ -4797,7 +4872,7 @@ describe('ArchiveChange — effective archive bindings and skipChecks', () => {
         expect(failure.checkId).toBe('@sec.scan')
         expect(failure.label).toBe('Scanning plugin')
         expect(failure.code).toBe('SECURITY_FINDINGS')
-        expect(failure.command).toBe('fix-it')
+        expect(failure.action).toEqual({ kind: '@acme.fix-it', guidance: 'fix-it' })
         expect(failure.details).toMatchObject({ count: 2 })
         expect(failure.skippable).toBe(false)
         expect(error).not.toBeInstanceOf(ArchiveImplementationStateError)

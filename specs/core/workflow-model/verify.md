@@ -300,7 +300,7 @@
 - **AND** the `tasks` artifact type declares `taskCompletionCheck.incompletePattern: '^\s*-\s+\[ \]'`
 - **AND** the tasks file contains `- [ ] implement login`
 - **WHEN** a transition to that step is attempted
-- **THEN** `InvalidStateTransitionError` is thrown with reason `incomplete-tasks`
+- **THEN** `CheckPredicateFailedError` is thrown for `workflow.taskCompletion` with the incomplete count in `details`
 
 #### Scenario: Transition allowed when all tasks are complete
 
@@ -496,7 +496,7 @@
 - **AND** `skipHookPhases` is empty
 - **WHEN** `TransitionChange` executes
 - **THEN** those effects run after predicates pass
-- **AND** the agent is not required to call `run-hooks` for the default path
+- **AND** the caller is not required to run hook effects manually for the default path
 
 #### Scenario: Deterministic step executes hooks internally
 

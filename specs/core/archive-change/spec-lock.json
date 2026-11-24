@@ -31,20 +31,11 @@
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/archive-change.ts",
-      "symbols": ["ArchiveChange", "ArchiveChangeInput"]
-    },
-    {
-      "file": "core:src/application/services/validate-skip-checks.ts",
-      "symbols": ["validateSkipChecks"]
+      "file": "core:src/application/use-cases/archive-change.ts"
     },
     {
       "file": "core:src/composition/use-cases/archive-change.ts",
-      "symbols": ["resolveArchiveChangeDeps", "ArchiveChangeDeps"]
-    },
-    {
-      "file": "core:src/domain/errors/spec-overlap-error.ts",
-      "symbols": ["SpecOverlapError"]
+      "symbols": ["resolveArchiveChangeDeps"]
     }
   ],
   "optimizations": {

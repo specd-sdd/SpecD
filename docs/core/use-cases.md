@@ -124,7 +124,7 @@ Loads a change and reports its current lifecycle state, artifact statuses, and p
 
 `validTransitions` is the protocol list (`VALID_TRANSITIONS` for the current state). `availableTransitions` is **check-derived**: `GetStatus` gathers the same snapshots `TransitionChange` uses and evaluates every protocol candidate. Targets whose blocking predicates fail (incomplete artifacts or tasks, enter-`ready` deps/read-only, exit-`implementing` impl integrity, missing spec/signoff consent on the delivery edge) are omitted.
 
-Active status always runs `ReconcileChangeValidity` first, even when `ifModifiedSince` matches. That reconciliation may persist recovery. Draft status stays read-only. `refreshImplementationTracking: false` skips the refresh and still evaluates the links and files already known. The returned state, blockers, and next action describe the committed aggregate. `GetStatusResult` adds a `validity` projection (`specApproval`, `signoff`, `verification`, `automaticReturn`) without removing existing fields. Verification freshness separates an active attempt from completed evidence. Stale verification is context before `verifying` and a blocker at the verification, sign-off, and archive boundaries.
+Active status always runs `ReconcileChangeValidity` first, even when `ifModifiedSince` matches. That reconciliation may persist recovery. Draft status stays read-only. `refreshImplementationTracking: false` skips the refresh and still evaluates the links and files already known. The returned state, blockers, and next action describe the committed aggregate. `nextAction` carries `intent`, one of `design | implement | verify | archive` or `null`, and `action`, the optional `CheckAction` declared by the failing check the recommendation waits on. When that action supersedes the phase intent (the default), `intent` is `null` and `action` is the sole instruction; with `supersedesIntent: false`, both are present. `GetStatusResult` adds a `validity` projection (`specApproval`, `signoff`, `verification`, `automaticReturn`) without removing existing fields. Verification freshness separates an active attempt from completed evidence. Stale verification is context before `verifying` and a blocker at the verification, sign-off, and archive boundaries.
 
 **Constructor:** `new GetStatus(changes: ChangeRepository, schemaProvider: SchemaProvider, approvals: { spec: boolean; signoff: boolean }, refreshImplementationTracking: RefreshImplementationTracking)`
 
@@ -191,16 +191,10 @@ The final persisted lifecycle update is applied through `ChangeRepository.mutate
 
 There is **no** approval-gate rewrite of the requested target:
 
-- `ready → implementing` is evaluated as that pair. When `approvals.spec` is `true` and no spec approval is recorded, the use case throws `InvalidStateTransitionError` with `reason.type === 'approval-required'` and `gate: 'spec'`. The change stays in `ready`.
-- `done → archivable` is evaluated as that pair. When `approvals.signoff` is `true` and no signoff is recorded, the use case throws `InvalidStateTransitionError` with `reason.type === 'approval-required'` and `gate: 'signoff'`. The change stays in `done`.
+- `ready → implementing` is evaluated as that pair. When `approvals.spec` is `true` and no spec approval is recorded, the bound `approval.spec` check fails and `TransitionChange` throws `CheckPredicateFailedError` (`checkCode: 'APPROVAL_REQUIRED'`, `action: approveSpecAction()`). The change stays in `ready`.
+- `done → archivable` is evaluated as that pair. When `approvals.signoff` is `true` and no signoff is recorded, the bound `approval.signoff` check fails and `TransitionChange` throws `CheckPredicateFailedError` (`checkCode: 'APPROVAL_REQUIRED'`, `action: approveSignoffAction()`). The change stays in `done`.
 
-For in-flight changes already at a historic parking state, `TransitionChange` does not synthesize a forward delivery hop. It throws `InvalidStateTransitionError` with `reason.type === 'approval-required'` except for redesign:
-
-- `pending-spec-approval` -> any target other than `designing` (and the drain target used by `ApproveSpec`) yields `{ type: 'approval-required', gate: 'spec' }`
-- `pending-signoff` -> any target other than `designing` (and the drain target used by `ApproveSignoff`) yields `{ type: 'approval-required', gate: 'signoff' }`
-
-This keeps redesign available while giving adapters enough context to explain why
-normal progression is blocked. New work must use `ApproveSpec` / `ApproveSignoff` in `ready` / `done`, not `change transition` into pending states.
+For in-flight changes already at a historic parking state, `pending-spec-approval → implementing` and `pending-signoff → archivable` are direct delivery-edge transitions gated by `approval.spec` and `approval.signoff` respectively (throwing `CheckPredicateFailedError` with `checkCode: 'APPROVAL_REQUIRED'` when consent is missing), while `designing` remains available as the escape hatch for redesign. New work must use `ApproveSpec` / `ApproveSignoff` in `ready` / `done`, not `change transition` into pending states.
 
 **Constructor:** `new TransitionChange(changes: ChangeRepository, actor: ActorResolver, schemaProvider: SchemaProvider, runStepHooks: RunStepHooks, refreshImplementationTracking: RefreshImplementationTracking)`
 
@@ -242,11 +236,12 @@ type TransitionProgressEvent =
 
 **Throws:**
 
-| Error                         | Condition                                                                                                                                                                               |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ChangeNotFoundError`         | No change with the given name exists.                                                                                                                                                   |
-| `InvalidStateTransitionError` | Transition not permitted, requires unsatisfied, tasks incomplete, or progression blocked at a human approval boundary. Carries a structured `reason` field (`TransitionFailureReason`). |
-| `HookFailedError`             | A source.post or target.pre hook exited with a non-zero code.                                                                                                                           |
+| Error                         | Condition                                                                                                                           |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `ChangeNotFoundError`         | No change with the given name exists.                                                                                               |
+| `CheckPredicateFailedError`   | A transition predicate check failed (protocol edge, requires, task completion, approval gate, workspace, overlap, or custom check). |
+| `InvalidStateTransitionError` | Entity-level state transition rejection or incomplete-artifact rejection.                                                           |
+| `HookFailedError`             | A source.post or target.pre hook exited with a non-zero code.                                                                       |
 
 ---
 
@@ -471,7 +466,7 @@ Retrieves a single archived change by name.
 
 `ReconcileChangeValidity` is the only use case that mutates validity projections, artifact review, matching audit events, and automatic lifecycle recovery. `StartVerification`, `CompleteVerification`, and `InvalidateVerification` call it. They do not apply those effects themselves.
 
-Recovery priority is fixed and is not configuration: required stale or revoked spec approval returns to `designing` when the state is after `designing`; otherwise required stale or revoked sign-off returns to `done` only when the state is later than `done`; otherwise `workflow: redesign` with unresolved non-task drift returns to `designing`; otherwise the state is preserved. Recovery never advances an earlier state. Verification staleness never moves the lifecycle. `artifacts: none` skips reopening and does not waive freshness.
+Recovery priority is fixed and is not configuration: required stale or revoked spec approval returns to `designing` when the state is after `ready` (not requested from `ready`, where `approval.spec` blocks forward transitions until consent is renewed); otherwise required stale or revoked sign-off returns to `done` only when the state is later than `done`; otherwise `workflow: redesign` with unresolved non-task drift returns to `designing`; otherwise the state is preserved. Recovery never advances an earlier state. Verification staleness never moves the lifecycle. `artifacts: none` skips reopening and does not waive freshness.
 
 ### ReconcileChangeValidity
 
@@ -559,7 +554,7 @@ Requires completed evidence. Marks valid or legacy-unknown evidence stale once, 
 
 ### ApproveSpec
 
-Records a spec approval. Requires the spec approval gate to be enabled. The use case reconciles first, requires the committed state to be exactly `ready`, and records one `SpecApprovalFingerprint`: canonical sorted/deduplicated `specIds` plus the artifact fingerprint of the required non-task artifacts. Scope additions/removals stale consent; reordering does not. Task artifacts (`hasTasks`) are excluded. It does not move the lifecycle state.
+Records a spec approval. Requires the spec approval gate to be enabled. The use case reconciles first, requires the committed state to be `ready` or a legacy parking state (`pending-spec-approval` or `spec-approved`), and records one `SpecApprovalFingerprint`: canonical sorted/deduplicated `specIds` plus the artifact fingerprint of the required non-task artifacts. Scope additions/removals stale consent; reordering does not. Task artifacts (`hasTasks`) are excluded. It does not move the lifecycle state (even when called on a legacy `pending-spec-approval` or `spec-approved` change).
 
 Renewal replaces only the current materialized projection and appends a new `spec-approved` event. Prior approvals, invalidations, and legacy pending-state transitions remain unchanged in history.
 
@@ -578,18 +573,18 @@ The actor is resolved once through the injected `ActorResolver` and reused for t
 
 **Throws:**
 
-| Error                         | Condition                                             |
-| ----------------------------- | ----------------------------------------------------- |
-| `ApprovalGateDisabledError`   | The spec approval gate is disabled.                   |
-| `ChangeNotFoundError`         | No change with the given name exists.                 |
-| `InvalidStateTransitionError` | The committed state is not `ready`.                   |
-| `FingerprintInputError`       | A required non-task artifact cannot be fingerprinted. |
+| Error                         | Condition                                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------- |
+| `ApprovalGateDisabledError`   | The spec approval gate is disabled.                                             |
+| `ChangeNotFoundError`         | No change with the given name exists.                                           |
+| `InvalidStateTransitionError` | The committed state is not `ready`, `pending-spec-approval` or `spec-approved`. |
+| `FingerprintInputError`       | A required non-task artifact cannot be fingerprinted.                           |
 
 ---
 
 ### ApproveSignoff
 
-Records a sign-off. Requires the signoff gate to be enabled. The use case refreshes implementation links, reconciles, requires the committed state to be exactly `done`, and requires current completed verification. It stores a complete fingerprint and that verification id, then stays in `done`. An empty implementation `files` map is valid. A `null` implementation fingerprint is legacy unknown evidence and cannot be renewed as current until a concrete fingerprint is recorded.
+Records a sign-off. Requires the signoff gate to be enabled. The use case refreshes implementation links, reconciles, requires the committed state to be `done` or a legacy parking state (`pending-signoff` or `signed-off`), and requires current completed verification. It stores a complete fingerprint and that verification id, then stays in its current state without moving to `signed-off`. An empty implementation `files` map is valid. A `null` implementation fingerprint is legacy unknown evidence and cannot be renewed as current until a concrete fingerprint is recorded.
 
 Renewal replaces only the current sign-off projection and appends a new `signed-off` event. It never filters earlier sign-offs, invalidations, or legacy pending-state transitions from history.
 
@@ -610,16 +605,16 @@ Missing completed evidence throws `VerificationNotFoundError`; active-only evide
 
 **Throws:**
 
-| Error                                  | Condition                                                                       |
-| -------------------------------------- | ------------------------------------------------------------------------------- |
-| `ApprovalGateDisabledError`            | The sign-off gate is disabled.                                                  |
-| `ChangeNotFoundError`                  | No change with the given name exists.                                           |
-| `InvalidStateTransitionError`          | The committed state is not `done`, or another artifact/gate blocker remains.    |
-| `VerificationNotFoundError`            | No completed verification exists.                                               |
-| `VerificationInProgressError`          | Only an active attempt exists.                                                  |
-| `VerificationStaleError`               | Completed evidence is stale or has a legacy-unknown implementation fingerprint. |
-| `VerificationFingerprintMismatchError` | Current inputs differ from explicitly comparable completed evidence.            |
-| `FingerprintInputError`                | A linked implementation file or required artifact cannot be fingerprinted.      |
+| Error                                  | Condition                                                                                                       |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `ApprovalGateDisabledError`            | The sign-off gate is disabled.                                                                                  |
+| `ChangeNotFoundError`                  | No change with the given name exists.                                                                           |
+| `InvalidStateTransitionError`          | The committed state is not `done`, `pending-signoff` or `signed-off`, or another artifact/gate blocker remains. |
+| `VerificationNotFoundError`            | No completed verification exists.                                                                               |
+| `VerificationInProgressError`          | Only an active attempt exists.                                                                                  |
+| `VerificationStaleError`               | Completed evidence is stale or has a legacy-unknown implementation fingerprint.                                 |
+| `VerificationFingerprintMismatchError` | Current inputs differ from explicitly comparable completed evidence.                                            |
+| `FingerprintInputError`                | A linked implementation file or required artifact cannot be fingerprinted.                                      |
 
 ---
 
@@ -668,14 +663,15 @@ interface ArchiveChangeResult {
 
 **Throws:**
 
-| Error                             | Condition                                                            |
-| --------------------------------- | -------------------------------------------------------------------- |
-| `ChangeNotFoundError`             | No change with the given name exists.                                |
-| `SchemaNotFoundError`             | The schema reference cannot be resolved.                             |
-| `SchemaMismatchError`             | The active schema name differs from the one on record in the change. |
-| `InvalidStateTransitionError`     | Change is not in `archivable` state.                                 |
-| `HookFailedError`                 | A pre-archive `run:` hook exited with a non-zero code.               |
-| `ReconciledOperationBlockedError` | Reconciliation committed recovery before archive could continue.     |
+| Error                             | Condition                                                                        |
+| --------------------------------- | -------------------------------------------------------------------------------- |
+| `ChangeNotFoundError`             | No change with the given name exists.                                            |
+| `SchemaNotFoundError`             | The schema reference cannot be resolved.                                         |
+| `SchemaMismatchError`             | The active schema name differs from the one on record in the change.             |
+| `CheckPredicateFailedError`       | An archive predicate check or merge-time dependency/implementation guard failed. |
+| `InvalidStateTransitionError`     | Change is not in `archivable` or `archiving` state.                              |
+| `HookFailedError`                 | A pre-archive `run:` hook exited with a non-zero code.                           |
+| `ReconciledOperationBlockedError` | Reconciliation committed recovery before archive could continue.                 |
 
 ---
 

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Changes must advance through a strict lifecycle, and the rules for doing so — approval gates, task completion checks, validation clearing, requires enforcement, and hook execution — are too complex for callers to enforce ad-hoc. The `TransitionChange` use case centralises lifecycle state transitions, importing `evaluateLifecycle` for schema-aware interpretation (approval-gate checks, workflow requires, recursive blocking, and task gating) while still owning hook execution, redesign invalidation, and persistence of the final transitioned state.
+Changes must advance through a strict lifecycle, and the rules for doing so — approval gates, task completion checks, requires enforcement, and hook execution — are too complex for callers to enforce ad-hoc. The `TransitionChange` use case centralises lifecycle state transitions, importing `evaluateLifecycle` for schema-aware interpretation (approval-gate checks, workflow requires, recursive blocking, and task gating) while still owning hook execution and persistence of the final transitioned state. Fingerprint- and consent-driven validity changes belong to the reconciler.
 
 ## Requirements
 
@@ -13,8 +13,10 @@ The Use Case MUST accept `TransitionChangeInput` containing:
 - `name`: Change identifier (`string`).
 - `to`: Target lifecycle state enum or `'next'`.
 - `skipChecks`: Optional array of check IDs to bypass (`readonly string[]`).
-- `skipHookPhases`: Optional array of hook phases to skip (`readonly HookPhase[]`).
-- `onProgress`: Optional progress callback for streaming telemetry.
+- `skipHookPhases`: Optional set of hook phase selectors to skip (`ReadonlySet<HookPhaseSelector>`; selectors are `'source.pre'`, `'source.post'`, `'target.pre'`, `'target.post'`, `'all'`). It skips effects only, never predicates.
+- `refreshImplementationTrackingBefore`: Optional boolean (default `true`) controlling only the pre-evaluation implementation tracking refresh (see "Optional pre-transition implementation tracking refresh").
+
+Progress telemetry is NOT an input field: `onProgress` is the optional second parameter of `execute` (see "Progress callback").
 
 The Use Case MUST NOT accept ad-hoc check bypass booleans (`allowOutOfScope`, `allowOverlap`). Check bypasses SHALL be supplied uniformly through `skipChecks`.
 
@@ -50,7 +52,7 @@ Lifecycle rules MUST be evaluated against tracked implementation state after any
 
 For a forward attempt from `ready` with the spec gate enabled, `TransitionChange` SHALL require the materialized spec-approval projection to be `valid` for the current canonical spec scope and artifact fingerprint. Absence, `stale`, `revoked`, or legacy-unprovable scope/evidence fails with structured approval guidance. It MUST NOT rewrite the target to a pending approval state.
 
-Reconciliation runs first, so stale required consent has already committed the return to `designing`; the original transition then stops as inapplicable.
+Reconciliation runs first. Stale or revoked required consent in a state after `ready` has already committed the return to `designing`, and the original transition then stops as inapplicable. In `ready` reconciliation commits no recovery (consent is renewed there): the change stays in `ready` and the `approval.spec` check fails the forward attempt with `CheckPredicateFailedError` carrying the `approve-spec` action.
 
 ### Requirement: Signoff is a check not a pending hop
 
@@ -60,7 +62,7 @@ Reconciliation runs first, so stale required sign-off beyond `done` has already 
 
 ### Requirement: Human-approval pending states produce explicit transition failures
 
-For in-flight changes already in `pending-spec-approval` or `pending-signoff`, `TransitionChange` MUST still fail automatic progression except `designing` (and the historic approve-forward targets used by drain). New work MUST NOT enter those states.
+For in-flight changes already in `pending-spec-approval` or `pending-signoff`, `TransitionChange` MUST validate the requested target through the same bound checks as any other source state (see "Historic parked approval repair precedence"). A request that the topology does not admit fails with `CheckPredicateFailedError` for `protocol.edge`, and a delivery-edge request without a valid approval fails with `CheckPredicateFailedError` for `approval.spec` / `approval.signoff`. New work MUST NOT enter those states.
 
 When the change is in `ready` waiting on spec approval, callers MUST use `ApproveSpec`, not `change transition` to a pending state.
 
@@ -73,27 +75,26 @@ When the change is in `ready` waiting on spec approval, callers MUST use `Approv
 Before attempting state mutation, the Use Case MUST reconcile and evaluate all checks applicable to the target state:
 
 1. **Active Check Resolution**: Resolve the effective bindings for `attempt.to`, classified `attempt.along`, and every bypassed step through `resolveEffectiveBindings` (see [`core:transition-checks`](../transition-checks/spec.md)). Checks declared with `disabled: true` on the step declaration (permitted only when `allowDisable !== false`) MUST be cleanly omitted from predicate execution for that coordinate.
-2. **Bypass Verification**: For each check identifier present in `skipChecks`:
+2. **Bypass Verification**: Every `skipChecks` identifier MUST be validated against the bindings resolved for the attempt BEFORE any early return, including the neutral `designing → designing` redesign no-op path, so an unknown, effect or non-skippable id is rejected there too and never silently ignored. For each check identifier present in `skipChecks`:
    - If the check is unregistered, the orchestrator MUST throw an `UnknownCheckError`.
    - If the check is an effect (`kind: 'effect'`), the orchestrator MUST reject the bypass with a `CheckNotSkippableError`, because effect checks (hooks) are governed exclusively by `skipHookPhases`.
    - If the resolved binding of that check for this attempt declares `skippable !== true`, the orchestrator MUST throw a `CheckNotSkippableError`. Skippability is read from the resolved bindings for the attempt, never from the first base binding that shares the check id.
    - If the check is skippable, the orchestrator MUST bypass calling `check.execute()` and inject a synthetic `{ outcome: 'skip', details: { bypassedByUser: true } }`.
 3. **Check Execution**: For all non-bypassed checks, invoke `check.execute(ctx)` passing the active change aggregate, resolved schema, attempt coordinates, and the binding's single-pass resolved `ctx.config`.
-4. **Failure Abort**: A failing `protocol.edge` stops evaluation before any other predicate runs. Otherwise every matching predicate of the candidate is evaluated (so collected failures can be reported together), and if any returned `outcome: 'fail'` the transition MUST be aborted before any effect, hook, or persistence, and the failure MUST be thrown as defined in "Shared runner errors propagate on transition". The thrown `CheckPredicateFailedError.skippable` SHALL come from the resolved binding of the failing check.
-5. **Committed recovery reporting**: When reconciliation commits an automatic recovery that moves the change away from the source state, the thrown error SHALL report the committed state and recommend the command produced by lifecycle guidance for that committed state and the change's schema. It MUST NOT hardcode a skill such as `/specd-verify`; when the change schema disables `verifying`, the recommendation MUST NOT route to verification.
+4. **Failure Abort**: A failing `protocol.edge` stops evaluation before any other predicate runs. Otherwise every matching predicate of the candidate is evaluated (so collected failures can be reported together), and if any returned `outcome: 'fail'` the transition MUST be aborted before any effect, hook, or persistence, and the failure MUST be thrown as defined in "Shared runner errors propagate on transition". The thrown `CheckPredicateFailedError.skippable` SHALL come from the resolved bindings of the attempt (the first resolved binding that shares the failing check id).
+5. **Committed recovery reporting**: When reconciliation commits an automatic recovery that moves the change away from the source state, the thrown error SHALL report the committed state and carry the host-neutral `nextAction` (`intent` and optional `action`) produced by `evaluateLifecycle` for that committed state and the change's schema. To obtain check-declared actions, the use case MUST evaluate the forward checks of the committed state through the `CheckRegistry` (it MUST NOT pass an empty `checksByTarget`). The error and its message MUST NOT embed CLI commands, flags, or slash commands; delivery hosts render the intent and action. It MUST NOT hardcode a skill such as `/specd-verify`; when the change schema disables `verifying`, the guidance MUST NOT route to verification. When a committed movement away from the source state reports no automatic return, the use case throws a context-free `InvalidStateTransitionError` for the committed state.
 
 ### Requirement: Workflow requires enforcement
 
 After resolving the effective target, `TransitionChange` MUST call `execute` on matching **predicates** for the attempt (see [`core:transition-checks`](../transition-checks/spec.md)). `evaluateLifecycle` SHALL project `allowed` from those results. `workflow.requires` SHALL be that evaluation for the effective target's schema step.
 
-If any required artifact has an effective status other than `complete` or `skipped`, the use case MUST throw `InvalidStateTransitionError` with a structured reason explaining the block. It MUST map the failed predicate — it MUST NOT re-walk `requires` with a different status algorithm after a green `execute` of the same attempt.
+If any required artifact has an effective status other than `complete` or `skipped`, the use case MUST throw `CheckPredicateFailedError` for `workflow.requires`, as defined in "Shared runner errors propagate on transition". It MUST map the failed predicate; it MUST NOT re-walk `requires` with a different status algorithm after a green `execute` of the same attempt.
 
-The error reason MUST include:
+The error `details` come from the check result and MUST include:
 
-- `type`: `'incomplete-artifact'`
 - `artifactId`: The ID of the blocking artifact.
-- `status`: The artifact's current effective status (e.g. `'drifted-pending-review'`, `'pending-parent-artifact-review'`).
-- `blockedBy`: (Optional) If the status is `'pending-parent-artifact-review'`, this MUST include the ID and status of the first upstream parent in the DAG that is causing the recursive block.
+- `status`: (Optional) The artifact's current effective status (e.g. `'drifted-pending-review'`, `'pending-parent-artifact-review'`).
+- `blockedBy`: (Optional) If the status is `'pending-parent-artifact-review'`, the ID and status of the first upstream parent in the DAG causing the recursive block, computed by the check.
 
 If no workflow step exists for the effective target (the schema does not declare one), or the schema cannot be resolved, the requires check is skipped.
 
@@ -101,11 +102,11 @@ The use case MUST emit a `requires-check` progress event per artifact checked, r
 
 ### Requirement: Task completion check during requires enforcement
 
-For every artifact listed in the effective workflow step's `requiresTaskCompletion`, the `workflow.taskCompletion` predicate MUST first verify that the schema artifact type declares `hasTasks: true` and `taskCompletionCheck`. If either is absent, `TransitionChange` MUST throw `InvalidStateTransitionError` with reason `missing-task-capability`.
+For every artifact listed in the effective workflow step's `requiresTaskCompletion`, the `workflow.taskCompletion` predicate MUST first verify that the schema artifact type declares `hasTasks: true` and `taskCompletionCheck`. If either is absent, the predicate fails and `TransitionChange` MUST throw `CheckPredicateFailedError` for `workflow.taskCompletion` whose `details` carry the missing-capability reason.
 
 Task counts MUST come from `workflow.taskCompletion.execute` (`CountTasks` composed into that check). An absent entry after capability validation MUST be treated as no qualifying task content and MUST NOT block the transition.
 
-When a required artifact's count has `incomplete > 0`, `TransitionChange` MUST emit the `task-completion-failed` progress event and throw `InvalidStateTransitionError` with reason `incomplete-tasks`, including that artifact's complete, incomplete, and total counts.
+When a required artifact's count has `incomplete > 0`, `TransitionChange` MUST emit the `task-completion-failed` progress event and throw `CheckPredicateFailedError` for `workflow.taskCompletion` whose `details` include that artifact's complete, incomplete, and total counts.
 
 `TransitionChange` MUST NOT invoke `CountTasks` again after a green predicate evaluation of that attempt.
 
@@ -129,15 +130,17 @@ Verification can be started and completed explicitly from any active lifecycle s
 
 ### Requirement: Skill-aligned backward hop invalidation
 
-A backward hop alone SHALL preserve unchanged completed verification. Returning from a post-signoff phase to `done`, `verifying`, or `implementing` marks sign-off stale or revoked as appropriate. It MUST NOT globally invalidate spec approval unless its artifact fingerprint or explicit consent is affected.
+A backward hop alone SHALL preserve unchanged completed verification and unchanged spec approval. Spec approval is never invalidated by lifecycle movement alone; it is invalidated only when its artifact fingerprint changed or explicit consent revocation is requested.
 
-All projection updates and any required recovery are applied by the central reconciler and persisted with the transition. History remains append-only.
+For a backward skill hop from `done`, `signed-off`, or `archivable` to `implementing` or `verifying`, `TransitionChange` applies the sign-off invalidation (`Change.invalidateSignoff`) inside the serialized transition mutation, atomically with the state change, because it depends on the fresh persisted state. This is the only validity mutation `TransitionChange` applies directly.
+
+Every fingerprint-driven or consent-driven validity change (stale verification, stale spec approval or sign-off, artifact review reopening, and any required recovery) is owned by the central reconciler and persisted with the transition. History remains append-only.
 
 ### Requirement: Transition to designing from any state
 
 Every state except `drafting` SHALL retain `designing` as an explicit valid target, including `archiving`. Requesting it is an intentional redesign operation, not ordinary drift preservation.
 
-`TransitionChange` SHALL delegate review reopening and validity changes to the central reconciler inside the serialized transition. Explicit redesign revokes required spec consent, applies independent sign-off recovery and the configured artifact reopening breadth, appends focused audit evidence, and commits the transition to `designing`. Verification becomes stale only through affected inputs or explicit withdrawal, not phase movement alone. It MUST NOT unconditionally mark every artifact file pending review outside the effective artifact policy.
+`TransitionChange` SHALL delegate review reopening and validity changes to the central reconciler inside the serialized transition. Redesign does NOT revoke required spec consent by itself: lifecycle movement alone preserves approvals. Spec consent is revoked only when its artifact fingerprint changed or an explicit consent revocation is requested. Independent sign-off recovery and the configured artifact reopening breadth still apply through the reconciler, focused audit evidence is appended, and the transition to `designing` is committed. Verification becomes stale only through affected inputs or explicit withdrawal, not phase movement alone. It MUST NOT unconditionally mark every artifact file pending review outside the effective artifact policy.
 
 Re-entering `designing` from `designing` remains a no-op for approval invalidation and artifact reopening.
 
@@ -157,7 +160,7 @@ When `'all'` or `'target.pre'` is in `skipHookPhases`, those effects are skipped
 
 ### Requirement: Transition delegation
 
-After routing, pre-transition checks, and successful pre-hooks, the use case MUST delegate the actual state transition to `change.transition(effectiveTarget, actor)`. The `Change` entity enforces transition validity via its own state machine.
+After routing, pre-transition checks, and successful pre-hooks, the use case MUST delegate the actual state transition to `change.transition(effectiveTarget, actor, schema, approvals)`. The `Change` entity enforces transition validity via its own state machine.
 
 ### Requirement: Transition event
 
@@ -181,13 +184,13 @@ Then, when skip flags allow, execute matching `before-persist` effects for the *
 
 If no workflow step exists for the source or target, or the schema cannot be resolved, that effect is skipped.
 
-`--skip-hooks` / `skipHookPhases` SHALL skip effects only, never predicates. Skip matching MUST use binding `phase` (and the skip selector), not `check.id === 'hook.pre'|'hook.post'`.
+`skipHookPhases` SHALL skip effects only, never predicates. Skip matching MUST use binding `phase` (and the skip selector), not `check.id === 'hook.pre'|'hook.post'`.
 
 ### Requirement: Persistence
 
 After routing, persisted-state checks, and successful pre-transition hooks, the use case MUST apply the final change-state mutation through `ChangeRepository.mutate(name, fn)` rather than persisting a previously loaded snapshot.
 
-Inside the mutation callback, the repository supplies the fresh persisted `Change` for `name`. The use case MUST apply any persisted-state-dependent transition mutations on that instance — including approval invalidation for redesign, artifact validation clearing for `verifying -> implementing`, and the lifecycle transition itself — before returning the updated change.
+Inside the mutation callback, the repository supplies the fresh persisted `Change` for `name`. The use case MUST apply the persisted-state-dependent mutations on that instance — sign-off invalidation for backward skill hops from `done`, `signed-off`, or `archivable` to `implementing` or `verifying`, and the lifecycle transition itself — before returning the updated change. A `verifying -> implementing` retry does not clear unchanged artifact validation. Fingerprint- and consent-driven validity changes are not applied here; they belong to the reconciler.
 
 When the callback resolves, the repository persists the updated change manifest. This ensures the final lifecycle mutation is serialized with other concurrent mutations of the same change.
 
@@ -212,10 +215,11 @@ Hook checks MUST NOT emit first-class `{ type: 'hook-start' }` / `{ type: 'hook-
 
 ### Requirement: Dependencies
 
-`TransitionChange` depends on `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `RefreshImplementationTracking`, baked `approvals`, and `transitionBindings` (application `Check` instances). It MUST NOT depend on `LifecycleEngine` as a constructor port.
+`TransitionChange` depends on `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `RefreshImplementationTracking`, baked `approvals`, `transitionBindings` (application `Check` instances), the `ReconcileChangeValidity` reconciler, the `CheckRegistry`, and `ResolveChangeSchema`. The reconciler is mandatory: constructing the use case without it MUST throw `InvalidCompositionFactoryArgumentsError`. It MUST NOT depend on `LifecycleEngine` as a constructor port.
 
 `TransitionChange` MUST NOT depend on `ImplementationDetector` or invoke implementation autodetection directly.
 `TransitionChange` MUST NOT take `RunStepHooks` or `CountTasks` as use-case constructor ports.
+The check-specific error classes and reasons previously produced by the mapper (`InvalidStateTransitionError` reasons `invalid-transition`, `incomplete-artifact`, `incomplete-tasks`, `missing-task-capability`, `approval-required`, `gate-not-required`, and `ArchiveImplementationStateError` / `ArchiveDependencyMismatchError` for checks) SHALL NOT be produced from predicate failures.
 
 ### Requirement: to next is the happy-path next state
 
@@ -246,23 +250,18 @@ When a transition `from → to` bypasses one or more intermediate steps as ident
 
 ### Requirement: Shared runner errors propagate on transition
 
-Predicate failures SHALL be mapped to exactly one of two typed errors:
+Every failed predicate SHALL be reported through exactly one typed error, `CheckPredicateFailedError`, including `protocol.edge`, `workflow.requires`, `workflow.taskCompletion`, the approval checks, Category C checks, plugin checks, and `scope: 'step-skip'` checks. `TransitionChange` MUST NOT switch on a check id to choose another error class or reason. It MAY key on a check id only to emit the progress events required by this spec (`requires-check`, `task-completion-failed`), never to select the thrown error. The error MUST encapsulate:
 
-1. **Canonical reasons** — `InvalidStateTransitionError` with a structured reason for the built-in predicates whose failure has a dedicated lifecycle meaning:
-   - `protocol.edge` → `invalid-transition`
-   - `workflow.requires` → `incomplete-artifact` (with `artifactId`, optional `status`, and optional `blockedBy` parent)
-   - `workflow.taskCompletion` → `incomplete-tasks` (with counts) or `missing-task-capability`
-   - `approval.spec` / `approval.signoff` → `approval-required` (with `gate`)
-2. **Generic predicate failure** — `CheckPredicateFailedError` for every other predicate, including Category C checks, plugin checks, and `scope: 'step-skip'` checks. It MUST encapsulate:
-   - `checkId`: the canonical identifier of the failed check
-   - `label`: the human-readable gerund phrase describing the check
-   - `code`: diagnostic error code (default `CHECK_FAILED`)
-   - `message`: diagnostic message explaining the failure
-   - `command`: optional suggested remediation CLI command
-   - `details`: optional structured details from the check result
-   - `skippable`: whether the failed binding permits `--skip-checks`, so the CLI can suggest the bypass
+- `checkId`: the canonical identifier of the failed check
+- `label`: the human-readable gerund phrase describing the check
+- `code`: diagnostic error code (default `CHECK_FAILED`)
+- `message`: host-neutral diagnostic message from the check
+- `action`: optional host-neutral `CheckAction` declared by the failing check result (see [`core:transition-checks`](../transition-checks/spec.md)); there is no `command` property
+- `details`: structured details from the check result, following the per-code contract in `core:transition-checks`; with several failures under `onFailure: 'collect'`, `details.failures` lists every failed check
+- `skippable`: whether the failed binding permits bypass, so hosts can offer it. It is read from the resolved bindings of the attempt (the first resolved binding that shares the failing check id), never from base bindings
+- `from` and `to` (optional): the lifecycle states of the attempted hop, so hosts can render context such as the attempted transition
 
-Duplicated, check-specific error classes (including `ArchiveImplementationStateError` and `ArchiveDependencyMismatchError`) SHALL be retired from `_mapFailedPredicate`. No predicate failure may be reported through any other error type.
+The check-specific error classes and reasons previously produced by the mapper (`InvalidStateTransitionError` reasons `invalid-transition`, `incomplete-artifact`, `incomplete-tasks`, `missing-task-capability`, `approval-required`, `gate-not-required`, and `ArchiveImplementationStateError` / `ArchiveDependencyMismatchError` for checks) SHALL NOT be produced from predicate failures.
 
 ### Requirement: Config-based factory delegates through resolveTransitionChangeDeps
 
@@ -276,6 +275,9 @@ The config-based `createTransitionChange(config, options?)` form MUST derive `Tr
 - `refreshImplementationTracking: RefreshImplementationTracking`
 - `approvals: ApprovalGates`
 - `transitionBindings` from `resolveWorkflowCheckRegistry` (application `create*` checks)
+- `reconcile: ReconcileChangeValidity` (mandatory)
+- `checkRegistry: CheckRegistry`
+- `resolveChangeSchema: ResolveChangeSchema`
 
 It MUST NOT resolve `lifecycle` or `LifecycleEngine`. `TransitionChange` imports `evaluateLifecycle` as a module function.
 
@@ -285,20 +287,20 @@ The helper is the only use-case-specific composition entry for config-based boot
 
 ### Requirement: Historic parked approval repair precedence
 
-For an in-flight change already in `pending-spec-approval` or `pending-signoff`, `TransitionChange` MUST allow only its documented drain target. Before evaluating `protocol.edge` or any other transition predicate, a request for any non-drain target MUST fail with `InvalidStateTransitionError` whose reason has `type: 'approval-required'` and the matching `gate` (`'spec'` or `'signoff'`). It MUST NOT report `invalid-transition` for that request.
+For an in-flight change in `pending-spec-approval` or `pending-signoff`, `TransitionChange` MUST NOT apply drain-specific target rules, and MUST NOT keep a hardcoded list of legal drain targets. It validates the requested target with the same bound checks as any other source state. Because the approval predicates are bound on those source states (see [`core:transition-checks`](../transition-checks/spec.md)), leaving a parked state without a valid approval fails with `CheckPredicateFailedError` for `approval.spec` / `approval.signoff` (code `APPROVAL_REQUIRED`, carrying the approval action). A target that the topology does not admit (including any other legacy state) fails with `CheckPredicateFailedError` for `protocol.edge`. No transition leads into a legacy parking state.
 
 ## Constraints
 
 - `TransitionChange` MUST enforce the legal entity/protocol edge; it only resolves the effective target and delegates the state mutation.
 - Task completion checks are controlled by schema-declared `requiresTaskCompletion`; only listed artifacts are content-checked. `safeRegex` compilation failures or nested quantifiers are treated as non-matching without throwing.
-- `InvalidStateTransitionError` retains structured reasons for incomplete artifacts/tasks, missing task capability, invalid edges, approval required, and gate not required. Registered predicate failures MUST map to canonical reasons rather than a parallel requires/task/dependency/readOnly/implementation algorithm.
+- `InvalidStateTransitionError` is reserved for the rejection raised by the `Change` entity when `Change.transition()` is called with a pair that `VALID_TRANSITIONS` does not admit, and for the `incomplete-artifact` eligibility failure of `ApproveSpec` / `ApproveSignoff` (not a check). Registered predicate failures MUST map to `CheckPredicateFailedError` rather than to check-specific reasons, and `TransitionChange` MUST NOT keep a parallel requires/task/dependency/readOnly/implementation algorithm.
 - Enter-ready predicates and forward exit-implementing predicates MUST use the same runners as `ArchiveChange`. Redesign MUST NOT run implementation-readiness checks merely because it moves backward.
 - Pre-hook and before-persist post-hook aborts prevent the requested transition. Post effects run only on forward movement; source-post effects do not run for backward, redesign, or recovery.
 - `verifying → implementing` MUST NOT clear unchanged artifact validation. Schema `implementing.requires` still governs later forward readiness, not retry-side clearing.
-- A `designing → designing` request is a neutral application no-op: it MUST NOT append a transition event or invalidate approval/artifacts. The entity continues to reject real self-transitions. `verifying → verifying` remains invalid, not a renewal protocol.
+- A `designing → designing` request is a neutral application no-op: it MUST NOT append a transition event or invalidate approval/artifacts, and it MUST still validate `skipChecks` against the resolved bindings before returning the unchanged change. The entity continues to reject real self-transitions. `verifying → verifying` remains invalid, not a renewal protocol.
 - Schema resolution failure MUST throw; absence of a target workflow row only skips workflow-specific requires/task checks, not protocol or other predicates.
 - Composition MUST inject application `create*` transition bindings, not domain stubs; `RunStepHooks` belongs in hook checks rather than the use-case constructor.
-- Enter-ready and forward exit-implementing failures MUST preserve their existing typed errors. A missing happy-path next hop MUST throw `HappyPathNextUnavailableError`.
+- Enter-ready and forward exit-implementing predicate failures are reported as `CheckPredicateFailedError` like every other predicate failure; no check-specific error class is preserved for them. A missing happy-path next hop MUST throw `HappyPathNextUnavailableError`.
 
 ## Spec Dependencies
 

@@ -1,3 +1,4 @@
+import { type SpecOverlapEntrySummary } from '../services/detect-spec-overlap.js'
 import {
   CHECK_LABELS,
   fail,
@@ -19,6 +20,7 @@ export interface SpecOverlapFacts {
   readonly specOverlapBlocked: boolean
   readonly specOverlapMessage?: string
   readonly specOverlapPeers?: readonly SpecOverlapPeerDetail[]
+  readonly specOverlapEntries?: readonly SpecOverlapEntrySummary[]
 }
 
 /**
@@ -51,9 +53,11 @@ export function runSpecOverlap(facts: SpecOverlapFacts): CheckResult {
     return pass('spec.overlap')
   }
   const peers = facts.specOverlapPeers ?? []
+  const entries = facts.specOverlapEntries ?? []
   const fallback = facts.specOverlapMessage ?? 'Specs overlap with other active changes'
   const message = formatOverlapMessage(peers, fallback)
   return fail('spec.overlap', 'OVERLAP_CONFLICT', message, {
+    ...(entries.length > 0 ? { entries } : {}),
     ...(peers.length > 0 ? { peers } : {}),
   })
 }

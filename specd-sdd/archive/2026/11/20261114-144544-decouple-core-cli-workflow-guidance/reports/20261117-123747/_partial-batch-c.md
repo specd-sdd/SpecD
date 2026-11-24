@@ -1,0 +1,74 @@
+# Round 4 audit, batch C (cli:change-status/transition/invalidate/verification/archive/approve, error-handling-conventions, skill-templates-source)
+
+Scope: read-only. Merged spec+verify read via `changes spec-preview`. Code compared against packages/cli/src, core/src, skills/templates and tests. CLI test run: `vitest run test/commands/change test/error-hints.spec.ts test/handle-error.spec.ts` = 646/646 pass. Core src grep for flags/commands/slash commands/input-name phrasing in non-comment code: clean. Project-wide specs (architecture, conventions, testing, docs, etc.): no contradictions found.
+
+## Round-3 items
+
+| Item                                                                  | Verdict                                     | Evidence                                                                                                                                                                                                                                                                                                                   |
+| --------------------------------------------------------------------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| H1 ReconciledOperationBlockedError repair guide (transition, archive) | FIXED                                       | guidance-presenter.ts:364-418 (`projectReconciledOperationBlocked`, `reconciledRepairGuideLines`, `isReconciledOperationBlocked`); transition.ts:458-477; archive.ts:181-199; test reconciled-blocked.spec.ts (text + json for both). Text has committed state, blockers, `repair guide:` with state/return/target/command | guidance/reason, no `error:` line. JSON: state, automaticReturn, projected blockers, nextAction (intent/action/command/guidance). |
+| H2 shared.md.tpl nextAction docs                                      | FIXED                                       | shared.md.tpl:144-160 lists all 7 fields and the command-null rule; asserted in packages/skills/test/template-lifecycle-consent.spec.ts:20-45.                                                                                                                                                                             |
+| M1 transition --help actionType                                       | FIXED                                       | transition.ts:367-369; `dist` help output confirmed; test reconciled-blocked.spec.ts "help lists actionType".                                                                                                                                                                                                              |
+| M2 status --help emitted fields                                       | FIXED (see M-C3 for descriptions)           | status.ts:151-204 lists validity, verification, invalidation, implementationTracking, approvalGates, lifecycle.checks/checksByTarget, displayStatus, hasDrift; test status.spec.ts:2247.                                                                                                                                   |
+| M3 invalidate blocker projection + single force hint                  | FIXED                                       | invalidate.ts:225,247; cli-audit-round-2.spec.ts:136,149.                                                                                                                                                                                                                                                                  |
+| M4 one bypass line per skippable blocker                              | PARTIAL                                     | Works in the non-CheckPredicateFailedError branch (transition.ts:222-226, tested). NOT done in the CheckPredicateFailedError branch, see M-C1.                                                                                                                                                                             |
+| L1 deps.consistent hint non-skippable only                            | FIXED                                       | error-hints.ts:182-187 (`isSkippable !== true`); archive.ts:223-234; transition.ts:198-215; error-hints.spec.ts.                                                                                                                                                                                                           |
+| L3 archive passes effective skipHooks                                 | FIXED                                       | archive.ts:135-139; test reconciled-blocked.spec.ts "archive skip hooks".                                                                                                                                                                                                                                                  |
+| L4 approve error line first                                           | FIXED functionally (see M-C2 for line form) | approve.ts:156-169; approve-failure.spec.ts:133.                                                                                                                                                                                                                                                                           |
+| L5 verification-invalidate blockers via projectCliBlocker             | FIXED                                       | verification.ts:253-271 (text), 294-303 (json); cli-audit-round-2.spec.ts:267.                                                                                                                                                                                                                                             |
+| L6 approve enrichment tolerates read-only props                       | FIXED                                       | approve.ts:236-251 `Reflect.defineProperty`; approve-failure.spec.ts:166.                                                                                                                                                                                                                                                  |
+
+## Findings
+
+### MEDIUM
+
+**M-C1 (code vs spec) transition CheckPredicateFailedError repair guide emits only the failed check's bypass, not one `bypass:` per skippable blocker.**
+packages/cli/src/commands/change/transition.ts:150-158 lists every `status.blockers` entry (`! CODE ...`) and 198-205 prints a single `bypass:` for `cpErr.skippable`. The per-blocker loop (222-226) exists only in the `else` branch (non-CPFE errors). Spec cli:change-transition "Invalid transition error" (every skippable blocker listed in the repair guide MUST get its own `bypass:` line) and scenario "Every skippable blocker gets a bypass line" are violated when the error is a CPFE and fresh status carries additional skippable blockers (e.g. failed `impl.linksInScope` plus blocker `spec.overlap`). Test reconciled-blocked.spec.ts "prints one bypass line per skippable blocker" uses InvalidStateTransitionError, so the CPFE path is untested. Fix: also loop blockers in the CPFE branch (dedupe against `cpErr.checkId`).
+
+**M-C2 (spec vs code, pick one) approve failure text blocker line form.**
+Spec cli:change-approve: blockers MUST print as `! <CODE> — <label>: <message>` "in the same form as status". Code approve.ts:179-183 prints `blocker: <CODE> — <label>: <message>` (plus `  bypass:`); also `next action: <command>`, `guidance:`, `reason:` are flat, unindented. Tests (approve.spec.ts:279, approve-failure.spec.ts:155) pin `blocker: ...`. Either change code and tests to `! CODE — label: message`, or relax the spec wording. Ordering requirement (error first, then state, blockers, next action) is satisfied.
+
+**M-C3 (spec vs code) status `--help` fields do not all carry descriptions.**
+Spec cli:change-status "Output format" says the schema MUST describe each field it lists; verify scenario "Help schema lists every emitted field" ends with "every field it lists carries a description". status.ts:151-204 describes only some fields (validity, verification, invalidation, checks, approvalGates, displayStatus, hasDrift, etc.); name, state, specIds, schema, description, schemaWarnings, blockers, nextAction, specDependsOn, artifactDag, review, lifecycle sub-fields mostly have no description. Test status.spec.ts:2247 only checks field names, never descriptions. Either add descriptions (and an assertion) or narrow the spec to "newly listed fields".
+
+**M-C4 (code gap) transition does not render the `CHECK_NOT_SKIPPABLE` hook hint.**
+error-hints.ts:171-177 defines the rule `CHECK_NOT_SKIPPABLE` (hook._ checks) scoped to `change.transition` and `change.archive`. Archive reaches it through `handleError`. Transition catches `CheckNotSkippableError` as a repair-guide error (transition.ts:93-110), and `writeTextRepairGuide` (137-231) and the JSON `structuredHint` (488-500) only resolve `HAPPY_PATH_NEXT_UNAVAILABLE` / CPFE hints. So `change transition x ready --skip-checks hook.pre` prints no "use --skip-hooks" hint, and core no longer embeds it (error-handling-conventions: "every command that can surface that code ... matching CLI hint"). Test gap: transition.spec.ts:1709 only asserts the message for `protocol.edge`; no transition test for hook._ hint. Fix: resolve `resolveCliErrorHint(err.code, {command:'change.transition'}, {checkId})` for CheckNotSkippableError in both text and JSON.
+
+### LOW
+
+**L-C1 (code vs spec ambiguity) transition JSON/TOON failure record carries no error identity.**
+transition.ts:501-518: record has blockers/nextAction/hint/state/validity from fresh status, but no `code`/`message`/failed `checkId`. For `UnknownCheckError`, `CheckNotSkippableError`, `InvalidStateTransitionError` or a CPFE whose blocker is absent from fresh status, machine consumers cannot tell why it failed (text prints the code at 180). Spec lists the field set without code/message, so this is a spec gap; consider adding `error: {code, message, checkId?}` to spec and code. Also for a skippable CPFE the JSON `hint` is absent (hint only for non-skippable or HappyPath); bypass is only visible via `blockers[].bypassFlag` when the blocker exists, whereas archive JSON (via handleError) does emit the bypass hint.
+
+**L-C2 (code) reconciled text repair guide omits blocker `action`.**
+Spec says text shows blockers projected through the CLI blocker projection (label, checkId, action, bypassFlag). guidance-presenter.ts:385-418 prints code/label/message, `check:`, `bypass:` only; blocker `action` command/guidance (as verification invalidate does at verification.ts:263-270) is dropped in text. JSON includes `action`. Also real ValidityBlocker (change-validity.ts:33-49) has no `label`/`checkId`/`isSkippable`, so in production the label/check/bypass lines never appear; tests inject them with `as never`. Not wrong, but the scenario with "skippable blocker" is not reachable from core today.
+
+**L-C3 (code) `--skip-hooks` skip reason is coarse.**
+\_check-progress-presenter.ts:69-72 reports `--skip-hooks` for both hook.pre and hook.post whenever any phase is skipped (`skipHooks = skipHookPhases.size > 0`, transition.ts:427, archive.ts:138). With `--skip-hooks pre`, a `hook.post` skip caused by "no hooks configured" would be labelled `--skip-hooks`. Spec only requires the user-skip reason; consider per-phase mapping.
+
+**L-C4 (code) parseFormat after mutation.**
+invalidate.ts:132 and approve.ts:56/110 call `parseFormat` after the mutating use case, so `--format xml` fails after the approval or invalidation was persisted. cli:change-verification requires format validation before mutation for its commands (which does it, verification.ts:97,114,132); approve/invalidate specs are silent, but the same hazard exists. Transition and archive validate early.
+
+**L-C5 (code) verification mismatch guidance ordering.**
+verification.ts:350-355 writes the guidance sentence to stderr before `cliError`'s `error:` line (the opposite of the approve L4 rule). No spec requirement; consistency only.
+
+**L-C6 (code) invalidate success next action ignores overlap bypass suffix.**
+invalidate.ts:146 `projectCliNextAction(rawNextAction)` does not pass blockers, unlike status/transition, so an `OVERLAP_CONFLICT` skippable blocker never appends "Use --skip-checks ... to archive anyway." Spec only requires it for status; INFO-level inconsistency.
+
+### INFO
+
+- reconciled-blocked.spec.ts archive skip-hooks test builds `CheckPredicateFailedError('x.y','X','boom','X_FAILED',...)`, swapping `checkCode` and `message` (signature: id, label, code, message). transition.spec.ts:1973 also passes `('spec.overlap','Checking spec overlap','OVERLAP_CONFLICT','Specs overlap',...)`, which is the correct order. Harmless fixture nit.
+- Status drafted help: `schema` is documented with `artifactDag` as always present; drafted output omits it (spec-conformant) but help does not mark it active-only.
+- Archive `--help` does not document the failure/reconciled record shape (spec does not require it for archive).
+- Status help lists top-level `availableTransitions`/`availableSteps` as "legacy"; active output does not emit them (conformant; comment is ambiguous).
+
+## Untested scenarios
+
+- cli:change-transition: "Every skippable blocker gets a bypass line" with a CheckPredicateFailedError (see M-C1); `--skip-checks hook.pre` hint on transition (M-C4); JSON reconciled failure includes `from`/`to` (not asserted); skippable `deps.consistent` generic-bypass for transition text (transition.spec.ts:1418 covers the bypass line; no assertion that the dependency-extraction hint is absent).
+- cli:change-status: help descriptions (M-C3); "Pipeline follows canonical order" at JSON level is covered at status.spec.ts:1612/1657.
+- cli:change-archive: json-mode reconciled record (covered), `--skip-hooks` reason (covered); no test that the archive reconciled text guide omits `error:` was checked beyond shared test (covered in reconciled-blocked.spec.ts).
+- cli:change-approve: text failure with `guidance:` line and unlabelled next action in text mode (JSON covered at approve-failure.spec.ts:100); frozen-error case for Reflect.defineProperty returning false.
+- skills:skill-templates-source: covered (template-lifecycle-consent.spec.ts).
+
+## Counts
+
+HIGH 0, MEDIUM 4 (M-C1..M-C4), LOW 6 (L-C1..L-C6), INFO 4. Round-3: H1, H2, M1, M2, M3, L1, L3, L4, L5, L6 FIXED; M4 PARTIAL (see M-C1).

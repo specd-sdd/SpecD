@@ -115,6 +115,229 @@ describe('change invalidate', () => {
     })
   })
 
+  it('appends the skip-checks suffix to the next-action reason for an overlap blocker', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.invalidate.execute.mockResolvedValue({
+      change: { name: 'feat', state: 'archivable' },
+      reason: 'semantic review',
+      effectivePolicy: { artifacts: 'none', workflow: 'preserve' },
+      affected: [],
+      blockers: [
+        {
+          code: 'OVERLAP_CONFLICT',
+          message: 'Specs overlap',
+          checkId: 'spec.overlap',
+          isSkippable: true,
+        },
+      ],
+      nextAction: {
+        targetStep: 'archivable',
+        actionType: 'mechanical',
+        reason: 'Specs overlap with other active changes.',
+        intent: 'archive',
+      },
+    })
+    const program = makeProgram()
+    registerChangeInvalidate(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'invalidate',
+      'feat',
+      '--reason',
+      'semantic review',
+      '--format',
+      'json',
+    ])
+    const parsed = JSON.parse(stdout()) as { nextAction: { reason: string } }
+    expect(parsed.nextAction.reason).toContain('Use --skip-checks spec.overlap to archive anyway.')
+  })
+
+  it('prints the skip-checks suffix in the text next-action reason for an overlap blocker', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.invalidate.execute.mockResolvedValue({
+      change: { name: 'feat', state: 'archivable' },
+      reason: 'semantic review',
+      effectivePolicy: { artifacts: 'none', workflow: 'preserve' },
+      affected: [],
+      blockers: [
+        {
+          code: 'OVERLAP_CONFLICT',
+          message: 'Specs overlap',
+          checkId: 'spec.overlap',
+          isSkippable: true,
+        },
+      ],
+      nextAction: {
+        targetStep: 'archivable',
+        actionType: 'mechanical',
+        reason: 'Specs overlap with other active changes.',
+        intent: 'archive',
+      },
+    })
+    const program = makeProgram()
+    registerChangeInvalidate(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'invalidate',
+      'feat',
+      '--reason',
+      'semantic review',
+    ])
+    expect(stdout()).toContain(
+      'reason:  Specs overlap with other active changes. Use --skip-checks spec.overlap to archive anyway.',
+    )
+  })
+
+  describe('skippable blocker projection', () => {
+    const skippable = {
+      code: 'OVERLAP_CONFLICT',
+      message: 'Specs overlap',
+      label: 'Spec overlap',
+      checkId: 'spec.overlap',
+      isSkippable: true,
+    }
+
+    function mockSkippable(kernel: ReturnType<typeof setup>['kernel']) {
+      kernel.changes.invalidate.execute.mockResolvedValue({
+        change: { name: 'feat', state: 'archivable' },
+        reason: 'semantic review',
+        effectivePolicy: { artifacts: 'none', workflow: 'preserve' },
+        affected: [],
+        blockers: [skippable, { code: 'ARTIFACT_REVIEW_REQUIRED', message: 'Review required' }],
+        nextAction: {
+          targetStep: 'archivable',
+          actionType: 'mechanical',
+          reason: 'Specs overlap.',
+          intent: 'archive',
+        },
+      })
+    }
+
+    async function run(format: 'text' | 'json' | 'toon') {
+      const program = makeProgram()
+      registerChangeInvalidate(program.command('change'))
+      await program.parseAsync([
+        'node',
+        'specd',
+        'change',
+        'invalidate',
+        'feat',
+        '--reason',
+        'semantic review',
+        '--format',
+        format,
+      ])
+    }
+
+    it.each(['json', 'toon'] as const)(
+      'projects a bypassFlag and never emits isSkippable in %s',
+      async (format) => {
+        const { kernel, stdout } = setup()
+        mockSkippable(kernel)
+        await run(format)
+
+        const parsed = (format === 'json' ? JSON.parse(stdout()) : decodeToon(stdout())) as {
+          blockers: Record<string, unknown>[]
+        }
+        expect(parsed.blockers).toEqual([
+          {
+            code: 'OVERLAP_CONFLICT',
+            message: 'Specs overlap',
+            label: 'Spec overlap',
+            checkId: 'spec.overlap',
+            bypassFlag: '--skip-checks spec.overlap',
+          },
+          { code: 'ARTIFACT_REVIEW_REQUIRED', message: 'Review required' },
+        ])
+        expect(stdout()).not.toContain('isSkippable')
+      },
+    )
+
+    it('prints the labelled blocker and a single bypass line in text mode', async () => {
+      const { kernel, stdout } = setup()
+      mockSkippable(kernel)
+      await run('text')
+
+      const lines = stdout().split('\n')
+      const start = lines.indexOf('blockers:')
+      expect(start).toBeGreaterThanOrEqual(0)
+      expect(lines.slice(start + 1, start + 4)).toEqual([
+        '  ! OVERLAP_CONFLICT \u2014 Spec overlap: Specs overlap',
+        '    bypass: --skip-checks spec.overlap',
+        '  ! ARTIFACT_REVIEW_REQUIRED: Review required',
+      ])
+      expect(lines.filter((l) => l.includes('bypass:'))).toHaveLength(1)
+    })
+  })
+
+  it('rejects an invalid --format before the use case mutates', async () => {
+    const { kernel, stderr } = setup()
+    const program = makeProgram()
+    registerChangeInvalidate(program.command('change'))
+    await program
+      .parseAsync([
+        'node',
+        'specd',
+        'change',
+        'invalidate',
+        'feat',
+        '--reason',
+        'x',
+        '--format',
+        'bogus',
+      ])
+      .catch(() => {})
+    expect(kernel.changes.invalidate.execute).not.toHaveBeenCalled()
+    expect(stderr()).toContain("invalid format 'bogus'")
+    expect(process.exit).toHaveBeenCalledWith(1)
+  })
+
+  it.each(['json', 'toon', 'text'] as const)(
+    'projects the next-action command from the host-neutral intent in %s',
+    async (format) => {
+      const { kernel, stdout } = setup()
+      kernel.changes.invalidate.execute.mockResolvedValue({
+        change: { name: 'feat', state: 'designing' },
+        reason: 'semantic review',
+        effectivePolicy: { artifacts: 'none', workflow: 'preserve' },
+        affected: [],
+        projectionChanges: [],
+        automaticReturn: null,
+        blockers: [],
+        nextAction: {
+          targetStep: 'designing',
+          actionType: 'cognitive',
+          reason: 'Review the reported blockers before advancing',
+          intent: 'design',
+        },
+      })
+      const program = makeProgram()
+      registerChangeInvalidate(program.command('change'))
+      await program.parseAsync([
+        'node',
+        'specd',
+        'change',
+        'invalidate',
+        'feat',
+        '--reason',
+        'semantic review',
+        ...(format === 'text' ? [] : ['--format', format]),
+      ])
+      const out = stdout()
+      expect(out).toContain('/specd-design')
+      if (format !== 'text') {
+        const parsed = format === 'json' ? JSON.parse(out) : decodeToon(out)
+        expect(parsed).toMatchObject({
+          nextAction: { command: '/specd-design', intent: 'design' },
+        })
+      }
+    },
+  )
+
   it('passes name, reason, targets, policy, and force to execute', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.invalidate.execute.mockResolvedValue({
@@ -545,5 +768,83 @@ describe('change invalidate', () => {
     const parsed = JSON.parse(stdout())
     expect(parsed.code).toBe('INVALIDATE_REQUIRES_FORCE')
     expect(parsed.hint).toContain('--force')
+  })
+})
+
+describe('change invalidate hints and guidance (text mode)', () => {
+  async function runInvalidate(extra: string[] = []): Promise<void> {
+    const program = makeProgram()
+    registerChangeInvalidate(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'invalidate', 'feat', '--reason', 'r', ...extra])
+      .catch(() => {})
+  }
+
+  it('prints the --target hint for INVALID_INVALIDATE_TARGET', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.invalidate.execute.mockRejectedValue(
+      new TestInvalidInvalidateTargetError(["At least one --target is required with 'surgical'"]),
+    )
+    await runInvalidate(['--artifact-policy', 'surgical'])
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toContain('Pass --target <spec-id>')
+  })
+
+  it('prints the --target hint for INVALID_INPUT', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.invalidate.execute.mockRejectedValue(
+      new (class extends SpecdError {
+        override get code(): string {
+          return 'INVALID_INPUT'
+        }
+      })('bad input'),
+    )
+    await runInvalidate()
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toContain('Pass --target <spec-id>')
+  })
+
+  it('prints the --force hint when approval consent would be revoked', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.invalidate.execute.mockRejectedValue(
+      new InvalidateRequiresForceError([{ gate: 'spec', target: 'designing' }]),
+    )
+    await runInvalidate()
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toContain('Re-run with --force to revoke the affected approval gate(s)')
+  })
+
+  it('prints the --force hint exactly once in text output', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.invalidate.execute.mockRejectedValue(
+      new InvalidateRequiresForceError([{ gate: 'spec', target: 'designing' }]),
+    )
+    await runInvalidate()
+    const err = stderr()
+    const hint = 'Re-run with --force to revoke the affected approval gate(s)'
+    expect(err.split(hint).length - 1).toBe(1)
+    expect(err.split('\n').filter((line) => line.includes('--force'))).toHaveLength(1)
+  })
+
+  it('prints a guidance line when the next action has no command', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.invalidate.execute.mockResolvedValue({
+      change: { name: 'feat', state: 'designing' },
+      reason: 'r',
+      effectivePolicy: { artifacts: 'none', workflow: 'preserve' },
+      affected: [],
+      blockers: [],
+      nextAction: {
+        targetStep: 'designing',
+        actionType: 'cognitive',
+        reason: 'Run the plugin scan',
+        intent: null,
+        action: { kind: '@security.code-scan', guidance: 'Run the security scan' },
+      },
+    })
+    await runInvalidate()
+    const out = stdout()
+    expect(out).toContain('command: (none)')
+    expect(out).toContain('  guidance: Run the security scan')
   })
 })

@@ -1,7 +1,9 @@
 import { type Command } from 'commander'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
+import { InvalidFormatError } from '../../errors/invalid-format-error.js'
 import { resolveCliContext } from '../../helpers/cli-context.js'
+import { projectCliBlocker, projectCliNextAction } from '../../guidance-presenter.js'
 import {
   fingerprintTextLines,
   formatDecisionTime,
@@ -24,9 +26,7 @@ export function registerChangeApprove(parent: Command): void {
   approveCmd
     .command('spec <name>')
     .allowExcessArguments(false)
-    .description(
-      'Record spec-gate consent for a change in ready (pending-spec-approval remains valid for drain).',
-    )
+    .description('Record spec-gate consent for a change in ready (or a legacy parking state).')
     .requiredOption('--reason <text>', 'rationale for approval')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
@@ -34,11 +34,18 @@ export function registerChangeApprove(parent: Command): void {
       'after',
       `
 JSON/TOON output schema:
-  { result: "ok", gate: "spec", name: string }
+  { result: "ok", gate: "spec", name: string, state: string,
+    approval?: { status, approver?, at?, fingerprint?, verificationId? } }
+JSON/TOON error payload additions after a failed approval (under \`metadata\`):
+  state: string,
+  blockers: [{ code, message, label?, checkId?, action?, bypassFlag?, details? }],
+  nextAction?: { targetStep, actionType, command: string|null, guidance?: string, reason, intent, action? }
 `,
     )
     .action(async (name: string, opts: { reason: string; format: string; config?: string }) => {
       try {
+        // Validate the output format before any mutation so a bad --format cannot leave the change approved.
+        const fmt = parseFormat(opts.format)
         const { kernel } = await resolveCliContext({
           configPath: opts.config,
         })
@@ -49,9 +56,8 @@ JSON/TOON output schema:
         })
 
         const evidence = readSpecApproval(change)
-        const fmt = parseFormat(opts.format)
         if (fmt === 'text') {
-          const lines = [`approved spec for ${name}`]
+          const lines = [`approved spec for ${name}`, `state:       ${change.state}`]
           if (evidence !== undefined) lines.push(...evidence.lines)
           output(lines.join('\n'), 'text')
         } else {
@@ -60,23 +66,23 @@ JSON/TOON output schema:
               result: 'ok',
               gate: 'spec',
               name,
+              state: change.state,
               ...(evidence !== undefined ? { approval: evidence.payload } : {}),
             },
             fmt,
           )
         }
       } catch (err) {
-        await enrichApprovalFailure(err, name, opts.config, opts.format)
-        handleError(err, opts.format)
+        if (err instanceof InvalidFormatError) handleError(err, opts.format)
+        const projection = await enrichApprovalFailure(err, name, opts.config)
+        handleErrorWithApprovalState(err, opts.format, projection)
       }
     })
 
   approveCmd
     .command('signoff <name>')
     .allowExcessArguments(false)
-    .description(
-      'Record signoff-gate consent for a change in done (pending-signoff remains valid for drain).',
-    )
+    .description('Record signoff-gate consent for a change in done (or a legacy parking state).')
     .requiredOption('--reason <text>', 'rationale for sign-off')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
@@ -84,11 +90,18 @@ JSON/TOON output schema:
       'after',
       `
 JSON/TOON output schema:
-  { result: "ok", gate: "signoff", name: string }
+  { result: "ok", gate: "signoff", name: string, state: string,
+    approval?: { status, approver?, at?, fingerprint?, verificationId? } }
+JSON/TOON error payload additions after a failed approval (under \`metadata\`):
+  state: string,
+  blockers: [{ code, message, label?, checkId?, action?, bypassFlag?, details? }],
+  nextAction?: { targetStep, actionType, command: string|null, guidance?: string, reason, intent, action? }
 `,
     )
     .action(async (name: string, opts: { reason: string; format: string; config?: string }) => {
       try {
+        // Validate the output format before any mutation so a bad --format cannot leave the change approved.
+        const fmt = parseFormat(opts.format)
         const { kernel } = await resolveCliContext({
           configPath: opts.config,
         })
@@ -99,9 +112,8 @@ JSON/TOON output schema:
         })
 
         const evidence = readSignoff(change)
-        const fmt = parseFormat(opts.format)
         if (fmt === 'text') {
-          const lines = [`approved signoff for ${name}`]
+          const lines = [`approved signoff for ${name}`, `state:       ${change.state}`]
           if (evidence !== undefined) lines.push(...evidence.lines)
           output(lines.join('\n'), 'text')
         } else {
@@ -110,14 +122,16 @@ JSON/TOON output schema:
               result: 'ok',
               gate: 'signoff',
               name,
+              state: change.state,
               ...(evidence !== undefined ? { approval: evidence.payload } : {}),
             },
             fmt,
           )
         }
       } catch (err) {
-        await enrichApprovalFailure(err, name, opts.config, opts.format)
-        handleError(err, opts.format)
+        if (err instanceof InvalidFormatError) handleError(err, opts.format)
+        const projection = await enrichApprovalFailure(err, name, opts.config)
+        handleErrorWithApprovalState(err, opts.format, projection)
       }
     })
 }
@@ -125,62 +139,123 @@ JSON/TOON output schema:
 /** Canonical status fields attached to an approval error after reconciliation may have committed. */
 interface ApprovalFailureStatus {
   readonly state: string
-  readonly blockers: readonly { readonly code: string; readonly message: string }[]
+  readonly blockers: readonly Record<string, unknown>[]
   readonly nextAction?: {
     readonly targetStep: string
     readonly command: string | null
+    readonly guidance?: string
     readonly reason: string
   }
 }
 
 /**
- * Reloads canonical status after approval failure and adds it to text and structured errors.
+ * Reports an approval failure: the shared `error:` line first, then (text only) the canonical
+ * state, labelled blockers and next action, so the error line is never preceded by them.
+ *
+ * @param err - Approval error
+ * @param format - Requested output format
+ * @param projection - Canonical status projection, or `null` when it could not be reloaded
+ * @returns Never; always rethrows through the shared error handler
+ * @throws {CliExitError} Always, after the shared handler wrote the error line
+ */
+function handleErrorWithApprovalState(
+  err: unknown,
+  format: string,
+  projection: ApprovalFailureStatus | null,
+): never {
+  try {
+    handleError(err, format)
+  } catch (exit) {
+    if (projection !== null && format === 'text') {
+      writeApprovalFailureText(projection)
+    }
+    throw exit
+  }
+}
+
+/**
+ * Writes the canonical state, blockers and next action of a failed approval to stderr.
+ *
+ * @param projection - Canonical status projection
+ */
+function writeApprovalFailureText(projection: ApprovalFailureStatus): void {
+  process.stderr.write(`state: ${projection.state}\n`)
+  for (const blocker of projection.blockers) {
+    const label = typeof blocker.label === 'string' ? ` — ${blocker.label}` : ''
+    process.stderr.write(`! ${String(blocker.code)}${label}: ${String(blocker.message)}\n`)
+    if (typeof blocker.bypassFlag === 'string') {
+      process.stderr.write(`  bypass: ${blocker.bypassFlag}\n`)
+    }
+  }
+  if (projection.nextAction !== undefined) {
+    process.stderr.write(`next action: ${projection.nextAction.command ?? '(none)'}\n`)
+    if (projection.nextAction.command === null && projection.nextAction.guidance !== undefined) {
+      process.stderr.write(`guidance: ${projection.nextAction.guidance}\n`)
+    }
+    process.stderr.write(`reason: ${projection.nextAction.reason}\n`)
+  }
+}
+
+/**
+ * Reloads canonical status after approval failure and attaches it to the error for structured
+ * output. Assignment is defensive: read-only (getter-only) or frozen error properties are
+ * shadowed with an own property, and a property that still cannot be set is skipped.
  *
  * @param err - Approval error that will be passed to the shared error handler
  * @param name - Actual change name
  * @param configPath - Optional config path
- * @param format - Requested output format
+ * @returns The projection, or `null` when canonical status could not be reloaded
  */
 async function enrichApprovalFailure(
   err: unknown,
   name: string,
   configPath: string | undefined,
-  format: string,
-): Promise<void> {
+): Promise<ApprovalFailureStatus | null> {
   let projection: ApprovalFailureStatus | null = null
   try {
     const { kernel } = await resolveCliContext({ configPath })
     const status = await kernel.changes.status.execute({ name })
     const state = status.change?.state ?? status.draftView?.state
     if (state !== undefined) {
+      const projectedNextAction =
+        status.nextAction !== undefined
+          ? {
+              ...projectCliNextAction(status.nextAction, status.blockers),
+              intent: status.nextAction.intent,
+              ...(status.nextAction.action !== undefined
+                ? { action: status.nextAction.action }
+                : {}),
+            }
+          : undefined
       projection = {
         state,
-        blockers: Array.isArray(status.blockers) ? status.blockers : [],
-        ...(status.nextAction !== undefined ? { nextAction: status.nextAction } : {}),
+        blockers: Array.isArray(status.blockers) ? status.blockers.map(projectCliBlocker) : [],
+        ...(projectedNextAction !== undefined ? { nextAction: projectedNextAction } : {}),
       }
     }
   } catch {
     // Preserve the original approval error if canonical status cannot be reloaded.
   }
-  if (projection === null) return
+  if (projection === null) return null
 
   if (typeof err === 'object' && err !== null) {
-    Object.assign(err, {
+    const fields: Record<string, unknown> = {
       state: projection.state,
       blockers: projection.blockers,
       ...(projection.nextAction !== undefined ? { nextAction: projection.nextAction } : {}),
-    })
-  }
-  if (parseFormat(format) === 'text') {
-    process.stderr.write(`state: ${projection.state}\n`)
-    for (const blocker of projection.blockers) {
-      process.stderr.write(`blocker: ${blocker.code} — ${blocker.message}\n`)
     }
-    if (projection.nextAction !== undefined) {
-      process.stderr.write(`next action: ${projection.nextAction.command ?? '(none)'}\n`)
-      process.stderr.write(`reason: ${projection.nextAction.reason}\n`)
+    for (const [key, value] of Object.entries(fields)) {
+      // Reflect.defineProperty reports failure (frozen or sealed error) instead of throwing, so the
+      // original error stays untouched for that property.
+      Reflect.defineProperty(err, key, {
+        value,
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      })
     }
   }
+  return projection
 }
 
 /** Rendered approval evidence without file bytes or digests. */

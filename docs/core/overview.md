@@ -100,31 +100,33 @@ Everything exported is a domain type (entity, value object, error, service), an 
 
 **From the domain layer — errors:**
 
-| Export                         | Code                        |
-| ------------------------------ | --------------------------- |
-| `SpecdError`                   | abstract base class         |
-| `InvalidStateTransitionError`  | `INVALID_STATE_TRANSITION`  |
-| `ApprovalRequiredError`        | `APPROVAL_REQUIRED`         |
-| `HookFailedError`              | `HOOK_FAILED`               |
-| `ArtifactConflictError`        | `ARTIFACT_CONFLICT`         |
-| `DeltaApplicationError`        | `DELTA_APPLICATION`         |
-| `InvalidSpecPathError`         | `INVALID_SPEC_PATH`         |
-| `InvalidSpecIdError`           | `INVALID_SPEC_ID`           |
-| `InvalidSpecPatternError`      | `INVALID_SPEC_PATTERN`      |
-| `InvalidSpecLockError`         | `INVALID_SPEC_LOCK`         |
-| `InvalidChangeError`           | `INVALID_CHANGE`            |
-| `ArtifactNotOptionalError`     | `ARTIFACT_NOT_OPTIONAL`     |
-| `SchemaValidationError`        | `SCHEMA_VALIDATION_ERROR`   |
-| `ConfigValidationError`        | `CONFIG_VALIDATION_ERROR`   |
-| `CorruptedManifestError`       | `CORRUPTED_MANIFEST`        |
-| `MetadataValidationError`      | `METADATA_VALIDATION_ERROR` |
-| `DependsOnOverwriteError`      | `DEPENDS_ON_OVERWRITE`      |
-| `HookNotFoundError`            | `HOOK_NOT_FOUND`            |
-| `StepNotValidError`            | `STEP_NOT_VALID`            |
-| `PathTraversalError`           | `PATH_TRAVERSAL`            |
-| `UnsupportedPatternError`      | `UNSUPPORTED_PATTERN_ERROR` |
-| `MissingDefaultWorkspaceError` | `MISSING_DEFAULT_WORKSPACE` |
-| `ArtifactParseError`           | `ARTIFACT_PARSE_ERROR`      |
+| Export                            | Code                                                  |
+| --------------------------------- | ----------------------------------------------------- |
+| `SpecdError`                      | abstract base class                                   |
+| `InvalidStateTransitionError`     | `INVALID_STATE_TRANSITION`                            |
+| `CheckPredicateFailedError`       | the check's own `checkCode` (`CHECK_FAILED` fallback) |
+| `ApprovalRequiredError`           | `APPROVAL_REQUIRED`                                   |
+| `HookFailedError`                 | `HOOK_FAILED`                                         |
+| `ArtifactConflictError`           | `ARTIFACT_CONFLICT`                                   |
+| `DeltaApplicationError`           | `DELTA_APPLICATION`                                   |
+| `InvalidSpecPathError`            | `INVALID_SPEC_PATH`                                   |
+| `InvalidSpecIdError`              | `INVALID_SPEC_ID`                                     |
+| `InvalidSpecPatternError`         | `INVALID_SPEC_PATTERN`                                |
+| `InvalidSpecLockError`            | `INVALID_SPEC_LOCK`                                   |
+| `InvalidChangeError`              | `INVALID_CHANGE`                                      |
+| `ArtifactNotOptionalError`        | `ARTIFACT_NOT_OPTIONAL`                               |
+| `SchemaValidationError`           | `SCHEMA_VALIDATION_ERROR`                             |
+| `ConfigValidationError`           | `CONFIG_VALIDATION_ERROR`                             |
+| `CorruptedManifestError`          | `CORRUPTED_MANIFEST`                                  |
+| `UnsupportedManifestVersionError` | `UNSUPPORTED_MANIFEST_VERSION`                        |
+| `MetadataValidationError`         | `METADATA_VALIDATION_ERROR`                           |
+| `DependsOnOverwriteError`         | `DEPENDS_ON_OVERWRITE`                                |
+| `HookNotFoundError`               | `HOOK_NOT_FOUND`                                      |
+| `StepNotValidError`               | `STEP_NOT_VALID`                                      |
+| `PathTraversalError`              | `PATH_TRAVERSAL`                                      |
+| `UnsupportedPatternError`         | `UNSUPPORTED_PATTERN_ERROR`                           |
+| `MissingDefaultWorkspaceError`    | `MISSING_DEFAULT_WORKSPACE`                           |
+| `ArtifactParseError`              | `ARTIFACT_PARSE_ERROR`                                |
 
 **From the domain layer — services:**
 

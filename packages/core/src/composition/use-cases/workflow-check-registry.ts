@@ -70,6 +70,7 @@ export function resolveWorkflowCheckRegistry(
       return {
         blocked: true,
         peers: detection.peers,
+        entries: detection.entries,
       }
     }
   }

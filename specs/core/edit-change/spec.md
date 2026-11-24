@@ -14,7 +14,7 @@ As a change evolves, its spec scope often needs to grow or shrink — but modify
 - `addSpecIds` (optional, string array) — spec IDs to add to the change's `specIds`; each entry is one whole spec ID, validated and normalized per "Spec ID validation"
 - `removeSpecIds` (optional, string array) — spec IDs to remove from the change's `specIds`; each entry is one whole spec ID and is never split
 - `description` (optional, string) — new description for the change
-- `invalidationPolicy` (optional, string) — new invalidation policy for the change, see "Invalidation policy edits"
+- `invalidation` (optional, `{ artifacts?, workflow? }`) — partial update of the change's invalidation policy: a provided dimension replaces only that dimension, see "Invalidation policy edits"
 
 ### Requirement: Spec ID validation
 
@@ -75,10 +75,9 @@ When `EditChange.execute` effectively adds a spec ID that was not already presen
 Seeding rules:
 
 - Seeding applies only to spec IDs newly entering the change scope.
-- If the repository exposes persisted dependency state for the spec via `readPersistedDependsOn(spec)`, that value MUST be used.
-- Otherwise, if canonical `metadata.json.dependsOn` exists for the spec, that value MUST be used as the legacy fallback even when the persisted metadata file is stale.
-- Otherwise, the seeded value is an empty array.
 - If the spec already has an entry in `change.specDependsOn`, `EditChange` MUST NOT overwrite it just because the scope was edited again later.
+- Otherwise the seeded value is the `dependsOn` of the spec's persisted state, read through the spec repository's `readPersistedState(spec)` (the `spec-lock.json` state). No fallback to `metadata.json.dependsOn` exists.
+- If the workspace is unknown, the spec does not exist in its repository, or the repository has no persisted state for it, the seeded value is an empty array.
 
 This seeding establishes the baseline dependency snapshot for the change so later artifact validation and archive do not start from an empty dependency set for existing specs.
 
@@ -90,7 +89,7 @@ If the resulting `specIds` list is identical (same length, same order) to the ch
 
 When `specIds` effectively change, `EditChange` SHALL run the scope update and central validity reconciliation within one serialized repository mutation. The reconciler compares the fresh post-edit canonical scope with the scope-aware spec-approval fingerprint, reports explicit `spec-added` and `spec-removed` differences, and determines affected artifact review, approval and verification staleness or revocation, and required recovery while retaining all prior audit events. Reordering or normalization that leaves the canonical spec set unchanged MUST NOT stale approval.
 
-A required spec approval made stale by scope change SHALL cause an immediate return to `designing` even when `invalidation.workflow` is `preserve`. Without a required spec gate, `preserve` retains the current lifecycle state but unresolved non-task artifact review blocks forward progress. Sign-off and verification are invalidated only when their independently fingerprinted input set changes.
+A required spec approval made stale by scope change SHALL cause an immediate return to `designing` from any state after `ready`, even when `invalidation.workflow` is `preserve`. In `ready` no return is requested: `approval.spec` blocks leaving `ready` and consent is renewed there, so the change stays in `ready` with the approval reported stale. Without a required spec gate, `preserve` retains the current lifecycle state but unresolved non-task artifact review blocks forward progress. Sign-off and verification are invalidated only when their independently fingerprinted input set changes.
 
 `EditChange` MUST NOT independently append recovery transitions or delete approval history. The repository persists the reconciled result before returning.
 
@@ -134,7 +133,9 @@ The config-based `createEditChange(config, options?)` form MUST derive `EditChan
 - `listWorkspaces: ListWorkspaces`
 - `actor: ActorResolver`
 - `schemaProvider: SchemaProvider`
-- `refreshImplementationTracking?: RefreshImplementationTracking`
+- `resolveChangeSchema: ResolveChangeSchema`
+- `refreshImplementationTracking: RefreshImplementationTracking`
+- `reconcile: ReconcileChangeValidity`
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
 

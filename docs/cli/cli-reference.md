@@ -105,7 +105,7 @@ Available transitions are **check-derived**: the same predicate evaluation used 
 - **Blockers**: A dedicated section listing explicit conditions preventing progress (e.g. `ARTIFACT_DRIFT`, `MISSING_ARTIFACT`).
 - **Next Action**: A direct recommendation of the next step to take, including the suggested command and rationale.
 
-A blocker whose resolved binding can be bypassed shows the flag `GetStatus` projected under it, and only then. The CLI never builds a bypass of its own, so a flag shown here is exactly what `specd changes archive` accepts:
+A blocker whose resolved binding can be bypassed shows a bypass flag under it, and only then. Core carries only the blocker's `isSkippable` and `checkId`; the CLI presenter builds `--skip-checks <checkId>` from them, so a flag shown here is what `specd changes archive` accepts:
 
 ```text
 blockers:
@@ -122,9 +122,9 @@ Active status reconciles validity before it renders, including when `ifModifiedS
 
 Expected Core errors exit 1 and keep their `code`. Repeating status after the same facts produces no second invalidation or transition.
 
-Drafted changes are read-only. Text mode marks the state as `(drafted)` and prints `transitions: (none — change is drafted)`. JSON/TOON include `isDrafted: true`, empty `availableTransitions`, and `nextAction.command: null`.
+Drafted changes are read-only. Text mode marks the state as `(drafted)` and prints `transitions: (none — change is drafted)`. JSON/TOON include `isDrafted: true`, empty `availableTransitions`, and `nextAction` with `command: null` (no `intent` or `action` key is emitted).
 
-In JSON mode, the output includes a `nextAction` object and a `blockers` array. A top-level `approvalGates` object reports whether spec approval and signoff approval are enabled in the project config. Extra-bearing workflow rows appear as `availableSteps` (not protocol membership). Blockers from failed predicates include optional `label` and `checkId`.
+In JSON mode, the output includes a `nextAction` object (carrying Core's `intent` / `action` alongside the CLI-projected `command`; `command` is always an executable command or `null`, and when an action has no command mapping, such as an unknown plugin action kind, its host-neutral prose is exposed in a separate `guidance` field and text output prints it as a `guidance:` line) and a `blockers` array (carrying `label`, `checkId`, `details`, and `action` alongside the CLI-projected `bypassFlag`; Core's raw `isSkippable` is not exposed). A top-level `approvalGates` object reports whether spec approval and signoff approval are enabled in the project config. Extra-bearing workflow rows appear as `availableSteps` (not protocol membership). Blockers from failed predicates include optional `label`, `checkId`, and `action`.
 
 Artifact and file states:
 
@@ -157,21 +157,22 @@ Core resolves the happy-path next state (`HAPPY_PATH_NEXT`). This is not
 
 The command reconciles validity before checks and again after hooks. If that commits a different lifecycle state, the requested transition stops and the repair guide describes the state that was committed. Recovery is not rolled back when the requested transition then fails. There is no flag that restarts verification. Entry to `verifying` does not start an attempt, and `verifying → done` only checks current completed evidence. The repair for stale or missing verification is [verification start](change-verification.md) in the current state, then the verification work, then `complete`.
 
-When a transition fails (e.g. due to missing artifacts or drifted content), the command renders a **Repair Guide** to **stderr**, providing the blocker codes and a recommended next command to resolve the issue. Expected Core errors exit 1.
+When a transition fails (e.g. due to missing artifacts or drifted content), the command renders a **Repair Guide** to **stderr**, providing the blocker codes and a recommended next command to resolve the issue. Expected Core errors exit 1. If reading the fresh status fails while rendering a repair guide, the command prints only the original error (text, JSON and TOON) and no repair guide.
 
 `--next` happy-path map in Core:
 
 - `drafting -> designing`
 - `designing -> ready`
 - `ready -> implementing`
+- `pending-spec-approval -> implementing`
 - `spec-approved -> implementing`
 - `implementing -> verifying`
 - `verifying -> done`
 - `done -> archivable`
+- `pending-signoff -> archivable`
 - `signed-off -> archivable`
 
-Core rejects `--next` from `pending-spec-approval`, `pending-signoff`,
-`archivable`, and `archiving`.
+Core rejects `--next` from `archivable` and `archiving`, the only states with no happy-path next step.
 
 The resolved target still goes through the normal `TransitionChange` flow, so
 `requires` checks, task completion gating, approval predicates on the requested
@@ -193,14 +194,22 @@ check-progress bus (`stream: "change-transition"`), not the `run-hooks`
   event). `stderr` is reserved for text-mode progress, the Repair Guide, and
   non-structured process diagnostics. `change run-hooks` remains on
   `stream: "hook-progress"`.
+- A failed transition ends the stream with a `complete` event whose `result` is
+  a structured failure record: `result: "failure"`, `name`, `from`, `to`, `error`
+  (`code`, `message`, and `checkId` when a check failed), `hint`, `state`,
+  `validity`, `verification`, `blockers` (each with `bypassFlag` only when the
+  check is skippable), and `nextAction`. The same `error` and `hint` fields are
+  emitted in `json` and `toon`.
 
-| Option                      | Description                                                                                                                          |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `--next`                    | Resolve the next logical lifecycle target from the current state. Mutually exclusive with `<step>`.                                  |
-| `--allow-out-of-scope`      | Permit the hop when implementation links resolve outside the change scope (`impl.linksInScope`). Does not bypass open tracked files. |
-| `--skip-hooks <phases>`     | Skip hooks at the specified phases. Valid values: `source.pre`, `source.post`, `target.pre`, `target.post`, `all`.                   |
-| `--format text\|json\|toon` | Output format.                                                                                                                       |
-| `--config <path>`           | Config file path.                                                                                                                    |
+| Option                      | Description                                                                                                                    |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `--next`                    | Resolve the next logical lifecycle target from the current state. Mutually exclusive with `<step>`.                            |
+| `--skip-checks <ids>`       | Comma-separated check identifiers to bypass, for example `impl.linksInScope,spec.overlap`. Only skippable checks are accepted. |
+| `--allow-out-of-scope`      | Deprecated alias of `--skip-checks impl.linksInScope`. Does not bypass open tracked files.                                     |
+| `--allow-overlap`           | Deprecated alias of `--skip-checks spec.overlap` (archive hop).                                                                |
+| `--skip-hooks <phases>`     | Skip hooks at the specified phases. Valid values: `source.pre`, `source.post`, `target.pre`, `target.post`, `all`.             |
+| `--format text\|json\|toon` | Output format.                                                                                                                 |
+| `--config <path>`           | Config file path.                                                                                                              |
 
 ```bash
 # Resolve the next transition automatically
@@ -246,6 +255,10 @@ Edit the spec scope, description, or stored invalidation policy of an existing c
 | `--config <path>`           | Config file path.                                                             |
 
 `--add-spec` values are validated like `changes create --spec` (`INVALID_SPEC_ID` / `WORKSPACE_NOT_FOUND`). `--remove-spec` removes a stored ID and does not re-validate syntax, so an invalid persisted ID can still be removed.
+
+When Core reports validity blockers or a next action, text output appends them after the change summary. Blockers are listed under `blockers:` as `! CODE — label: message` (`! CODE: message` when the blocker has no label); a skippable blocker is followed by an indented `bypass: --skip-checks <checkId>` line. The next action is printed under `next action:` as `target:`, `command:` (`(none)` when the action has no CLI command), an optional `guidance:` line (shown only when `command` is `(none)` and the action declared guidance) and `reason:`.
+
+JSON and TOON output carry the same information as structured fields. `blockers` is present only when there are blockers; each entry is the projected blocker (`code`, `message`, and when available `label`, `checkId`, `details`, `action`) with `bypassFlag` only for skippable blockers, never the raw `isSkippable`. `nextAction` is present when Core reports one and carries `targetStep`, `actionType`, `reason`, `command`, `guidance` (only when `command` is null), `intent`, and `action` when the check declared one. The three formats expose the same blocker codes, labels and bypass flags.
 
 ### change validate
 
@@ -340,7 +353,7 @@ Dependency-blocked failures are status-aware. When validation is blocked by an u
 specd changes approve spec <name> [options]
 ```
 
-Record a spec approval for the change. This command is only meaningful when `approvals.spec: true` in `specd.yaml`. It reconciles first, requires the committed state to be exactly `ready`, and **leaves the change in `ready`**. Text output reports the materialized status, fingerprint algorithm, and file count. It does not print source bytes or full hashes. Task artifacts are excluded from the fingerprint. An empty observed artifact set is distinct from missing evidence. Expected failures, including a gate that is off or a state other than `ready`, exit 1.
+Record a spec approval for the change. This command is only meaningful when `approvals.spec: true` in `specd.yaml`. It reconciles first, requires the committed state to be `ready` (or a legacy parking state, `pending-spec-approval` or `spec-approved`), never transitions the change, and **leaves it in its current state**. Text output reports the materialized status, fingerprint algorithm, and file count. It does not print source bytes or full hashes. Task artifacts are excluded from the fingerprint. An empty observed artifact set is distinct from missing evidence. Expected failures, including a gate that is off or a state outside those the approval check accepts, exit 1.
 
 | Option                      | Description                    |
 | --------------------------- | ------------------------------ |
@@ -354,7 +367,7 @@ Record a spec approval for the change. This command is only meaningful when `app
 specd changes approve signoff <name> [options]
 ```
 
-Record a sign-off for the change. This command is only meaningful when `approvals.signoff: true` in `specd.yaml`. It reconciles first, requires the committed state to be exactly `done`, requires current completed verification, and **leaves the change in `done`**. Text output reports the materialized status, fingerprint algorithms, file counts, and verification id. An empty implementation `files` map means no linked files were observed. `implementation: null` is legacy unknown evidence and cannot be signed off until it is renewed. Text does not print source bytes or full hashes. Expected failures exit 1.
+Record a sign-off for the change. This command is only meaningful when `approvals.signoff: true` in `specd.yaml`. It reconciles first, requires the committed state to be `done` (or a legacy parking state, `pending-signoff` or `signed-off`), requires current completed verification, never transitions the change, and **leaves it in its current state**. Text output reports the materialized status, fingerprint algorithms, file counts, and verification id. An empty implementation `files` map means no linked files were observed. `implementation: null` is legacy unknown evidence and cannot be signed off until it is renewed. Text does not print source bytes or full hashes. Expected failures exit 1.
 
 | Option                      | Description                    |
 | --------------------------- | ------------------------------ |
@@ -506,7 +519,7 @@ Mark an optional artifact as intentionally skipped. A skipped artifact is treate
 specd changes invalidate <name> --reason <text> [options]
 ```
 
-Invalidate a change by hand. This records review and, when valid consent is affected and `--force` is set, revokes that consent. Lifecycle recovery is chosen by Core, not by this command: a required spec approval returns to `designing` when the state is later than `designing`; a required sign-off returns to `done` only when the state is later than `done`; otherwise `workflow: redesign` with unresolved non-task review returns to `designing`; otherwise the phase stays. The command does not persist `--artifact-policy` or `--workflow-policy`. They override this invocation only. There is no `--invalidation-policy` or `--policy` flag.
+Invalidate a change by hand. This records review and, when valid consent is affected and `--force` is set, revokes that consent. Lifecycle recovery is chosen by Core, not by this command: a required spec approval returns to `designing` when the state is later than `ready` (in `ready` the change stays and consent is renewed there); a required sign-off returns to `done` only when the state is later than `done`; otherwise `workflow: redesign` with unresolved non-task review returns to `designing`; otherwise the phase stays. The command does not persist `--artifact-policy` or `--workflow-policy`. They override this invocation only. There is no `--invalidation-policy` or `--policy` flag.
 
 Artifact reopening uses the effective artifact policy:
 
@@ -631,7 +644,7 @@ If other active changes target the same specs, the archive is blocked by default
 
 If implementation links resolve to specs outside the change scope (`impl.linksInScope`), archive is blocked by default. Use `--skip-checks impl.linksInScope` only when that out-of-scope link set is intentional. It does not bypass unresolved tracked files (`impl.filesResolved`).
 
-If a check registered by a host or plugin (or embedded by the schema) fails, the command exits `1` with the check id, label, message, and command. In `text` format it prints `bypass:  Retry with --skip-checks <id> if an exception is granted` only when that check's binding is skippable.
+If any built-in, host, plugin, or schema-embedded archive check fails, the command exits `1` with `CheckPredicateFailedError` details formatted by `checkId`, label, message, and projected command. In `text` format it prints `bypass:  Retry with --skip-checks <id> if an exception is granted` only when that check's binding is skippable. For `spec.overlap` failures that carry `details.entries`, the peer list is printed first, followed (only when skippable) by the bare hint line without the `bypass:` prefix.
 
 An unregistered id fails with `UnknownCheckError`. A hook (`hook.pre`, `hook.post`) or a non-skippable check fails with `CheckNotSkippableError`; hook phases are skipped with `--skip-hooks`. Ids are matched exactly (case-sensitive), duplicates collapse, and every id is validated before any check, hook, or write runs.
 

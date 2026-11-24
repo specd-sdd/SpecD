@@ -11,13 +11,5 @@
     "cli:change-create",
     "core:spec-id-format"
   ],
-  "implementation": [
-    {
-      "file": "cli:src/commands/change/edit.ts",
-      "symbols": ["registerChangeEdit"]
-    },
-    {
-      "file": "cli:test/commands/change-edit.spec.ts"
-    }
-  ]
+  "implementation": []
 }

@@ -20,6 +20,7 @@ export interface ArchiveBatchSnapshotPort {
   restoreBatch(
     specIds: readonly string[],
     publishOrder: readonly string[],
+    changeName: string,
   ): Promise<ArchiveBatchRestoreResult>
-  cleanup(specIds: readonly string[]): Promise<void>
+  cleanup(specIds: readonly string[], changeName: string): Promise<void>
 }

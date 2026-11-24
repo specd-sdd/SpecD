@@ -260,6 +260,23 @@ describe('workflow-topology', () => {
       expect(transitions).toEqual([])
     })
 
+    it('honors the supplied approval snapshot: a disabled ready is legal when the spec gate is inactive', () => {
+      const schema = makeSchema([], [makeWorkflowStep('ready', { disabled: true })])
+      const gated = { spec: true, signoff: false } as const
+
+      expect(() => listWorkflowTransitions('designing', schema, gated)).toThrow(
+        SchemaValidationError,
+      )
+      // Same schema, converse snapshot: no throw, and `ready` is skipped.
+      expect(() => listWorkflowTransitions('designing', schema, approvals)).not.toThrow()
+      expect(listWorkflowTransitions('designing', schema, approvals)).not.toContain('ready')
+      expect(isWorkflowTransitionLegal('designing', 'implementing', schema, approvals)).toBe(true)
+      expect(nextWorkflowStep('designing', schema, approvals)).toBe('implementing')
+      expect(() =>
+        listBypassedWorkflowSteps('designing', 'implementing', schema, approvals),
+      ).not.toThrow()
+    })
+
     it('enforces approval anchors through every legal-transition query', () => {
       const schema = makeSchema([], [makeWorkflowStep('ready', { disabled: true })])
       const gatedApprovals = { spec: true, signoff: false } as const
@@ -290,6 +307,17 @@ describe('workflow-topology', () => {
       const schema = makeSchema([], [makeWorkflowStep('implementing', { optional: true })])
       const bypassed = listBypassedWorkflowSteps('ready', 'verifying', schema, approvals)
       expect(bypassed).toEqual(['implementing'])
+    })
+
+    it('returns empty array for ready to done when implementing and verifying are disabled', () => {
+      const schema = makeSchema(
+        [],
+        [
+          makeWorkflowStep('implementing', { disabled: true }),
+          makeWorkflowStep('verifying', { disabled: true }),
+        ],
+      )
+      expect(listBypassedWorkflowSteps('ready', 'done', schema, approvals)).toEqual([])
     })
 
     it('excludes disabled intermediate steps from bypassedSteps', () => {
@@ -346,21 +374,21 @@ describe('workflow-topology', () => {
   describe('drain states', () => {
     const schema = makeSchema([], [])
 
-    it('has no shortcut from pending-signoff to archivable', () => {
+    it('exits pending-signoff directly to archivable', () => {
       expect(listWorkflowTransitions('pending-signoff', schema, approvals)).toEqual([
-        'signed-off',
+        'archivable',
         'designing',
         'done',
       ])
-      expect(nextWorkflowStep('pending-signoff', schema, approvals)).toBeNull()
+      expect(nextWorkflowStep('pending-signoff', schema, approvals)).toBe('archivable')
     })
 
-    it('has no shortcut from pending-spec-approval to implementing', () => {
+    it('exits pending-spec-approval directly to implementing', () => {
       expect(listWorkflowTransitions('pending-spec-approval', schema, approvals)).toEqual([
-        'spec-approved',
+        'implementing',
         'designing',
       ])
-      expect(nextWorkflowStep('pending-spec-approval', schema, approvals)).toBeNull()
+      expect(nextWorkflowStep('pending-spec-approval', schema, approvals)).toBe('implementing')
     })
 
     it('resolves next steps for approved drain states', () => {
@@ -428,8 +456,10 @@ describe('workflow-topology', () => {
       expect(nextWorkflowStep('ready', schema, approvals)).toBe('done')
     })
 
-    it('exposes only the six topology functions', () => {
+    it('exposes only the topology functions (including the drain-state table accessors)', () => {
       expect(Object.keys(topology).sort()).toEqual([
+        'drainAnchorOf',
+        'isDrainState',
         'isWorkflowStepEnabled',
         'isWorkflowTransitionLegal',
         'listBypassedWorkflowSteps',
@@ -475,5 +505,18 @@ describe('workflow-topology', () => {
         }
       }
     })
+  })
+})
+
+describe('drain-state table', () => {
+  it('maps each parking state to its pipeline anchor and nothing else', () => {
+    expect(topology.drainAnchorOf('pending-spec-approval')).toEqual({
+      anchor: 'ready',
+      offset: 0.25,
+    })
+    expect(topology.drainAnchorOf('signed-off')).toEqual({ anchor: 'done', offset: 0.5 })
+    expect(topology.drainAnchorOf('ready')).toBeNull()
+    expect(topology.isDrainState('pending-signoff')).toBe(true)
+    expect(topology.isDrainState('done')).toBe(false)
   })
 })

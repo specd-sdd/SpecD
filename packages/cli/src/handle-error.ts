@@ -10,7 +10,7 @@ import {
 } from '@specd/sdk'
 import { output } from './formatter.js'
 import { CliExitError } from './helpers/cli-exit-error.js'
-import { resolveCliErrorHint, type CliCommandId } from './error-hints.js'
+import { resolveCliErrorHint, skippableCheckHint, type CliCommandId } from './error-hints.js'
 
 /**
  *
@@ -223,6 +223,11 @@ export function handleError(err: unknown, format?: string, options?: HandleError
             ...metadata,
             isSkippable: metadata.isSkippable ?? metadata.skippable,
           })
+        : undefined) ??
+      (typeof metadata.checkId === 'string' &&
+      metadata.checkId.length > 0 &&
+      (metadata.isSkippable ?? metadata.skippable) === true
+        ? skippableCheckHint(metadata.checkId)
         : undefined)
     const hintOption = hint !== undefined ? { hint } : {}
 

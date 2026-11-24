@@ -222,8 +222,12 @@ describe('check registry bindings', () => {
   })
 
   it('given approval checks, when boundFromStates is called, then it returns registry from states', () => {
-    expect(boundFromStates('approval.spec')).toEqual(['ready'])
-    expect(boundFromStates('approval.signoff')).toEqual(['done'])
+    expect(boundFromStates('approval.spec')).toEqual([
+      'ready',
+      'pending-spec-approval',
+      'spec-approved',
+    ])
+    expect(boundFromStates('approval.signoff')).toEqual(['done', 'pending-signoff', 'signed-off'])
   })
 
   it('given approval.spec wildcard, when ready to verifying, then matches', () => {
@@ -341,10 +345,15 @@ describe('runWorkspaceReadOnly', () => {
   it('given readOnly specs, when the check fails, then message names workspace', () => {
     const result = runWorkspaceReadOnly({
       ownershipBySpecId: new Map([['platform:auth/tokens', 'readOnly']]),
+      changeName: 'my-change',
     })
     expect(result.outcome).toBe('fail')
     if (result.outcome !== 'fail') return
-    expect(result.message).toContain("platform:auth/tokens (workspace 'platform')")
+    expect(result.message).toBe(
+      'Change "my-change" contains specs from readOnly workspaces:\n\n' +
+        '  - platform:auth/tokens  →  workspace "platform" (readOnly)\n\n' +
+        'Writing deltas into protected specs is not allowed.',
+    )
     expect(result.details).toMatchObject({
       specIds: ['platform:auth/tokens'],
       specs: [{ specId: 'platform:auth/tokens', workspace: 'platform' }],
@@ -388,7 +397,7 @@ describe('snapshot bag absence', () => {
     )
   })
 
-  it('binds live task completion and verification freshness on archive without widening the transition edge', () => {
+  it('binds live task completion and verification freshness on archive and bounds the done to archivable exit', () => {
     expect(ARCHIVE_BINDINGS.some((row) => row.check.id === 'workflow.taskCompletion')).toBe(true)
     expect(ARCHIVE_BINDINGS.some((row) => row.check.id === 'verification.current')).toBe(true)
     const transitionRows = TRANSITION_BINDINGS.filter(
@@ -397,6 +406,9 @@ describe('snapshot bag absence', () => {
     expect(transitionRows).toHaveLength(1)
     expect(transitionRows[0]?.applicability).toEqual([
       { scope: 'transition', from: 'verifying', to: 'done', along: 'forward' },
+      { scope: 'transition', from: 'done', to: 'archivable', along: 'forward' },
+      { scope: 'transition', from: 'pending-signoff', to: 'archivable', along: 'forward' },
+      { scope: 'transition', from: 'signed-off', to: 'archivable', along: 'forward' },
     ])
   })
 

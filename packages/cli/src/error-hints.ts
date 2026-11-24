@@ -21,8 +21,10 @@ export type CliHintId =
   | 'lock.repair-deps'
   | 'deps.operation-flags'
   | 'invalidate.target-flags'
-  | 'checks.skip-impl-links-in-scope'
+  | 'verification.renew'
   | 'checks.skip-hooks-instead'
+  | 'checks.deps-consistent'
+  | 'spec.init'
 
 /** Context passed by CLI command handlers when resolving an error hint. */
 export interface CliHintContext {
@@ -84,10 +86,22 @@ export const CLI_ERROR_HINTS: Readonly<
     'Use one of --add, --remove, --set, or --clear (--set and --clear cannot be combined with --add or --remove)',
   'invalidate.target-flags': () =>
     'Pass --target <spec-id> when targeting spec-scoped artifacts, or omit --target for global/none policies',
-  'checks.skip-impl-links-in-scope': () =>
-    'Re-run with --skip-checks impl.linksInScope (or --allow-out-of-scope) if intentional',
+  'verification.renew': (metadata) => {
+    const changeName = typeof metadata.changeName === 'string' ? metadata.changeName.trim() : ''
+    return changeName.length > 0
+      ? `Renew the verification evidence with: specd changes verification start ${changeName}`
+      : 'Renew the verification evidence before signing off'
+  },
   'checks.skip-hooks-instead': () =>
     'Use --skip-hooks <phases> instead of --skip-checks for hook checks',
+  'spec.init': (metadata) => {
+    const specId = typeof metadata.specId === 'string' ? metadata.specId.trim() : ''
+    return specId.length > 0
+      ? `Initialize its persisted state with: specd specs init ${specId}`
+      : 'Initialize its persisted state with: specd specs init <spec-id>'
+  },
+  'checks.deps-consistent': () =>
+    'Re-run dependency extraction or update the change dependencies with: specd changes deps <name> <spec-id> --set ...',
 }
 
 /**
@@ -102,6 +116,11 @@ export const CLI_ERROR_HINT_RULES: readonly CliHintRule[] = [
   {
     code: 'DEPENDS_ON_OVERWRITE',
     commands: ['specs.validate'],
+    hintId: 'deps.repair-or-force-generate',
+  },
+  {
+    // Any other command that can surface the overwrite guard gets the same repair advice.
+    code: 'DEPENDS_ON_OVERWRITE',
     hintId: 'deps.repair-or-force-generate',
   },
   {
@@ -146,10 +165,8 @@ export const CLI_ERROR_HINT_RULES: readonly CliHintRule[] = [
     hintId: 'invalidate.target-flags',
   },
   {
-    code: 'impl.linksInScope',
-    commands: ['change.transition', 'change.archive'],
-    when: (_context, metadata) => metadata.isSkippable === true,
-    hintId: 'checks.skip-impl-links-in-scope',
+    code: 'VERIFICATION_STALE',
+    hintId: 'verification.renew',
   },
   {
     code: 'CHECK_NOT_SKIPPABLE',
@@ -157,6 +174,16 @@ export const CLI_ERROR_HINT_RULES: readonly CliHintRule[] = [
     when: (_context, metadata) =>
       typeof metadata.checkId === 'string' && metadata.checkId.startsWith('hook.'),
     hintId: 'checks.skip-hooks-instead',
+  },
+  {
+    code: 'SPEC_NOT_INITIALIZED',
+    hintId: 'spec.init',
+  },
+  {
+    code: 'deps.consistent',
+    commands: ['change.transition', 'change.archive'],
+    when: (_context, metadata) => metadata.isSkippable !== true,
+    hintId: 'checks.deps-consistent',
   },
 ]
 
@@ -182,4 +209,14 @@ export function resolveCliErrorHint(
     return CLI_ERROR_HINTS[rule.hintId](metadata)
   }
   return undefined
+}
+
+/**
+ * Builds the generic bypass hint shown for every skippable check failure.
+ *
+ * @param checkId - Failing check identifier
+ * @returns The host-rendered hint, identical in form for every skippable check
+ */
+export function skippableCheckHint(checkId: string): string {
+  return `Retry with --skip-checks ${checkId} if an exception is granted`
 }

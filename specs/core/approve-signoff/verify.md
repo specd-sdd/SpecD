@@ -43,7 +43,9 @@ Scenarios:
 
 - **GIVEN** the change is `done` but completed verification is stale
 - **WHEN** signoff is requested
-- **THEN** no signoff is recorded and in-place verification renewal is recommended
+- **THEN** no signoff is recorded and `VerificationStaleError` is thrown
+- **AND** the error carries only structured data (`changeName`), not a recommended action or command
+- **AND** the delivery layer renders the in-place verification renewal recommendation from that data in its own syntax
 
 #### Scenario: Valid signoff stays in done
 
@@ -55,6 +57,13 @@ Scenarios:
 - **WHEN** signoff sees respectively no completion, active-only work, stale or legacy-unknown evidence, or a valid record with a mismatched expected fingerprint
 - **THEN** it returns respectively not-found, in-progress, stale/not-current, or fingerprint-mismatch errors
 - **AND** stale evidence is never reported as not found
+
+#### Scenario: Stale verification error carries no command and exposes changeName
+
+- **GIVEN** a change in `done` whose completed verification is stale
+- **WHEN** `execute({ name: 'checkout-retry', reason })` is called
+- **THEN** it throws `VerificationStaleError` with code `VERIFICATION_STALE` and `changeName` equal to `checkout-retry`
+- **AND** its `message` contains no CLI command, flag, or slash command (no `specd`, `--`, or `/specd-`)
 
 #### Scenario: Signoff actor decorator remains authoritative
 
@@ -70,6 +79,27 @@ Scenarios:
 - **WHEN** `ApproveSignoff.execute` runs with a valid reason
 - **THEN** sign-off is recorded
 - **AND** no `VerificationNotFoundError` or other verification eligibility error is thrown
+
+#### Scenario: Eligible states come from the check bindings
+
+- **GIVEN** `approval.signoff` is bound as a transition source from `done`, `pending-signoff`, and `signed-off`
+- **WHEN** `ApproveSignoff` decides whether the current state accepts consent
+- **THEN** the decision uses the binding `from` states of `approval.signoff`
+- **AND** a change in any other state fails with `InvalidStateTransitionError`
+
+#### Scenario: Consent in a parking state never transitions
+
+- **GIVEN** a historic change in `signed-off` with no recorded sign-off and valid verification
+- **WHEN** sign-off is recorded
+- **THEN** the sign-off is recorded
+- **AND** no `transitioned` event is appended and the state is still `signed-off`
+
+#### Scenario: Stale consent in a parking state is recovered before it is renewed
+
+- **GIVEN** a historic change in `signed-off` with a stale sign-off
+- **WHEN** `ApproveSignoff` runs
+- **THEN** the reconciler first commits the return to `done`
+- **AND** the renewed sign-off is recorded in `done`
 
 ### Requirement: Canonical pre-signoff reconciliation
 
@@ -112,7 +142,8 @@ Scenarios:
 - **GIVEN** `ApproveSignoff` is constructed with `approvals.signoff: true`
 - **GIVEN** the change is in `pending-signoff` state
 - **WHEN** `execute({ name, reason })` is called
-- **THEN** the change transitions to `signed-off`
+- **THEN** a valid signoff is recorded
+- **AND** the change remains in `pending-signoff`
 
 #### Scenario: Sovereign schema resolution in gate guard
 

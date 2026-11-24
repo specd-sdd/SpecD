@@ -8,6 +8,7 @@ import { VerificationNotFoundError } from '../errors/verification-not-found-erro
 import { VerificationInProgressError } from '../errors/verification-in-progress-error.js'
 import { VerificationStaleError } from '../errors/verification-stale-error.js'
 import { VerificationFingerprintMismatchError } from '../errors/verification-fingerprint-mismatch-error.js'
+import { boundFromStates } from '../../domain/services/check-bindings.js'
 import { InvalidStateTransitionError } from '../../domain/errors/invalid-state-transition-error.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { ResolveChangeSchema } from '../services/resolve-change-schema.js'
@@ -29,10 +30,9 @@ export interface ApproveSignoffInput {
 }
 
 /**
- * Records sign-off consent only while the reconciled change is `done`
- * with current completed verification.
- *
- * Historic `pending-signoff` manifests still drain to `signed-off`.
+ * Records sign-off consent for changes in a state bound by `approval.signoff`
+ * (such as `done`, or legacy parking states) with current completed verification.
+ * Never transitions lifecycle state.
  */
 export class ApproveSignoff {
   private readonly _changes: ChangeRepository
@@ -83,8 +83,12 @@ export class ApproveSignoff {
    * @returns The updated change
    * @throws {ApprovalGateDisabledError} If the signoff gate is not enabled
    * @throws {ChangeNotFoundError} If no change with the given name exists
+   * @throws {SchemaNotFoundError} If the change's schema cannot be resolved by the provider
+   * @throws {SchemaProviderIdentityMismatchError} If the provider returns a differently named schema
    * @throws {InvalidStateTransitionError} If the reconciled change cannot accept sign-off
    * @throws {VerificationNotFoundError} If completed verification is missing
+   * @throws {VerificationInProgressError} If verification was started but not completed
+   * @throws {VerificationStaleError} If completed verification is no longer current
    * @throws {VerificationFingerprintMismatchError} If the fresh fingerprint differs from verification
    * @throws {FingerprintInputError} If the complete fingerprint cannot be collected
    */
@@ -110,7 +114,7 @@ export class ApproveSignoff {
     const actor = await this._actor.identity()
     const mutation = await this._reconcile.mutate({ name: input.name, actor }, async (ctx) => {
       const state = ctx.change.state
-      if (state !== 'done' && state !== 'pending-signoff') {
+      if (!boundFromStates('approval.signoff').includes(state)) {
         return { outcome: 'state' as const, state }
       }
       const completed = ctx.change.verification.completed
@@ -155,9 +159,6 @@ export class ApproveSignoff {
         ctx.change.recordSignoff(input.reason, collected.fingerprint, completed.id, actor)
       } else {
         ctx.change.recordSignoff(input.reason, collected.fingerprint, actor)
-      }
-      if (ctx.change.state === 'pending-signoff') {
-        ctx.change.transition('signed-off', actor)
       }
       return { outcome: 'ok' as const }
     })

@@ -1,5 +1,6 @@
 import { Schema, parseSchemaCompat } from '../value-objects/schema.js'
-import { VALID_TRANSITIONS } from '../value-objects/change-state.js'
+import { VALID_TRANSITIONS, type ChangeState } from '../value-objects/change-state.js'
+import { isDrainState } from './workflow-topology.js'
 import {
   ArtifactType,
   type ArtifactScope,
@@ -807,12 +808,6 @@ export function buildSchema(
   }
 
   const BEDROCK_STATES = new Set(['drafting', 'designing', 'done', 'archiving', 'archivable'])
-  const DRAIN_STATES = new Set([
-    'pending-spec-approval',
-    'spec-approved',
-    'pending-signoff',
-    'signed-off',
-  ])
   const workflow: WorkflowStep[] = (data.workflow ?? []).map((step) => ({
     step: step.step,
     optional: step.optional ?? false,
@@ -843,7 +838,7 @@ export function buildSchema(
         `workflow step '${step.step}' is not a valid lifecycle state`,
       )
     }
-    if (DRAIN_STATES.has(step.step)) {
+    if (isDrainState(step.step as ChangeState)) {
       throw new SchemaValidationError(
         ref,
         `Workflow step '${step.step}' is a drain-only state and cannot be declared`,
@@ -928,7 +923,11 @@ export function buildSchema(
   const checkCoordinateSet = new Set<string>()
   for (const step of workflow) {
     for (const chk of step.checks ?? []) {
-      if (chk.from !== undefined && chk.from !== '*' && !(chk.from in VALID_TRANSITIONS)) {
+      if (
+        chk.from !== undefined &&
+        chk.from !== '*' &&
+        !Object.hasOwn(VALID_TRANSITIONS, chk.from)
+      ) {
         throw new SchemaValidationError(
           ref,
           `workflow check '${chk.id}' has invalid from state '${chk.from}'`,

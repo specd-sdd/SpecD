@@ -18,6 +18,8 @@ specd change approve signoff <name> --reason <text> [--format text|json|toon]
 - `--reason <text>` — required; a human-readable explanation for the approval decision
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
+The `--help` JSON output schema MUST list every field of the structured success and failure records, including the `approval` evidence block, `state`, and `nextAction.intent`, `nextAction.action`, and `nextAction.guidance` alongside `command`. The failure error payload additions (`state`, `blockers`, `nextAction`) live under the error `metadata` object, and the help text MUST say so rather than describing them as top-level payload fields. Blocker entries MUST list `code`, `message`, `label`, `checkId`, `details`, `action`, and `bypassFlag`, and the `nextAction` shape MUST list `command`, `intent`, `action`, `guidance`, `actionType`, and `reason`. Text failure output MUST print a `guidance:` line for a next action without a command mapping. Text failure output MUST print the `error:` line first and then the `state:`, blocker and next-action lines; blockers MUST print with their label in the same form as status (`! <CODE> — <label>: <message>`). Enriching a failure with `state`, `blockers` and `nextAction` metadata is best effort: assigning them onto an error whose properties are read-only (getter-only) MUST NOT throw and MUST NOT mask the original error.
+
 ### Requirement: Delegates gate state to kernel
 
 The CLI MUST NOT pass `approvalsSpec` or `approvalsSignoff` to `ApproveSpec.execute` or `ApproveSignoff.execute`.
@@ -34,11 +36,11 @@ Spec approval is available only in reconciled `ready` after required artifact va
 
 ### Requirement: Approve spec behaviour
 
-`approve spec` invokes `ApproveSpec`. It is valid when the change is in a binding `from` state for `approval.spec` (currently `ready`) or, for drain, `pending-spec-approval`. On success from `ready`, the change stays in `ready` with a recorded spec approval. It MUST NOT print a transition to `pending-spec-approval`. Help text MUST use bound-`from` language, with `ready` as the current example.
+`approve spec` invokes `ApproveSpec`. It is valid when the change is in a binding `from` state for `approval.spec` (`ready`, plus the legacy parking states `pending-spec-approval` and `spec-approved`). On success the change stays in its current state with the consent recorded; the success output (text and JSON) MUST include a `state:` line / `state` field with that unchanged current state and MUST NOT print a transition, and from a legacy parking state the user continues with a normal transition to `implementing`. Help text MUST use bound-`from` language, with `ready` as the current example.
 
 ### Requirement: Approve signoff behaviour
 
-`approve signoff` invokes `ApproveSignoff`. It is valid when the change is in a binding `from` state for `approval.signoff` (currently `done`) or, for drain, `pending-signoff`. On success from `done`, the change stays in `done` with a recorded signoff. Help text MUST use bound-`from` language, with `done` as the current example.
+`approve signoff` invokes `ApproveSignoff`. It is valid when the change is in a binding `from` state for `approval.signoff` (`done`, plus the legacy parking states `pending-signoff` and `signed-off`). On success the change stays in its current state with the consent recorded; the success output (text and JSON) MUST include a `state:` line / `state` field with that unchanged current state and MUST NOT print a transition, and from a legacy parking state the user continues with a normal transition to `archivable`. Help text MUST use bound-`from` language, with `done` as the current example.
 
 ### Requirement: Output on success
 

@@ -43,7 +43,7 @@ user transitions and never appear in `VALID_TRANSITIONS`. Transition and archive
 report a committed recovery through `ReconciledOperationBlockedError`; they do
 not undo it or reinterpret it as a requested backward hop.
 
-Recovery priority is fixed: required stale or revoked spec approval returns to `designing` when the state is later than `designing`; otherwise required stale or revoked sign-off returns to `done` only when the state is later than `done`; otherwise `workflow: redesign` with unresolved non-task drift returns to `designing`; otherwise the phase is preserved. Recovery never advances an earlier state. Verification staleness never moves the lifecycle. `artifacts: none` waives reopening, not freshness.
+Recovery priority is fixed: required stale or revoked spec approval returns to `designing` when the state is later than `designing`, except in `ready`, where spec consent is renewed in place and no recovery is requested (see the update note at the end); otherwise required stale or revoked sign-off returns to `done` only when the state is later than `done`; otherwise `workflow: redesign` with unresolved non-task drift returns to `designing`; otherwise the phase is preserved. Recovery never advances an earlier state. Verification staleness never moves the lifecycle. `artifacts: none` waives reopening, not freshness.
 
 New changes default to `{ artifacts: downstream, workflow: preserve }`. A legacy scalar maps to `{ artifacts: <scalar>, workflow: redesign }`. Setting the structured object and the deprecated scalar together is a config error.
 
@@ -137,3 +137,7 @@ Rollback is safe only while an older binary will not open a version 2 active man
 - [`core:transition-change`](../../specs/core/transition-change/spec.md)
 - `core:invalidate-verification` (new spec; not yet under `specs/`)
 - `cli:change-verification` (new spec; not yet under `specs/`)
+
+## Update: spec consent in `ready`
+
+Superseding note for the recovery priority above. Spec-consent recovery is no longer requested from `ready`: `approval.spec` blocks leaving `ready` and consent is renewed there, so returning to `designing` from `ready` could never be renewed (the reconciler re-evaluated the persisted stale consent and returned the change again). Later states, sign-off recovery and `workflow: redesign` recovery are unchanged. The decision above is otherwise intact.

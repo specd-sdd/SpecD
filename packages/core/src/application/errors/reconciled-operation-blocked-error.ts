@@ -44,8 +44,9 @@ export class ReconciledOperationBlockedError extends SpecdError {
    * @param input - Operation, persisted recovery, blockers, and canonical repair guidance
    */
   constructor(input: ReconciledOperationBlockedInput) {
+    const token = input.nextAction.intent ?? input.nextAction.action?.kind
     super(
-      `Cannot continue ${input.operation} for change '${input.changeName}': validity reconciliation returned it to '${input.state}'. Follow ${input.nextAction.command ?? `the '${input.nextAction.targetStep}' next action`}.`,
+      `Cannot continue ${input.operation} for change '${input.changeName}': validity reconciliation returned it to '${input.state}'. Follow ${token !== undefined ? `the '${token}' next action` : `the '${input.nextAction.targetStep}' next action`}.`,
     )
     this._operation = input.operation
     this._changeName = input.changeName

@@ -6,17 +6,26 @@ import {
   type LifecycleNextHop,
   type LifecycleReviewSummary,
 } from '../../domain/services/lifecycle-verdict.js'
-import { isWorkflowStepEnabled } from '../../domain/services/workflow-topology.js'
+import { type CheckAction, type CheckResult } from '../../domain/services/transition-checks.js'
+import {
+  isDrainState,
+  isWorkflowStepEnabled,
+  nextWorkflowStep,
+} from '../../domain/services/workflow-topology.js'
 import { type Schema } from '../../domain/value-objects/schema.js'
-import { boundFromStates } from '../../domain/services/check-bindings.js'
 
-/** Public next-action including the application-owned command string. */
+/** Host-neutral workflow phase intent emitted by core guidance. */
+export type LifecycleActionIntent = 'design' | 'implement' | 'verify' | 'archive'
+
+/** Public next-action including host-neutral intent and optional check-declared action. */
 export interface LifecycleNextAction extends LifecycleNextHop {
-  readonly command: string | null
+  readonly intent: LifecycleActionIntent | null
+  readonly action?: CheckAction
 }
 
 /**
- * Resolves the product command or skill string for a lifecycle next hop.
+ * Resolves the host-neutral phase intent and optional check-declared remediation action
+ * for a lifecycle next hop.
  *
  * @param change - Active change aggregate
  * @param nextHop - Domain next-hop recommendation
@@ -27,9 +36,10 @@ export interface LifecycleNextAction extends LifecycleNextHop {
  * @param approvals.signoff - Whether signoff approval is enabled in config
  * @param schema - Sovereign change schema; guidance follows its topology
  * @param validity - Reconciled validity verdict, when one is available
- * @returns Skill or CLI command string, or null when no guidance applies
+ * @param hopFailures - Failed predicate results of the hop the recommendation waits on
+ * @returns Host-neutral intent and optional check action
  */
-export function resolveLifecycleCommand(
+export function resolveLifecycleIntent(
   change: Change,
   nextHop: LifecycleNextHop,
   review: LifecycleReviewSummary,
@@ -37,172 +47,151 @@ export function resolveLifecycleCommand(
   approvals: { readonly spec: boolean; readonly signoff: boolean },
   schema: Schema,
   validity?: ChangeValidityVerdict,
-): string | null {
-  const state = change.state
-  const verifyingEnabled = isWorkflowStepEnabled('verifying', schema)
+  hopFailures: readonly CheckResult[] = [],
+): { readonly intent: LifecycleActionIntent | null; readonly action?: CheckAction } {
   // Retained in the public contract for diagnostics; routing follows Core's selected nextHop.
   void availableTransitions
 
-  if (validity?.specApproval === 'stale' || validity?.specApproval === 'revoked') {
-    return '/specd-design'
+  const phaseIntent = resolvePhaseIntent(change, nextHop, review, approvals, schema, validity)
+  const firstWithAction = hopFailures.find((result) => result.action !== undefined)
+  if (firstWithAction?.action !== undefined) {
+    return {
+      intent: firstWithAction.action.supersedesIntent === false ? phaseIntent : null,
+      action: firstWithAction.action,
+    }
   }
+  return { intent: phaseIntent }
+}
+
+/**
+ * Resolves the phase-level intent from topology, review, and validity without
+ * inspecting specific check ids or parking states.
+ *
+ * @param change - Active change aggregate
+ * @param nextHop - Domain next-hop recommendation
+ * @param review - Artifact review summary
+ * @param approvals - Configured approval gates
+ * @param approvals.spec - Whether spec approval is enabled
+ * @param approvals.signoff - Whether signoff approval is enabled
+ * @param schema - Sovereign change schema
+ * @param validity - Reconciled validity verdict, when available
+ * @returns Phase intent or `null` when no phase intent applies
+ */
+function resolvePhaseIntent(
+  change: Change,
+  nextHop: LifecycleNextHop,
+  review: LifecycleReviewSummary,
+  approvals: { readonly spec: boolean; readonly signoff: boolean },
+  schema: Schema,
+  validity?: ChangeValidityVerdict,
+): LifecycleActionIntent | null {
+  const state = change.state
+  const verifyingEnabled = isWorkflowStepEnabled('verifying', schema)
 
   if (
     verifyingEnabled &&
     validity !== undefined &&
-    nextHop.reason === 'Renew verification in place' &&
+    validity.recovery === null &&
     isAtOrAfterVerificationBoundary(state, schema, approvals) &&
     (validity.verification === 'stale' ||
       validity.verification === 'absent' ||
       validity.verification === 'attempt-active')
   ) {
-    return '/specd-verify'
+    return 'verify'
   }
 
-  const guidance: PhaseGuidance = { verifyingEnabled, review, approvals, validity }
-
   if (validity?.artifactReviewRequired === true && validity.recovery === null) {
-    return phaseCommand(change, nextHop, guidance)
+    return 'design'
   }
 
   if (review.required || validity?.recovery?.cause === 'workflow-redesign') {
-    return '/specd-design'
+    return 'design'
   }
 
-  if (
-    boundFromStates('approval.spec').includes(state) &&
-    approvals.spec &&
-    change.activeSpecApproval === undefined
-  ) {
-    return 'specd changes approve spec'
-  }
-
-  if (
-    boundFromStates('approval.signoff').includes(state) &&
-    approvals.signoff &&
-    change.activeSignoff === undefined
-  ) {
-    return 'specd changes approve signoff'
-  }
-
-  return phaseCommand(change, nextHop, guidance)
+  return intentForStateAndHop(change, nextHop, verifyingEnabled, review, approvals, schema)
 }
 
-/** Context phase guidance needs beyond the change and next hop. */
-interface PhaseGuidance {
-  readonly verifyingEnabled: boolean
-  readonly review: LifecycleReviewSummary
-  readonly approvals: { readonly spec: boolean; readonly signoff: boolean }
-  readonly validity: ChangeValidityVerdict | undefined
+/** Phase owned by a state itself, regardless of the selected hop. */
+const OWN_PHASE: Readonly<Partial<Record<ChangeState, LifecycleActionIntent>>> = {
+  drafting: 'design',
+  designing: 'design',
+  verifying: 'verify',
+  archivable: 'archive',
+}
+
+/** Phase that owns a hop target. The four phase intents are a fixed vocabulary. */
+const TARGET_PHASE: Readonly<Partial<Record<ChangeState, LifecycleActionIntent>>> = {
+  designing: 'design',
+  implementing: 'implement',
+  verifying: 'verify',
+  done: 'archive',
+  archivable: 'archive',
+  archiving: 'archive',
 }
 
 /**
- * Phase command.
+ * Maps the current state and selected next hop to a phase intent. Schema-dependent facts
+ * (enabled steps, drain exits) come from the topology; the two tables above only map a
+ * state or hop target to one of the four phase intents.
  *
- * @param change - change
- * @param nextHop - next hop
- * @param guidance - Schema topology, review, approvals, and validity context
- * @returns phase command result
+ * @param change - Active change aggregate
+ * @param nextHop - Domain next-hop recommendation
+ * @param verifyingEnabled - Whether `verifying` is enabled in the schema
+ * @param review - Artifact review summary
+ * @param approvals - Configured approval gates
+ * @param approvals.spec - Whether spec approval is enabled
+ * @param approvals.signoff - Whether signoff approval is enabled
+ * @param schema - Sovereign change schema
+ * @returns Phase intent or `null`
  */
-function phaseCommand(
+function intentForStateAndHop(
   change: Change,
   nextHop: LifecycleNextHop,
-  guidance: PhaseGuidance,
-): string | null {
+  verifyingEnabled: boolean,
+  review: LifecycleReviewSummary,
+  approvals: { readonly spec: boolean; readonly signoff: boolean },
+  schema: Schema,
+): LifecycleActionIntent | null {
   const state = change.state
-  const { verifyingEnabled, review, approvals, validity } = guidance
 
-  if (state === 'drafting' || state === 'designing') {
-    return '/specd-design'
-  }
+  if (nextHop.targetStep === 'designing') return 'design'
 
-  if (state === 'ready') {
-    if (nextHop.targetStep === 'implementing') return '/specd-implement'
-    if (nextHop.targetStep === 'verifying') return '/specd-verify'
-    if (nextHop.targetStep === 'done' || nextHop.targetStep === 'archivable') {
-      return '/specd-archive'
-    }
-  }
+  const own = OWN_PHASE[state]
+  if (own !== undefined) return own
 
-  if (state === 'pending-spec-approval') {
-    return 'specd changes approve spec'
-  }
-
-  if (state === 'spec-approved') {
-    if (nextHop.targetStep === 'implementing') return '/specd-implement'
-    if (nextHop.targetStep === 'verifying') return '/specd-verify'
-    if (nextHop.targetStep === 'done' || nextHop.targetStep === 'archivable') {
-      return '/specd-archive'
-    }
-  }
-
-  if (state === 'implementing') {
-    if (nextHop.targetStep === 'verifying') return '/specd-verify'
-    if (nextHop.targetStep === 'done' || nextHop.targetStep === 'archivable') {
-      return '/specd-archive'
-    }
-    return '/specd-implement'
-  }
-
-  if (state === 'verifying') {
-    return '/specd-verify'
-  }
-
-  if (state === 'pending-signoff') {
-    return 'specd changes approve signoff'
-  }
-
-  if (state === 'done' || state === 'signed-off') {
-    if (nextHop.targetStep === 'archivable') return '/specd-archive'
-    if (!verifyingEnabled) {
-      // Without verification evidence the blocker is design, review, or sign-off.
-      if (nextHop.targetStep === 'designing' || review.required) return '/specd-design'
-      if (
-        approvals.signoff &&
-        (validity !== undefined ? validity.signoff !== 'valid' : change.activeSignoff === undefined)
-      ) {
-        return 'specd changes approve signoff'
-      }
-      return '/specd-archive'
-    }
-    return '/specd-verify'
-  }
-
-  if (state === 'archivable') {
-    return '/specd-archive'
+  if (state === 'done') {
+    if (nextHop.targetStep === 'archivable') return 'archive'
+    if (!verifyingEnabled) return review.required ? 'design' : 'archive'
+    return 'verify'
   }
 
   if (state === 'archiving') {
     const lastArchiveFailure = [...change.history]
       .reverse()
       .find((event) => event.type === 'archive-failed')
-    if (
-      lastArchiveFailure?.type === 'archive-failed' &&
-      lastArchiveFailure.commitStarted &&
-      change.state === 'archiving'
-    ) {
-      return '/specd-design'
-    }
-    return 'specd change archive'
+    return lastArchiveFailure?.type === 'archive-failed' && lastArchiveFailure.commitStarted
+      ? 'design'
+      : 'archive'
+  }
+
+  if (state === 'implementing') {
+    return TARGET_PHASE[nextHop.targetStep] ?? 'implement'
   }
 
   if (nextHop.targetStep !== state) {
-    if (nextHop.targetStep === 'implementing') return '/specd-implement'
-    if (nextHop.targetStep === 'verifying') return '/specd-verify'
-    if (
-      nextHop.targetStep === 'done' ||
-      nextHop.targetStep === 'archivable' ||
-      nextHop.targetStep === 'archiving'
-    )
-      return '/specd-archive'
-    if (nextHop.targetStep === 'designing') return '/specd-design'
+    return TARGET_PHASE[nextHop.targetStep] ?? null
+  }
+
+  if (isDrainState(state)) {
+    const exit = nextWorkflowStep(state, schema, approvals)
+    return exit === null ? null : (TARGET_PHASE[exit] ?? null)
   }
 
   return null
 }
 
 /**
- * Assembles a full next action from a domain next hop and product command resolution.
+ * Assembles a full next action from a domain next hop and host-neutral intent resolution.
  *
  * @param change - Active change aggregate
  * @param nextHop - Domain next-hop recommendation
@@ -213,7 +202,8 @@ function phaseCommand(
  * @param approvals.signoff - Whether signoff approval is enabled in config
  * @param schema - Sovereign change schema; guidance follows its topology
  * @param validity - Reconciled validity verdict, when one is available
- * @returns Next hop fields plus resolved command string
+ * @param hopFailures - Failed predicate results of the hop the recommendation waits on
+ * @returns Next hop fields plus resolved intent and optional check action
  */
 export function resolveLifecycleNextAction(
   change: Change,
@@ -223,17 +213,21 @@ export function resolveLifecycleNextAction(
   approvals: { readonly spec: boolean; readonly signoff: boolean },
   schema: Schema,
   validity?: ChangeValidityVerdict,
+  hopFailures: readonly CheckResult[] = [],
 ): LifecycleNextAction {
+  const resolved = resolveLifecycleIntent(
+    change,
+    nextHop,
+    review,
+    availableTransitions,
+    approvals,
+    schema,
+    validity,
+    hopFailures,
+  )
   return {
     ...nextHop,
-    command: resolveLifecycleCommand(
-      change,
-      nextHop,
-      review,
-      availableTransitions,
-      approvals,
-      schema,
-      validity,
-    ),
+    intent: resolved.intent,
+    ...(resolved.action !== undefined ? { action: resolved.action } : {}),
   }
 }

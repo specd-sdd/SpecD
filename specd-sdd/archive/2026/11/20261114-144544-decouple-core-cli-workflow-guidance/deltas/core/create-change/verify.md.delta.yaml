@@ -1,0 +1,36 @@
+- op: modified
+  description: 'Audit round 10 wording'
+  selector:
+    type: section
+    matches: 'Scenario: Persisted dependency state seeds dependencies at creation time'
+  content: |
+    - **GIVEN** `CreateChange.execute` is called with a spec that already exists in a repository
+    - **AND** that repository returns persisted state from `readPersistedState(spec)`
+    - **WHEN** the change is constructed
+    - **THEN** the change seeds `specDependsOn` for that spec from the `dependsOn` of that persisted state
+
+- op: removed
+  description: 'Audit round 10 rename'
+  selector:
+    type: section
+    matches: 'Scenario: Legacy metadata seeds when persisted semantic state is absent'
+
+- op: removed
+  description: 'Audit round 10 rename'
+  selector:
+    type: section
+    matches: 'Scenario: Stale metadata still seeds as legacy fallback'
+
+- op: added
+  description: 'Audit round 10 scenario'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Initial specDependsOn seeding'
+  content: |
+    #### Scenario: Absent persisted state seeds no dependency entry
+
+    - **GIVEN** `CreateChange.execute` is called with a spec that exists in its repository but has no persisted state
+    - **WHEN** the change is constructed
+    - **THEN** no `specDependsOn` entry is seeded for that spec
+    - **AND** `metadata.json.dependsOn` is not consulted

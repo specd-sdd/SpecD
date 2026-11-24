@@ -243,7 +243,7 @@ describe('ApproveSpec', () => {
   })
 
   describe('given the spec approval gate is enabled and change is in pending-spec-approval (drain)', () => {
-    it('appends approval and drain transition without removing the pending history', async () => {
+    it('appends approval without transitioning or removing the pending history', async () => {
       const change = makePendingSpecApprovalChange('legacy-history')
       const historyBefore = [...change.history]
       const repo = makeChangeRepository([change])
@@ -255,10 +255,7 @@ describe('ApproveSpec', () => {
       })
 
       expect(result.history.slice(0, historyBefore.length)).toEqual(historyBefore)
-      expect(result.history.slice(-2).map((event) => event.type)).toEqual([
-        'spec-approved',
-        'transitioned',
-      ])
+      expect(result.history.slice(-1).map((event) => event.type)).toEqual(['spec-approved'])
       expect(
         result.history.some(
           (event) => event.type === 'transitioned' && event.to === 'pending-spec-approval',
@@ -281,7 +278,7 @@ describe('ApproveSpec', () => {
       expect(result.activeSpecApproval?.reason).toBe('looks good')
     })
 
-    it('transitions the change to spec-approved', async () => {
+    it('keeps the change in pending-spec-approval without an implicit transition', async () => {
       const change = makePendingSpecApprovalChange('my-change')
       const repo = makeChangeRepository([change])
       vi.spyOn(repo, 'artifact').mockResolvedValue(null)
@@ -292,7 +289,7 @@ describe('ApproveSpec', () => {
         reason: 'looks good',
       })
 
-      expect(result.state).toBe('spec-approved')
+      expect(result.state).toBe('pending-spec-approval')
     })
 
     it('computes artifact hashes from loaded artifacts', async () => {
@@ -321,7 +318,8 @@ describe('ApproveSpec', () => {
         reason: 'ok',
       })
 
-      expect(repo.store.get('my-change')?.state).toBe('spec-approved')
+      expect(repo.store.get('my-change')?.state).toBe('pending-spec-approval')
+      expect(repo.store.get('my-change')?.activeSpecApproval?.reason).toBe('ok')
     })
 
     it('persists through ChangeRepository.mutate', async () => {

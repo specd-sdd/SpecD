@@ -3,6 +3,7 @@ import { DependsOnOverwriteError } from '../../../src/domain/errors/depends-on-o
 import { HistoricalImplementationGuardError } from '../../../src/domain/errors/historical-implementation-guard-error.js'
 import { HappyPathNextUnavailableError } from '../../../src/domain/errors/happy-path-next-unavailable-error.js'
 import { InvalidateRequiresForceError } from '../../../src/application/errors/invalidate-requires-force-error.js'
+import { SpecNotInitializedError } from '../../../src/domain/errors/spec-not-initialized-error.js'
 import { SpecNotInChangeError } from '../../../src/application/errors/spec-not-in-change-error.js'
 
 describe('Host-neutral core error messages and metadata getters', () => {
@@ -53,5 +54,35 @@ describe('Host-neutral core error messages and metadata getters', () => {
       "Spec 'core:auth' is not in the current specIds of change 'my-change'.",
     )
     expect(err.message).not.toContain('specd specs show')
+  })
+
+  describe('remedy-free messages', () => {
+    const forbidden = [/Pass force/i, /--force/, /run "specs init"/, /\bforce\b/i]
+    const cases: ReadonlyArray<readonly [string, () => Error]> = [
+      ['DependsOnOverwriteError', () => new DependsOnOverwriteError(['core:a'], ['core:b'])],
+      [
+        'InvalidateRequiresForceError',
+        () =>
+          new InvalidateRequiresForceError([
+            { gate: 'spec' as const, target: 'designing' as const },
+          ]),
+      ],
+      ['SpecNotInitializedError', () => new SpecNotInitializedError('core:auth')],
+    ]
+
+    for (const [name, make] of cases) {
+      it(`${name} message names no force or init remedy`, () => {
+        const { message } = make()
+        for (const pattern of forbidden) {
+          expect(message, `${name} vs ${String(pattern)}`).not.toMatch(pattern)
+        }
+      })
+    }
+  })
+
+  it('HistoricalImplementationGuardError names no use-case input as a remedy', () => {
+    const err = new HistoricalImplementationGuardError('draft', 'my-change')
+    expect(err.message).not.toMatch(/\bforce\b/i)
+    expect(err.message).toContain('explicit confirmation')
   })
 })

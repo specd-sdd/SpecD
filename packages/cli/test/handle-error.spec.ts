@@ -24,7 +24,7 @@ import {
   HookFailedError,
   SchemaValidationError,
   ConfigValidationError,
-  ArchiveDependencyMismatchError,
+  CheckPredicateFailedError,
   PluginDestroyError,
   PluginValidationError,
   InvalidSpecLockError,
@@ -320,21 +320,35 @@ describe('handleError — structured error output', () => {
 
   it('structured output preserves contextual metadata from SpecdError getters', () => {
     callHandleError(
-      new ArchiveDependencyMismatchError(
-        'core:archive-change',
-        ['core:change', 'core:storage'],
-        ['core:change', 'default:_global/error-handling-conventions'],
+      new CheckPredicateFailedError(
+        'deps.consistent',
+        'Checking dependency consistency',
+        'DEPS_INCONSISTENT',
+        'Extracted dependsOn disagrees with persisted values',
+        undefined,
+        {
+          mismatches: [
+            {
+              specId: 'core:archive-change',
+              extracted: ['core:change', 'default:_global/error-handling-conventions'],
+              persisted: ['core:change', 'core:storage'],
+            },
+          ],
+        },
+        false,
+        { from: 'archivable', to: 'archiving' },
       ),
       'json',
     )
 
     const parsed = JSON.parse(capturedStdout()) as Record<string, unknown>
-    expect(parsed.code).toBe('ARCHIVE_DEPENDENCY_MISMATCH')
-    expect(parsed.message).toContain('Archive failed')
-    expect(parsed.metadata).toEqual({
-      specId: 'core:archive-change',
-      expectedDeps: ['core:change', 'core:storage'],
-      actualDeps: ['core:change', 'default:_global/error-handling-conventions'],
+    expect(parsed.code).toBe('DEPS_INCONSISTENT')
+    expect(parsed.message).toContain("Check 'deps.consistent' failed")
+    expect(parsed.metadata).toMatchObject({
+      checkId: 'deps.consistent',
+      checkCode: 'DEPS_INCONSISTENT',
+      from: 'archivable',
+      to: 'archiving',
     })
   })
 
@@ -507,7 +521,9 @@ describe('handleError — command-aware hint rendering', () => {
     callHandleError(err, 'json', { command: 'change.archive' })
     const payload = JSON.parse(capturedStdout()) as { code: string; hint?: string }
     expect(payload.code).toBe('IMPLEMENTATION_STATE')
-    expect(payload.hint).toContain('--skip-checks impl.linksInScope')
-    expect(payload.hint).toContain('--allow-out-of-scope')
+    expect(payload.hint).toBe(
+      'Retry with --skip-checks impl.linksInScope if an exception is granted',
+    )
+    expect(payload.hint).not.toContain('--allow-out-of-scope')
   })
 })
