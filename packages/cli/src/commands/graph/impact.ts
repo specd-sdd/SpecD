@@ -438,7 +438,7 @@ JSON/TOON output schema:
         }
         const filter = normalizeImpactResultFilter(opts, opts.format)
 
-        const { config, kernel } = await resolveGraphCliContext({
+        const { config, kernel, host } = await resolveGraphCliContext({
           configPath: opts.config,
           repoPath: opts.path,
         }).catch((err: unknown) =>
@@ -498,7 +498,7 @@ JSON/TOON output schema:
               )
             }
           },
-          { kernel },
+          { host },
         )
       },
     )

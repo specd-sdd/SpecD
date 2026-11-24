@@ -62,6 +62,10 @@ If a single `<specPath>` does not exist, write error to stderr, exit 1.
 
 If `--workspace <name>` references an unknown workspace, write error to stderr, exit 1.
 
+### Requirement: Error — dependsOn overwrite hint
+
+When `specs validate` surfaces a `DependsOnOverwriteError` (`DEPENDS_ON_OVERWRITE`), it MUST NOT suggest passing `--force` to `specs validate` (which has no `--force` flag). Instead, the CLI SHALL render a command-appropriate hint guiding the user to update dependencies via `specd specs deps add/set` or regenerate metadata via `specd specs generate-metadata --force`.
+
 ## Constraints
 
 - The command contains no validation logic — all rules are evaluated by the `ValidateSpecs` use case

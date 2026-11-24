@@ -377,6 +377,9 @@ importers:
       '@specd/core':
         specifier: workspace:*
         version: link:../core
+      '@specd/plugin-manager':
+        specifier: workspace:*
+        version: link:../plugin-manager
 
   packages/skills:
     dependencies:

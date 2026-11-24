@@ -16,6 +16,8 @@ function makeContext(provider: ReturnType<typeof makeProvider>): SdkHostContext 
   return {
     kernel: {} as SdkHostContext['kernel'],
     createGraphProvider: () => provider as never,
+    dispose: async () => {},
+    [Symbol.asyncDispose]: async () => {},
   }
 }
 

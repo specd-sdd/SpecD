@@ -10,14 +10,21 @@
     "skills:skill-templates-source",
     "skills:resolve-bundle",
     "skills:agents",
-    "skills:agent-instruction-template"
+    "skills:agent-instruction-template",
+    "skills:shared-folder-owners"
   ],
   "implementation": [
     {
-      "file": "plugin-agent-copilot:src/domain/frontmatter/index.ts"
+      "file": "plugin-agent-copilot:src/application/use-cases/uninstall-skills.ts",
+      "symbols": ["UninstallSkills"]
     },
     {
-      "file": "plugin-agent-copilot:test/install-skills.spec.ts"
+      "file": "plugin-agent-copilot:src/application/use-cases/install-skills.ts",
+      "symbols": ["InstallSkills"]
+    },
+    {
+      "file": "plugin-agent-copilot:src/index.ts",
+      "symbols": ["create"]
     }
   ]
 }

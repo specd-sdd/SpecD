@@ -1,4 +1,4 @@
-import { createVcsAdapter, type Kernel, type SpecdConfig } from '@specd/sdk'
+import { createVcsAdapter, type Kernel, type SdkHostContext, type SpecdConfig } from '@specd/sdk'
 import { CliValidationError } from '../../errors/index.js'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { resolveConfigPath } from '../../load-config.js'
@@ -16,6 +16,8 @@ export interface GraphCliContext {
   readonly configFilePath: string | null
   /** Wired kernel for configured mode, else `null`. */
   readonly kernel: Kernel | null
+  /** Opened SDK host for configured mode, else `null` (bootstrap mode opens its own). */
+  readonly host: SdkHostContext | null
   /** Root directory used for graph storage. */
   readonly projectRoot: string
   /** Resolved repository root, when bootstrap mode requires one. */
@@ -51,6 +53,7 @@ export async function resolveGraphCliContext(options?: {
       config: context.config,
       configFilePath: context.configFilePath,
       kernel: context.kernel,
+      host: context,
       projectRoot: context.config.projectRoot,
       vcsRoot: null,
     }
@@ -64,6 +67,7 @@ export async function resolveGraphCliContext(options?: {
       config: context.config,
       configFilePath: context.configFilePath,
       kernel: context.kernel,
+      host: context,
       projectRoot: context.config.projectRoot,
       vcsRoot: null,
     }
@@ -87,6 +91,7 @@ async function createBootstrapContext(startPath: string): Promise<GraphCliContex
     config,
     configFilePath: null,
     kernel: null,
+    host: null,
     projectRoot: vcsRoot,
     vcsRoot,
   }

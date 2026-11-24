@@ -10,61 +10,55 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/domain/value-objects/qualified-reference-fact.ts",
-      "symbols": ["QualifiedReferenceKind", "QualifiedReferenceFact", "qualifiedReferenceKey"]
+      "file": "code-graph:src/domain/value-objects/symbol-reference.ts",
+      "symbols": [
+        "createLogicalSymbol",
+        "parseLogicalSymbol",
+        "deriveQualifiedName",
+        "assignQualifiedNames"
+      ]
     },
     {
-      "file": "code-graph:src/domain/value-objects/file-analysis.ts",
-      "symbols": ["FileAnalysisDraft"]
+      "file": "code-graph:src/domain/services/exact-lane-query.ts",
+      "symbols": ["isExactLaneQuery", "qualifiedLookupText"]
     },
     {
-      "file": "code-graph:test/domain/value-objects/qualified-reference-fact.spec.ts"
-    },
-    {
-      "file": "code-graph:src/domain/value-objects/index.ts"
-    },
-    {
-      "file": "code-graph:src/index.ts"
-    },
-    {
-      "file": "code-graph:src/public.ts"
-    },
-    {
-      "file": "code-graph:test/barrel.spec.ts"
+      "file": "code-graph:src/domain/services/parse-member-reference.ts",
+      "symbols": ["parseDottedMemberReference", "renderDottedMemberReference"]
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Immutable language-neutral model for graph nodes, semantic identities, bindings, relations, runtime facts, and coverage.",
+      "value": "Defines immutable graph nodes, analysis facts, logical symbols, member semantics, bindings, coverage, and deterministic relations.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:b21a33751b81b117d6163cd2755ba16a6c379c0778bc359ba00e2fb57a52d977",
-          "lastModified": "2026-11-02T19:27:44.791Z"
+          "hash": "sha256:a7fa9c173421d6b97fecb8d67df429f61158d6495fcba9c896d0f5fd72ad1fcb",
+          "lastModified": "2026-09-28T11:19:59.099Z"
         },
         "verify.md": {
-          "hash": "sha256:49fa230ed0d26fb52611984972796109fe7fbea94dec6de4fa4a6c5d9b0acd7d",
-          "lastModified": "2026-11-02T19:27:44.806Z"
+          "hash": "sha256:d99e928446663c3e04da37da6da0b38a10bc75bbef94007270a9cfdc14d37ac7",
+          "lastModified": "2026-09-28T11:19:59.102Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Symbol Model\n\n## Rules\n- `FileNode`: canonical forward-slash `{workspace}:{relativeToCodeRoot}` `path`; project-relative diagnostic path; language, content hash, workspace, optional deferred embedding. Equality by `path`. Optional `namespace` + `namespaceSeparator` co-occur, survive hydration, ignore equality.\n- `SpecNode`: identity `specId`; path, title, description, artifact-derived content/hash, ordered `dependsOn`, workspace. Equality by `specId`.\n- `SymbolNode`: deterministic `filePath + kind + name + line + column` identity; canonical file path, project-relative path, full construct range, exact `selectionRange`, optional comment. Ranges 1-based lines, 0-based half-open columns; construct non-empty and contains selection.\n- Specs, Files, Symbols, Documents use workspace-qualified canonical primary identities.\n- Immutable runtime `FileAnalysisDraft`, `FileAnalysis`, `ParserState`, `AdapterSessionState` carry symbols, imports, deterministic binding/call facts, optional `qualifiedReferenceFacts`, namespace context, normalized metadata, run-local identity, compact reusable parser/cache data. Distinct from persistence; no persisted ID/schema changes.\n- Optional `qualifiedReferenceFacts`: syntax-only `qualifier.name` evidence with `kind` `call`|`construct`|`type`, optional `sourceSymbolId`, location. Absent≡empty; never alone implies relation/target; resolution owned by `code-graph:language-adapter`.\n- Run-scoped lookup: files by canonical path/run ID; symbols by file/simple/qualified name; file↔symbol; specs/documents; spec↔covered symbol; pre-persistence relation dedupe. `IndexSession`/`SymbolIndex` may collaborate.\n- Retained parser/session state, facts, imports, indexes = plain immutable data; never retain AST/parser trees/cursors after per-file analysis.\n- `DocumentNode`: searchable non-code text; same identity format including reserved `root:`.\n- Closed `SymbolKind`: `function`, `class`, `method`, `variable`, `type`, `interface`, `enum`, `property`. File/module state→Variable no `parentId`; routine-local→Variable + routine `parentId`; container state→Property + container `parentId`.\n- Closed `RelationType`: `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`. Equality = source+target+type.\n- Hierarchy: type→ancestor `EXTENDS`; type→contract `IMPLEMENTS`; replacing/concretizing method→`OVERRIDES`. Language inheritance-adjacent MAY normalize conservatively.\n- `ImportDeclaration`: local/original names, raw specifier, relative flag, optional kind. Side-effect/dynamic/require/Go blank = empty names, no fake symbols; resolve later.\n- Immutable scoped facts: scope ownership; source-aware bindings; local/parameter/property/class-managed/inherited/global/imported/framework/constructor/alias sources; free/member/static/constructor calls; caller; deterministic evidence. Scope cycles abort lookup.\n- Deterministic facts emit persisted `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`. Drop self-relations; unresolved = non-persisted diagnostics only. No runtime/reflection/container/interprocedural guessing.\n- All model/aggregate props `readonly`; graph mutation only via atomic `GraphStore` replacement.\n- `SpecdCodeGraphError extends SpecdError`; package errors: `InvalidSymbolKindError`, `InvalidRelationTypeError`, `DuplicateSymbolIdError`, `StoreNotOpenError`.\n- Logical ≠ physical declaration. Language-proven overload/merge/augmentation MAY group; competing stay distinct. Structured workspace, surface, canonical logical owner, symbol space, simple name, `MemberSemantics`, escaped versioned canonical reference authoritative. Canonical ref includes semantic axes, round-trips, survives location moves; rejects retired single-form encoding.\n- Owned logical symbol stores exact dotted `qualified_name`; top-level omits. Not canonical ID, alias row, simple-name replacement, or FTS exact-match surrogate; `::` queries compare as dotted spelling.\n- Logical identity carries no package name. `SymbolKind` stays broad; symbol space + member semantics independent. Namespace/module = owner-path role/surface, not `SymbolKind`.\n- `declaringOwner` = canonical logical owner, never parser/location/display ID. Adapter establishes owner before members; emits lexical occurrence `parentId`. Same-name under different owners never share identity.\n- Three non-bijective layers: physical location-backed `SymbolNode`; scope/range-preserving `LocalBinding`; semantic `LogicalSymbol`. Parameters/receivers/aliases/locals stay bindings unless proven addressable. Unmapped physical decls remain navigation/dependency evidence.\n- Multiple decls share logical identity only with positive language grouping evidence; absent/empty/unknown key never groups. Logical target retains deterministic declaration set.\n- `MemberSemantics` = `kind`+`dispatch`+`accessor`+optional `nativeKind`; retired `MemberForm` absent. Preserve type/value/namespace-module/property spaces and language-sensitive case; never globally lowercase or collapse differing axes.\n- Public binding slot = surface+exported name+symbol space. Each target/ordered re-export route distinct binding identity incl. default/anonymous; never first same-name workspace symbol. Local bindings preserve scope/range; aliases/shadowing/competing routes never collapse via metadata-insensitive relation equality.\n- Physical dependency/hierarchy relations authoritative. Logical projection MAY aggregate but retains every declaration, relation, source location. Counts label physical vs logical; unmapped decls = declaration-only evidence.\n- `COVERS_SYMBOL` targets `LogicalSymbol.id`; physical traversal projects to logical while retaining declaration locations. Persist per-file/package coverage state + indexed hash for indexed/excluded/unsupported/parse-failed/partial.\n\n## Constraints\n- Structural value equality except deterministic `SymbolNode.id`.\n- Adding `SymbolKind` or `RelationType` requires spec change.\n- Runtime dependency on `@specd/core`.\n- `FileNode.embedding` deferred until embedding pipeline.\n- `COVERS_FILE`/`COVERS_SYMBOL` vocabulary exists but v1.5/v2 processes do not populate it.\n- v1.5 indexer populates `DEPENDS_ON` from `.specd-metadata.yaml` or `spec.md`.\n- v2 persists `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES` for supported languages.",
+      "value": "# Symbol Model\n\n## Rules\n- `FileNode.path` canonical `{workspace}:{relativeToCodeRoot}`, forward-slash; `configRelativePath` config-root-relative and may contain `..`; plus language/hash/workspace, deferred embedding. Equality by canonical path.\n- `SpecNode` identity `specId`; metadata title/description/dependsOn defaults; content/hash concatenate `spec.md` then other artifacts alphabetically, excluding metadata. `DocumentNode` searchable non-code with workspace-qualified identity.\n- `SymbolNode.id` remains deterministic location occurrence (`filePath + kind + name + line + column`); complete half-open construct range uses 1-based lines/0-based columns and contains exact-name `selectionRange`; line/column alias construct start.\n- All Specs/Files/Symbols/Documents use workspace-qualified canonical primary identities.\n- Immutable compact `FileAnalysisDraft`/`FileAnalysis` contain symbols, imports, bindings, calls, namespace context, normalized metadata, optional plain `ParserState`/`AdapterSessionState`; never retain AST/parser objects. `IndexSession`/`SymbolIndex` provide bounded file/symbol/spec/document/coverage lookup and relation dedup.\n- Closed `SymbolKind`: `function`, `class`, `method`, `variable`, `type`, `interface`, `enum`.\n- Closed relations: `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`. Relation equality = source/target/type; `metadata.stale` applies to unresolved `COVERS_SYMBOL`, not generic materialization failure.\n- `ImportDeclaration`: local/original/specifier/relative plus optional `named|namespace|default|side-effect|dynamic|require|blank`; undefined means named. File-only forms use empty names and create no fake symbol.\n- Immutable scoped facts model scope ownership, binding sources, calls, deterministic reason/diagnostics. Parent-scope cycles abort lookup. Emit only deterministic persisted relations; drop self-relations and speculative facts.\n- Distinguish declaration occurrences from logical symbols; language-defined overload/merge may share logical identity, competing declarations remain distinct.\n- Logical symbol structured authority: workspace, surface, `declaringOwner`, symbol space, simple name, `MemberSemantics`, versioned delimiter-safe escaped canonical reference. Canonical reference includes semantic axes, survives location movement, round-trips, never uses human `.`/`::`; retired member-form encoding is invalid current ID.\n- Owned logical symbol stores exact `qualified_name` as dotted owner chain + simple name; top-level omits it. `::` query compares to same spelling. Qualified name is not canonical ID, alias row, simple-name replacement, or FTS exact store.\n- Logical symbols carry no package name. Workspace plus adapter package map owns package identity. `SymbolKind` remains broad; namespace/module is owner-path role/surface.\n- `declaringOwner` is canonical logical identity of syntactic owner, never parser/location/display ID. Adapter emits declaration `parentId`; shared model has no language list. Same-name members under different owners differ; movement within owner preserves canonical reference.\n- `MemberSemantics` jointly represents `kind`, `dispatch`, `accessor`, optional proven `nativeKind`. No `MemberForm` in logical symbols, resolver inputs, store lookups, or persistence. Preserve language-specific type/value/namespace/module/property spaces and case rules; never globally lowercase or collapse differing semantic axes.\n- Public slot lookup uses surface + exported name + symbol space. Each proven route has independent binding identity distinguishing target or ordered re-export provenance. Binding surface is exporter; target may be cross-workspace; never first same-name guess. Local binding preserves lexical scope/range. Aliases, shadowing, competing routes/targets never collapse through relation equality; generic/native spellings are rendered, not alias rows.\n- Persist per-file/package coverage: indexed, excluded, unsupported adapter/capability, parse-failed, partial, plus indexed content hash establishing trustworthy absence.\n- All model properties readonly; mutations occur only via atomic `GraphStore` replacement.\n- Errors derive `SpecdCodeGraphError extends SpecdError`: invalid symbol/relation, duplicate ID, closed store.\n\n## Constraints\n- Value-object structural equality except deterministic `SymbolNode.id`.\n- `SymbolKind` and `RelationType` changes require spec change.\n- Runtime dependency on `@specd/core`; errors follow Specd Error Contract.\n- No reflection, runtime containers, interprocedural or whole-program inference.\n- `embedding` deferred v2+; `COVERS_*` vocabulary deferred v2+ population; `DEPENDS_ON` indexed from spec metadata/content; `CONSTRUCTS`, `USES_TYPE`, hierarchy relations first-class v2.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:b21a33751b81b117d6163cd2755ba16a6c379c0778bc359ba00e2fb57a52d977",
-          "lastModified": "2026-11-02T19:27:44.791Z"
+          "hash": "sha256:a7fa9c173421d6b97fecb8d67df429f61158d6495fcba9c896d0f5fd72ad1fcb",
+          "lastModified": "2026-09-28T11:19:59.099Z"
         },
         "verify.md": {
-          "hash": "sha256:49fa230ed0d26fb52611984972796109fe7fbea94dec6de4fa4a6c5d9b0acd7d",
-          "lastModified": "2026-11-02T19:27:44.806Z"
+          "hash": "sha256:d99e928446663c3e04da37da6da0b38a10bc75bbef94007270a9cfdc14d37ac7",
+          "lastModified": "2026-09-28T11:19:59.102Z"
         }
       }
     }

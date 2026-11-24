@@ -2,14 +2,46 @@ import { type Command } from 'commander'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
-import { ArtifactDag, type ArtifactStatusEntry, type ArtifactType } from '@specd/sdk'
+import { ArtifactDag, type ArtifactStatusEntry, type ArtifactType, type Schema } from '@specd/sdk'
+import {
+  publicValidity,
+  publicVerificationEvidence,
+  readStructuredPolicy,
+  validityTextLines,
+} from './_validity-present.js'
 import { enrichImplementationTracking } from './_implementation-tracking.js'
-import { resolveSdkHostContext } from '../../helpers/sdk-host.js'
+import { resolveChangeSchemaForCli } from '../../helpers/change-schema.js'
+import {
+  blockerTextLines,
+  projectCliBlocker,
+  projectCliNextAction,
+  projectCliNextActionRecord,
+} from '../../guidance-presenter.js'
 
-/** Resolved active schema from the kernel. */
-type ActiveSchemaResult = Awaited<
-  ReturnType<import('@specd/sdk').Kernel['specs']['getActiveSchema']['execute']>
->
+/**
+ * Projects artifact rows for structured output, with the display-status fallback shared by
+ * active and drafted status (`displayStatus`, then `effectiveStatus`, then the persisted state).
+ *
+ * @param artifactStatuses - Artifact rows from `GetStatus`
+ * @returns Structured artifact rows
+ */
+function projectArtifactStatuses(artifactStatuses: ArtifactStatusEntry[]): unknown[] {
+  return artifactStatuses.map((a) => ({
+    type: a.type,
+    state: a.state,
+    displayStatus: a.displayStatus ?? a.effectiveStatus ?? a.state,
+    effectiveStatus: a.effectiveStatus,
+    ...(a.taskCompletion !== undefined ? { taskCompletion: a.taskCompletion } : {}),
+    files: a.files.map((file) => ({
+      key: file.key,
+      filename: file.filename,
+      state: file.state,
+      displayStatus: file.displayStatus ?? file.state,
+      hasDrift: file.hasDrift,
+      ...(file.validatedHash !== undefined ? { validatedHash: file.validatedHash } : {}),
+    })),
+  }))
+}
 
 /** Schema metadata attached to lifecycle evaluation. */
 type LifecycleSchemaInfo = NonNullable<
@@ -18,25 +50,52 @@ type LifecycleSchemaInfo = NonNullable<
   >['lifecycle']['schemaInfo']
 >
 
+/** Lifecycle projection returned by `kernel.changes.status.execute`. */
+type StatusLifecycle = Awaited<
+  ReturnType<import('@specd/sdk').Kernel['changes']['status']['execute']>
+>['lifecycle']
+
 /**
- * Resolves the canonical schema DAG for status rendering, falling back to lifecycle schemaInfo.
+ * Copies optional check rows from GetStatus when the core payload includes them.
  *
- * @param activeSchema - Result from `getActiveSchema`
+ * @param lifecycle - Lifecycle projection from GetStatus
+ * @returns Structured extra fields, or an empty object when both fields are absent
+ */
+function optionalCheckFields(lifecycle: StatusLifecycle): Record<string, unknown> {
+  const extra: Record<string, unknown> = {}
+  const withChecks = lifecycle as StatusLifecycle & {
+    checksByTarget?: unknown
+    checks?: unknown
+  }
+  if ('checksByTarget' in withChecks && withChecks.checksByTarget !== undefined) {
+    extra.checksByTarget = withChecks.checksByTarget
+  }
+  if ('checks' in withChecks && withChecks.checks !== undefined) {
+    extra.checks = withChecks.checks
+  }
+  return extra
+}
+
+/**
+ * Resolves the canonical schema DAG for status rendering from the change's own schema,
+ * falling back to lifecycle schemaInfo.
+ *
+ * @param schema - The change's resolved schema, when available
  * @param schemaInfo - Schema snapshot attached to lifecycle
  * @returns DAG and artifact types for rendering
  */
 function resolveStatusSchemaDag(
-  activeSchema: ActiveSchemaResult,
+  schema: Schema | undefined,
   schemaInfo: LifecycleSchemaInfo,
 ): { dag: ArtifactDag; artifactTypes: readonly ArtifactType[] } {
   if (
-    !activeSchema.raw &&
-    typeof activeSchema.schema.artifactDag === 'function' &&
-    typeof activeSchema.schema.artifacts === 'function'
+    schema !== undefined &&
+    typeof schema.artifactDag === 'function' &&
+    typeof schema.artifacts === 'function'
   ) {
     return {
-      dag: activeSchema.schema.artifactDag(),
-      artifactTypes: activeSchema.schema.artifacts(),
+      dag: schema.artifactDag(),
+      artifactTypes: schema.artifacts(),
     }
   }
   return {
@@ -63,31 +122,155 @@ export function registerChangeStatus(parent: Command): void {
     .addHelpText(
       'after',
       `
-JSON/TOON output schema:
+JSON/TOON output schema (every field is described inline after //):
   {
-    name: string
-    state: string
-    specIds: string[]
-    schema: { name: string, version: number }
-    description?: string
-    blockers: Array<{ code: string, message: string }>
-    nextAction: { targetStep: string, actionType: string, reason: string, command: string | null }
-    specDependsOn: Record<string, string[]>
-    artifactDag: Array<{ id: string, scope: string, state: string, requires: string[], children: string[] }>
-    artifacts: Array<{
-      type: string
-      state: string
-      effectiveStatus: string
-      taskCompletion?: { complete: number, incomplete: number, total: number }
-      files: Array<{ key: string, filename: string, state: string, validatedHash?: string }>
+    name: string  // change name
+    state: string  // current lifecycle state (for drafted changes, the state the draft is in)
+    isDrafted?: boolean  // true only for drafted changes
+    specIds: string[]  // spec IDs the change targets
+    schema: {  // schema snapshot used to render the change
+      name: string  // schema name
+      version: number  // schema version
+      artifactDag: Array<{  // active changes only; omitted for drafted changes
+        id: string  // artifact type id
+        scope: string  // artifact scope (spec or change)
+        optional: boolean  // whether the artifact may be skipped
+        requires: string[]  // ids of artifacts this one depends on
+        hasTasks: boolean  // whether the artifact carries a task checklist
+        output: string  // output path pattern of the artifact
+        children: string[]  // ids of artifacts that depend on this one
+      }>
+    }
+    description?: string  // change description, when set
+    invalidation?: {  // effective invalidation policy (active changes)
+      artifacts: string  // artifact invalidation policy
+      workflow: string  // workflow invalidation policy
+    }
+    validity?: object  // validity projection: spec/signoff consent validity, drift and projection changes (active changes)
+    verification?: object  // verification evidence summary: id, status, fingerprint, validity (active changes)
+    schemaWarnings: Array<{  // schema resolution advisories
+      code: 'SCHEMA_VERSION_DRIFT'  // advisory code
+      changeName: string  // change the advisory applies to
+      schemaName: string  // schema the advisory applies to
+      recordedVersion: number  // schema version recorded on the change
+      resolvedVersion: number  // schema version resolved now
+      message: string  // human-readable advisory
     }>
-    review: {
-      required: boolean
-      route: string | null
-      reason: string | null
-      affectedArtifacts: Array<{
-        type: string
-        files: Array<{ key: string, filename: string, path: string }>
+    blockers: Array<{  // conditions currently blocking forward progress
+      code: string  // stable blocker code
+      message: string  // human-readable explanation
+      label?: string  // short check label
+      checkId?: string  // id of the check that produced the blocker
+      action?: { kind: string, params?: object }  // structured recovery action, when core provides one
+      bypassFlag?: string  // CLI flag that bypasses the blocker, when it is skippable
+      details?: Record<string, unknown>  // blocker-specific structured details
+    }>
+    nextAction: {  // recommended next step
+      targetStep: string  // lifecycle step the action moves toward
+      actionType: string  // kind of action (cognitive or mechanical)
+      reason: string  // why this action is recommended
+      intent: 'design'|'implement'|'verify'|'archive'|null  // workflow intent, or null when none applies
+      action?: { kind: string, params?: object }  // structured action, when core provides one
+      command: string | null  // command or skill to run, or null when only guidance applies
+      guidance?: string  // advice shown when command is null
+    }
+    checks?: Array<object>  // drafted changes only: lifecycle check rows, when emitted by core
+    checksByTarget?: Record<string, Array<object>>  // drafted changes only: check rows grouped by transition target, when emitted by core
+    specDependsOn: Record<string, string[]>  // per spec ID, the spec IDs it depends on
+    availableTransitions: string[]  // legacy top-level copy kept for compatibility; active changes should read lifecycle.availableTransitions
+    availableSteps: Array<{  // legacy top-level copy kept for compatibility; active changes should read lifecycle.availableSteps
+      step: string  // step name
+      optional: boolean  // whether the step may be skipped
+      available: boolean  // whether the step can be entered now
+      isReady: boolean  // whether the step prerequisites are met
+      isPermitted: boolean  // whether the schema workflow permits the step
+    }>
+    lifecycle?: {  // active (non-drafted) changes only
+      validTransitions: string[]  // protocol-legal hops
+      availableTransitions: string[]  // check-derived hops
+      availableSteps: Array<{  // per-step availability
+        step: string  // step name
+        optional?: boolean  // whether the step may be skipped
+        available: boolean  // whether the step can be entered now
+        isReady: boolean  // whether the step prerequisites are met
+        isPermitted: boolean  // whether the schema workflow permits the step
+        blockingArtifacts: string[]  // artifacts that must complete first
+      }>
+      blockers: Array<{  // per-transition blockers
+        transition: string  // transition the blocker applies to
+        reason: string  // why the transition is blocked
+        blocking: string[]  // artifacts or checks causing the block
+      }>
+      approvals: {  // approval gate status
+        spec: boolean  // spec approval recorded
+        signoff: boolean  // signoff approval recorded
+      }
+      nextArtifact: string | null  // next artifact to work on, or null
+      changePath: string  // path to the change directory
+      schemaInfo: { name: string, version: number } | null  // schema snapshot, or null when unavailable
+      checks?: Array<object>  // lifecycle check rows evaluated for the change, when emitted by core
+      checksByTarget?: Record<string, Array<object>>  // lifecycle check rows grouped by transition target, when emitted by core
+    }
+    implementationTracking?: {  // only with --implementation
+      trackedFiles: Array<{  // implementation files tracked for the change
+        file: string  // file path
+        state: 'open'|'resolved'|'ignored'  // tracking state
+      }>
+      links: Array<{  // links between specs and implementation files
+        specId: string  // linked spec ID
+        file: string  // linked file path
+        symbols?: string[]  // linked symbols, when recorded
+      }>
+      graphHealth: object  // code graph health summary
+      graphHint: { message: string }  // hint about graph freshness
+    }
+    approvalGates: {  // whether the approval gates are enabled
+      specEnabled: boolean  // spec approval gate enabled
+      signoffEnabled: boolean  // signoff approval gate enabled
+    }
+    artifactDag: Array<{  // DAG with per-artifact state
+      id: string  // artifact type id
+      scope: string  // artifact scope
+      state: string  // artifact state
+      requires: string[]  // ids of artifacts this one depends on
+      children: string[]  // ids of artifacts that depend on this one
+      hasTasks?: boolean  // whether the artifact carries a task checklist
+    }>
+    artifacts: Array<{  // artifact rows
+      type: string  // artifact type id
+      state: string  // persisted artifact state
+      effectiveStatus: string  // status after drift and dependency evaluation
+      displayStatus: string  // user-facing artifact status (falls back to effectiveStatus, then state)
+      taskCompletion?: {  // task progress, when the artifact has tasks
+        complete: number  // completed tasks
+        incomplete: number  // open tasks
+        total: number  // all tasks
+      }
+      files: Array<{  // files of the artifact
+        key: string  // file key
+        filename: string  // file name
+        state: string  // persisted file state
+        displayStatus: string  // user-facing file status
+        hasDrift: boolean  // true when the file drifted from its validated hash
+        validatedHash?: string  // hash recorded at validation
+      }>
+    }>
+    review: {  // review requirement
+      required: boolean  // whether review is required
+      route: string | null  // lifecycle route to review, or null
+      reason: string | null  // why review is required, or null
+      message?: string  // additional message
+      overlapDetail: Array<{  // archived changes overlapping this one
+        archivedChangeName: string  // overlapping archived change
+        overlappingSpecIds: string[]  // spec IDs in the overlap
+      }>
+      affectedArtifacts: Array<{  // artifacts affected by the overlap
+        type: string  // artifact type id
+        files: Array<{  // affected files
+          key: string  // file key
+          filename: string  // file name
+          path: string  // file path
+        }>
       }>
     }
   }
@@ -96,14 +279,21 @@ JSON/TOON output schema:
     .action(
       async (name: string, opts: { format: string; implementation?: boolean; config?: string }) => {
         try {
-          const { config, kernel } = await resolveCliContext({ configPath: opts.config })
+          const host = await resolveCliContext({ configPath: opts.config })
+          const { kernel } = host
           const statusResult = await kernel.changes.status.execute({
             name,
           })
 
           if (statusResult.draftView !== undefined) {
             const draftView = statusResult.draftView
-            const { artifactStatuses, lifecycle, nextAction, specDependsOn } = statusResult
+            const { artifactStatuses, lifecycle, specDependsOn } = statusResult
+            const nextAction = {
+              targetStep: statusResult.nextAction.targetStep,
+              actionType: statusResult.nextAction.actionType,
+              reason: statusResult.nextAction.reason,
+              command: null,
+            }
             const fmt = parseFormat(opts.format)
             if (fmt === 'text') {
               const lines = [
@@ -115,6 +305,16 @@ JSON/TOON output schema:
               for (const specId of draftView.specIds) {
                 const deps = specDependsOn[specId]
                 lines.push(`  ${specId}: ${deps?.length ? deps.join(', ') : '(none)'}`)
+              }
+              if (statusResult.blockers.length > 0) {
+                lines.push('', 'blockers:')
+                for (const b of statusResult.blockers) lines.push(...blockerTextLines(b))
+              }
+              if (statusResult.schemaWarnings.length > 0) {
+                lines.push('', 'warnings:')
+                for (const advisory of statusResult.schemaWarnings) {
+                  lines.push(`  ! ${advisory.code}: ${advisory.message}`)
+                }
               }
               lines.push(
                 '',
@@ -137,9 +337,13 @@ JSON/TOON output schema:
                   specIds: [...draftView.specIds],
                   schema: { name: draftView.schemaName, version: draftView.schemaVersion },
                   specDependsOn,
-                  availableTransitions: lifecycle.availableTransitions,
+                  schemaWarnings: statusResult.schemaWarnings,
+                  blockers: statusResult.blockers.map(projectCliBlocker),
+                  availableTransitions: [],
+                  availableSteps: [],
+                  ...optionalCheckFields(lifecycle),
                   nextAction,
-                  artifacts: artifactStatuses,
+                  artifacts: projectArtifactStatuses(artifactStatuses),
                 },
                 fmt,
               )
@@ -150,36 +354,36 @@ JSON/TOON output schema:
           const change = statusResult.change!
           const { artifactStatuses, lifecycle, review, blockers, nextAction } = statusResult
           const implementationTracking = opts.implementation
-            ? await enrichImplementationTracking(await resolveSdkHostContext(config, kernel), name)
+            ? await enrichImplementationTracking(host, name)
             : undefined
 
-          // Schema version warning
-          if (lifecycle.schemaInfo !== null) {
-            const recorded = `${change.schemaName}@${change.schemaVersion}`
-            const current = `${lifecycle.schemaInfo.name}@${lifecycle.schemaInfo.version}`
-            if (recorded !== current) {
-              process.stderr.write(
-                `warning: change was created with schema ${recorded} but active schema is ${current}\n`,
-              )
-            }
-          }
-
           const fmt = parseFormat(opts.format)
+          const validity = publicValidity(statusResult.validity)
+          const evidence = publicVerificationEvidence(change)
+          const invalidation = readStructuredPolicy(change)
 
           if (fmt === 'text') {
             const lines = [`change:      ${change.name}`, `state:       ${change.state}`]
             if (change.description !== undefined) {
               lines.push(`description: ${change.description}`)
             }
+            if (invalidation !== undefined) {
+              lines.push(
+                `policy:      artifacts=${invalidation.artifacts} workflow=${invalidation.workflow}`,
+              )
+            }
+            const validityLines = validityTextLines(validity, evidence)
+            if (validityLines.length > 0) {
+              lines.push('')
+              lines.push('validity:')
+              for (const line of validityLines) lines.push(`  ${line}`)
+            }
             lines.push('')
 
             // Artifact DAG Section
             if (lifecycle.schemaInfo !== null) {
-              const activeSchema = await kernel.specs.getActiveSchema.execute()
-              const { dag, artifactTypes } = resolveStatusSchemaDag(
-                activeSchema,
-                lifecycle.schemaInfo,
-              )
+              const { schema } = await resolveChangeSchemaForCli(kernel, name)
+              const { dag, artifactTypes } = resolveStatusSchemaDag(schema, lifecycle.schemaInfo)
               lines.push('artifacts (DAG):')
               lines.push(
                 '  [✓] complete  [ ] missing  [!] drifted  [~] needs review  [?] in-progress',
@@ -197,26 +401,66 @@ JSON/TOON output schema:
             }
             lines.push('')
 
+            // Invalidation overlap is review, not an OVERLAP_CONFLICT line.
+            const textBlockers =
+              review?.reason === 'spec-overlap-conflict'
+                ? blockers.filter((blocker) => blocker.code !== 'OVERLAP_CONFLICT')
+                : blockers
+
             // Blockers Section
-            if (blockers.length > 0) {
+            if (textBlockers.length > 0) {
               lines.push('blockers:')
-              for (const b of blockers) {
-                lines.push(`  ! ${b.code}: ${b.message}`)
+              for (const b of textBlockers) lines.push(...blockerTextLines(b))
+              lines.push('')
+            }
+
+            if (review?.required === true) {
+              lines.push('review:')
+              lines.push(`  required: ${review.required ? 'yes' : 'no'}`)
+              lines.push(`  route:    ${review.route ?? '(none)'}`)
+              lines.push(`  reason:   ${review.reason ?? '(none)'}`)
+              if (review.message !== undefined && review.message !== '') {
+                lines.push(`  message:  ${review.message}`)
               }
               lines.push('')
             }
 
+            // Schema resolution advisories
+            const schemaWarnings = statusResult.schemaWarnings
+            if (schemaWarnings.length > 0) {
+              lines.push('warnings:')
+              for (const advisory of schemaWarnings) {
+                lines.push(`  ! ${advisory.code}: ${advisory.message}`)
+              }
+              lines.push('')
+            }
+
+            const projectedNextAction = projectCliNextAction(nextAction, blockers)
+
             // Next Action Section
             lines.push('next action:')
-            lines.push(`  target:  ${nextAction.targetStep}`)
-            lines.push(`  command: ${nextAction.command ?? '(none)'}`)
-            lines.push(`  reason:  ${nextAction.reason}`)
+            lines.push(`  target:  ${projectedNextAction.targetStep}`)
+            lines.push(`  command: ${projectedNextAction.command ?? '(none)'}`)
+            if (
+              projectedNextAction.command === null &&
+              projectedNextAction.guidance !== undefined
+            ) {
+              lines.push(`  guidance: ${projectedNextAction.guidance}`)
+            }
+            lines.push(`  reason:  ${projectedNextAction.reason}`)
             lines.push('')
 
             // Lifecycle Section
             lines.push('lifecycle:')
             if (lifecycle.availableTransitions.length > 0) {
               lines.push(`  transitions:  ${lifecycle.availableTransitions.join(', ')}`)
+            }
+            if ((lifecycle.availableSteps ?? []).length > 0) {
+              const formattedSteps = (lifecycle.availableSteps ?? []).map((step) => {
+                const s = step as typeof step & { optional?: boolean }
+                return s.optional ? `${step.step} [optional]` : step.step
+              })
+              lines.push(`  extras:      ${formattedSteps.join(', ')}`)
             }
             if (lifecycle.nextArtifact !== null) {
               lines.push(`  next artifact: ${lifecycle.nextArtifact}`)
@@ -271,43 +515,37 @@ JSON/TOON output schema:
               }
             }
 
-            if (review?.required === true) {
+            if (
+              review?.required === true &&
+              review.reason === 'spec-overlap-conflict' &&
+              review.overlapDetail.length > 0
+            ) {
               lines.push('')
-              lines.push('review:')
-              lines.push(`  required: yes`)
-              lines.push(`  route:    ${review.route}`)
-              lines.push(`  reason:   ${review.reason}`)
-              if (review.reason === 'spec-overlap-conflict' && review.overlapDetail.length > 0) {
-                lines.push('  overlap:')
-                for (const entry of review.overlapDetail) {
-                  lines.push(
-                    `    - archived: ${entry.archivedChangeName}, specs: ${entry.overlappingSpecIds.join(', ')}`,
-                  )
-                }
-              }
-              for (const artifact of review.affectedArtifacts) {
-                lines.push(`  ${artifact.type}:`)
-                for (const file of artifact.files) {
-                  lines.push(`    - ${file.path}`)
-                }
+              lines.push('overlap:')
+              for (const entry of review.overlapDetail) {
+                lines.push(
+                  `  - archived: ${entry.archivedChangeName}, specs: ${entry.overlappingSpecIds.join(', ')}`,
+                )
               }
             }
 
             lines.push('')
             lines.push('artifacts (details):')
             for (const a of artifactStatuses) {
+              const displayStatus = a.displayStatus ?? a.effectiveStatus ?? a.state
               const taskSuffix =
                 a.taskCompletion !== undefined
                   ? `  tasks: ${a.taskCompletion.complete}/${a.taskCompletion.total}`
                   : ''
               lines.push(
-                `  ${a.type}  ${a.displayStatus}  (effective: ${a.effectiveStatus})${taskSuffix}`,
+                `  ${a.type}  ${displayStatus}  (effective: ${a.effectiveStatus})${taskSuffix}`,
               )
               for (const file of a.files) {
+                const fileDisplayStatus = file.displayStatus ?? file.state
                 const hash = file.validatedHash !== undefined ? `  ${file.validatedHash}` : ''
                 const drift = file.hasDrift ? '  [drift]' : ''
                 lines.push(
-                  `    - ${file.key}  ${file.displayStatus}  ${file.filename}${hash}${drift}`,
+                  `    - ${file.key}  ${fileDisplayStatus}  ${file.filename}${hash}${drift}`,
                 )
               }
             }
@@ -317,7 +555,10 @@ JSON/TOON output schema:
             const schemaInfo = lifecycle.schemaInfo
             const statusDag =
               schemaInfo !== null
-                ? resolveStatusSchemaDag(await kernel.specs.getActiveSchema.execute(), schemaInfo)
+                ? resolveStatusSchemaDag(
+                    (await resolveChangeSchemaForCli(kernel, name)).schema,
+                    schemaInfo,
+                  )
                 : null
             const schemaPayload =
               schemaInfo !== null && statusDag !== null
@@ -348,13 +589,12 @@ JSON/TOON output schema:
                 specIds: [...change.specIds],
                 schema: { name: change.schemaName, version: change.schemaVersion },
                 ...(change.description !== undefined ? { description: change.description } : {}),
-                blockers: blockers.map((b) => ({ code: b.code, message: b.message })),
-                nextAction: {
-                  targetStep: nextAction.targetStep,
-                  actionType: nextAction.actionType,
-                  reason: nextAction.reason,
-                  command: nextAction.command,
-                },
+                ...(invalidation !== undefined ? { invalidation } : {}),
+                ...(validity !== undefined ? { validity } : {}),
+                ...(evidence !== undefined ? { verification: evidence } : {}),
+                schemaWarnings: statusResult.schemaWarnings,
+                blockers: blockers.map(projectCliBlocker),
+                nextAction: projectCliNextActionRecord(nextAction, blockers),
                 specDependsOn: statusResult.specDependsOn,
                 artifactDag:
                   statusDag === null
@@ -376,27 +616,12 @@ JSON/TOON output schema:
                           }
                         })
                         .filter((entry): entry is NonNullable<typeof entry> => entry !== null),
-                artifacts: artifactStatuses.map((a) => ({
-                  type: a.type,
-                  state: a.state,
-                  displayStatus: a.displayStatus,
-                  effectiveStatus: a.effectiveStatus,
-                  ...(a.taskCompletion !== undefined ? { taskCompletion: a.taskCompletion } : {}),
-                  files: a.files.map((file) => ({
-                    key: file.key,
-                    filename: file.filename,
-                    state: file.state,
-                    displayStatus: file.displayStatus,
-                    hasDrift: file.hasDrift,
-                    ...(file.validatedHash !== undefined
-                      ? { validatedHash: file.validatedHash }
-                      : {}),
-                  })),
-                })),
+                artifacts: projectArtifactStatuses(artifactStatuses),
                 review: {
                   required: review?.required ?? false,
                   route: review?.route ?? null,
                   reason: review?.reason ?? null,
+                  ...(review?.message !== undefined ? { message: review.message } : {}),
                   overlapDetail: review?.overlapDetail ?? [],
                   affectedArtifacts: (review?.affectedArtifacts ?? []).map((artifact) => ({
                     type: artifact.type,
@@ -410,6 +635,17 @@ JSON/TOON output schema:
                 lifecycle: {
                   validTransitions: [...lifecycle.validTransitions],
                   availableTransitions: [...lifecycle.availableTransitions],
+                  availableSteps: (lifecycle.availableSteps ?? []).map((step) => {
+                    const s = step as typeof step & { optional?: boolean }
+                    return {
+                      step: step.step,
+                      ...(s.optional !== undefined ? { optional: s.optional } : {}),
+                      available: step.available,
+                      isReady: step.isReady,
+                      isPermitted: step.isPermitted,
+                      blockingArtifacts: [...step.blockingArtifacts],
+                    }
+                  }),
                   blockers: lifecycle.blockers.map((b) => ({
                     transition: b.transition,
                     reason: b.reason,
@@ -422,6 +658,7 @@ JSON/TOON output schema:
                     lifecycle.schemaInfo !== null
                       ? { name: lifecycle.schemaInfo.name, version: lifecycle.schemaInfo.version }
                       : null,
+                  ...optionalCheckFields(lifecycle),
                 },
                 ...(opts.implementation && implementationTracking !== undefined
                   ? {
@@ -499,7 +736,8 @@ function renderDag(
     const scope = `[scope: ${artifact.scope}]`
 
     const connector = isRoot ? '' : isLast ? '└── ' : '├── '
-    const taskTag = artifact.hasTasks
+    const hasTasks = artifact.hasTasks === true || artifact.taskCompletionCheck !== undefined
+    const taskTag = hasTasks
       ? artifactStatus?.taskCompletion !== undefined
         ? ` [hasTasks - ${artifactStatus.taskCompletion.complete}/${artifactStatus.taskCompletion.total} done]`
         : ' [hasTasks]'

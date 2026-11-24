@@ -40,9 +40,11 @@ For all other step/phase combinations, if `ChangeRepository.get(name)` returns n
 
 Neither lookup path reads or derives a workspace value: `GetHookInstructions` MUST NOT build a `change.workspace` variable or inject any singular/primary workspace value (for example via `change.workspaces[0] ?? 'default'` or `specIds[0]?.split(':')[0]`) into the `change` namespace passed to `TemplateExpander.expand()`. Per [`core:template-variables`](../template-variables/spec.md), `change.workspace` is not a supported token.
 
-### Requirement: Schema name guard
+### Requirement: Sovereign schema resolution
 
-After resolving the schema, `GetHookInstructions` MUST compare `schema.name()` with `change.schemaName`. If they differ, it MUST throw `SchemaMismatchError`.
+`GetHookInstructions` MUST obtain the schema for the change through `ResolveChangeSchema`. The change's recorded schema is the sovereign authority defining its workflow step hooks. A different workspace default MUST remain irrelevant; provider identity mismatch MUST propagate as `SchemaProviderIdentityMismatchError`.
+
+Hooks declared on a step that the change schema marks `disabled: true` SHALL NOT be returned: a disabled step is never entered or exited, so it has no applicable hook instructions.
 
 ### Requirement: Step resolution
 
@@ -102,3 +104,5 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:template-variables`](../template-variables/spec.md)
 - [`core:archive-repository-port`](../archive-repository-port/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)
+- [core:resolve-change-schema](../resolve-change-schema/spec.md) — named sovereign lookup, provider identity validation, and same-name version advisory
+- [`core:workflow-topology`](../workflow-topology/spec.md) — step enablement (`isWorkflowStepEnabled`) used to decide hook applicability for disabled steps

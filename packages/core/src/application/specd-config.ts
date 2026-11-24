@@ -24,9 +24,7 @@ export interface SpecdConfigRemoval {
     readonly file?: string
     readonly instruction?: string
   }>
-  readonly plugins?: {
-    readonly agents?: Array<{ readonly name: string }>
-  }
+  readonly plugins?: ReadonlyArray<{ readonly name: string }>
 }
 
 /** Supported display modes for compiled context specs. */
@@ -318,16 +316,26 @@ export interface SpecdConfig {
   readonly schemaPlugins?: readonly string[] | undefined
   /** Inline schema override operations from `specd.yaml`. */
   readonly schemaOverrides?: SchemaOperations | undefined
-  /** Default invalidation policy for new changes. Defaults to `'downstream'`. */
-  readonly invalidationPolicy?: InvalidationPolicy | undefined
-  /** Declared plugins grouped by type (currently `agents`). */
+  /**
+   * Resolved default invalidation policy for new changes.
+   *
+   * Always present after load. Native omission is `{ artifacts: 'downstream', workflow: 'preserve' }`.
+   * A legacy `invalidationPolicy` scalar is adapted to `{ artifacts: <scalar>, workflow: 'redesign' }`.
+   */
+  readonly invalidation: InvalidationPolicy
+  /**
+   * Declared plugins as a flat list.
+   *
+   * Each entry names a scoped package. `config` is opaque here; plugin-manager
+   * validates it against the manifest. `contributions` is an optional allowlist
+   * of contribution ids.
+   */
   readonly plugins?:
-    | {
-        readonly agents?: readonly {
-          readonly name: string
-          readonly config?: Readonly<Record<string, unknown>>
-        }[]
-      }
+    | readonly {
+        readonly name: string
+        readonly config?: Readonly<Record<string, unknown>>
+        readonly contributions?: readonly string[]
+      }[]
     | undefined
 }
 

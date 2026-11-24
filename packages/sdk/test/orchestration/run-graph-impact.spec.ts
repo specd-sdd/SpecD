@@ -114,6 +114,8 @@ describe('runGraphImpact', () => {
         },
       } as any,
       createGraphProvider: () => mockProvider,
+      dispose: async () => {},
+      [Symbol.asyncDispose]: async () => {},
     }
 
     const result = await runGraphImpact(ctx, { files: ['src/auth.ts'], provider: mockProvider })
@@ -181,6 +183,8 @@ describe('runGraphImpact', () => {
         },
       } as any,
       createGraphProvider: () => mockProvider,
+      dispose: async () => {},
+      [Symbol.asyncDispose]: async () => {},
     }
 
     const result = await runGraphImpact(ctx, {
@@ -270,6 +274,8 @@ describe('runGraphImpact', () => {
         },
       } as any,
       createGraphProvider: () => mockProvider,
+      dispose: async () => {},
+      [Symbol.asyncDispose]: async () => {},
     }
 
     const result = await runGraphImpact(ctx, {
@@ -449,6 +455,8 @@ describe('runGraphImpact', () => {
         },
       } as any,
       createGraphProvider: () => mockProvider,
+      dispose: async () => {},
+      [Symbol.asyncDispose]: async () => {},
     }
 
     const result = await runGraphImpact(ctx, {
@@ -530,6 +538,8 @@ describe('runGraphImpact', () => {
         },
       } as any,
       createGraphProvider: () => mockProvider,
+      dispose: async () => {},
+      [Symbol.asyncDispose]: async () => {},
     }
 
     await runGraphImpact(ctx, { files: ['src/auth.ts'] })
@@ -572,6 +582,8 @@ describe('runGraphImpact', () => {
         },
       } as any,
       createGraphProvider: () => mockProvider,
+      dispose: async () => {},
+      [Symbol.asyncDispose]: async () => {},
     }
 
     await runGraphImpact(ctx, { files: ['src/auth.ts'], provider: mockProvider })
@@ -620,6 +632,8 @@ describe('runGraphImpact', () => {
         },
       } as any,
       createGraphProvider: () => mockProvider,
+      dispose: async () => {},
+      [Symbol.asyncDispose]: async () => {},
     }
 
     const result = await runGraphImpact(ctx, { spec: 'core:auth', provider: mockProvider })
@@ -669,6 +683,8 @@ describe('runGraphImpact', () => {
         project: { getConfig: { execute: vi.fn().mockReturnValue(mockConfig) } },
       } as any,
       createGraphProvider: () => mockProvider,
+      dispose: async () => {},
+      [Symbol.asyncDispose]: async () => {},
     }
 
     const result = await runGraphImpact(ctx, {
@@ -800,6 +816,8 @@ describe('runGraphImpact', () => {
         },
       } as any,
       createGraphProvider: () => mockProvider,
+      dispose: async () => {},
+      [Symbol.asyncDispose]: async () => {},
     }
 
     const result = await runGraphImpact(ctx, {
@@ -881,6 +899,8 @@ describe('runGraphImpact', () => {
         },
       } as any,
       createGraphProvider: () => mockProvider,
+      dispose: async () => {},
+      [Symbol.asyncDispose]: async () => {},
     }
 
     const filter = {
@@ -923,6 +943,8 @@ describe('runGraphImpact', () => {
         },
       } as any,
       createGraphProvider: () => mockProvider,
+      dispose: async () => {},
+      [Symbol.asyncDispose]: async () => {},
     }
 
     const result = await runGraphImpact(ctx, {
@@ -980,6 +1002,8 @@ describe('runGraphImpact', () => {
         },
       } as any,
       createGraphProvider: () => mockProvider,
+      dispose: async () => {},
+      [Symbol.asyncDispose]: async () => {},
     }
 
     const result = await runGraphImpact(ctx, {
@@ -1003,6 +1027,8 @@ describe('runGraphImpact', () => {
         project: { getConfig: { execute: vi.fn().mockReturnValue(mockConfig) } },
       } as any,
       createGraphProvider: () => provider,
+      dispose: async () => {},
+      [Symbol.asyncDispose]: async () => {},
     })
     const unresolvedResolution = (reasonCode: string): any => ({
       request: { workspace: 'core', requested: 'run' },
@@ -1156,6 +1182,8 @@ describe('runGraphImpact', () => {
         },
       } as any,
       createGraphProvider: () => mockProvider,
+      dispose: async () => {},
+      [Symbol.asyncDispose]: async () => {},
     }
 
     await expect(
@@ -1181,6 +1209,8 @@ describe('runGraphImpact', () => {
         },
       } as any,
       createGraphProvider: () => mockProvider,
+      dispose: async () => {},
+      [Symbol.asyncDispose]: async () => {},
     }
 
     await expect(

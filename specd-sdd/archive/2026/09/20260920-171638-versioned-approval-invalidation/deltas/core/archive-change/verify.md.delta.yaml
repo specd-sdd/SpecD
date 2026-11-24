@@ -1,0 +1,105 @@
+- op: added
+  position:
+    {
+      parent: { type: section, matches: '^Requirements$' },
+      after: { type: section, matches: '^Requirement: Deferred transition to archiving$' },
+    }
+  content: |
+    ### Requirement: Canonical validity archive preflight
+
+    #### Scenario: Archive rechecks all live blockers after hooks
+
+    - **GIVEN** pre-archive hooks modify fingerprinted inputs or add an incomplete task
+    - **WHEN** archive preflight runs
+    - **THEN** implementation tracking is refreshed and canonical reconciliation plus fresh evidence or task checks block publication
+    - **AND** stale verification recommends renewal in the current state
+
+    #### Scenario: Archive reports committed recovery separately from eligibility
+
+    - **GIVEN** fresh preflight commits gate recovery that makes archive inapplicable
+    - **WHEN** archive stops
+    - **THEN** the recovery remains persisted and the failure includes canonical blockers and next action
+    - **AND** it is not reduced to a generic invalid-state error
+
+    #### Scenario: Every archive construction path requires reconciliation
+
+    - **WHEN** direct dependencies or either factory form omit the reconciler
+    - **THEN** construction fails with the standard composition error
+    - **AND** archive never falls back to `Change.invalidate`
+
+    #### Scenario: Publication plan uses the accepted post-hook snapshot
+
+    - **GIVEN** a pre-archive hook adds and accepts an in-scope implementation link
+    - **WHEN** archive refreshes, reconciles, and passes live predicates
+    - **THEN** it constructs the plan and snapshots only afterward
+    - **AND** the new link is included in the publication plan and spec-lock sidecar
+
+- op: added
+  position:
+    {
+      parent: { type: section, matches: '^Requirements$' },
+      before: { type: section, matches: '^Requirement: Archive repository call$' },
+    }
+  content: |
+    ### Requirement: Versioned validity evidence preservation
+
+    #### Scenario: Archived v2 retains audit evidence
+
+    - **WHEN** a valid change is archived
+    - **THEN** its structured policy, projections, fingerprints, algorithms, and complete history remain readable
+    - **AND** inspecting an archived v1 record does not migrate or repair it
+
+- op: modified
+  description: 'Qualify redesign outcomes by each overlapping peer policy'
+  selector:
+    type: section
+    matches: '^Scenario: Archive with allowOverlap invalidates overlapping changes$'
+  rename: 'Scenario: Archive overlap applies each peer policy and records exact affected scope'
+  content: |
+    - **GIVEN** `alpha` in `archivable` targets `core:config` and `core:kernel`
+    - **AND** active peers `beta` and `gamma` overlap those specs and each has workflow `redesign`
+    - **WHEN** `ArchiveChange.execute({ name: 'alpha', allowOverlap: true })` succeeds
+    - **THEN** each peer receives a `spec-overlap-conflict` invalidation through canonical reconciliation and returns to `designing` once
+    - **AND** each audit message names `alpha` and its overlapping spec ID
+    - **AND** `invalidatedChanges` contains `{ name: 'beta', specIds: ['core:config'] }` and `{ name: 'gamma', specIds: ['core:kernel'] }`
+
+- op: modified
+  description: 'Assert serialized reconciler ownership, not a direct aggregate invalidation call'
+  selector:
+    type: section
+    matches: '^Scenario: Archive with allowOverlap invalidation happens via ChangeRepository.mutate$'
+  rename: 'Scenario: Archive overlap peer recovery is reconciler-owned and serialized'
+  content: |
+    - **GIVEN** `alpha` and active `beta` both target `core:config`
+    - **WHEN** archive of `alpha` permits overlap
+    - **THEN** the `spec-overlap-conflict` intent for `beta` is processed inside one serialized `ChangeRepository.mutate('beta', fn)` reconciliation
+    - **AND** artifact review, projection changes, audit event, and any gate-required return are committed atomically
+    - **AND** `ArchiveChange` never calls `beta.invalidate` directly
+
+- op: added
+  description: 'Cover an ungated peer whose workflow policy preserves its phase'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Overlap guard$'
+    after:
+      type: section
+      matches: '^Scenario: Archive overlap peer recovery is reconciler-owned and serialized$'
+  content: |
+    #### Scenario: Ungated preserve peer remains in its current phase
+
+    - **GIVEN** an overlapping active peer in `implementing` with workflow `preserve` and no required stale spec consent
+    - **WHEN** another change archives with `allowOverlap: true`
+    - **THEN** the peer remains in `implementing` with explicit overlap review and a forward-progress blocker
+    - **AND** no unconditional return to `designing` is appended
+
+- op: modified
+  description: 'Use the materialization dependency specified by the factory contract'
+  selector:
+    type: section
+    matches: '^Scenario: resolveArchiveChangeDeps does not resolve GenerateSpecMetadata or SaveSpecMetadata directly$'
+  rename: 'Scenario: resolveArchiveChangeDeps resolves materialization, not direct metadata writers'
+  content: |
+    - **WHEN** `resolveArchiveChangeDeps(resolver)` runs
+    - **THEN** it resolves `materializeMetadata: MaterializeSpecMetadata`
+    - **AND** it does not resolve `regenerateMetadata`, `GenerateSpecMetadata`, or `SaveSpecMetadata` directly

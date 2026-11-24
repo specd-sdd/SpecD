@@ -8,6 +8,8 @@
 specd plugins install @specd/plugin-agent-standard
 ```
 
+The package manifest is `specd-plugin.json` with `schemaVersion: 2` and an `agents.standard` contribution.
+
 ## Supported frontmatter fields
 
 | Field           | Required | Description                        |

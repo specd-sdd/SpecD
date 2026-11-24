@@ -1,0 +1,17 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Schema plugin kind$'
+  content: |
+    #### Scenario: Valid plugin with operations
+
+    - **GIVEN** a schema file with `kind: schema-plugin`, `name: my-plugin`, `version: 1`, and merge operations
+    - **WHEN** the plugin is resolved
+    - **THEN** it loads successfully
+
+    #### Scenario: Plugin cannot declare metadata extraction
+
+    - **GIVEN** a schema plugin declares `metadataExtraction`
+    - **WHEN** its schema is parsed
+    - **THEN** parsing rejects the plugin declaration
+    - **AND** transforms and resolved schema layers remain the supported plugin extension points

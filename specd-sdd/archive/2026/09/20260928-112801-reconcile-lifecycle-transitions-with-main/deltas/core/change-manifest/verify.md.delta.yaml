@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing persistence and append-only history scenarios cover the reconciled manifest.'

@@ -1,0 +1,13 @@
+- op: added
+  description: 'Ensure SpecNotInChangeError thrown by PreviewSpec is host-neutral without CLI command syntax'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Error handling'
+  content: |
+    ### Requirement: Host-neutral SpecNotInChangeError
+
+    When `PreviewSpec` throws `SpecNotInChangeError` (`SPEC_NOT_IN_CHANGE`), the error `message` MUST be host-neutral without embedding CLI commands such as `specd specs show`, and the error MUST expose `specId` and `changeName` metadata properties.

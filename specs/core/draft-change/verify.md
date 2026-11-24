@@ -120,3 +120,13 @@
 - `changes: ChangeRepository`
 - `actor: ActorResolver`
 - **AND** the factory delegates to canonical `createDraftChange(deps)`
+
+### Requirement: Host-neutral HistoricalImplementationGuardError
+
+#### Scenario: DraftChange guard error omits --force
+
+- **GIVEN** a change that has previously reached `implementing`
+- **WHEN** `DraftChange` is called without `force: true`
+- **THEN** `HistoricalImplementationGuardError` (`IMPLEMENTATION_DETECTED`) is thrown
+- **AND** `error.message` does not contain `--force`
+- **AND** `error.operation` is `'draft'` and `error.changeName` is the change name

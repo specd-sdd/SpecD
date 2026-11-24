@@ -1,9 +1,16 @@
 import { type Command } from 'commander'
 import { createConfigWriter } from '@specd/sdk'
-import { LoadPlugin, UninstallPlugin, createPluginLoader } from '@specd/plugin-manager'
+import {
+  LoadPlugin,
+  PluginNotFoundError,
+  UninstallPlugin,
+  createPluginLoader,
+} from '@specd/plugin-manager'
+import { findDeclaredPlugin } from './get-declared-plugins.js'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat, type OutputFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
+import { CliExitError } from '../../helpers/cli-exit-error.js'
 
 /**
  * One plugin-uninstall result entry.
@@ -12,7 +19,7 @@ interface PluginUninstallEntry {
   /** Plugin package name. */
   readonly name: string
   /** Result status. */
-  readonly status: 'uninstalled' | 'error'
+  readonly status: 'uninstalled' | 'skipped' | 'error'
   /** Human-readable detail. */
   readonly detail: string
 }
@@ -34,6 +41,7 @@ export function registerPluginsUninstall(parent: Command): void {
         const fmt = parseFormat(opts.format)
         const { config, configFilePath } = await resolveCliContext({
           configPath: opts.config,
+          plugins: false,
         })
         const configPath = configFilePath ?? `${config.projectRoot}/specd.yaml`
         const writer = createConfigWriter()
@@ -43,18 +51,40 @@ export function registerPluginsUninstall(parent: Command): void {
 
         const plugins: PluginUninstallEntry[] = []
         let hasErrors = false
+        const processed = new Set<string>()
 
         for (const pluginName of pluginNames) {
+          if (processed.has(pluginName)) {
+            plugins.push({ name: pluginName, status: 'skipped', detail: 'already processed' })
+            continue
+          }
+          processed.add(pluginName)
           try {
-            await load.execute({ pluginName })
-            const type = 'agents'
-            await uninstall.execute({ pluginName, config })
-            await writer.removePlugin(configPath, type, pluginName)
-            plugins.push({
-              name: pluginName,
-              status: 'uninstalled',
-              detail: `uninstalled '${pluginName}'`,
-            })
+            const declared = findDeclaredPlugin(config, pluginName)
+            if (declared === undefined) {
+              throw new Error(`plugin '${pluginName}' is not declared in specd.yaml`)
+            }
+            let detail = `uninstalled '${pluginName}'`
+            // No hook can run for a plugin that cannot be loaded: only the declaration remains.
+            const loadFailure = await load.execute({ pluginName }).then(
+              () => undefined,
+              (error: unknown) => (error instanceof Error ? error : new Error(String(error))),
+            )
+            if (loadFailure === undefined) {
+              await uninstall.execute({
+                pluginName,
+                config,
+                ...(declared.contributions !== undefined
+                  ? { contributions: declared.contributions }
+                  : {}),
+              })
+            } else if (loadFailure instanceof PluginNotFoundError) {
+              detail = 'package not found; only the declaration was removed'
+            } else {
+              detail = `plugin failed to load (${loadFailure.message}); only the declaration was removed`
+            }
+            await writer.removePlugin(configPath, pluginName)
+            plugins.push({ name: pluginName, status: 'uninstalled', detail })
           } catch (error) {
             hasErrors = true
             plugins.push({
@@ -67,7 +97,7 @@ export function registerPluginsUninstall(parent: Command): void {
 
         renderUninstallOutput(plugins, fmt)
         if (hasErrors) {
-          process.exit(1)
+          throw new CliExitError(1)
         }
       } catch (error) {
         handleError(error, opts.format)

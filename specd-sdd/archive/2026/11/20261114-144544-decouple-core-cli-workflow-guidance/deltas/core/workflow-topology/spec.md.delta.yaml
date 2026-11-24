@@ -1,0 +1,50 @@
+- op: modified
+  description: 'Drain states expose the exits the transition table lists, including a forward exit toward the delivery edge'
+  selector:
+    type: section
+    matches: 'Requirement: Dynamic legal transitions'
+  content: |
+    `listWorkflowTransitions(from, schema, approvals)` SHALL return the complete set of valid destination states from a given state `from`:
+
+    1. Forward transition to the next active step in the pipeline.
+    2. Shortcut/bypass transitions to a later active step if and only if EVERY active step strictly between `from` and that destination is `optional: true`. Disabled steps are not in the pipeline and therefore never block a shortcut.
+    3. Backward transitions only when the edge is admitted by the canonical `VALID_TRANSITIONS` protocol table AND the destination precedes `from` in the pipeline. Redesign (`to = designing`) is admitted whenever `VALID_TRANSITIONS` admits it for the exact source, including the `designing → designing` re-entry, independent of pipeline position. Pipeline position alone MUST NOT invent a backward edge, and a `VALID_TRANSITIONS` edge MUST NOT be admitted as a forward move that bypasses a non-optional active step.
+    4. Archive-boundary rules: `archivable` is entered only from `done`, and `archiving` only from `archivable`. Archiving escape transitions admitted by `VALID_TRANSITIONS` remain legal.
+    5. Drain-only compatibility states SHALL only expose the exits that `VALID_TRANSITIONS` defines for that exact source state, filtered by step enablement. Drain states SHALL NOT be normalized onto a pipeline position to gain forward shortcuts: an exit exists only because the table lists it. `pending-spec-approval → implementing` and `pending-signoff → archivable` are legal because the table lists them, and for no other reason. No exit of `pending-spec-approval` or `pending-signoff` is another drain state.
+    6. If a destination step is disabled in the active schema, it SHALL NOT appear in legal transitions, and `isWorkflowTransitionLegal(from, to, schema, approvals)` SHALL return `false`.
+    7. If `from` is a disabled step, the result is empty.
+
+    `isWorkflowTransitionLegal(from, to, schema, approvals)` SHALL return `true` exactly when `to` is in `listWorkflowTransitions(from, schema, approvals)`.
+
+- op: modified
+  description: 'One rule for every drain state in nextWorkflowStep'
+  selector:
+    type: section
+    matches: 'Requirement: Topological forward progression'
+  content: |
+    `nextWorkflowStep(from, schema, approvals)` SHALL return the closest subsequent active step in the ordered pipeline:
+
+    1. If `from` is `archivable` or `archiving`, the result is `null`.
+    2. If `from` is a drain-only state, the result is the first exit other than `designing` that `listWorkflowTransitions(from, schema, approvals)` admits for that exact state (`pending-spec-approval → implementing`, `spec-approved → implementing`, `pending-signoff → archivable`, `signed-off → archivable`), or `null` when no such exit is legal (for example `implementing` is disabled). The same rule MUST apply to all four drain states; the function MUST NOT special-case individual drain states, and drain states SHALL NOT be mapped onto a pipeline anchor to compute a successor.
+    3. Otherwise, it returns the immediately following active step in the pipeline, including an enabled optional step.
+    4. Disabled steps are skipped automatically when resolving the next forward step.
+    5. Whenever the result is not `null`, `isWorkflowTransitionLegal(from, result, schema, approvals)` SHALL be `true`.
+
+- op: modified
+  description: 'Export list includes the drain-state accessors'
+  selector:
+    type: section
+    matches: '^Requirement: Module of pure workflow functions$'
+  content: |
+    The topology SHALL be exposed as pure exported functions of the `workflow-topology` domain module, not as a class with static methods, in line with the global rule that stateless domain services are plain functions. Every exported function name SHALL carry the `workflow` qualifier or describe the drain-state table it reads, so call sites are self-describing:
+
+    - `resolveWorkflowPipeline(schema, approvals)`
+    - `isWorkflowStepEnabled(step, schema)`
+    - `listWorkflowTransitions(from, schema, approvals)`
+    - `isWorkflowTransitionLegal(from, to, schema, approvals)`
+    - `listBypassedWorkflowSteps(from, to, schema, approvals)`
+    - `nextWorkflowStep(from, schema, approvals)`
+    - `drainAnchorOf(state)` — returns the pipeline anchor (and offset) of a drain-only parking state, or `null` for any other state
+    - `isDrainState(state)` — returns whether a state is a drain-only parking state
+
+    Consumers SHALL import these functions by name. The drain-state accessors exist so consumers never keep their own lists of drain states. Internal helpers (raw pipeline construction, forward-target computation) SHALL NOT be exported.

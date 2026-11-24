@@ -1,5 +1,4 @@
-import type { SpecdConfig } from '@specd/core'
-import type { SpecdPlugin } from './specd-plugin.js'
+import type { PluginInstallContext, SpecdPlugin } from './specd-plugin.js'
 
 /**
  * Recursive variable values accepted by agent install rendering.
@@ -14,27 +13,16 @@ export type TemplateVariable =
     }
 
 /**
- * Options used during plugin install and uninstall operations.
+ * Options used during agent install and uninstall operations.
  */
 export interface AgentInstallOptions {
-  /**
-   * Optional skill-name filter. When omitted, install all skills.
-   */
+  /** Optional skill-name filter. When omitted, install all skills. */
   readonly skills?: readonly string[]
-
-  /**
-   * Optional agent-name filter. When omitted, install all agents.
-   */
+  /** Optional agent-name filter. When omitted, install all agents. */
   readonly agents?: readonly string[]
-
-  /**
-   * Recursive variables used for template rendering.
-   */
+  /** Recursive variables used for template rendering. */
   readonly variables?: Readonly<Record<string, TemplateVariable>>
-
-  /**
-   * Capability identifiers supported by the target runtime.
-   */
+  /** Capability identifiers supported by the target runtime. */
   readonly capabilities?: readonly string[]
 }
 
@@ -42,15 +30,18 @@ export interface AgentInstallOptions {
  * Result returned by an agent-plugin install operation.
  */
 export interface AgentInstallResult {
-  /**
-   * Successfully installed skills and output paths.
-   */
+  /** Successfully installed skills and output paths. */
   readonly installed: ReadonlyArray<{ skill: string; path: string }>
-
-  /**
-   * Skipped skills and the reason for skipping.
-   */
+  /** Skipped skills and the reason for skipping. */
   readonly skipped: ReadonlyArray<{ skill: string; reason: string }>
+}
+
+/**
+ * Install context for agent plugins.
+ */
+export interface AgentInstallContext extends Omit<PluginInstallContext, 'options'> {
+  /** Agent install options forwarded by the caller. */
+  readonly options?: AgentInstallOptions
 }
 
 /**
@@ -58,43 +49,27 @@ export interface AgentInstallResult {
  */
 export interface AgentPlugin extends SpecdPlugin {
   /**
-   * Fixed plugin type for agent plugins.
-   */
-  readonly type: 'agent'
-
-  /**
    * Installs agent assets into a project root.
    *
-   * @param config - Project configuration.
-   * @param options - Install options.
-   * @returns Install summary.
+   * @param context - Install context
+   * @returns Install summary
    */
-  install(config: SpecdConfig, options?: AgentInstallOptions): Promise<AgentInstallResult>
-
+  install(context: AgentInstallContext): Promise<AgentInstallResult>
   /**
    * Uninstalls agent assets from a project root.
    *
-   * @param config - Project configuration.
-   * @param options - Uninstall options.
-   * @returns A promise that resolves when uninstall completes.
+   * @param context - Uninstall context
    */
-  uninstall(config: SpecdConfig, options?: AgentInstallOptions): Promise<void>
+  uninstall(context: AgentInstallContext): Promise<void>
 }
 
 /**
- * Checks whether a value satisfies the agent-plugin extension contract.
+ * Checks whether a plugin exposes agent install and uninstall hooks.
  *
- * Validates that the plugin has `type: 'agent'` and exposes both
- * `install` and `uninstall` methods.
- *
- * @param value - Candidate plugin to check.
- * @returns `true` when the value matches {@link AgentPlugin}.
+ * @param value - Candidate plugin
+ * @returns `true` when both hooks are functions
  */
 export function isAgentPlugin(value: SpecdPlugin): value is AgentPlugin {
   const record = value as unknown as Record<string, unknown>
-  return (
-    record['type'] === 'agent' &&
-    typeof record['install'] === 'function' &&
-    typeof record['uninstall'] === 'function'
-  )
+  return typeof record['install'] === 'function' && typeof record['uninstall'] === 'function'
 }

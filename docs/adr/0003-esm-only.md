@@ -63,3 +63,7 @@ All `package.json` files in `packages/` contain `"type": "module"`. The root Typ
 ### Spec
 
 - [`default:_global/conventions`](../../specs/_global/conventions/spec.md)
+
+## Update (2026-10-27)
+
+The supported Node.js floor is now **Node.js >= 22**, declared as `engines.node` in every published package (see [ADR-0031](./0031-host-lifecycle-and-node-floor.md)). The ">= 20" statements above describe the situation when this ADR was accepted and are kept for history.

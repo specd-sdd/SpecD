@@ -6,6 +6,7 @@ import {
   mockProcessExit,
   captureStdout,
   captureStderr,
+  makeMockHost,
 } from './helpers.js'
 import {
   ConfigValidationError,
@@ -113,12 +114,14 @@ function setup() {
     llmOptimizedContext: false,
   }
 
-  vi.mocked(openSpecdHost).mockResolvedValue({
-    config,
-    configFilePath: '/project/specd.yaml',
-    kernel,
-    createGraphProvider: vi.fn(),
-  })
+  vi.mocked(openSpecdHost).mockResolvedValue(
+    makeMockHost({
+      config,
+      configFilePath: '/project/specd.yaml',
+      kernel,
+      createGraphProvider: vi.fn(),
+    }),
+  )
   vi.mocked(buildProjectStatusSnapshot).mockResolvedValue(mockSnapshot)
 
   const stdout = captureStdout()
@@ -284,12 +287,14 @@ describe('project dashboard', () => {
       approvals: { specEnabled: false, signoffEnabled: false },
       llmOptimizedContext: false,
     }
-    vi.mocked(openSpecdHost).mockResolvedValue({
-      config,
-      configFilePath: '/project/specd.yaml',
-      kernel: makeMockKernel(),
-      createGraphProvider: vi.fn(),
-    })
+    vi.mocked(openSpecdHost).mockResolvedValue(
+      makeMockHost({
+        config,
+        configFilePath: '/project/specd.yaml',
+        kernel: makeMockKernel(),
+        createGraphProvider: vi.fn(),
+      }),
+    )
     vi.mocked(buildProjectStatusSnapshot).mockResolvedValue(mockSnapshot)
 
     const stdout = captureStdout()

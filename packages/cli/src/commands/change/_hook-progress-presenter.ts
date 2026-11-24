@@ -31,6 +31,14 @@ export type HookPresenterEvent =
       success: boolean
       exitCode: number
     }
+  | {
+      type: 'hook-warning'
+      phase?: 'pre' | 'post'
+      hookId: string
+      command: string
+      exitCode: number
+      stderr: string
+    }
 
 /** Shared presenter contract used by hook-aware CLI commands. */
 export interface HookProgressPresenter {
@@ -84,7 +92,8 @@ function stripTerminalControlSequences(text: string): string {
 }
 
 /**
- * Creates the shared hook-progress presenter used by `change run-hooks` and `change transition`.
+ * Creates the hook-progress presenter used by `change run-hooks`.
+ * `change transition` uses the generic check-progress presenter (`stream: change-transition`).
  *
  * @param options - Rendering options for text or structured hook progress
  * @param options.format - Output format that determines text vs structured rendering
@@ -225,6 +234,14 @@ export function createHookProgressPresenter(options: {
             )
             state.renderedFinal = true
           }
+          return
+        }
+        case 'hook-warning': {
+          const state = states.get(key)
+          if (options.format !== 'text') return
+          options.stream.write(`[warn] ${state ? labelFor(state) : event.hookId}\n`)
+          options.stream.write(`  command: ${event.command}\n`)
+          options.stream.write(`  exit: ${event.exitCode}\n`)
           return
         }
       }

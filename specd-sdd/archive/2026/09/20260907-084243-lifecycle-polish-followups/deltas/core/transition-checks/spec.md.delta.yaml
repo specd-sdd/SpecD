@@ -1,0 +1,10 @@
+- op: added
+  description: Make approval precedence and production overlap detector wiring explicit.
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Approval precedence and production registry composition
+
+    Transition evaluation for historic parked approval states MUST preserve the approval-required repair contract before protocol-edge rejection of a non-drain target. Production status and archive composition MUST inject the overlap detector into their workflow check registries; a default registry without that injected dependency is permitted only for non-production or isolated use.

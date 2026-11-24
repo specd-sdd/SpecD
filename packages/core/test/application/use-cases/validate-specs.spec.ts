@@ -1455,6 +1455,7 @@ describe('ValidateSpecs', () => {
           },
         },
         approvals: { spec: false, signoff: false },
+        invalidation: { artifacts: 'downstream', workflow: 'preserve' },
       } as SpecdConfig
       const resolver = createCompositionResolver(config)
       const deps = resolveValidateSpecsDeps(resolver)

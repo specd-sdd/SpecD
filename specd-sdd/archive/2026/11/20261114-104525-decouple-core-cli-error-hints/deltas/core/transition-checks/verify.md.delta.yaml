@@ -1,0 +1,15 @@
+- op: added
+  description: 'Verify host-neutral impl.linksInScope detection message'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Host-neutral impl.linksInScope message
+
+    #### Scenario: Out-of-scope detection message omits --allow-out-of-scope
+
+    - **GIVEN** a change with confirmed implementation links targeting specs outside `change.specIds`
+    - **WHEN** `detectImplLinksInScope` runs
+    - **THEN** `blocked` is `true` and `outOfScopeSpecIds` lists the out-of-scope spec IDs
+    - **AND** `message` does not contain `--allow-out-of-scope`

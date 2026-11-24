@@ -1,0 +1,125 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Schema plugins, schema overrides, and context entry mapping'
+  content: |
+    #### Scenario: Context entry with id is preserved
+
+    - **GIVEN** the config declares `context: [{ id: bootstrap, file: specd-bootstrap.md }]`
+    - **WHEN** `load()` is called
+    - **THEN** the mapped context entry preserves both `id` and `file`
+
+    #### Scenario: Plugin identity is name
+
+    - **GIVEN** the config declares `plugins: [{ name: '@specd/plugin-agent-codex', config: { commandsDir: '.codex/commands' }, contributions: ['codex'] }]`
+    - **WHEN** `load()` is called
+    - **THEN** the mapped plugin entry preserves `name`, `config` and `contributions`
+    - **AND** inherited removal resolves that entry by `name`
+
+    #### Scenario: Plugins are not loaded by the loader
+
+    - **GIVEN** a plugin entry whose package is not installed
+    - **WHEN** `load()` is called
+    - **THEN** loading the config succeeds
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: YAML parsing and structural validation'
+  content: |
+    #### Scenario: Invalid YAML syntax
+
+    - **GIVEN** the config file contains malformed YAML
+    - **WHEN** `load()` is called
+    - **THEN** `load()` throws `ConfigValidationError` with a message containing the YAML parse error
+
+    #### Scenario: Missing required field
+
+    - **GIVEN** the config file is valid YAML but omits the `schema` field
+    - **WHEN** `load()` is called
+    - **THEN** `load()` throws `ConfigValidationError` with the Zod path referencing the missing field
+
+    #### Scenario: Invalid adapter value
+
+    - **GIVEN** a workspace `specs` section declares `adapter: s3`
+    - **WHEN** `load()` is called
+    - **THEN** `load()` throws `ConfigValidationError`
+
+    #### Scenario: Validation precedes path resolution
+
+    - **GIVEN** the config has both an invalid structure and relative paths
+    - **WHEN** `load()` is called
+    - **THEN** the structural error is thrown before any path resolution occurs
+
+    #### Scenario: Legacy plugins object produces migration message
+
+    - **GIVEN** `plugins: { agents: [{ name: '@specd/plugin-agent-claude' }] }`
+    - **WHEN** `load()` is called
+    - **THEN** `LegacyConfigFormatError` is thrown before strict schema validation
+    - **AND** the message contains the flat `plugins` list and `configVersion: 2`
+
+    #### Scenario: Newer configVersion
+
+    - **GIVEN** `configVersion: 3`
+    - **WHEN** `load()` is called
+    - **THEN** `UnsupportedConfigVersionError` is thrown
+
+    #### Scenario: Newer version takes precedence over legacy format
+
+    - **GIVEN** a layer with `configVersion: 3` and `plugins: { agents: [...] }`
+    - **WHEN** `load()` is called
+    - **THEN** `UnsupportedConfigVersionError` is thrown
+
+    #### Scenario: Legacy format in an extending layer
+
+    - **GIVEN** a valid root layer and an extending layer with `plugins: { agents: [...] }`
+    - **WHEN** `load()` is called
+    - **THEN** `LegacyConfigFormatError` is thrown for the extending layer
+
+    #### Scenario: Legacy detection is not a generic schema error
+
+    - **GIVEN** `plugins: { agents: [{ name: '@specd/plugin-agent-claude' }] }`
+    - **WHEN** `load()` is called
+    - **THEN** the thrown error is `LegacyConfigFormatError` with code `LEGACY_CONFIG_FORMAT`, not a strict-schema error message
+
+    #### Scenario: remove.plugins of an absent name fails
+
+    - **GIVEN** a base layer declaring `@acme/x` and a later layer with `remove: { plugins: [{ name: '@acme/absent' }] }`
+    - **WHEN** `load()` is called
+    - **THEN** `ConfigValidationError` is thrown
+
+    #### Scenario: Absent configVersion with current shape
+
+    - **GIVEN** a flat `plugins` list and no `configVersion`
+    - **WHEN** `load()` is called
+    - **THEN** loading succeeds
+
+    #### Scenario: Unscoped plugin name
+
+    - **GIVEN** `plugins: [{ name: 'my-plugin' }]`
+    - **WHEN** `load()` is called
+    - **THEN** `ConfigValidationError` is thrown
+
+    #### Scenario: Duplicate plugin name
+
+    - **GIVEN** the same plugin name twice
+    - **WHEN** `load()` is called
+    - **THEN** `ConfigValidationError` is thrown
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: All errors are ConfigValidationError'
+  content: |
+    #### Scenario: All validation errors use ConfigValidationError
+
+    - **GIVEN** any validation failure occurs during `load()`
+    - **WHEN** the error is caught
+    - **THEN** it is a `ConfigValidationError`
+    - **AND** `LegacyConfigFormatError` and `UnsupportedConfigVersionError` are instances of it
+
+    #### Scenario: Invalid cascade chain still uses ConfigValidationError
+
+    - **GIVEN** an explicit `extends` target points outside the applicable chain
+    - **WHEN** `load()` is called
+    - **THEN** the thrown error is `ConfigValidationError`

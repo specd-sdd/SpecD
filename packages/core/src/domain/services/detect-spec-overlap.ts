@@ -43,3 +43,72 @@ export function detectSpecOverlap(changes: readonly Change[]): OverlapReport {
 
   return new OverlapReport(entries)
 }
+
+/** Named peer with overlapping spec ids for `spec.overlap` messaging. */
+export interface SpecOverlapPeerSummary {
+  /** Overlapping peer change name. */
+  readonly changeName: string
+  /** Spec ids shared with this peer. */
+  readonly overlappingSpecIds: readonly string[]
+}
+
+/** Overlap entry summary for `spec.overlap` details. */
+export interface SpecOverlapEntrySummary {
+  /** Spec id shared by multiple active changes. */
+  readonly specId: string
+  /** Active changes targeting this spec. */
+  readonly changes: readonly OverlapChange[]
+}
+
+/** Detection payload for archive `spec.overlap`. */
+export interface SpecOverlapDetectionSummary {
+  /** True when this change shares specs with another active change. */
+  readonly blocked: boolean
+  /** Named peers with overlapping spec ids when blocked. */
+  readonly peers: readonly SpecOverlapPeerSummary[]
+  /** Overlap entries shaped for host rendering when blocked. */
+  readonly entries: readonly SpecOverlapEntrySummary[]
+}
+
+/**
+ * Projects an overlap report onto one change for `spec.overlap`.
+ *
+ * @param changeName - Change being archived or status-checked
+ * @param report - Full overlap report across active changes
+ * @returns Blocked flag and peer summaries (empty peers when unblocked)
+ */
+export function specOverlapDetectionForChange(
+  changeName: string,
+  report: OverlapReport,
+): SpecOverlapDetectionSummary {
+  const relevant = report.entries.filter((entry) =>
+    entry.changes.some((peer) => peer.name === changeName),
+  )
+  if (relevant.length === 0) {
+    return { blocked: false, peers: [], entries: [] }
+  }
+
+  const byPeer = new Map<string, string[]>()
+  for (const entry of relevant) {
+    for (const peer of entry.changes) {
+      if (peer.name === changeName) continue
+      const ids = byPeer.get(peer.name) ?? []
+      ids.push(entry.specId)
+      byPeer.set(peer.name, ids)
+    }
+  }
+
+  const peers = [...byPeer.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, overlappingSpecIds]) => ({
+      changeName: name,
+      overlappingSpecIds,
+    }))
+
+  const entries: SpecOverlapEntrySummary[] = relevant.map((entry) => ({
+    specId: entry.specId,
+    changes: entry.changes,
+  }))
+
+  return { blocked: true, peers, entries }
+}

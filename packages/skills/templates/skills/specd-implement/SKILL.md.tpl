@@ -20,44 +20,100 @@ specd changes status <name> --format text
 ```
 
 Identify any high-visibility blockers from the **blockers:** section (e.g. `ARTIFACT_DRIFT`,
-`OVERLAP_CONFLICT`, `REVIEW_REQUIRED`) and inform the user. Follow the **next action:**
-command recommendation.
+`REVIEW_REQUIRED`) and inform the user. Follow the **next action:**
+command recommendation. `OVERLAP_CONFLICT` is archive-only. Invalidation overlap
+is `review.reason: spec-overlap-conflict` → `/specd-design`, never bypassed with
+`--skip-checks spec.overlap` or `--allow-overlap`.
 
 Extract the `path:` field from the "lifecycle:" section.
 From the `artifacts (DAG):` section, note which artifact IDs are marked with
 `[hasTasks]`; those are the task-bearing artifacts to read and update later.
 
-If the status output shows `review: required: yes`, this change has artifacts that
-require review before implementation can continue. Tell the user:
+### Schema-aware lifecycle routing
 
-> Artifacts need review before implementation can continue. Run `/specd-design <name>`.
+Read a fresh structured routing projection before entering or leaving a phase:
 
-**Stop — do not continue.**
+```bash
+specd changes status <name> --format toon
+```
 
-If not in `ready` or `implementing` or `spec-approved`, this is the wrong skill.
+Treat `nextAction.command` as the preferred default recommendation and choose targets
+only from `lifecycle.availableTransitions`. When explicitly invoked, map `/specd-implement`
+to its intended target `implementing`: if a different command is recommended, report that
+recommendation but continue toward `implementing` if `implementing` is present in
+`lifecycle.availableTransitions`. If `implementing` is absent from `availableTransitions`,
+stop before running any hooks and report the blockers along with the recommended command;
+never fall back to a fixed `ready → implementing → verifying` sequence. Refresh status
+before advancing and hard-stop on absent, malformed, or stale routing data. Run hooks only
+for the source and selected target of an actual hop. When `implementing` is bypassed,
+do not enter it or run its hooks.
+
+Routed blocks (`<!-- route: target -->` … `<!-- /route -->`) use placeholders instead of
+fixed state names: `<target>` is the lifecycle step selected from a fresh
+`lifecycle.availableTransitions` (this skill's intended target when advertised,
+otherwise `nextAction.targetStep`) and `<source>` is the change's current `state`.
+Run `run-hooks` / `hook-instruction` only for the source (`--phase post`) and the
+selected target (`--phase pre`) of an actual hop, and never substitute a fixed state
+sequence.
+
+Trust reconciled status. Do not calculate fingerprints, edit projections, or
+roll the lifecycle back yourself.
+
+- Required stale or revoked spec approval returns to `designing`. Stop and
+  route to `/specd-design` through `designing` → `ready` → human `approve spec`.
+- Required stale or revoked sign-off after `done` returns to `done`. Do not
+  move this earlier state forward to `done`.
+- Verification staleness does **not** move lifecycle state. Before `verifying`
+  it is contextual, so keep implementing. At `verifying` or later it blocks and
+  recommends in-place verification (`/specd-verify` or
+  `specd changes verification start <name>`). Do not start that attempt here.
+- `workflow: preserve` plus artifact review stays in phase. Semantically review
+  drifted artifacts you can correct without a new design decision, then
+  `specd changes validate`. Do not force `/specd-design` for every drift.
+  Structural validation is not semantic review or approval renewal.
+- `workflow: redesign` plus unresolved non-task drift returns to `designing`.
+  Stop and route to `/specd-design`.
+- `artifacts: none` waives reopening, not freshness. Existing drift still blocks
+  forward progress.
+- New design decisions and artifact authoring still go to `/specd-design`.
+
+If not in `ready`, `pending-spec-approval`, `spec-approved`, or `implementing`, this is the wrong skill.
 Redirect based on the **next action:** `target` recommendation.
 
 **Stop — do not continue.**
 
-If in `ready` or `spec-approved`, run pre-hooks and transition:
+If in `ready`, `pending-spec-approval`, or `spec-approved` and the spec gate is on with no recorded spec approval (status
+`lifecycle.approvals.spec` true in the fresh toon status and an `APPROVAL_REQUIRED` blocker, or next action pointing at
+human `approve spec`): **stay in place**. Tell the user to run
+`specd changes approve spec <name> --reason "..."`. Do **not** `transition implementing`.
 
+**Stop — do not continue.**
+
+If in `ready`, `pending-spec-approval`, or `spec-approved` with spec gate off (or spec already approved), run pre-hooks and transition:
+
+<!-- route: target -->
 ```bash
-specd changes run-hooks <name> implementing --phase pre
-specd changes hook-instruction <name> implementing --phase pre --format text
+specd changes run-hooks <name> <target> --phase pre
+specd changes hook-instruction <name> <target> --phase pre --format text
 ```
+<!-- /route -->
 
 Follow guidance — it tells you which change artifacts to read.
 
+<!-- route: target -->
 ```bash
-specd changes transition <name> implementing --skip-hooks all
+specd changes transition <name> <target> --skip-hooks all
 ```
+<!-- /route -->
 
 If already in `implementing` (resuming), run pre-hooks but skip the transition:
 
+<!-- route: target -->
 ```bash
-specd changes run-hooks <name> implementing --phase pre
-specd changes hook-instruction <name> implementing --phase pre --format text
+specd changes run-hooks <name> <target> --phase pre
+specd changes hook-instruction <name> <target> --phase pre --format text
 ```
+<!-- /route -->
 
 ### 2. Check workspace ownership
 
@@ -143,14 +199,20 @@ symbols that realize its requirements. These links feed into downstream tooling
 
 **What to link:**
 
-For each spec in the change, identify every file and symbol you create or modify that
-directly implements that spec's requirements. A link answers the question: _"which
-code makes this spec real?"_
+A link answers: _"which code makes this spec real?"_ Prefer **`--symbol` on a
+top-level** named construct (exported function, class, type, method) that
+implements a requirement. Do **not** link local variables, helpers that only
+happen to sit in the same file, or incidental dirty files.
+
+- If the symbol is not actually about that spec, **do not add the link**.
+- Links are not a catch-all: fewer high-value links beat dumping every touched name.
+- File-level links are the fallback when there is no stable top-level symbol
+  (config, templates, barrels, docs).
 
 **Symbol-level vs file-level links:**
 
-- **Symbol-level** (preferred) — link a specific function, class, type, method, or
-  constant to the spec. Use when the implementation maps to named code constructs.
+- **Symbol-level** (preferred) — link a **top-level** function, class, type, or
+  method that implements the spec. Do not link variables or incidental names.
 
   ```bash
   specd changes implementation add <name> --spec <specId> --file <path> --symbol "<SymbolName>"
@@ -171,33 +233,20 @@ code makes this spec real?"_
 After finishing each task, before marking its checkbox done:
 
 1. Identify which spec(s) the task's code fulfills
-2. For each file touched, determine the concrete symbols introduced or modified
+2. For each file, pick only the **top-level** symbols that actually implement
+   those specs (not every name you touched)
 3. Add implementation links: one `add` call per `(specId, file)` pair with `--symbol`
-   for each named construct
+   for each **relevant** construct. Skip the file if nothing in it is about the spec.
 4. If a file implements parts of multiple specs, add separate links per spec
 5. Mark the task checkbox done (`- [ ]` → `- [x]`) in the task-bearing artifact
 
-**Review and resolve:**
+**Review and resolve:** use `shared.md` — "Implementation tracking" for `list` /
+`review` / `resolve` / `ignore` command syntax. After each task (and again before
+recommending verify): `list`, then **resolve** in-scope files and **ignore**
+incidental ones. Ignoring a file preserves any confirmed links on it.
 
-```bash
-specd changes implementation list <name>     # current tracking state
-specd changes implementation review <name>   # + stale symbol diagnostics from code graph
-specd changes implementation resolve <name> --file <path1> --file <path2> ... # mark files fully reviewed
-```
-
-- `list` shows all tracked files (grouped by state) and confirmed links.
-- `review` adds graph-based diagnostics: symbols that no longer exist in the code
-  are flagged as stale.
-- `resolve` marks one or more tracked files as fully reviewed. Pass each path as
-  its own `--file` value (repeat the option or list paths after it).
-- `ignore` is for files that do **not** belong to the change's implementation surface.
-  Pass each path as its own `--file` value. Ignoring a file preserves any confirmed links on it.
-  ```bash
-  specd changes implementation ignore <name> --file <path1> --file <path2> ...
-  ```
-
-**Security & Integrity Guard:** All implementation management commands (`add`, `resolve`,
-`ignore`) validate that the target files exist on disk before updating the manifest.
+**Security & Integrity Guard:** `add`, `resolve`, and `ignore` validate that the
+target files exist on disk before updating the manifest.
 
 **Out-of-scope guard:**
 
@@ -261,17 +310,31 @@ For each task in order:
 **Trigger:** the moment the last `- [ ]` across ALL task-bearing artifacts is marked
 `- [x]`, run the post-implementing hooks.
 
+<!-- route: target -->
 ```bash
-specd changes run-hooks <name> implementing --phase post
-specd changes hook-instruction <name> implementing --phase post --format text
+specd changes run-hooks <name> <source> --phase post
+specd changes hook-instruction <name> <source> --phase post --format text
 ```
+<!-- /route -->
 
 Follow guidance. If hooks fail (tests, lint), fix and re-run until they pass.
 
-> Implementation complete. Run `/specd-verify <name>` to verify against scenarios.
+**Before recommending verify:** run `specd changes implementation list <name>`.
+There MUST be **zero open** tracked files (`resolve` or `ignore` per `shared.md` —
+"Implementation tracking"). If `changes status` still shows `IMPLEMENTATION_STATE`,
+keep draining — do **not** recommend the next phase yet.
+
+When open files are gone:
+
+<!-- route: target -->
+Read a fresh `specd changes status <name> --format toon` and tell the user:
+
+> Implementation complete. Next: the command in `nextAction.command`.
+
+<!-- /route -->
 
 **Stop.**
-Do not invoke `/specd-verify` automatically; wait for explicit user confirmation.
+Do not invoke the recommended command automatically; wait for explicit user confirmation.
 
 ## Session tasks
 
@@ -292,9 +355,11 @@ Follow the recommended repair command based on the target recommendation.
 If during implementation you discover that the artifacts need changes, stop and explain
 the issue. If the user agrees:
 
+<!-- route: target -->
 ```bash
-specd changes transition <name> designing --skip-hooks all
+specd changes transition <name> <target> --skip-hooks all
 ```
+<!-- /route -->
 
 > Artifacts need revision. Run `/specd-design <name>` to update them.
 
@@ -306,5 +371,8 @@ specd changes transition <name> designing --skip-hooks all
 - The change artifacts are the source of truth for implementation approach
 - If you touch code outside the change's spec scope, surface it to the user
 - Never skip the pre-hook — it tells you what to read
-- Any time a fresh `changes status` shows `review: required: yes`, stop
-  implementation and redirect to `/specd-design <name>`
+- Never recommend `/specd-verify` while `implementation list` still shows `open` files
+- On `review: required: yes`, follow canonical recovery. Spec consent or
+  `workflow: redesign` goes to `/specd-design`. `workflow: preserve` stays in
+  phase for in-place review and validation. `artifacts: none` does not clear
+  a freshness blocker

@@ -82,32 +82,37 @@ export const runGraphIndexTask: GraphIndexTask<
     input.context.mode === 'forced'
       ? await openSpecdHost({
           configPath: input.context.configPath,
-          options: { kernel },
+          options: { kernel, plugins: false },
         })
       : input.context.mode === 'discovered'
         ? await openSpecdHost({
             startDir: input.context.startDir,
-            options: { kernel },
+            options: { kernel, plugins: false },
           })
         : await createSdkContext(
             createBootstrapGraphConfig({
               projectRoot: input.context.projectRoot,
               vcsRoot: input.context.vcsRoot,
             }),
-            { kernel },
+            { kernel, plugins: false },
           )
 
-  return runIndexProjectGraph(host, {
-    force: input.index.force,
-    ...(input.index.excludePaths !== undefined ? { excludePaths: input.index.excludePaths } : {}),
-    onProgress: (percent, phase) => emitProgress({ percent, phase }),
-    onEvent: (event) => {
-      if (event.kind === 'file-activity') {
-        const mandatory = (event.sizeBytes ?? 0) >= LARGE_FILE_ANNOUNCE_BYTES
-        announce(event.filePath, { mandatory })
-      } else {
-        emitProgress({ event })
-      }
-    },
-  })
+  try {
+    return await runIndexProjectGraph(host, {
+      force: input.index.force,
+      ...(input.index.excludePaths !== undefined ? { excludePaths: input.index.excludePaths } : {}),
+      onProgress: (percent, phase) => emitProgress({ percent, phase }),
+      onEvent: (event) => {
+        if (event.kind === 'file-activity') {
+          const mandatory = (event.sizeBytes ?? 0) >= LARGE_FILE_ANNOUNCE_BYTES
+          announce(event.filePath, { mandatory })
+        } else {
+          emitProgress({ event })
+        }
+      },
+    })
+  } finally {
+    // The worker runs in its own process and does not use the CLI cleanup registry.
+    await host.dispose()
+  }
 }

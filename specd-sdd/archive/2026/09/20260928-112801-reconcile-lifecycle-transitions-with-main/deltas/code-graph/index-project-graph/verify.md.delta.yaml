@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing orchestration scenarios remain valid; fixture portability is implementation-level.'

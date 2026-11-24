@@ -89,8 +89,10 @@ Config inheritance MUST use local structural identity rules for removable collec
 The following identity rules apply in the first version:
 
 - `context[]` supports an optional `id` field. When present, `id` is the preferred identity key for inherited removal.
-- `plugins.agents[]` uses `name` as its identity key.
+- `plugins[]` uses `name` as its identity key. Layer entries with the same `name` replace the inherited entry in place; entries with a new `name` are appended in layer order.
 - keyed object maps such as `workspaces` and `storage` use their object keys as removal targets.
+
+A later layer removes an inherited plugin entry with `remove: { plugins: [{ name: '@scope/name' }] }`. Removal matches the inherited entry by `name`. A name that is removed and then re-declared by the same layer is appended as a new entry at the end of the list. Only entries inherited from the layers below can be removed: a plugin declared by the same layer is not inherited, so adding and removing one name in a single layer fails. Removing a name that is absent from the inherited list (or when no plugins are inherited) MUST fail with `ConfigValidationError`, like removal of an absent workspace, storage key or context entry. Because each removal consumes the matched entry, listing the same name twice in `remove.plugins` is rejected with `ConfigValidationError` as well.
 
 The system MUST NOT use arbitrary field-combination matching or AST-wide selector matching for config inheritance removal. Each removable array or map MUST define its own deterministic identity model.
 
@@ -124,16 +126,19 @@ There is no implicit multi-level fallback — the prefix determines exactly wher
 
 ### Requirement: Invalidation policy configuration
 
-`specd.yaml` MAY declare a root-level `invalidationPolicy` field controlling how artifact/file invalidation propagates when a change is invalidated.
+Project configuration SHALL accept the structured invalidation policy:
 
-Allowed values are:
+```yaml
+invalidation:
+  artifacts: downstream
+  workflow: preserve
+```
 
-- `none`
-- `surgical`
-- `downstream`
-- `global`
+`artifacts` MUST be one of `none`, `surgical`, `downstream`, or `global`. `workflow` MUST be `preserve` or `redesign`. Missing values for a newly created change resolve to `{ artifacts: downstream, workflow: preserve }` before the policy is persisted on that change.
 
-The configured value is the project default used to seed new changes and to resolve effective invalidation policy when a change has not been overridden later.
+The legacy top-level `invalidationPolicy` key SHALL remain readable temporarily as a deprecated alias. It maps to `{ artifacts: <legacy value>, workflow: redesign }`, preserving legacy rollback behaviour. Supplying both `invalidationPolicy` and `invalidation` in the same effective configuration SHALL fail validation as ambiguous; merge precedence MUST NOT silently select one.
+
+The workflow policy controls drift-driven lifecycle recovery only. It MUST NOT configure transition topology, waive unresolved artifact freshness, or override mandatory approval-gate recovery.
 
 ### Requirement: Workspaces
 
@@ -507,19 +512,19 @@ File paths remain resolved relative to the directory containing the active confi
 
 ### Requirement: Approvals
 
-`specd.yaml` may include an `approvals` section to configure which lifecycle gates require explicit human approval. Both gates are disabled by default — teams opt in to the level of governance they need.
+`specd.yaml` MAY configure two independent human-approval gates. Both are disabled by default:
 
 ```yaml
 approvals:
-  spec: false # require approval of the spec before implementation (default: false)
-  signoff: false # require sign-off of the completed work before archiving (default: false)
+  spec: false
+  signoff: false
 ```
 
-**`spec`** — when `true`, a change in `ready` state cannot transition directly to `implementing`. It must first enter `pending-spec-approval` and receive an explicit approval (with approver identity, reason, and timestamp) before transitioning to `spec-approved` and then to `implementing`. When `false` (default), `ready → implementing` is a free transition.
+When `spec` is `true`, a change in `ready` MUST NOT take a legal forward leave of `ready` until `ApproveSpec` records current consent. The `approval.spec` check applies to that forward boundary and fails with `APPROVAL_REQUIRED` while consent is missing or stale. Redesign (`ready → designing`) MUST NOT require consent. When the gate is off, the check skips. Omitting a workflow row does not by itself create a direct transition to a later lifecycle state; phase skipping is outside this contract.
 
-**`signoff`** — when `true`, a change in `done` state cannot transition directly to `archivable`, regardless of whether it contains structural modifications or only additions. It must enter `pending-signoff`, receive explicit sign-off, and transition through `signed-off → archivable`. The sign-off record captures what was reviewed — new specs, modified specs, and removed specs alike. When `false` (default), `done → archivable` is a free transition.
+When `signoff` is `true`, a change in `done` MUST NOT enter `archivable` until `ApproveSignoff` records current consent. When the gate is off, that approval check skips.
 
-Both flags are independent — any combination is valid.
+New work MUST stay in `ready` or `done` while awaiting the respective approval; it MUST NOT enter `pending-spec-approval` or `pending-signoff` as a happy-path hop. Existing changes already in those pending states retain their compatibility drain. Both gate flags are independent and every combination is valid.
 
 ### Requirement: Logging configuration
 
@@ -541,17 +546,30 @@ This field is a project-level opt-in. Teams that have no LLM available in their 
 
 ### Requirement: Plugin declarations
 
-`specd.yaml` MUST include a `plugins` section declaring installed plugins, grouped by type. The config loader MUST validate the `plugins` field at load time using the Zod schema — structural errors MUST produce a `ConfigValidationError` before any command runs.
+`specd.yaml` MAY include a `plugins` section declaring installed plugins as a flat list. The config loader MUST validate the `plugins` field at load time using the Zod schema — structural errors MUST produce a `ConfigValidationError` before any command runs.
 
 The validated structure is:
 
 ```typescript
-plugins: {
-  agents?: Array<{ name: string; config?: Record<string, unknown> }>
-}
+plugins: Array<{
+  name: string // scoped plugin name, "@scope/name"
+  config?: Record<string, unknown>
+  contributions?: string[] // allowlist of contribution ids; absent = all
+}>
 ```
 
-Each plugin entry has `name` (required) and optional `config`. Unknown plugin types are rejected at validation time.
+Each plugin entry has `name` (required, matching the scoped plugin name grammar `^@[a-z0-9][a-z0-9_-]*\/[a-z0-9][a-z0-9_-]*$`, which core owns in `domain/plugin-name.ts` and plugin-manager reuses), optional `config` and optional `contributions` (when present it MUST list at least one id; omit the key to select every contribution). A plugin name MUST appear at most once within any single layer: a duplicate inside one layer, including the root layer and an extending layer, MUST be rejected with `ConfigValidationError` before any layer is merged, so a later `remove.plugins` cannot erase it. There is no grouping by plugin type and no `exclude`/`disable` mechanism. The config validation does NOT load plugins: whether `config` satisfies the plugin's schema, or whether an id in `contributions` is declared, is validated by plugin-manager when the plugin is loaded.
+
+### Requirement: Config version
+
+`specd.yaml` MAY declare a top-level `configVersion` integer. The version introduced together with the flat `plugins` list is `2`. `specd init` MUST write `configVersion: 2`.
+
+- `configVersion` MUST be a positive integer; `0`, negative, fractional or non-numeric values fail with a `ConfigValidationError` (a schema validation error, or `UnsupportedConfigVersionError`, itself a `ConfigValidationError`, when the value exceeds the supported version).
+- An absent `configVersion` is accepted when the shape of the file is current.
+- A `configVersion` greater than the version supported by the running specd MUST fail with `UnsupportedConfigVersionError` (code `UNSUPPORTED_CONFIG_VERSION`) asking to upgrade specd.
+- A `plugins` value that is an object with an `agents` key (the previous format) MUST fail with `LegacyConfigFormatError` (code `LEGACY_CONFIG_FORMAT`) whose message contains the exact replacement `plugins` list and `configVersion: 2`, instead of a generic schema error. This detection MUST run before strict schema validation and applies only when `plugins` is an object with an `agents` key; any other non-list `plugins` value (for example `plugins: { skills: [] }`) falls through to the generic strict schema error. Detection runs on every cascade layer, including extending layers, and the `configVersion` check runs before the legacy check within a layer.
+- Across the config cascade, `configVersion` is taken from the root layer, and an absent root `configVersion` means the current version; a different `configVersion` in an extending layer MUST fail validation, while an extending layer that states the current version over a root without one is accepted.
+- `LegacyConfigFormatError` and `UnsupportedConfigVersionError` extend `ConfigValidationError`.
 
 ### Requirement: Config writer port
 
@@ -559,19 +577,12 @@ Each plugin entry has `name` (required) and optional `config`. Unknown plugin ty
 
 The port MUST define the following methods:
 
-- `initProject(options: InitProjectOptions): Promise<InitProjectResult>` — creates a new `specd.yaml` with default content
-- `addPlugin(configPath: string, type: string, name: string, config?: Record<string, unknown>): Promise<void>` — adds a plugin entry to `plugins.<type>`, with optional config
-- `removePlugin(configPath: string, type: string, name: string): Promise<void>` — removes a plugin entry from `plugins.<type>`
-- `listPlugins(configPath: string, type?: string): Promise<Array<{ name: string; config?: Record<string, unknown> }>>` — reads plugin entries from `plugins.<type>`, or all plugins if type is omitted
+- `initProject(options: InitProjectOptions): Promise<InitProjectResult>` — creates a new `specd.yaml` with default content (including `configVersion`)
+- `addPlugin(configPath: string, name: string, options?: { config?: Record<string, unknown>; contributions?: readonly string[] }): Promise<void>` — adds a plugin entry to `plugins`
+- `removePlugin(configPath: string, name: string): Promise<void>` — removes a plugin entry from `plugins`
+- `listPlugins(configPath: string): Promise<Array<{ name: string; config?: Record<string, unknown>; contributions?: string[] }>>` — reads the plugin entries from `plugins`
 
-The `addPlugin` method accepts four parameters:
-
-1. `configPath: string` — absolute path to the `specd.yaml` to update
-2. `type: string` — the plugin type (e.g. `"agents"`)
-3. `name: string` — the plugin package name (e.g. `"@specd/plugin-agent-claude"`)
-4. `config?: Record<string, unknown>` — optional plugin configuration
-
-It MUST return `Promise<void>`. The method MUST add the plugin to the `plugins.<type>` array in `specd.yaml`. If the plugin is already present, the method MUST NOT duplicate it.
+`addPlugin` MUST add the entry to the `plugins` list in `specd.yaml`. If the plugin is already present, the method MUST NOT duplicate it. The methods have no notion of plugin type.
 
 ### Requirement: Startup validation
 
@@ -596,17 +607,17 @@ These warnings MUST be non-fatal diagnostics about configuration shape or compat
 
 #### Scenario: Legacy config format emits warnings
 
-- **GIVEN** a config file declares a legacy workspace spec adapter format:
-- **WHEN** config is loaded
-- **THEN** it resolves successfully
-- **AND** `config.warnings` contains a warning string for `'workspaces.default.specs'`
+- GIVEN a config file declares a legacy workspace spec adapter format:
+- WHEN config is loaded
+- THEN it resolves successfully
+- AND `config.warnings` contains a warning string for `'workspaces.default.specs'`
 
 #### Scenario: Omitted storage defaults do not emit legacy configuration warnings
 
-- **GIVEN** a config file that completely omits the `storage` key
-- **WHEN** config is loaded
-- **THEN** it resolves successfully
-- **AND** `config.warnings` is undefined or does not contain warnings for storage
+- GIVEN a config file that completely omits the `storage` key
+- WHEN config is loaded
+- THEN it resolves successfully
+- AND `config.warnings` is undefined or does not contain warnings for storage
 
 ### Requirement: Project-level graph configuration
 
@@ -852,6 +863,7 @@ schemaOverrides:
 
 - [`core:vcs-adapter-port`](../vcs-adapter-port/spec.md) — configuration bounding relies on vcs adapter
 - [`default:_global/architecture`](../../_global/architecture/spec.md)
+- [`core:transition-checks`](../transition-checks/spec.md) — `approvals.spec` / `approvals.signoff` are in-place checks, not pending hops
 - [`core:spec-id-format`](../spec-id-format/spec.md) — workspace name rule, capability path segment rule, and `parseSpecPattern`
 
 ## ADRs

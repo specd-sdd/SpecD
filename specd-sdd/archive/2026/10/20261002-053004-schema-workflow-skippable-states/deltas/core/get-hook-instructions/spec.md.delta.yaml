@@ -1,0 +1,26 @@
+- op: modified
+  description: Resolve sovereign change schema without throwing SchemaMismatchError
+  selector:
+    type: section
+    matches: 'Requirement: Schema name guard'
+  rename: 'Requirement: Sovereign schema resolution'
+  content: |
+    `GetHookInstructions` MUST obtain the schema for the change through `ResolveChangeSchema`. The change's recorded schema is the sovereign authority defining its workflow step hooks. A different workspace default MUST remain irrelevant; provider identity mismatch MUST propagate as `SchemaProviderIdentityMismatchError`.
+
+    Hooks declared on a step that the change schema marks `disabled: true` SHALL NOT be returned: a disabled step is never entered or exited, so it has no applicable hook instructions.
+- op: added
+  description: Declare the shared sovereign change-schema resolution dependency
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [core:resolve-change-schema](../resolve-change-schema/spec.md) — named sovereign lookup, provider identity validation, and same-name version advisory
+- op: added
+  description: Declare the workflow-topology dependency used for step enablement
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [`core:workflow-topology`](../workflow-topology/spec.md) — step enablement (`isWorkflowStepEnabled`) used to decide hook applicability for disabled steps

@@ -1,0 +1,26 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Input contract$'
+  content: |
+    Scenarios:
+
+    #### Scenario: Malformed cross-field input fails before reconciliation
+
+    - **GIVEN** note is supplied without reason, a blank reason is supplied, or unknown nested fields exist
+    - **WHEN** execute is called directly
+    - **THEN** typed validation rejects input before actor resolution, refresh, reconcile, hooks or writes
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Atomic optional reason and current note
+
+    #### Scenario: Reason-only and note request remain distinct
+
+    - **GIVEN** two otherwise identical valid transitions, one with reason and one with reason/note
+    - **WHEN** each succeeds and a third reason/note request is a neutral no-op
+    - **THEN** reason-only has no new note; reason/note records both atomically; the no-op errors without cleanup

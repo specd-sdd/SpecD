@@ -8,6 +8,8 @@ Open Code agent plugin for [specd](https://github.com/specd-sdd/SpecD). For more
 specd plugins install @specd/plugin-agent-opencode
 ```
 
+The package manifest is `specd-plugin.json` with `schemaVersion: 2` and an `agents.opencode` contribution.
+
 ## Supported frontmatter fields
 
 | Field           | Required | Description         |

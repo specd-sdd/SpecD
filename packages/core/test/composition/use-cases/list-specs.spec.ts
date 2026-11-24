@@ -68,6 +68,7 @@ async function makeConfig(): Promise<SpecdConfig> {
       },
     },
     approvals: { spec: false, signoff: false },
+    invalidation: { artifacts: 'downstream', workflow: 'preserve' },
   }
 }
 

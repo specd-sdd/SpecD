@@ -5,6 +5,7 @@ import {
   makeProgram,
   mockProcessExit,
   captureStdout,
+  makeMockHost,
 } from './helpers.js'
 
 vi.mock('../../src/helpers/cli-context.js', () => ({
@@ -18,11 +19,13 @@ import { registerSpecMetadata } from '../../src/commands/spec/metadata.js'
 function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
-  vi.mocked(resolveCliContext).mockResolvedValue({
-    config: config,
-    configFilePath: null,
-    kernel: kernel,
-  })
+  vi.mocked(resolveCliContext).mockResolvedValue(
+    makeMockHost({
+      config: config,
+      configFilePath: null,
+      kernel: kernel,
+    }),
+  )
   const stdout = captureStdout()
   mockProcessExit()
   return { config, kernel, stdout }

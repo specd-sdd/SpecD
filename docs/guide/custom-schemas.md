@@ -68,6 +68,58 @@ schemaOverrides:
               run: 'pnpm test'
 ```
 
+### Example: Making a Step Optional or Disabled
+
+You can customize lifecycle step execution in `schemaOverrides` by setting `optional: true` (skippable if step-skip checks pass) or `disabled: true` (excluded from the active pipeline):
+
+```yaml
+# specd.yaml
+schemaOverrides:
+  append:
+    workflow:
+      - step: implementing
+        optional: true # can be bypassed for spec-only or doc-only changes
+      - step: verifying
+        disabled: true # excludes formal verification for fast prototyping
+```
+
+Bedrock states (`drafting`, `designing`, `done`, `archivable`, `archiving`) can never be disabled or marked optional; attempting to set `optional: true` or `disabled: true` on any bedrock state fails schema validation. The `ready` delivery anchor cannot be disabled when `approvals.spec` is enabled, while signoff gate configuration skips the `approval.signoff` check on `done -> archivable` without altering topology. For full topology rules, see the [Workflow Guide](workflow.md#skippable-and-disabled-workflow-steps).
+
+The four cases are distinct:
+
+| Declaration      | Effective skip checks | Default route                                                                        |
+| ---------------- | --------------------- | ------------------------------------------------------------------------------------ |
+| neither flag     | irrelevant            | the step is mandatory                                                                |
+| `optional: true` | none                  | Core recommends bypassing it unconditionally                                         |
+| `optional: true` | one or more           | Core recommends bypass only when all pass; otherwise it recommends entering the step |
+| `disabled: true` | none allowed          | the step is absent and cannot be entered                                             |
+
+“Effective” includes registry bindings supplied by Core or plugins, not only inline `skipChecks`. Skills never infer the route: they execute the `nextAction` selected by Core. Explicit entry into an optional step remains available even when Core recommends the shortcut.
+
+### Checks on the archive operation
+
+A workflow row has three independent check surfaces:
+
+| Field           | Evaluated when                                | Scope        |
+| --------------- | --------------------------------------------- | ------------ |
+| `checks`        | entering the step                             | `transition` |
+| `skipChecks`    | an optional step is bypassed                  | `step-skip`  |
+| `archiveChecks` | the change is archived (`archiving` row only) | `archive`    |
+
+`archiveChecks` lets a schema tune or embed checks of the archive operation. A schema can configure, disable, or change the `skippable` permission of `spec.overlap` and `impl.linksInScope`, and of checks bound to the archive operation by a host or plugin. It cannot relax `workspace.readOnly`, `impl.filesResolved`, `deps.consistent`, or the protocol checks (`schema.nameMatch`, `archive.archivable`, `workflow.taskCompletion`, `verification.current`, `hook.pre`, `hook.post`): they are locked on archive and the schema fails to build if it tries.
+
+```yaml
+workflow:
+  - step: archiving
+    archiveChecks:
+      - id: spec.overlap
+        skippable: false # this project never archives over live overlap
+      - id: '@security.code-scan'
+        skippable: true
+```
+
+`archiveChecks` accepts only `id`, `skippable`, `disabled`, and `config` (there is no `onFailure`). Full reference: [Archive operation checks](../schemas/schema-format.md#archive-operation-checks).
+
 ---
 
 ## 2. Composable Schema Plugins (`schemaPlugins`)
@@ -130,6 +182,7 @@ This copies the entire schema definition, giving you full ownership of every art
 | Use Case                                                         | Recommended Approach              |
 | :--------------------------------------------------------------- | :-------------------------------- |
 | Add a test hook or lint rule to your project                     | `schemaOverrides` in `specd.yaml` |
+| Make a step optional or disabled (e.g. skip implementing/verify) | `schemaOverrides` in `specd.yaml` |
 | Add an optional project-specific artifact (e.g. `openapi.yaml`)  | `schemaOverrides`                 |
 | Share custom rules across multiple company repositories          | `schemaPlugins`                   |
 | Build an organization-wide standard based on `@specd/schema-std` | `specd schema extend`             |

@@ -1,30 +1,33 @@
 import { describe, it, expect } from 'vitest'
-import { buildSchema } from '../../../src/domain/services/build-schema.js'
+import { buildSchema, type SchemaYamlData } from '../../../src/domain/services/build-schema.js'
 import { SchemaValidationError } from '../../../src/domain/errors/schema-validation-error.js'
+import { mergeSchemaLayers } from '../../../src/domain/services/merge-schema-layers.js'
+import { CheckRegistry } from '../../../src/domain/services/check-registry.js'
+import {
+  CheckBindingOverrideForbiddenError,
+  CheckConfigOverrideForbiddenError,
+  CheckDisableForbiddenError,
+  CheckEmbeddingForbiddenError,
+  DuplicateCheckBindingError,
+  UnknownCheckError,
+} from '../../../src/domain/errors/check-registry-errors.js'
 
-function minimalData(
-  workflow?: Array<{
-    step: string
-    requires: string[]
-    requiresTaskCompletion: string[]
-    hooks: { pre: never[]; post: never[] }
-  }>,
-) {
+function minimalData(workflow?: Array<Record<string, unknown>>): SchemaYamlData {
   return {
-    kind: 'schema' as const,
+    kind: 'schema',
     name: 'test',
     version: 1,
-    artifacts: [{ id: 'spec', scope: 'spec' as const, output: 'spec.md' }],
-    workflow,
+    artifacts: [{ id: 'spec', scope: 'spec', output: 'spec.md' }],
+    workflow: workflow as unknown as SchemaYamlData['workflow'],
   }
 }
 
-function step(name: string) {
+function step(name: string): Record<string, unknown> {
   return {
     step: name,
     requires: [],
     requiresTaskCompletion: [],
-    hooks: { pre: [] as never[], post: [] as never[] },
+    hooks: { pre: [], post: [] },
   }
 }
 
@@ -43,6 +46,35 @@ describe('buildSchema', () => {
   it('accepts archiving as a valid workflow step', () => {
     const schema = buildSchema('#test', minimalData([step('archiving')]), new Map())
     expect(schema.workflowStep('archiving')).not.toBeNull()
+  })
+
+  it('rejects bedrock steps declared as disabled', () => {
+    for (const bedrock of ['drafting', 'designing', 'done', 'archivable', 'archiving'] as const) {
+      expect(() =>
+        buildSchema('#test', minimalData([{ ...step(bedrock), disabled: true }]), new Map()),
+      ).toThrow(SchemaValidationError)
+    }
+  })
+
+  it('rejects bedrock steps declared as optional', () => {
+    for (const bedrock of ['drafting', 'designing', 'done', 'archivable', 'archiving'] as const) {
+      expect(() =>
+        buildSchema('#test', minimalData([{ ...step(bedrock), optional: true }]), new Map()),
+      ).toThrow(SchemaValidationError)
+    }
+  })
+
+  it('accepts configurable delivery steps declared as optional or disabled', () => {
+    const schema = buildSchema(
+      '#test',
+      minimalData([
+        { ...step('implementing'), optional: true },
+        { ...step('verifying'), disabled: true },
+      ]),
+      new Map(),
+    )
+    expect(schema.workflowStep('implementing')?.optional).toBe(true)
+    expect(schema.workflowStep('verifying')?.disabled).toBe(true)
   })
 
   it('populates compat and canonicalSpecSchema from string compat', () => {
@@ -492,6 +524,28 @@ describe('buildSchema', () => {
     expect(() => buildSchema('#test', data, new Map())).not.toThrow()
   })
 
+  it('treats hasTasks as metadata even when the output file is not tasks.md', () => {
+    const data = {
+      kind: 'schema' as const,
+      name: 'test',
+      version: 1,
+      artifacts: [
+        { id: 'checklist', scope: 'change' as const, output: 'checklist.md', hasTasks: true },
+      ],
+      workflow: [
+        {
+          step: 'archiving',
+          requires: ['checklist'],
+          requiresTaskCompletion: ['checklist'],
+          hooks: { pre: [], post: [] },
+        },
+      ],
+    }
+    const schema = buildSchema('#test', data, new Map())
+    expect(schema.artifact('checklist')?.hasTasks).toBe(true)
+    expect(schema.workflowStep('archiving')?.requiresTaskCompletion).toEqual(['checklist'])
+  })
+
   it('injects default patterns when hasTasks is true and patterns are missing', () => {
     const data = {
       kind: 'schema' as const,
@@ -794,5 +848,1135 @@ describe('buildSchema', () => {
       ],
     }
     expect(() => buildSchema('#test', data, new Map())).toThrow(SchemaValidationError)
+  })
+
+  describe('workflow checks validation and governance', () => {
+    it('accepts valid custom checks registered in CheckRegistry', () => {
+      const registry = new CheckRegistry()
+      registry.register('@acme/my-plugin', {
+        id: 'linter',
+        label: 'Linter',
+        execute: async () => ({
+          id: 'test',
+          label: 'Test',
+          kind: 'predicate',
+          outcome: 'pass',
+          details: {},
+        }),
+      })
+
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            checks: [{ id: '@acme/my-plugin.linter', config: { strict: true } }],
+          },
+        ]),
+      }
+
+      const schema = buildSchema('#test', data, new Map(), registry)
+      const stepObj = schema.workflowStep('implementing')
+      expect(stepObj?.checks).toBeDefined()
+      expect(stepObj?.checks?.[0]?.id).toBe('@acme/my-plugin.linter')
+      expect(stepObj?.checks?.[0]?.config).toEqual({ strict: true })
+    })
+
+    it('rejects unknown check IDs with UnknownCheckError', () => {
+      const registry = new CheckRegistry()
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            checks: [{ id: '@unknown.check' }],
+          },
+        ]),
+      }
+
+      expect(() => buildSchema('#test', data, new Map(), registry)).toThrow(UnknownCheckError)
+    })
+
+    it('rejects duplicate check IDs in the same workflow step with DuplicateCheckBindingError', () => {
+      const registry = new CheckRegistry()
+      registry.register('@acme/my-plugin', {
+        id: 'linter',
+        label: 'Linter',
+        execute: async () => ({
+          id: 'test',
+          label: 'Test',
+          kind: 'predicate',
+          outcome: 'pass',
+          details: {},
+        }),
+      })
+
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            checks: [{ id: '@acme/my-plugin.linter' }, { id: '@acme/my-plugin.linter' }],
+          },
+        ]),
+      }
+
+      expect(() => buildSchema('#test', data, new Map(), registry)).toThrow(
+        DuplicateCheckBindingError,
+      )
+    })
+
+    it('rejects embedding Category A/B built-ins at coordinates their bindings do not serve', () => {
+      const registry = new CheckRegistry()
+      // (id, step, along) pairs where no code-defined binding serves the coordinate
+      const unserved: Array<[string, string]> = [
+        ['verification.current', 'verifying'],
+        ['archive.archivable', 'verifying'],
+        ['schema.nameMatch', 'verifying'],
+        ['approval.spec', 'verifying'],
+        ['approval.signoff', 'verifying'],
+      ]
+
+      for (const [id, stepName] of unserved) {
+        const data = {
+          ...minimalData([
+            {
+              ...step(stepName),
+              checks: [{ id }],
+            },
+          ]),
+        }
+        expect(() => buildSchema('#test', data, new Map(), registry)).toThrow(
+          CheckEmbeddingForbiddenError,
+        )
+      }
+    })
+
+    it('does not treat a built-in declared at its own coordinate as embedding, but keeps its locks', () => {
+      const registry = new CheckRegistry()
+      const build = (check: Record<string, unknown>) =>
+        buildSchema(
+          '#test',
+          minimalData([{ ...step('verifying'), checks: [{ id: 'workflow.requires', ...check }] }]),
+          new Map(),
+          registry,
+        )
+      expect(() => build({})).not.toThrow()
+      expect(() => build({ disabled: true })).toThrow(CheckDisableForbiddenError)
+      expect(() => build({ config: { x: 1 } })).toThrow(CheckConfigOverrideForbiddenError)
+    })
+
+    it('applies only check-level locks to schema-owned declarations of a bound plugin check', () => {
+      const registry = new CheckRegistry()
+      registry.register(
+        '@acme/p',
+        { id: 'bound', label: 'bound', kind: 'predicate', execute: () => ({ ok: true }) } as never,
+        [{ scope: 'transition', to: 'ready', along: 'forward', allowConfigOverride: false }],
+        { allowSchemaEmbedding: true, allowConfigOverride: true },
+      )
+      // Not the code-defined coordinate: binding-level lock on config does not apply
+      const data = minimalData([
+        { ...step('verifying'), checks: [{ id: '@acme/p.bound', config: { x: 1 } }] },
+      ])
+      expect(() => buildSchema('#test', data, new Map(), registry)).not.toThrow()
+
+      const locked = new CheckRegistry()
+      locked.register(
+        '@acme/p',
+        { id: 'bound', label: 'bound', kind: 'predicate', execute: () => ({ ok: true }) } as never,
+        [{ scope: 'transition', to: 'ready', along: 'forward' }],
+        { allowSchemaEmbedding: true, allowConfigOverride: false },
+      )
+      expect(() => buildSchema('#test', data, new Map(), locked)).toThrow(
+        CheckConfigOverrideForbiddenError,
+      )
+    })
+
+    describe('layered schema-owned declarations', () => {
+      const doneWithCheck = (check: Record<string, unknown>) =>
+        minimalData([{ ...step('done'), checks: [check] }])
+
+      it('lets a later layer change onFailure and skippable on a schema-owned declaration', () => {
+        const base = doneWithCheck({ id: 'impl.linksInScope', onFailure: 'abort' })
+        const merged = mergeSchemaLayers(base, [
+          {
+            source: 'override',
+            ref: 'override',
+            operations: {
+              set: {
+                workflow: [
+                  {
+                    step: 'done',
+                    checks: [{ id: 'impl.linksInScope', onFailure: 'collect', skippable: false }],
+                  },
+                ],
+              },
+            } as never,
+          },
+        ])
+
+        const schema = buildSchema('#t', merged, new Map(), new CheckRegistry())
+
+        expect(schema.workflowStep('done')?.checks).toEqual([
+          { id: 'impl.linksInScope', onFailure: 'collect', skippable: false },
+        ])
+      })
+
+      it('still applies the check-level config lock to a later layer on a schema-owned declaration', () => {
+        const registry = new CheckRegistry()
+        registry.register(
+          '@acme/p',
+          { id: 'locked', label: 'Locked', execute: async () => ({}) } as never,
+          undefined,
+          { allowConfigOverride: false },
+        )
+        const base = doneWithCheck({ id: '@acme/p.locked' })
+        const merged = mergeSchemaLayers(base, [
+          {
+            source: 'override',
+            ref: 'override',
+            operations: {
+              set: {
+                workflow: [{ step: 'done', checks: [{ id: '@acme/p.locked', config: { x: 1 } }] }],
+              },
+            } as never,
+          },
+        ])
+
+        expect(() => buildSchema('#t', merged, new Map(), registry)).toThrow(
+          CheckConfigOverrideForbiddenError,
+        )
+      })
+    })
+
+    it('allows embedding and configuring Category C built-in checks in schema workflow steps', () => {
+      const registry = new CheckRegistry()
+      const categoryCIds = [
+        'impl.linksInScope',
+        'spec.overlap',
+        'deps.consistent',
+        'impl.filesResolved',
+        'workspace.readOnly',
+      ]
+
+      for (const id of categoryCIds) {
+        const data = {
+          ...minimalData([
+            {
+              ...step('verifying'),
+              checks: [{ id, config: { maxScopeDiff: 10 } }],
+            },
+          ]),
+        }
+        const schema = buildSchema('#test', data, new Map(), registry)
+        const verifyingStep = schema.workflowStep('verifying')
+        const declaredCheck = verifyingStep?.checks?.find((c) => c.id === id)
+        expect(declaredCheck).toBeDefined()
+        expect(declaredCheck?.config).toEqual({ maxScopeDiff: 10 })
+      }
+    })
+
+    it('allows Category C built-in checks to be declaratively disabled with disabled: true', () => {
+      const registry = new CheckRegistry()
+      const categoryCIds = [
+        'impl.linksInScope',
+        'spec.overlap',
+        'deps.consistent',
+        'impl.filesResolved',
+        'workspace.readOnly',
+      ]
+
+      for (const id of categoryCIds) {
+        const data = {
+          ...minimalData([
+            {
+              ...step('verifying'),
+              checks: [{ id, disabled: true }],
+            },
+          ]),
+        }
+        const schema = buildSchema('#test', data, new Map(), registry)
+        const verifyingStep = schema.workflowStep('verifying')
+        const declaredCheck = verifyingStep?.checks?.find((c) => c.id === id)
+        expect(declaredCheck).toBeDefined()
+        expect(declaredCheck?.disabled).toBe(true)
+      }
+    })
+
+    it('rejects binding override when allowBindingOverride is false with CheckBindingOverrideForbiddenError', () => {
+      const registry = new CheckRegistry()
+      registry.register(
+        '@acme/my-plugin',
+        {
+          id: 'locked-binding',
+          label: 'Locked Binding',
+          execute: async () => ({
+            id: 'test',
+            label: 'Test',
+            kind: 'predicate',
+            outcome: 'pass',
+            details: {},
+          }),
+        },
+        [
+          {
+            scope: 'transition',
+            to: 'implementing',
+            skippable: false,
+          },
+        ],
+        { allowBindingOverride: false },
+      )
+
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            checks: [{ id: '@acme/my-plugin.locked-binding', skippable: true }],
+          },
+        ]),
+      }
+
+      expect(() => buildSchema('#test', data, new Map(), registry)).toThrow(
+        CheckBindingOverrideForbiddenError,
+      )
+    })
+
+    it.each(['constructor', 'toString', '__proto__'])(
+      "rejects a check declared from the inherited object key '%s'",
+      (from) => {
+        const data = minimalData([
+          {
+            ...step('implementing'),
+            checks: [{ id: 'workflow.taskCompletion', from }],
+          },
+        ])
+
+        expect(() => buildSchema('#test', data, new Map())).toThrow(SchemaValidationError)
+        expect(() => buildSchema('#test', data, new Map())).toThrow(`invalid from state '${from}'`)
+      },
+    )
+
+    it('allows modifying onFailure and skippable when check has an existing binding and allowBindingOverride is true', () => {
+      const registry = new CheckRegistry()
+      registry.register(
+        '@acme/my-plugin',
+        {
+          id: 'customizable-binding',
+          label: 'Customizable Binding',
+          execute: async () => ({
+            id: 'test',
+            label: 'Test',
+            kind: 'predicate',
+            outcome: 'pass',
+            details: {},
+          }),
+        },
+        [
+          {
+            scope: 'transition',
+            to: 'implementing',
+            onFailure: 'abort',
+            skippable: false,
+            allowBindingOverride: true,
+          },
+        ],
+        { allowBindingOverride: true },
+      )
+
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            checks: [
+              {
+                id: '@acme/my-plugin.customizable-binding',
+                onFailure: 'warn',
+                skippable: true,
+              },
+            ],
+          },
+        ]),
+      }
+
+      const schema = buildSchema('#test', data, new Map(), registry)
+      const stepObj = schema.workflowStep('implementing')
+      const declaredCheck = stepObj?.checks?.find(
+        (c) => c.id === '@acme/my-plugin.customizable-binding',
+      )
+      expect(declaredCheck).toBeDefined()
+      expect(declaredCheck?.onFailure).toBe('warn')
+      expect(declaredCheck?.skippable).toBe(true)
+    })
+
+    it('rejects config override when allowConfigOverride is false with CheckConfigOverrideForbiddenError', () => {
+      const registry = new CheckRegistry()
+      registry.register(
+        '@acme/my-plugin',
+        {
+          id: 'locked-config',
+          label: 'Locked Config',
+          execute: async () => ({
+            id: 'test',
+            label: 'Test',
+            kind: 'predicate',
+            outcome: 'pass',
+            details: {},
+          }),
+        },
+        [],
+        { allowConfigOverride: false },
+      )
+
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            checks: [{ id: '@acme/my-plugin.locked-config', config: { override: true } }],
+          },
+        ]),
+      }
+
+      expect(() => buildSchema('#test', data, new Map(), registry)).toThrow(
+        CheckConfigOverrideForbiddenError,
+      )
+    })
+
+    it('allows config override when check has an existing binding and allowConfigOverride is true', () => {
+      const registry = new CheckRegistry()
+      registry.register(
+        '@acme/my-plugin',
+        {
+          id: 'configurable-check',
+          label: 'Configurable Check',
+          execute: async () => ({
+            id: 'test',
+            label: 'Test',
+            kind: 'predicate',
+            outcome: 'pass',
+            details: {},
+          }),
+        },
+        [
+          {
+            scope: 'transition',
+            to: 'verifying',
+            along: 'forward',
+            allowConfigOverride: true,
+            config: { defaultTimeout: 1000 },
+          },
+        ],
+        { allowBindingOverride: true, allowConfigOverride: true },
+      )
+
+      const data = {
+        ...minimalData([
+          {
+            ...step('verifying'),
+            checks: [
+              {
+                id: '@acme/my-plugin.configurable-check',
+                along: 'forward',
+                config: { defaultTimeout: 5000, extraParam: 'active' },
+              },
+            ],
+          },
+        ]),
+      }
+
+      const schema = buildSchema('#test', data, new Map(), registry)
+      const verifyingStep = schema.workflowStep('verifying')
+      const declaredCheck = verifyingStep?.checks?.find(
+        (c) => c.id === '@acme/my-plugin.configurable-check',
+      )
+      expect(declaredCheck).toBeDefined()
+      expect(declaredCheck?.config).toEqual({ defaultTimeout: 5000, extraParam: 'active' })
+    })
+
+    it('rejects disabled: true when check has allowDisable: false with CheckDisableForbiddenError', () => {
+      const registry = new CheckRegistry()
+      registry.register(
+        '@acme/my-plugin',
+        {
+          id: 'non-disableable',
+          label: 'Non Disableable',
+          execute: async () => ({
+            id: 'test',
+            label: 'Test',
+            kind: 'predicate',
+            outcome: 'pass',
+            details: {},
+          }),
+        },
+        [],
+        { allowDisable: false },
+      )
+
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            checks: [{ id: '@acme/my-plugin.non-disableable', disabled: true }],
+          },
+        ]),
+      }
+
+      expect(() => buildSchema('#test', data, new Map(), registry)).toThrow(
+        CheckDisableForbiddenError,
+      )
+    })
+
+    it('rejects disabled: true when binding has allowDisable: false with CheckDisableForbiddenError', () => {
+      const registry = new CheckRegistry()
+      registry.register(
+        '@acme/my-plugin',
+        {
+          id: 'binding-locked',
+          label: 'Binding Locked',
+          execute: async () => ({
+            id: 'test',
+            label: 'Test',
+            kind: 'predicate',
+            outcome: 'pass',
+            details: {},
+          }),
+        },
+        [
+          {
+            scope: 'transition',
+            to: 'implementing',
+            allowDisable: false,
+          },
+        ],
+        { allowDisable: true }, // check allows it, but binding locks it
+      )
+
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            checks: [{ id: '@acme/my-plugin.binding-locked', disabled: true }],
+          },
+        ]),
+      }
+
+      expect(() => buildSchema('#test', data, new Map(), registry)).toThrow(
+        CheckDisableForbiddenError,
+      )
+    })
+
+    it('preserves existing binding allowDisable lock when an identical binding is redeclared in schema', () => {
+      const registry = new CheckRegistry()
+      registry.register(
+        '@acme/compliance',
+        {
+          id: 'audit',
+          label: 'Audit Check',
+          execute: async () => ({
+            id: 'test',
+            label: 'Test',
+            kind: 'predicate',
+            outcome: 'pass',
+            details: {},
+          }),
+        },
+        [
+          {
+            scope: 'transition',
+            to: 'verifying',
+            along: 'forward',
+            allowDisable: false,
+          },
+        ],
+      )
+
+      // Schema redeclares the exact same check coordinate attempting to disable it
+      const data = {
+        ...minimalData([
+          {
+            ...step('verifying'),
+            checks: [
+              {
+                id: '@acme/compliance.audit',
+                along: 'forward',
+                disabled: true,
+              },
+            ],
+          },
+        ]),
+      }
+
+      // Pre-existing binding lock must NOT be overwritten or erased
+      expect(() => buildSchema('#test', data, new Map(), registry)).toThrow(
+        CheckDisableForbiddenError,
+      )
+    })
+
+    it('allows disabled: true when allowDisable is true', () => {
+      const registry = new CheckRegistry()
+      registry.register(
+        '@acme/my-plugin',
+        {
+          id: 'optional-check',
+          label: 'Optional Check',
+          execute: async () => ({
+            id: 'test',
+            label: 'Test',
+            kind: 'predicate',
+            outcome: 'pass',
+            details: {},
+          }),
+        },
+        [],
+        { allowDisable: true },
+      )
+
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            checks: [{ id: '@acme/my-plugin.optional-check', disabled: true }],
+          },
+        ]),
+      }
+
+      const schema = buildSchema('#test', data, new Map(), registry)
+      const stepObj = schema.workflowStep('implementing')
+      expect(stepObj?.checks?.[0]?.disabled).toBe(true)
+    })
+  })
+
+  describe('skipChecks governance and semantic validation', () => {
+    it('rejects unknown check in skipChecks with UnknownCheckError', () => {
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            skipChecks: [{ id: 'non-existent-check' }],
+          },
+        ]),
+      }
+      expect(() => buildSchema('#test', data, new Map())).toThrow(UnknownCheckError)
+    })
+
+    it('rejects duplicate check coordinate in skipChecks with DuplicateCheckBindingError', () => {
+      const registry = new CheckRegistry()
+      registry.register(
+        '@acme/my-plugin',
+        {
+          id: 'dup-check',
+          label: 'Dup Check',
+          execute: async () => ({
+            id: 'test',
+            label: 'Test',
+            kind: 'predicate',
+            outcome: 'pass',
+            details: {},
+          }),
+        },
+        [],
+      )
+
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            skipChecks: [{ id: '@acme/my-plugin.dup-check' }, { id: '@acme/my-plugin.dup-check' }],
+          },
+        ]),
+      }
+      expect(() => buildSchema('#test', data, new Map(), registry)).toThrow(
+        DuplicateCheckBindingError,
+      )
+    })
+
+    it('rejects embedding Category A/B checks in skipChecks with CheckEmbeddingForbiddenError', () => {
+      const registry = new CheckRegistry()
+      const lockedBuiltinIds = ['protocol.edge', 'verification.current', 'workflow.requires']
+
+      for (const id of lockedBuiltinIds) {
+        const data = {
+          ...minimalData([
+            {
+              ...step('implementing'),
+              skipChecks: [{ id }],
+            },
+          ]),
+        }
+        expect(() => buildSchema('#test', data, new Map(), registry)).toThrow(
+          CheckEmbeddingForbiddenError,
+        )
+      }
+    })
+
+    it('rejects modifying locked onFailure on skipChecks with CheckBindingOverrideForbiddenError', () => {
+      const registry = new CheckRegistry()
+      registry.register(
+        '@acme/my-plugin',
+        {
+          id: 'locked-policy',
+          label: 'Locked Policy',
+          execute: async () => ({
+            id: 'test',
+            label: 'Test',
+            kind: 'predicate',
+            outcome: 'pass',
+            details: {},
+          }),
+        },
+        [
+          {
+            scope: 'step-skip',
+            step: 'implementing',
+            onFailure: 'abort',
+            allowBindingOverride: false,
+          },
+        ],
+      )
+
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            skipChecks: [{ id: '@acme/my-plugin.locked-policy', onFailure: 'warn' }],
+          },
+        ]),
+      }
+      expect(() => buildSchema('#test', data, new Map(), registry)).toThrow(
+        CheckBindingOverrideForbiddenError,
+      )
+    })
+
+    it('rejects modifying locked skippable on skipChecks with CheckBindingOverrideForbiddenError', () => {
+      const registry = new CheckRegistry()
+      registry.register(
+        '@acme/my-plugin',
+        {
+          id: 'locked-skippable',
+          label: 'Locked Skippable',
+          execute: async () => ({
+            id: 'test',
+            label: 'Test',
+            kind: 'predicate',
+            outcome: 'pass',
+            details: {},
+          }),
+        },
+        [
+          {
+            scope: 'step-skip',
+            step: 'implementing',
+            skippable: false,
+            allowBindingOverride: false,
+          },
+        ],
+      )
+
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            skipChecks: [{ id: '@acme/my-plugin.locked-skippable', skippable: true }],
+          },
+        ]),
+      }
+      expect(() => buildSchema('#test', data, new Map(), registry)).toThrow(
+        CheckBindingOverrideForbiddenError,
+      )
+    })
+
+    it('allows modifying onFailure and skippable when check has an existing step-skip binding and allowBindingOverride is true', () => {
+      const registry = new CheckRegistry()
+      registry.register(
+        '@acme/my-plugin',
+        {
+          id: 'customizable-skip-policy',
+          label: 'Customizable Skip Policy',
+          execute: async () => ({
+            id: 'test',
+            label: 'Test',
+            kind: 'predicate',
+            outcome: 'pass',
+            details: {},
+          }),
+        },
+        [
+          {
+            scope: 'step-skip',
+            step: 'implementing',
+            onFailure: 'abort',
+            skippable: false,
+            allowBindingOverride: true,
+          },
+        ],
+        { allowBindingOverride: true },
+      )
+
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            optional: true,
+            skipChecks: [
+              {
+                id: '@acme/my-plugin.customizable-skip-policy',
+                onFailure: 'warn',
+                skippable: true,
+              },
+            ],
+          },
+        ]),
+      }
+
+      const schema = buildSchema('#test', data, new Map(), registry)
+      const stepObj = schema.workflowStep('implementing')
+      const declaredSkip = stepObj?.skipChecks?.find(
+        (c) => c.id === '@acme/my-plugin.customizable-skip-policy',
+      )
+      expect(declaredSkip).toBeDefined()
+      expect(declaredSkip?.onFailure).toBe('warn')
+      expect(declaredSkip?.skippable).toBe(true)
+    })
+
+    it('rejects config override when allowConfigOverride is false on skipChecks with CheckConfigOverrideForbiddenError', () => {
+      const registry = new CheckRegistry()
+      registry.register(
+        '@acme/my-plugin',
+        {
+          id: 'locked-config',
+          label: 'Locked Config',
+          execute: async () => ({
+            id: 'test',
+            label: 'Test',
+            kind: 'predicate',
+            outcome: 'pass',
+            details: {},
+          }),
+        },
+        [
+          {
+            scope: 'step-skip',
+            step: 'implementing',
+            allowConfigOverride: false,
+          },
+        ],
+      )
+
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            skipChecks: [{ id: '@acme/my-plugin.locked-config', config: { foo: 'bar' } }],
+          },
+        ]),
+      }
+      expect(() => buildSchema('#test', data, new Map(), registry)).toThrow(
+        CheckConfigOverrideForbiddenError,
+      )
+    })
+
+    it('rejects disabled: true when check/binding has allowDisable: false on skipChecks with CheckDisableForbiddenError', () => {
+      const registry = new CheckRegistry()
+      registry.register(
+        '@acme/my-plugin',
+        {
+          id: 'locked-disable',
+          label: 'Locked Disable',
+          execute: async () => ({
+            id: 'test',
+            label: 'Test',
+            kind: 'predicate',
+            outcome: 'pass',
+            details: {},
+          }),
+        },
+        [
+          {
+            scope: 'step-skip',
+            step: 'implementing',
+            allowDisable: false,
+          },
+        ],
+      )
+
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            skipChecks: [{ id: '@acme/my-plugin.locked-disable', disabled: true }],
+          },
+        ]),
+      }
+      expect(() => buildSchema('#test', data, new Map(), registry)).toThrow(
+        CheckDisableForbiddenError,
+      )
+    })
+
+    it('rejects skipChecks declared on a disabled: true workflow step with SchemaValidationError', () => {
+      const registry = new CheckRegistry()
+      registry.register(
+        '@acme/my-plugin',
+        {
+          id: 'some-check',
+          label: 'Some Check',
+          execute: async () => ({
+            id: 'test',
+            label: 'Test',
+            kind: 'predicate',
+            outcome: 'pass',
+            details: {},
+          }),
+        },
+        [],
+      )
+
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            disabled: true,
+            skipChecks: [{ id: '@acme/my-plugin.some-check' }],
+          },
+        ]),
+      }
+      expect(() => buildSchema('#test', data, new Map(), registry)).toThrow(SchemaValidationError)
+    })
+
+    it('accepts valid skipChecks with allowed overrides and stores them on WorkflowStep', () => {
+      const registry = new CheckRegistry()
+      registry.register(
+        '@acme/my-plugin',
+        {
+          id: 'custom-skip',
+          label: 'Custom Skip',
+          execute: async () => ({
+            id: 'test',
+            label: 'Test',
+            kind: 'predicate',
+            outcome: 'pass',
+            details: {},
+          }),
+        },
+        [],
+        { allowBindingOverride: true, allowConfigOverride: true, allowDisable: true },
+      )
+
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            optional: true,
+            skipChecks: [
+              {
+                id: '@acme/my-plugin.custom-skip',
+                onFailure: 'warn',
+                skippable: true,
+                config: { threshold: 10 },
+              },
+            ],
+          },
+        ]),
+      }
+
+      const schema = buildSchema('#test', data, new Map(), registry)
+      const stepObj = schema.workflowStep('implementing')
+      expect(stepObj?.skipChecks).toHaveLength(1)
+      expect(stepObj?.skipChecks?.[0]).toEqual({
+        id: '@acme/my-plugin.custom-skip',
+        onFailure: 'warn',
+        skippable: true,
+        config: { threshold: 10 },
+      })
+    })
+
+    it('allows config override when check has an existing step-skip binding and allowConfigOverride is true', () => {
+      const registry = new CheckRegistry()
+      registry.register(
+        '@acme/my-plugin',
+        {
+          id: 'configurable-skip-check',
+          label: 'Configurable Skip Check',
+          execute: async () => ({
+            id: 'test',
+            label: 'Test',
+            kind: 'predicate',
+            outcome: 'pass',
+            details: {},
+          }),
+        },
+        [
+          {
+            scope: 'step-skip',
+            step: 'implementing',
+            allowConfigOverride: true,
+            config: { threshold: 5 },
+          },
+        ],
+        { allowBindingOverride: true, allowConfigOverride: true },
+      )
+
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            optional: true,
+            skipChecks: [
+              {
+                id: '@acme/my-plugin.configurable-skip-check',
+                config: { threshold: 10, mode: 'strict' },
+              },
+            ],
+          },
+        ]),
+      }
+
+      const schema = buildSchema('#test', data, new Map(), registry)
+      const stepObj = schema.workflowStep('implementing')
+      const declaredSkip = stepObj?.skipChecks?.find(
+        (c) => c.id === '@acme/my-plugin.configurable-skip-check',
+      )
+      expect(declaredSkip).toBeDefined()
+      expect(declaredSkip?.config).toEqual({ threshold: 10, mode: 'strict' })
+    })
+  })
+
+  describe('hook onFailure policy', () => {
+    it('parses onFailure: "warn" and "abort" correctly', () => {
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            hooks: {
+              pre: [
+                { id: 'h1', type: 'run', command: 'echo 1', onFailure: 'warn' },
+                { id: 'h2', type: 'run', command: 'echo 2', onFailure: 'abort' },
+              ],
+              post: [],
+            },
+          },
+        ]),
+      }
+
+      const schema = buildSchema('#test', data, new Map())
+      const stepObj = schema.workflowStep('implementing')
+      expect((stepObj?.hooks.pre[0] as any)?.onFailure).toBe('warn')
+      expect((stepObj?.hooks.pre[1] as any)?.onFailure).toBe('abort')
+    })
+
+    it('rejects invalid hook onFailure values with SchemaValidationError', () => {
+      const data = {
+        ...minimalData([
+          {
+            ...step('implementing'),
+            hooks: {
+              pre: [{ id: 'h1', type: 'run', command: 'echo 1', onFailure: 'invalid' as any }],
+              post: [],
+            },
+          },
+        ]),
+      }
+
+      expect(() => buildSchema('#test', data, new Map())).toThrow(SchemaValidationError)
+    })
+  })
+})
+
+describe('verification-attempt-11 workflow validation', () => {
+  it('rejects drain-only states declared as workflow rows', () => {
+    for (const drain of [
+      'pending-spec-approval',
+      'spec-approved',
+      'pending-signoff',
+      'signed-off',
+    ]) {
+      expect(() => buildSchema('#test', minimalData([step(drain)]), new Map())).toThrow(
+        `Workflow step '${drain}' is a drain-only state and cannot be declared`,
+      )
+    }
+  })
+
+  it('rejects requires entries that are not declared artifact ids', () => {
+    expect(() =>
+      buildSchema(
+        '#test',
+        minimalData([{ ...step('implementing'), requires: ['ready'] }]),
+        new Map(),
+      ),
+    ).toThrow("Workflow step 'implementing' requires unknown artifact 'ready'")
+  })
+
+  it('rejects requiresTaskCompletion entries that are not declared artifact ids', () => {
+    expect(() =>
+      buildSchema(
+        '#test',
+        minimalData([{ ...step('implementing'), requiresTaskCompletion: ['tasks'] }]),
+        new Map(),
+      ),
+    ).toThrow("Workflow step 'implementing' requires unknown artifact 'tasks'")
+  })
+
+  it('accepts requires entries that reference declared artifacts', () => {
+    const schema = buildSchema(
+      '#test',
+      minimalData([{ ...step('implementing'), requires: ['spec'] }]),
+      new Map(),
+    )
+    expect(schema.workflowStep('implementing')?.requires).toEqual(['spec'])
+  })
+
+  it('lets a coordinate binding allow policy changes despite a check-level lock', () => {
+    const registry = new CheckRegistry()
+    registry.register(
+      '@acme/my-plugin',
+      {
+        id: 'confined',
+        label: 'Confined',
+        execute: async () => ({
+          id: 'test',
+          label: 'Test',
+          kind: 'predicate',
+          outcome: 'pass',
+          details: {},
+        }),
+      },
+      [{ scope: 'transition', to: 'implementing', skippable: false, allowBindingOverride: true }],
+      { allowBindingOverride: false },
+    )
+
+    const schema = buildSchema(
+      '#test',
+      minimalData([
+        { ...step('implementing'), checks: [{ id: '@acme/my-plugin.confined', skippable: true }] },
+      ]),
+      new Map(),
+      registry,
+    )
+    expect(schema.workflowStep('implementing')?.checks?.[0]?.skippable).toBe(true)
+  })
+
+  it('still blocks embedding a confined check at a new coordinate', () => {
+    const registry = new CheckRegistry()
+    registry.register(
+      '@acme/my-plugin',
+      {
+        id: 'confined',
+        label: 'Confined',
+        execute: async () => ({
+          id: 'test',
+          label: 'Test',
+          kind: 'predicate',
+          outcome: 'pass',
+          details: {},
+        }),
+      },
+      [{ scope: 'transition', to: 'implementing', allowBindingOverride: true }],
+      { allowBindingOverride: false },
+    )
+
+    expect(() =>
+      buildSchema(
+        '#test',
+        minimalData([{ ...step('verifying'), checks: [{ id: '@acme/my-plugin.confined' }] }]),
+        new Map(),
+        registry,
+      ),
+    ).toThrow(CheckEmbeddingForbiddenError)
   })
 })

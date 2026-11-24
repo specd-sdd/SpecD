@@ -14,7 +14,7 @@ specd has three layers that work together to drive a change from idea to complet
 
 **The CLI** is the engine. It manages changes, transitions between states, validates artifacts, compiles context, and enforces gates. Every operation — creating a change, checking status, transitioning states, archiving — is a CLI command. The CLI is the source of truth for what is happening.
 
-**The workflow** is the rules. It defines which states exist, what transitions are valid, what artifacts must be produced, and what gates must be passed. The workflow comes from two sources: the schema (which defines artifacts and their dependency order) and the project config (which enables approval gates and hooks). Together they determine the path a change must follow.
+**The workflow rules** come from two places. The Change lifecycle (`ChangeState` and `VALID_TRANSITIONS`) defines which states exist and which hops are legal. The schema’s `workflow[]` array does not add or remove those states: each `step` is a lookup onto an existing state and only attaches extras (`requires`, task gates, hooks). Artifact types and their dependency order also come from the schema. Project config enables approval gates and extra hooks. Together they determine what must be produced and which gates apply on a legal hop.
 
 **The skills** are the interface. They are slash commands installed in your coding assistant (`/specd`, `/specd-new`, `/specd-design`, etc.) that orchestrate the workflow by calling the CLI. Each skill knows how to guide the agent through one phase — loading context, writing artifacts, validating, transitioning. You interact with skills; skills interact with the CLI; the CLI enforces the workflow.
 
@@ -39,18 +39,16 @@ In practice, you type `/specd` and the skill figures out where you are, what to 
                         │    archiving when recovery is needed)               │
                         └──────────────────────────────────────────────────────┘
                                               ↑
-drafting → designing ⇄ ready ─────────────────────────────────── → implementing ⇄ verifying → done ──────────────────────── → archivable → archiving
-                        ↓                                                                       ↓
-               pending-spec-approval                                                    pending-signoff
-                        ↓                                                                       ↓
-                  spec-approved ─────────────────────────────────→ implementing           signed-off
+drafting → designing ⇄ ready → implementing ⇄ verifying → done → archivable → archiving
 ```
 
-When neither approval gate is enabled, the main path is:
+That is the happy path whether or not approval gates are enabled. Optional spec and signoff gates do **not** insert extra wait states. The change stays in `ready` or `done` until a human records consent with `specd changes approve spec` or `specd changes approve signoff`; then the same `ready → implementing` / `done → archivable` transition is allowed.
 
-```
-drafting → designing → ready → implementing → verifying → done → archivable → archiving
-```
+`specd changes status` lists **available** transitions from the same checks that `change transition` runs (artifact `requires`, task completion on the target step, enter-`ready` guards, exit-`implementing` implementation integrity, and approval on the delivery edge). The protocol graph (`VALID_TRANSITIONS`) is larger than what status shows as available.
+
+From `done`, `signed-off`, or `archivable` you can hop back to `implementing` or `verifying` (skill-aligned retry) without going through `ready` again.
+
+`pending-spec-approval`, `spec-approved`, `pending-signoff`, and `signed-off` remain in the protocol for **drain only** — in-flight changes that already sit there. New work does not enter those states via `change transition`.
 
 ## States explained
 
@@ -74,7 +72,7 @@ The active design and specification phase. This is where the bulk of artifact wo
 - **Transition out:** `specd changes transition <name> ready` once all required artifacts are complete and validated.
 - **What can block it:** The `ready` step requires all artifacts listed in the schema's `requires` field (by default: proposal, specs, verify, design, tasks) to have `complete` status. The CLI reports which artifacts are still missing or in progress.
 
-The `designing → designing` self-transition is valid — it records a checkpoint without changing state. This happens automatically when redesign invalidates an already-`designing` change.
+`designing → designing` is the sole neutral self-entry accepted by the application boundary. It returns the unchanged change and records no event or timestamp update. Other self-transitions, including `verifying → verifying`, are invalid.
 
 ---
 
@@ -82,34 +80,33 @@ The `designing → designing` self-transition is valid — it records a checkpoi
 
 All design artifacts are complete. The change is ready to hand off to implementation.
 
-- **What it means:** Every required artifact has been written and validated. The change has been reviewed and is cleared for implementation.
-- **What you do:** If the `approvals.spec` gate is enabled in `specd.yaml`, transition to `pending-spec-approval` to request approval. Otherwise, transition directly to `implementing`.
-- **Transition out:** `implementing` (no gate), or `pending-spec-approval` (with gate), or back to `designing` (redesign).
-- **What can block it:** The spec approval gate (if enabled) must be passed before proceeding to `implementing`.
+- **What it means:** Every required artifact has been written and validated. The change is cleared for implementation, subject to optional spec approval.
+- **What you do:** Transition to `implementing`. If `approvals.spec` is enabled, a reviewer first runs `specd changes approve spec <name> --reason "..."`; the change **stays in `ready`**. Then run the same `ready → implementing` transition.
+- **Transition out:** `implementing`, or back to `designing` (redesign). Do not use `change transition` into `pending-spec-approval`.
+- **What can block it:** Incomplete required artifacts, enter-`ready` dependency/read-only checks (on the way in), and — if the spec gate is on — a missing recorded spec approval (`APPROVAL_REQUIRED`). The change remains in `ready` until approval is recorded.
 
 ---
 
-### `pending-spec-approval`
+### `pending-spec-approval` (drain only)
 
-The spec approval gate is active and a human reviewer has not yet approved the specs.
+Historic wait state for in-flight changes that already sit here. New work does not enter this state.
 
-- **What it means:** specd has been asked to require human sign-off on the spec artifacts before implementation begins. The change is waiting for that approval.
-- **What you do:** A reviewer runs `specd changes approve-spec <name> --reason "..."` after inspecting the spec artifacts.
-- **Transition out:** `spec-approved` after approval, or back to `designing` (redesign).
-- **What can block it:** Approval must be recorded by a human. The gate cannot be bypassed.
+- **What it means:** An older change is waiting for human spec approval under the previous parking model.
+- **What you do:** A reviewer runs `specd changes approve spec <name> --reason "..."` (records consent in place without moving the state), then transition directly to `implementing`, or redesign to `designing`.
+- **Transition out:** `implementing`, or `designing` (gated by the bound `approval.spec` check when `approvals.spec` is enabled).
 
-This state only appears when `approvals.spec` is enabled in `specd.yaml`. See [Approval gates](#approval-gates).
+See [Approval gates](#approval-gates).
 
 ---
 
-### `spec-approved`
+### `spec-approved` (drain only)
 
-A human has reviewed and approved the spec artifacts.
+Historic post-approval parking state. New work records spec approval in `ready` and goes `ready → implementing`.
 
-- **What it means:** The specs have been signed off. Implementation may now proceed.
-- **What you do:** Transition to `implementing`.
-- **Transition out:** `implementing`, or back to `designing` (redesign).
-- **What can block it:** If specs were modified after approval, the change is automatically invalidated and returns to `designing` — the approval is cleared.
+- **What it means:** Specs were signed off while the change was in the old pending path.
+- **What you do:** Transition to `implementing`, or back to `designing`.
+- **Transition out:** `implementing`, or `designing`.
+- **What can block it:** If specs were modified after approval, the materialized approval becomes stale; the `approval.spec` check blocks the transition from `ready` until consent is renewed, and a later state returns to `designing`. The approval and invalidation events remain in append-only history; later approval replaces only the current projection.
 
 ---
 
@@ -119,8 +116,8 @@ Active development is in progress.
 
 - **What it means:** The implementation tasks are being worked through.
 - **What you do:** Work through the task list in `tasks.md`, checking off items as you go (`- [x]`). Run `specd changes status <name>` to see task progress. Re-check `specd graph impact` when a task touches a symbol or file that `design.md` did not already cover, and prefer `specd graph search` over repository-wide text search.
-- **Transition out:** `verifying` once all tasks are complete, or back to `designing` (redesign). The transition to `verifying` is blocked if any tasks remain incomplete.
-- **What can block it:** The `taskCompletionCheck` defined in the schema. By default, any unchecked `- [ ]` line in `tasks.md` prevents advancing to `verifying`. The CLI reports "N/M tasks complete" when this gate is active.
+- **Transition out:** `verifying` once task-completion checks on the **target** step pass, or back to `designing` (redesign).
+- **What can block it:** The `workflow.taskCompletion` check on the target step (typically `verifying`), driven by `taskCompletionCheck` on task-bearing artifacts listed in that step's `requiresTaskCompletion`. By default, any unchecked `- [ ]` line in `tasks.md` prevents advancing to `verifying`. Open implementation-tracking files can also block leaving `implementing`. The CLI reports "N/M tasks complete" when the task gate is active.
 
 ---
 
@@ -139,34 +136,33 @@ Implementation is complete. Verification scenarios are being run.
 
 Implementation and verification are complete.
 
-- **What it means:** The change is finished from a development perspective. It can now be archived.
-- **What you do:** If the `approvals.signoff` gate is enabled, transition to `pending-signoff`. Otherwise, transition to `archivable`.
-- **Transition out:** `archivable` (no gate), `pending-signoff` (with gate), or back to `designing` (redesign).
-- **What can block it:** The signoff gate (if enabled) must be passed before proceeding to `archivable`.
+- **What it means:** The change is finished from a development perspective. It can now be archived, or you can hop back to implementation or verification.
+- **What you do:** Transition to `archivable`. If `approvals.signoff` is enabled, a reviewer first runs `specd changes approve signoff <name> --reason "..."`; the change **stays in `done`**. Then run the same `done → archivable` transition. You may also hop to `implementing` or `verifying`.
+- **Transition out:** `archivable`, `implementing`, `verifying`, or `designing`. Do not use `change transition` into `pending-signoff`.
+- **What can block it:** If the signoff gate is on, a missing recorded signoff (`APPROVAL_REQUIRED`). The change remains in `done` until signoff is recorded.
 
 ---
 
-### `pending-signoff`
+### `pending-signoff` (drain only)
 
-The signoff gate is active and a human reviewer has not yet signed off.
+Historic wait state for in-flight changes that already sit here. New work does not enter this state.
 
-- **What it means:** The change requires final human sign-off before it can be archived. This gate is typically used for compliance or stakeholder review.
-- **What you do:** A reviewer runs `specd changes signoff <name> --reason "..."` after inspecting the completed work.
-- **Transition out:** `signed-off` after sign-off, or back to `designing` (redesign).
-- **What can block it:** Sign-off must be recorded by a human.
+- **What it means:** An older change is waiting for human sign-off under the previous parking model.
+- **What you do:** A reviewer runs `specd changes approve signoff <name> --reason "..."` (records consent in place without moving the state), then transition directly to `archivable`, or return to `done` or `designing`.
+- **Transition out:** `archivable`, `designing`, or `done` (gated by the bound `approval.signoff` check when `approvals.signoff` is enabled).
 
-This state only appears when `approvals.signoff` is enabled in `specd.yaml`. See [Approval gates](#approval-gates).
+See [Approval gates](#approval-gates).
 
 ---
 
-### `signed-off`
+### `signed-off` (drain only)
 
-A human has reviewed and signed off the completed change.
+Historic post-signoff parking state. New work records signoff in `done` and goes `done → archivable`.
 
-- **What it means:** The change has received its final human approval and may proceed to archiving.
-- **What you do:** Transition to `archivable`.
-- **Transition out:** `archivable`, or back to `designing` (redesign).
-- **What can block it:** Nothing.
+- **What it means:** Sign-off was recorded while the change was in the old pending path.
+- **What you do:** Transition to `archivable`, hop to `implementing` or `verifying`, or redesign to `designing`.
+- **Transition out:** `archivable`, `implementing`, `verifying`, or `designing`.
+- **What can block it:** Nothing on the protocol edge; archive still has its own operation checks.
 
 ---
 
@@ -176,7 +172,7 @@ The change is ready to be archived.
 
 - **What it means:** All gates have been passed. The change can run the archive operation.
 - **What you do:** Run `specd changes archive <name>` to perform the archive.
-- **Transition out:** `archiving` (only after archive preflight succeeds and canonical publication is about to start — see [Archiving](#archiving)), or back to `designing` (redesign).
+- **Transition out:** `archiving` (only after archive preflight succeeds and canonical publication is about to start — see [Archiving](#archiving)), `implementing` or `verifying` (skill-aligned hops), or back to `designing` (redesign).
 - **What can block it:** Archive pre-hooks, overlap/read-only guards, or preflight failures keep the change here (the archive command does not transition to `archiving` until commit preparation has passed).
 
 ---
@@ -197,16 +193,119 @@ The change is in the archive **commit phase** (canonical publication, archive mo
 | ----------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `drafting`              | `designing`                                                                                                 |
 | `designing`             | `ready`, `designing`                                                                                        |
-| `ready`                 | `implementing`, `pending-spec-approval`, `designing`                                                        |
-| `pending-spec-approval` | `spec-approved`, `designing`                                                                                |
-| `spec-approved`         | `implementing`, `designing`                                                                                 |
+| `ready`                 | `implementing`, `designing`                                                                                 |
+| `pending-spec-approval` | `implementing`, `designing` _(drain only; gated by `approval.spec`)_                                        |
+| `spec-approved`         | `implementing`, `designing` _(drain only; gated by `approval.spec`)_                                        |
 | `implementing`          | `verifying`, `designing`                                                                                    |
 | `verifying`             | `implementing`, `done`, `designing`                                                                         |
-| `done`                  | `archivable`, `pending-signoff`, `designing`                                                                |
-| `pending-signoff`       | `signed-off`, `designing`                                                                                   |
-| `signed-off`            | `archivable`, `designing`                                                                                   |
-| `archivable`            | `archiving`, `designing`                                                                                    |
+| `done`                  | `archivable`, `designing`, `implementing`, `verifying`                                                      |
+| `pending-signoff`       | `archivable`, `designing`, `done` _(drain only; gated by `approval.signoff`)_                               |
+| `signed-off`            | `archivable`, `designing`, `implementing`, `verifying` _(drain only; gated by `approval.signoff`)_          |
+| `archivable`            | `archiving`, `designing`, `implementing`, `verifying`                                                       |
 | `archiving`             | `archivable`, `designing` _(active change only; successful archive removes the change from the active set)_ |
+
+This table is the protocol graph (`VALID_TRANSITIONS`). Status **available** transitions are the protocol targets whose checks currently pass.
+
+---
+
+## Skippable and disabled workflow steps
+
+Custom schemas can configure individual lifecycle steps as `optional: true` or `disabled: true` in their `workflow[]` declaration:
+
+```yaml
+workflow:
+  - step: drafting
+  - step: designing
+  - step: ready
+  - step: implementing
+    optional: true
+  - step: verifying
+    disabled: true
+  - step: done
+  - step: archivable
+  - step: archiving
+```
+
+### Topology invariants and rules
+
+The workflow-topology domain functions (`resolveWorkflowPipeline`, `isWorkflowStepEnabled`, `listWorkflowTransitions`, `isWorkflowTransitionLegal`, `listBypassedWorkflowSteps`, `nextWorkflowStep`) validate the graph structure and govern allowed state transitions. The pipeline is always in canonical order; the order of `workflow` rows is not significant:
+
+1. **Bedrock state immutability**: Bedrock states (`drafting`, `designing`, `done`, `archivable`, `archiving`) are permanently active and **cannot** be disabled or marked optional. Attempting to mark any bedrock state `disabled: true` or `optional: true` triggers a schema validation error.
+2. **Approval anchor locks**:
+   - If `approvals.spec` is enabled in configuration, `ready` cannot be disabled.
+   - `done` is unconditional bedrock; signoff is an evaluation-time check on `done -> archivable` that returns `skip` when signoff is disabled without altering topology.
+3. **Forward connectivity by construction**: Bedrock states cannot be disabled and disabled steps are simply removed, so an active path from `designing` forward to `archivable` always exists.
+4. **Disabled steps**: A disabled step (`disabled: true`) is completely excluded from the active pipeline. It cannot be entered directly or recommended as a next step.
+
+### Optional-step decision table
+
+| Step      | Effective `step-skip` set | Core recommendation                                                  |
+| --------- | ------------------------- | -------------------------------------------------------------------- |
+| mandatory | any                       | enter the step                                                       |
+| optional  | empty                     | bypass unconditionally by default                                    |
+| optional  | all checks pass           | bypass to the furthest legal target after consecutive optional steps |
+| optional  | any check fails           | enter the closest optional step                                      |
+| disabled  | not applicable            | omit it from the pipeline                                            |
+
+Registry bindings and schema `skipChecks` are composed into the effective set. For example, `implementing` can be conditional because Core binds `workflow.tasksEmpty` even if the YAML row has no inline `skipChecks`. Passing the bypass policy changes only the recommendation: explicit entry into an optional step remains a legal alternative. Skills consume `nextAction.command` and `nextAction.targetStep`; they do not inspect tasks or choose a path independently.
+
+### Archive checks and bypass
+
+Archiving is an operation, not a lifecycle hop, and it resolves its checks through the same cascade as transitions: the built-in archive checks, the checks bound by hosts and plugins, and the schema's `archiveChecks` on the `archiving` row, all under the registry governance locks.
+
+Only checks whose resolved binding is skippable can be bypassed, with the generic flag:
+
+```bash
+specd changes archive <name> --skip-checks spec.overlap
+specd changes archive <name> --skip-checks spec.overlap,impl.linksInScope
+```
+
+By default only `spec.overlap` and `impl.linksInScope` are skippable. `workspace.readOnly`, `impl.filesResolved`, `deps.consistent`, `verification.current`, and the schema, archivable, and task-completion checks can never be bypassed on archive, and `specd changes status` shows a bypass flag only for blockers that can be skipped. `--allow-overlap` and `--allow-out-of-scope` are CLI aliases of the two skippable ids above. Every skippable failure shows the same hint, `Retry with --skip-checks <id> if an exception is granted`; the aliases are not mentioned in hints.
+
+### Shortcut transitions via `--next`
+
+When intermediate steps are skipped or disabled, changes do not need to pause in every intermediate state. The CLI supports shortcut transitions:
+
+```bash
+# Transition directly to next available topological step
+specd changes transition <name> --next
+```
+
+`--next` evaluates `nextWorkflowStep(current, schema, approvals)` to determine the closest forward step in the pipeline that is currently enabled. For instance, if `verifying` is disabled, transitioning with `--next` from `implementing` advances directly to `done`.
+
+`nextWorkflowStep` is deliberately only a topology primitive. Status guidance applies the optional-step policy above to the predicate-filtered `availableTransitions` and may recommend a farther shortcut. Agents should follow that published `nextAction` instead of treating `--next` as a path-selection policy.
+
+### Step-skip check semantics
+
+Skipping a step is not a blind jump. When a transition bypasses an active optional step (e.g., `ready → verifying` bypassing optional `implementing`), SpecD runs **step-skip checks** for each bypassed step before allowing the transition:
+
+- Checks registered under `{ scope: 'step-skip', step: '<bypassedStep>' }` are evaluated.
+- For example, `workflow.tasksEmpty` verifies that any task checklists in the change have zero incomplete tasks before allowing `implementing` to be skipped. If uncompleted tasks exist, the shortcut transition fails fast with a `CheckPredicateFailedError`.
+- If an intermediate step is completely `disabled: true`, it is excluded from the active pipeline and is not treated as a bypassed active step.
+
+### Hook suppression
+
+When a transition shortcuts across intermediate steps, hooks for the intermediate steps are **suppressed**:
+
+- Only the source step's post-transition hooks (if applicable) and the destination step's pre-transition hooks execute.
+- Bypassed steps never execute intermediate pre-hooks or post-hooks, ensuring idempotency and avoiding unintended side-effects.
+
+### Workflow examples
+
+#### 1. Documentation or spec-only changes (optional `implementing`)
+
+For changes that modify documentation, specifications, or schemas without executable code, `implementing` can be marked `optional: true`:
+
+- If no implementation tasks are added to `tasks.md`, `ready → verifying` or `ready → done` succeeds immediately.
+- If tasks are declared in `tasks.md`, they must all be completed before skipping `implementing` or `workflow.tasksEmpty` will reject the bypass.
+
+#### 2. Rapid prototyping / Spikes (disabled `verifying`)
+
+For quick experiments or spikes where formal verification test runs are omitted:
+
+- Mark `verifying: disabled: true`.
+- The verification boundary is relaxed: `verificationBoundary` returns `false`, meaning in-place verification renewal is not mandated.
+- Lifecycle guidance advances directly from `implementing` to `done` or `/specd-archive`.
 
 ---
 
@@ -236,39 +335,61 @@ Privacy settings also automatically filter out sensitive metadata. For more deta
 
 ## Redesign: going back to designing
 
-Almost every state can transition back to `designing`. This is the **redesign path** — it is how you handle requirement changes, new information, or mistakes discovered mid-lifecycle.
-
-To redesign from any active state:
+Almost every active state can transition back to `designing`:
 
 ```bash
 specd changes transition <name> designing
 ```
 
-When a redesign transition occurs:
+That command moves the lifecycle. It does not start or complete verification, and it does not restart an attempt. There is no transition flag for that. A backward move alone leaves matching verification evidence in place. An explicit return below a valid sign-off revokes that sign-off and does not broadly revoke spec approval.
 
-1. An `invalidated` event is appended to the change history with `cause: 'redesign'`.
-2. A `transitioned` event rolling back to `designing` is appended.
-3. Any active spec approval (`activeSpecApproval`) and signoff (`activeSignoff`) are cleared — they are no longer valid after specs have been reworked.
-4. Artifact validation hashes are reset, requiring re-validation before the change can advance to `ready` again.
+Redesign from `archiving` is allowed via `specd changes transition <name> designing`. Use it when batch restore failed partially or you need to change deltas before retrying archive. After a successful archive, the change is no longer active — create a new change instead.
 
-Redesign also happens automatically when spec IDs are updated (`cause: 'spec-change'`) or when artifact content changes after an approval was recorded (`cause: 'artifact-change'`).
+Automatic returns are a different, recovery-only path. Status and other mutations reconcile validity first, then apply the recovery rules in [Validity and verification](#validity-and-verification). Recovery that has already been committed is kept even when a later requested transition fails. In particular, `signed-off → done`, `archivable → done`, and `archiving → done` may be selected for stale or revoked sign-off, but users cannot request those edges with `changes transition`.
 
-Redesign from `archiving` is allowed via `specd changes transition <name> designing` (artifacts are downgraded for review). Use this when batch restore failed partially or you need to change deltas before retrying archive. After a **successful** archive, the change is no longer active — create a new change instead.
+## Validity and verification
+
+Current approval and verification state is a materialized projection on a version 2 manifest. History stays append-only audit. `stale` means a reviewed input changed or cannot be proven. `revoked` means consent was withdrawn. Restoring the old bytes does not make either status valid again. A missing projection means that evidence was never recorded. A `null` implementation fingerprint is legacy unknown evidence and cannot authorize a required gate. An empty `files` map is a real observation that no implementation files were linked.
+
+Fingerprints cover non-task artifacts (`artifact-pre-hash-v1`) and linked implementation files (`text-v1` or `bytes-v1`). A partial fingerprint is `null` and cannot authorize approval or verification. Artifacts whose schema type has `hasTasks` are excluded from those fingerprints and from automatic drift. They still have to exist, pass structural validation, and satisfy live task checks.
+
+Artifact policy, workflow policy, and gate recovery are independent. Gate recovery wins. Recovery never advances an earlier state.
+
+1. A required spec approval that becomes stale or revoked returns the change to `designing` when the state is after `ready`. From `ready` no recovery is requested: the `approval.spec` check blocks forward transitions until consent is renewed.
+2. Otherwise a required sign-off that becomes stale or revoked returns the change to `done` only when the state is later than `done`.
+3. Otherwise `workflow: redesign` plus unresolved non-task drift or review returns the change to `designing`.
+4. Otherwise the phase is preserved.
+
+`artifacts: none` adds no review reopening. Existing drift remains a blocker. `workflow: preserve` keeps the phase when no stricter gate applies, so drifted artifacts are reviewed in place. Verification staleness never moves the lifecycle. Before `verifying` it is context for the phase's normal work. At `verifying → done`, sign-off, and archive it blocks, and the repair is to verify again in the current state.
+
+Verification evidence is created only by these commands:
+
+```bash
+specd changes verification start <name>
+specd changes verification complete <name>
+specd changes verification invalidate <name> --reason "<text>"
+```
+
+`start` and `complete` are valid in any active state. Starting first refreshes tracking, reconciles, and runs the same implementation readiness checks used when exiting `implementing` or entering `verifying`. Entering `verifying` does not capture a baseline, and `verifying → done` only checks that completed evidence is current. A missing validity verdict fails closed; only an explicit `not-required` verdict skips freshness. `complete` records success only when the fresh fingerprint still matches the attempt baseline. It does not infer success from tests or from the transition. If inputs changed, start again, repeat the verification work against the new baseline, then complete. Details are in [change verification](../cli/change-verification.md).
+
+Active `changes status` reconciles before it renders. It may persist a recovery when it discovers invalidity. Draft status stays read-only. The status projection separates the active attempt from completed evidence and names the committed recovery, blockers, and the next command for the current phase.
 
 ---
 
 ## Approval gates
 
-specd supports two optional human-approval gates. Both are disabled by default.
+specd supports two optional human-approval gates. Both are disabled by default. When enabled, the change **stays in `ready` or `done`**. Approval is recorded in place; it is not a `change transition` into a parking state.
 
 ### Spec approval gate
 
-Blocks the transition from `ready` to `implementing` until a human approves the spec artifacts.
+Blocks `ready → implementing` until a human approves the spec artifacts. The change remains in `ready`.
+
+Consent covers both the canonical spec scope and the validated non-task artifact fingerprint. Adding or removing a spec invalidates that consent; reordering or duplicating the same IDs does not. Transitional manifests that lack the approved scope are readable but treated as stale `legacy-unknown` evidence.
 
 **Path when enabled:**
 
 ```
-ready → pending-spec-approval → spec-approved → implementing
+ready  —(approve spec, still ready)—→  ready → implementing
 ```
 
 **Enabling in `specd.yaml`:**
@@ -281,19 +402,19 @@ approvals:
 **Performing the approval:**
 
 ```bash
-specd changes approve-spec add-auth --reason "Specs reviewed and approved — all requirements are clear"
+specd changes approve spec add-auth --reason "Specs reviewed and approved — all requirements are clear"
 ```
 
-The approver reviews the spec and verify artifacts in the change directory. The approval records a hash of those artifacts at the moment of approval. If any of those artifacts are subsequently modified, an `invalidated` event is appended automatically and the change returns to `designing`, clearing the approval.
+The approver reviews the spec and verify artifacts in the change directory. The command records consent from `ready` (or a legacy parking state, `pending-spec-approval` or `spec-approved`), never transitions, and leaves the change in its current state. The approval stores an artifact fingerprint. Task artifacts are not part of that fingerprint. If a required approval later becomes stale or revoked, recovery follows [Validity and verification](#validity-and-verification): the change returns to `designing` only when it is already past `ready`; from `ready` the `approval.spec` check blocks forward transitions until consent is renewed.
 
 ### Signoff gate
 
-Blocks the transition from `done` to `archivable` until a human signs off the completed work.
+Blocks `done → archivable` until a human signs off the completed work. The change remains in `done`.
 
 **Path when enabled:**
 
 ```
-done → pending-signoff → signed-off → archivable
+done  —(approve signoff, still done)—→  done → archivable
 ```
 
 **Enabling in `specd.yaml`:**
@@ -306,8 +427,12 @@ approvals:
 **Performing the signoff:**
 
 ```bash
-specd changes signoff add-auth --reason "Implementation reviewed — all scenarios verified"
+specd changes approve signoff add-auth --reason "Implementation reviewed — all scenarios verified"
 ```
+
+The command records consent from `done` (or a legacy parking state, `pending-signoff` or `signed-off`), never transitions, and leaves the change in its current state. Sign-off stores a complete fingerprint, including an empty implementation map when no files are linked, and the completed verification id. Legacy unknown implementation evidence (`null`) cannot satisfy the gate until it is renewed.
+
+Approval renewal is append-only. A new approval or sign-off replaces the current materialized projection and appends a new event; it never deletes earlier pending-state transitions, approvals, sign-offs, or invalidations. Both commands continue to persist the privacy-decorated actor returned by the configured `ActorResolver`.
 
 Both gates can be enabled simultaneously:
 
@@ -321,7 +446,7 @@ approvals:
 
 ## Task completion gating
 
-The transition from `implementing` to `verifying` is gated on task completion. This is enforced by the `taskCompletionCheck` defined in the schema.
+The transition from `implementing` to `verifying` is gated on task completion. This is the `workflow.taskCompletion` check on the **target** step (`verifying`), not a `requires` rule on `implementing`. The schema lists which artifacts participate via that step's `requiresTaskCompletion`; each of those artifacts declares `taskCompletionCheck`.
 
 The default schema (`@specd/schema-std`) checks for unchecked checkbox lines in `tasks.md`:
 
@@ -336,7 +461,7 @@ When you run `specd changes transition <name> verifying` and tasks remain incomp
 
 Mark tasks complete by changing `- [ ]` to `- [x]` in `tasks.md`. Once all tasks are checked, the transition is allowed.
 
-One subtlety: `tasks.md` is also validated by artifact hashing. The schema normalises checkboxes before hashing — `- [x]` lines are converted back to `- [ ]` during hash computation so that checking off tasks does not trigger an approval invalidation. Checking off tasks is not a spec change; it is progress tracking.
+Checking tasks off does not invalidate approval or verification fingerprints. Artifacts marked `hasTasks` are operational state: they are excluded from those fingerprints and from automatic drift. A missing or invalid required task artifact, and incomplete live tasks, still block the transitions and archive that require them.
 
 ---
 
@@ -346,33 +471,57 @@ Hooks let you attach automated actions or AI guidance to lifecycle transitions. 
 
 ### Pre and post hooks
 
-- **Pre hooks** run before the change enters a step. If a pre hook fails, the transition is blocked.
-- **Post hooks** run after the change enters a step. If a post hook fails, the transition is not rolled back.
+- **Pre hooks** run before the change enters a step (`to` = that step). If a pre hook fails with `onFailure: abort` (the default), the transition is blocked. When `onFailure: warn` is configured, non-zero exits are captured as non-fatal warnings without halting the transition. Pre `run:` hooks apply for any `along` classification, including redesign into `designing`.
+- **Post hooks** on the **source** step run only when the transition is classified as **forward** (`along = forward`) — leaving a step toward a later delivery state. Backward hops, redesign, and archive recovery do not run source `post` `run:` hooks. If a post hook fails after a forward persist, the transition is not rolled back.
 
-When shell hooks are long-running, SpecD keeps them observable while they are
-in flight. In human-facing `text` output, completed hooks remain visible,
-active hooks show recent output plus a running indicator, and quiet hooks emit
-liveness updates. In `json` and `toon`, in-flight hook progress is emitted on
-`stderr` as structured events while the final command result remains on
-`stdout`.
+### Hook failure policies (`onFailure`)
 
-### Hook types
+Every `run:` and `external:` hook supports an optional `onFailure` policy:
 
-| Type           | Description                                                                              |
-| -------------- | ---------------------------------------------------------------------------------------- |
-| `run:`         | A shell command executed in the project root. Non-zero exit code blocks a pre hook.      |
-| `instruction:` | An AI context block injected into the agent context for the step. Not directly runnable. |
-| `external:`    | An explicit external hook dispatched to a registered external hook runner by `type`.     |
-
-An `instruction:` hook provides guidance to an AI agent about what to do in that step. It is informational — it does not execute code. A `run:` hook executes a shell command through the internal `HookRunner`. An `external:` hook is routed to a separate `ExternalHookRunner` selected by `external.type`.
+- **`abort` (default):** Any non-zero exit code halts hook execution immediately, prevents the state transition, and logs the process failure.
+- **`warn`:** Non-zero exit codes emit non-blocking warning diagnostics (`warnings[]`) and allow the transition pipeline to complete successfully.
 
 ```yaml
 workflow:
   - step: implementing
     hooks:
       pre:
+        - id: optional-lint
+          run: pnpm lint
+          onFailure: warn
+```
+
+When shell hooks are long-running, SpecD keeps them observable while they are
+in flight. In human-facing `text` output, completed hooks remain visible,
+active hooks show recent output plus a running indicator, and quiet hooks emit
+liveness updates. In `json` and `toon`, in-flight check/hook progress is
+emitted on **stdout** as NDJSON (`stream: "change-transition"` for
+`change transition`, `stream: "change-archive"` for `change archive`,
+`stream: "hook-progress"` for `change run-hooks`). The terminal record is a
+`complete` event on that command's stream. `stderr` is reserved for text-mode
+progress, the transition Repair Guide, and non-structured diagnostics.
+
+### Hook types
+
+| Type           | Description                                                                               |
+| -------------- | ----------------------------------------------------------------------------------------- |
+| `run:`         | A shell command executed in the project root. Exit code behavior governed by `onFailure`. |
+| `instruction:` | An AI context block injected into the agent context for the step. Not directly runnable.  |
+| `external:`    | An explicit external hook dispatched to a registered external hook runner by `type`.      |
+
+An `instruction:` hook provides guidance to an AI agent about what to do in that step. It is informational — it does not execute code. A `run:` hook executes a shell command through the internal `HookRunner`. An `external:` hook is routed to a separate `ExternalHookRunner` selected by `external.type`.
+
+```yaml
+workflow:
+  - step: implementing
+    checks:
+      - id: '@security.code-scan'
+        skippable: true
+    hooks:
+      pre:
         - id: run-lint
           run: pnpm lint
+          onFailure: warn
         - id: docker-test
           external:
             type: docker
@@ -496,7 +645,7 @@ specd changes archive <name>
 
 ### Phases and lifecycle state
 
-The change stays in **`archivable`** through early archive work (schema guard, overlap/read-only checks, pre-archive hooks, and full-batch preflight). It moves to **`archiving`** only immediately before the first canonical spec publication, after orphan backup detection and a per-spec batch snapshot under `.specd-archive-backup/` in each affected spec directory.
+The change stays in **`archivable`** through early archive work. It runs initial guards and pre-archive hooks, then refreshes implementation tracking, reconciles validity, reruns the guards, and builds the publication plan/full-batch preflight from that accepted post-hook state. It moves to **`archiving`** only immediately before the first canonical spec publication, after orphan backup detection and a per-spec batch snapshot under `.specd-archive-backup/` in each affected spec directory.
 
 | Phase                                | Lifecycle state | On failure                                                                                |
 | ------------------------------------ | --------------- | ----------------------------------------------------------------------------------------- |
@@ -506,6 +655,8 @@ The change stays in **`archivable`** through early archive work (schema guard, o
 | Metadata + post-archive hooks        | `archiving`     | Archive already committed; failures are reported but do not roll back specs               |
 
 Pre-archive hooks use the workflow step name `archiving`; they do **not** require the change to already be in lifecycle state `archiving`.
+
+When overlap is explicitly allowed, archiving sends a `spec-overlap-conflict` intent to the central reconciler for every active peer. Each peer uses its own stored workflow policy and the project's enabled gates: an ungated `preserve` peer stays in place with blockers, while `redesign` or stale required spec consent may return that peer to `designing`. Archive never hard-codes that return.
 
 ### Commit steps (after transition to `archiving`)
 
@@ -674,9 +825,17 @@ The agent reads each scenario from `verify.md` and confirms the implementation s
 → ✓ Verified: handler returns 401 with generic message
 ```
 
-If a scenario fails, the agent goes back to fix the issue and then returns to verify again.
+`/specd-verify` owns the attempt. It runs `specd changes verification start`, checks the scenarios, and runs `specd changes verification complete` only after that work succeeds. The transition into `verifying` does not start the attempt, and the transition to `done` does not complete it. If a scenario fails, or the inputs change, the agent fixes the issue, starts again, and repeats the checks against the new baseline before completing. A stale verification result does not move the lifecycle backward by itself.
 
-Once all scenarios pass, the agent transitions to `done`.
+In full mode, verify passes the same attempt explicitly to
+`/specd-compliance --change <name> --delegated --attempt <id>`. Delegated
+compliance neither starts nor completes an attempt, but otherwise follows the
+ordinary change-scoped path: status, project context, change specs, direct
+dependencies, merged `spec-preview` reads, the change's reports directory, and
+the change-scoped filename. Independent compliance owns its own start/complete;
+project-wide, diff, PR, single-spec, and selection modes are report-only.
+
+Once completed evidence is current and every scenario passes, the agent transitions to `done`.
 
 ### 6. Archiving — `/specd-archive`
 
@@ -697,11 +856,7 @@ If you discover during implementation that a requirement is wrong:
 > The rate limiting should be per-IP, not global. Let's go back and fix the spec.
 ```
 
-The agent transitions back to `designing`. This:
-
-- Records an `invalidated` event with `cause: 'redesign'`
-- Clears any active approvals
-- Resets artifact validation hashes
+The agent transitions back to `designing`. This changes the lifecycle and may reopen artifact review according to the transition effects. Current consent is represented by materialized projections: validity reconciliation marks affected approval or sign-off evidence stale/revoked and appends audit events; it does not erase prior approval history. A plain backward hop does not manufacture verification evidence or discard matching completed evidence.
 
 The agent updates the spec, verify, design, and tasks, then works forward through the lifecycle again.
 
@@ -763,4 +918,5 @@ Time passes between exploration and design. Code changes, specs get renamed, dec
 - [Configuration guide](configuration.md) — enable approval gates, configure workspaces, and add schema overrides.
 - [Code Graph](./code-graph.md) — search symbols, specs, and documents, and measure blast radius before design and implementation.
 - [CLI reference](../cli/cli-reference.md) — all `specd changes`, `specd drafts`, `specd discard`, and `specd archives` commands.
+- [Change verification](../cli/change-verification.md) — `verification start`, `complete`, and `invalidate`.
 - [Domain model](../core/domain-model.md) — the `Change`, `ChangeState`, `ChangeEvent`, and `ChangeArtifact` types returned by `@specd/core` use cases.

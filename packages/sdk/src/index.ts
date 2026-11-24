@@ -6,9 +6,24 @@ export {
   withOpenGraphProvider,
   type OpenSpecdHostInput,
   type OpenSpecdHostResult,
+  type SdkContextOptions,
   type SdkHostContext,
   type WithOpenGraphProviderOptions,
 } from './composition/index.js'
+export type { ContributionActivationContext, ContributionKindHandler } from '@specd/plugin-manager'
+export {
+  DuplicateContributionError,
+  DuplicateHandlerKindError,
+  InvalidContributionAddressError,
+  InvalidPluginConfigError,
+  PluginDestroyError,
+  PluginInitError,
+  PluginNotFoundError,
+  PluginValidationError,
+  UnknownContributionError,
+  UnknownContributionKindError,
+  UnsupportedSchemaKeywordError,
+} from '@specd/plugin-manager'
 
 export {
   buildImplementationReview,

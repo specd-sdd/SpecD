@@ -10,14 +10,26 @@
 - **THEN** the command accepts `--format` option
 - **AND** output is in JSON format
 
-### Requirement: Skills update step
+### Requirement: Plugin update step
 
 #### Scenario: Declared plugins are updated
 
-- **GIVEN** `specd.yaml` has `plugins.agents: [{ name: '@specd/plugin-agent-claude' }]`
+- **GIVEN** `specd.yaml` has `plugins: [{ name: '@specd/plugin-agent-claude' }]`
 - **WHEN** `specd project update` is run
-- **THEN** each plugin's `install()` method is called
+- **THEN** each declared plugin is updated through the `UpdatePlugin` use case (not `install()`)
 - **AND** the process exits with code 0
+
+#### Scenario: Allowlist is honoured
+
+- **GIVEN** `@acme/x` is declared with `contributions: ['audit']`
+- **WHEN** `specd project update` is run
+- **THEN** `UpdatePlugin` receives `contributions: ['audit']` for `@acme/x`
+
+#### Scenario: Host opened without plugins and config untouched
+
+- **WHEN** `specd project update` is run
+- **THEN** the host is opened with `plugins: false`
+- **AND** `specd.yaml` is not modified
 
 ### Requirement: Output on success
 
@@ -36,17 +48,9 @@
 #### Scenario: JSON output groups results by step
 
 - **WHEN** `specd project update --format json` succeeds
-- **THEN** stdout is valid JSON with a `plugins` array containing result objects
+- **THEN** stdout is valid JSON `{ plugins: [...], hasErrors: false }` where `plugins` holds result objects
 
 ### Requirement: Partial failure
-
-#### Scenario: Warnings from skills update do not change exit code
-
-- **GIVEN** one skill is current and one is missing from the bundle
-- **WHEN** `specd project update` is run
-- **THEN** the current skill is updated
-- **AND** the missing skill warning is printed to stderr
-- **AND** the process exits with code 0
 
 #### Scenario: Missing specd.yaml exits with error
 
@@ -54,3 +58,12 @@
 - **WHEN** `specd project update` is run
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message
+
+#### Scenario: Plugin update error exits non-zero after all plugins are processed
+
+- **GIVEN** two declared plugins and the first one fails to update
+- **WHEN** `specd project update` is run
+- **THEN** the second plugin is still updated
+- **AND** the error is reported for the first plugin
+- **AND** `hasErrors` is `true` in JSON output
+- **AND** the process exits with code 1

@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing workflow automation requirements already define lifecycle sequencing and diagnostic behavior; templates are reconciled to that contract.'

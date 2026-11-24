@@ -1,0 +1,1026 @@
+{
+  "manifestVersion": 2,
+  "name": "change-context-notes",
+  "createdAt": "2026-11-04T10:43:35.044Z",
+  "updatedAt": "2026-11-14T14:15:39.215Z",
+  "description": "Persist transition reasons and change context notes so workflow context survives across sessions.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:change",
+    "core:change-manifest",
+    "core:transition-change",
+    "core:get-status",
+    "cli:change-transition",
+    "skills:workflow-automation",
+    "skills:skill-templates-source",
+    "cli:change-status",
+    "core:transition-checks",
+    "core:kernel",
+    "core:lifecycle-engine",
+    "core:archive-change",
+    "core:actor-resolver-port",
+    "core:actor-resolver-privacy",
+    "core:actor-resolver",
+    "core:note-auto-removal-policy",
+    "core:add-change-note",
+    "core:remove-change-note",
+    "core:list-change-notes",
+    "core:get-change-note",
+    "cli:change-notes",
+    "core:archive-repository-port"
+  ],
+  "specDependsOn": {
+    "core:change": [
+      "core:change-manifest",
+      "core:workflow-model",
+      "core:spec-metadata",
+      "core:spec-id-format",
+      "default:_global/architecture",
+      "core:lifecycle-engine",
+      "default:_global/logging",
+      "core:implementation-detector-port",
+      "core:transition-checks",
+      "core:workflow-topology"
+    ],
+    "core:change-manifest": [
+      "core:change",
+      "core:change-layout",
+      "core:storage",
+      "core:spec-metadata",
+      "core:spec-id-format",
+      "core:workspace"
+    ],
+    "core:transition-change": [
+      "core:change",
+      "core:run-step-hooks",
+      "core:hook-execution-model",
+      "core:workflow-model",
+      "default:_global/architecture",
+      "core:lifecycle-engine",
+      "core:refresh-implementation-tracking",
+      "core:composition-resolver",
+      "core:count-tasks",
+      "core:transition-checks",
+      "core:check-registry",
+      "core:workflow-topology",
+      "core:resolve-change-schema",
+      "core:note-auto-removal-policy"
+    ],
+    "core:get-status": [
+      "core:change",
+      "core:kernel",
+      "core:transition-change",
+      "core:schema-format",
+      "core:config",
+      "core:lifecycle-engine",
+      "core:refresh-implementation-tracking",
+      "core:composition-resolver",
+      "core:count-tasks",
+      "core:transition-checks",
+      "core:resolve-change-schema"
+    ],
+    "cli:change-transition": [
+      "cli:entrypoint",
+      "core:change",
+      "core:transition-change",
+      "core:hook-execution-model",
+      "core:get-status",
+      "core:transition-checks",
+      "core:lifecycle-engine",
+      "core:note-auto-removal-policy"
+    ],
+    "skills:workflow-automation": [
+      "cli:command-resource-naming",
+      "skills:agents",
+      "cli:spec-context",
+      "cli:spec-metadata",
+      "core:get-status",
+      "core:validate-artifacts",
+      "core:transition-checks",
+      "cli:change-status",
+      "cli:change-transition"
+    ],
+    "skills:skill-templates-source": [
+      "skills:skill",
+      "cli:spec-optimizations",
+      "skills:workflow-automation",
+      "core:transition-checks"
+    ],
+    "cli:change-status": [
+      "cli:entrypoint",
+      "core:change",
+      "core:get-status",
+      "sdk:build-implementation-review",
+      "core:transition-checks",
+      "core:lifecycle-engine",
+      "core:resolve-change-schema"
+    ],
+    "core:transition-checks": [
+      "core:change",
+      "core:workflow-model",
+      "core:workflow-topology",
+      "core:schema-format",
+      "default:_global/architecture",
+      "core:check-registry",
+      "core:archive-change",
+      "core:get-status"
+    ],
+    "core:kernel": [
+      "default:_global/architecture",
+      "core:composition",
+      "core:create-change",
+      "core:get-status",
+      "core:transition-change",
+      "core:draft-change",
+      "core:restore-change",
+      "core:discard-change",
+      "core:archive-change",
+      "core:validate-artifacts",
+      "core:compile-context",
+      "core:list-changes",
+      "core:list-drafts",
+      "core:list-discarded",
+      "core:edit-change",
+      "core:skip-artifact",
+      "core:update-spec-deps",
+      "core:list-archived",
+      "core:get-archived-change",
+      "core:run-step-hooks",
+      "core:get-hook-instructions",
+      "core:get-artifact-instruction",
+      "core:approve-spec",
+      "core:approve-signoff",
+      "core:list-specs",
+      "core:get-spec",
+      "core:get-active-schema",
+      "core:validate-specs",
+      "core:generate-metadata",
+      "core:materialize-spec-metadata",
+      "core:get-spec-metadata",
+      "core:regenerate-spec-metadata",
+      "core:initialize-persisted-spec-state",
+      "core:get-persisted-spec-schema",
+      "core:update-persisted-spec-schema",
+      "core:get-persisted-spec-deps",
+      "core:update-persisted-spec-deps",
+      "core:get-persisted-spec-implementation",
+      "core:update-persisted-spec-implementation",
+      "core:get-persisted-spec-optimizations",
+      "core:update-persisted-spec-optimizations",
+      "core:get-spec-context",
+      "core:config-writer-port",
+      "core:list-workspaces",
+      "core:get-project-context",
+      "core:get-config",
+      "core:project-metadata",
+      "core:update-project-metadata",
+      "core:resolve-schema",
+      "core:spec-overlap",
+      "core:get-specs-health",
+      "core:count-tasks",
+      "core:check-registry",
+      "core:archive-repository-port",
+      "core:get-draft",
+      "core:get-discarded",
+      "core:invalidate-change",
+      "core:update-implementation-tracking",
+      "core:refresh-implementation-tracking",
+      "core:get-implementation-review",
+      "core:preview-spec",
+      "core:get-spec-outline",
+      "core:validate-schema",
+      "core:resolve-context-specs",
+      "core:get-project-summary",
+      "core:actor-resolver",
+      "core:add-change-note",
+      "core:remove-change-note",
+      "core:list-change-notes",
+      "core:get-change-note"
+    ],
+    "core:lifecycle-engine": [
+      "core:change",
+      "core:workflow-model",
+      "core:schema-format",
+      "default:_global/architecture",
+      "default:_global/logging",
+      "core:transition-checks",
+      "core:workflow-topology",
+      "core:resolve-change-schema"
+    ],
+    "core:archive-change": [
+      "core:change",
+      "core:schema-format",
+      "core:delta-format",
+      "core:validate-artifacts",
+      "core:storage",
+      "core:run-step-hooks",
+      "core:hook-execution-model",
+      "core:template-variables",
+      "core:spec-metadata",
+      "core:content-extraction",
+      "default:_global/architecture",
+      "core:workspace",
+      "core:spec-id-format",
+      "core:spec-overlap",
+      "default:_global/logging",
+      "core:spec-lock",
+      "default:_global/error-handling-conventions",
+      "core:materialize-spec-metadata",
+      "core:spec-optimization",
+      "core:initialize-persisted-spec-state",
+      "core:composition-resolver",
+      "core:transition-checks",
+      "core:resolve-change-schema",
+      "core:check-registry"
+    ],
+    "core:actor-resolver-port": ["core:actor-resolver", "core:change"],
+    "core:actor-resolver-privacy": ["core:actor-resolver-port", "core:config"],
+    "core:actor-resolver": [
+      "core:actor-provider",
+      "core:actor-resolver-privacy",
+      "core:composition"
+    ],
+    "core:note-auto-removal-policy": [
+      "core:change",
+      "core:workflow-topology",
+      "default:_global/error-handling-conventions"
+    ],
+    "core:add-change-note": [
+      "core:change",
+      "core:note-auto-removal-policy",
+      "core:change-repository-port",
+      "core:actor-resolver-port",
+      "default:_global/architecture"
+    ],
+    "core:remove-change-note": [
+      "core:change",
+      "core:change-repository-port",
+      "default:_global/error-handling-conventions"
+    ],
+    "core:list-change-notes": ["core:change", "core:change-repository-port"],
+    "core:get-change-note": [
+      "core:change",
+      "core:change-repository-port",
+      "default:_global/error-handling-conventions"
+    ],
+    "cli:change-notes": [
+      "core:add-change-note",
+      "core:remove-change-note",
+      "core:list-change-notes",
+      "core:get-change-note",
+      "core:note-auto-removal-policy",
+      "cli:entrypoint",
+      "cli:command-resource-naming"
+    ],
+    "core:archive-repository-port": [
+      "core:repository-port",
+      "default:_global/architecture",
+      "core:change",
+      "core:storage",
+      "core:archive-change",
+      "default:_global/logging",
+      "core:archived-change-index-entry",
+      "core:read-only-change-view"
+    ]
+  },
+  "invalidation": {
+    "artifacts": "downstream",
+    "workflow": "preserve"
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "pending-review",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "pending-review",
+          "validatedHash": "sha256:68c056df94ea60c421da28040eff739986a2cbfe41bfb35ed42067bc9455eb3b"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "pending-review",
+      "files": [
+        {
+          "key": "core:change",
+          "filename": "deltas/core/change/spec.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:73d659ca2d749da8cdc5bc60d5a10e1cde4c0fae1603de7a1817174682447bf1"
+        },
+        {
+          "key": "core:change-manifest",
+          "filename": "deltas/core/change-manifest/spec.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:3ea12513323c28a8daada24cc7a1ccf3d06febbc49a33c92a82a9717b82d30a9"
+        },
+        {
+          "key": "core:transition-change",
+          "filename": "deltas/core/transition-change/spec.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:2d087b844d707fec4285ddb0f8d2ec3372504623ae61b1e6dc02127be0126aa1"
+        },
+        {
+          "key": "core:get-status",
+          "filename": "deltas/core/get-status/spec.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:ec2ce6ce43725ad9cbcc66f405519fddab1eecf1a538cb2421cd9fd06a9aeb2a"
+        },
+        {
+          "key": "cli:change-transition",
+          "filename": "deltas/cli/change-transition/spec.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:d79b65633f9cf62adfdd6ee5625b0236c12840789f16f1a1fabad89e0414c534"
+        },
+        {
+          "key": "skills:workflow-automation",
+          "filename": "deltas/skills/workflow-automation/spec.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:6883e1c7a79d7de56fa57bfe9810361f8871e965f54ff1c6cf88218add3f85ea"
+        },
+        {
+          "key": "skills:skill-templates-source",
+          "filename": "deltas/skills/skill-templates-source/spec.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:f629e36d8c35072ff791ffed5b0a1ef2f079963598198377126e2d6eddec8e00"
+        },
+        {
+          "key": "cli:change-status",
+          "filename": "deltas/cli/change-status/spec.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:351b477d119c408cc536c8da0fafbd7a9baa74fefa2d81765317353d23bf436c"
+        },
+        {
+          "key": "core:transition-checks",
+          "filename": "deltas/core/transition-checks/spec.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:a9dd92202b7cd53646e921f9359af63f2806f3eefef5f3e09545a93a0e90794d"
+        },
+        {
+          "key": "core:kernel",
+          "filename": "deltas/core/kernel/spec.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:1e4b334cbdc9db1b737fd98e7e9b7a069d51defe4d0b19e208fcd4c31420c639"
+        },
+        {
+          "key": "core:lifecycle-engine",
+          "filename": "deltas/core/lifecycle-engine/spec.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:fe95fdd188eb1e2b6e560534354ee50de76e298495e1ae2c5947e782a848427e"
+        },
+        {
+          "key": "core:archive-change",
+          "filename": "deltas/core/archive-change/spec.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:839af2afe45cd6a490e7e0e222e0ec2040dd58a21c8037179d019f6ab691f077"
+        },
+        {
+          "key": "core:actor-resolver-port",
+          "filename": "deltas/core/actor-resolver-port/spec.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:c9e9b370561e5392e398d50f99e718e2c01a3c109b7a7feb058a7113359e019f"
+        },
+        {
+          "key": "core:actor-resolver-privacy",
+          "filename": "deltas/core/actor-resolver-privacy/spec.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:f41434a04250d0a96074b1994d980a05e421150924fcc786bba71f73782c7a55"
+        },
+        {
+          "key": "core:actor-resolver",
+          "filename": "deltas/core/actor-resolver/spec.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:5cc665e399511cc9784c929f4d6b5693ab6f082b9c13a20a4007682aa5791dd2"
+        },
+        {
+          "key": "core:note-auto-removal-policy",
+          "filename": "specs/core/note-auto-removal-policy/spec.md",
+          "state": "pending-review",
+          "validatedHash": "sha256:903a9eb2f91e20bbc0d2f79d10891b94de494996ee785dc2a911007829d7e7d2"
+        },
+        {
+          "key": "core:add-change-note",
+          "filename": "specs/core/add-change-note/spec.md",
+          "state": "pending-review",
+          "validatedHash": "sha256:123ec80eec3523854d189549f87797e269a9755830b376d177ae083b7e0dfe31"
+        },
+        {
+          "key": "core:remove-change-note",
+          "filename": "specs/core/remove-change-note/spec.md",
+          "state": "pending-review",
+          "validatedHash": "sha256:7050dd91c3ca351ebe6d26059e5028dfd1a75ef5e0bf09184b763e35e87b244e"
+        },
+        {
+          "key": "core:list-change-notes",
+          "filename": "specs/core/list-change-notes/spec.md",
+          "state": "pending-review",
+          "validatedHash": "sha256:c6e5c23f38b4190ae955113a90e4cd06b9e90eb163a02080edd3eb202c3ae80a"
+        },
+        {
+          "key": "core:get-change-note",
+          "filename": "specs/core/get-change-note/spec.md",
+          "state": "pending-review",
+          "validatedHash": "sha256:af61d636b3f0a2e38e5d8a9549db7a8ceede3f255a4a64805ae5f46c6b3ff920"
+        },
+        {
+          "key": "cli:change-notes",
+          "filename": "specs/cli/change-notes/spec.md",
+          "state": "pending-review",
+          "validatedHash": "sha256:2eab3d03fffa984de7eaad190f85688719529112c6614e6d5eb6124274a49a14"
+        },
+        {
+          "key": "core:archive-repository-port",
+          "filename": "deltas/core/archive-repository-port/spec.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:0ee39b453b2419f5279c40e5d17f0d6a3399b3647dadec1bacb3eef8794dc5d5"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "pending-review",
+      "files": [
+        {
+          "key": "core:change",
+          "filename": "deltas/core/change/verify.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:59a153fa64596b88d93164cf7d6987b8babfa7d98449d5b5442f7477236bc90f"
+        },
+        {
+          "key": "core:change-manifest",
+          "filename": "deltas/core/change-manifest/verify.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:47e527c19892bf8eea761bad45eae63dcbe67289beca2bbb74fac7578db06eef"
+        },
+        {
+          "key": "core:transition-change",
+          "filename": "deltas/core/transition-change/verify.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:cae80b70ca211c4c57e4cf4b2af7c7ee5073fd4a701c4e3c7bc8e51f29be350a"
+        },
+        {
+          "key": "core:get-status",
+          "filename": "deltas/core/get-status/verify.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:429382b9a5223ff6829dc0d9fbca6ec45b92c7e7cb47fe1097e389cafdd2c655"
+        },
+        {
+          "key": "cli:change-transition",
+          "filename": "deltas/cli/change-transition/verify.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:9d8e9acaa23aadbce74ee05465eecded427acc3d82837b7d01e7645b9258a156"
+        },
+        {
+          "key": "skills:workflow-automation",
+          "filename": "deltas/skills/workflow-automation/verify.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:602ed967d28fc553f03b969660fc4e4f27fe4aacd63e3da5a897bd9d7f0d700e"
+        },
+        {
+          "key": "skills:skill-templates-source",
+          "filename": "deltas/skills/skill-templates-source/verify.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:c84f4ce8e7cee3317a28b0c5e1b6f7dcbb58e1fb384ebf70d5b6a693daba8ebe"
+        },
+        {
+          "key": "cli:change-status",
+          "filename": "deltas/cli/change-status/verify.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:5c8e4ad40266cbfbce30faffda30d8b5c4a7a62c451b120fea8d1b830933185e"
+        },
+        {
+          "key": "core:transition-checks",
+          "filename": "deltas/core/transition-checks/verify.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:da420ad3cff8f1fa368a033b1b54e2625086591705c5928869dd82a824c6ea25"
+        },
+        {
+          "key": "core:kernel",
+          "filename": "deltas/core/kernel/verify.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:380f3d6ec8d31b2a34ce922105919ea27ea7a0c89e0f6f638e6a052bb501c82c"
+        },
+        {
+          "key": "core:lifecycle-engine",
+          "filename": "deltas/core/lifecycle-engine/verify.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:7c7a5bb3a2af629754daa69d3863098a1176b8c16a4708bf52a3768c617128c5"
+        },
+        {
+          "key": "core:archive-change",
+          "filename": "deltas/core/archive-change/verify.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:c7c71b68afab135ea52fd96f04e150c73274c4f3a6be9ebf901da337c3825e77"
+        },
+        {
+          "key": "core:actor-resolver-port",
+          "filename": "deltas/core/actor-resolver-port/verify.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:1436364df2974c7e8dcc569150486db3d6013713aa8df25f94fac95184a7505f"
+        },
+        {
+          "key": "core:actor-resolver-privacy",
+          "filename": "deltas/core/actor-resolver-privacy/verify.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:6d1dca7d42fd575fc68a7def514c88970430ab1962806464d0c746b8826c2509"
+        },
+        {
+          "key": "core:actor-resolver",
+          "filename": "deltas/core/actor-resolver/verify.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:8cddb8a1db6af19d6db4dcd3d128f56ce9c73543d2c631229a2c0d12e7e43875"
+        },
+        {
+          "key": "core:note-auto-removal-policy",
+          "filename": "specs/core/note-auto-removal-policy/verify.md",
+          "state": "pending-review",
+          "validatedHash": "sha256:2f993e46313fed98ec6f107fde8b700598047c937e3ecccaba4b2912afdb2769"
+        },
+        {
+          "key": "core:add-change-note",
+          "filename": "specs/core/add-change-note/verify.md",
+          "state": "pending-review",
+          "validatedHash": "sha256:c9b751fae3dd8618af84ac28de3e49f580abd36ae4d244eace4c946ef331765f"
+        },
+        {
+          "key": "core:remove-change-note",
+          "filename": "specs/core/remove-change-note/verify.md",
+          "state": "pending-review",
+          "validatedHash": "sha256:50ec8199d51418cc714a03e34dfb31a23fc4734eee42900d1f37e7f645cecf45"
+        },
+        {
+          "key": "core:list-change-notes",
+          "filename": "specs/core/list-change-notes/verify.md",
+          "state": "pending-review",
+          "validatedHash": "sha256:27753e52bea252fd3535c9adb41d6b84fc092ff3d585ddc85836446eac536e28"
+        },
+        {
+          "key": "core:get-change-note",
+          "filename": "specs/core/get-change-note/verify.md",
+          "state": "pending-review",
+          "validatedHash": "sha256:c987c0f7e96aec2b17c8078225cb5a561a13f8e6cddbe7aadd3209caff6610fc"
+        },
+        {
+          "key": "cli:change-notes",
+          "filename": "specs/cli/change-notes/verify.md",
+          "state": "pending-review",
+          "validatedHash": "sha256:59524c698bce711d52e4446aee71c387ef731f94882b48cbeec4ec4208bcf84c"
+        },
+        {
+          "key": "core:archive-repository-port",
+          "filename": "deltas/core/archive-repository-port/verify.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:2ae979afca721655f9f26d389bd183aaff2d6eb5aa38a61299eeda4f1a4812ff"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "pending-review",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "pending-review",
+          "validatedHash": "sha256:1a4e2fca2e32f1e4a2a1d05f715d73a110af2188158daeb242b876c8b0086879"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "in-progress",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "in-progress",
+          "validatedHash": "sha256:658e54e2a902426fbb597af800306ffdd7a8546c69fae2ad3c9f0735900e1f75"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-11-04T10:43:35.044Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "core:change",
+        "core:change-manifest",
+        "core:transition-change",
+        "core:get-status",
+        "cli:change-transition",
+        "skills:workflow-automation",
+        "skills:skill-templates-source"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-04T10:43:35.122Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:change"
+        },
+        {
+          "type": "specs",
+          "key": "core:change-manifest"
+        },
+        {
+          "type": "specs",
+          "key": "core:transition-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-status"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-transition"
+        },
+        {
+          "type": "specs",
+          "key": "skills:workflow-automation"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skill-templates-source"
+        },
+        {
+          "type": "verify",
+          "key": "core:change"
+        },
+        {
+          "type": "verify",
+          "key": "core:change-manifest"
+        },
+        {
+          "type": "verify",
+          "key": "core:transition-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-status"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-transition"
+        },
+        {
+          "type": "verify",
+          "key": "skills:workflow-automation"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skill-templates-source"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-04T15:48:40.854Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-04T18:18:08.168Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:change-status"
+        },
+        {
+          "type": "specs",
+          "key": "core:transition-checks"
+        },
+        {
+          "type": "specs",
+          "key": "core:kernel"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-status"
+        },
+        {
+          "type": "verify",
+          "key": "core:transition-checks"
+        },
+        {
+          "type": "verify",
+          "key": "core:kernel"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-05T14:27:37.650Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:lifecycle-engine"
+        },
+        {
+          "type": "specs",
+          "key": "core:archive-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:lifecycle-engine"
+        },
+        {
+          "type": "verify",
+          "key": "core:archive-change"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-06T16:54:53.325Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:actor-resolver-port"
+        },
+        {
+          "type": "specs",
+          "key": "core:actor-resolver-privacy"
+        },
+        {
+          "type": "specs",
+          "key": "core:actor-resolver"
+        },
+        {
+          "type": "specs",
+          "key": "core:note-auto-removal-policy"
+        },
+        {
+          "type": "specs",
+          "key": "core:add-change-note"
+        },
+        {
+          "type": "specs",
+          "key": "core:remove-change-note"
+        },
+        {
+          "type": "specs",
+          "key": "core:list-change-notes"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-change-note"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-notes"
+        },
+        {
+          "type": "verify",
+          "key": "core:actor-resolver-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:actor-resolver-privacy"
+        },
+        {
+          "type": "verify",
+          "key": "core:actor-resolver"
+        },
+        {
+          "type": "verify",
+          "key": "core:note-auto-removal-policy"
+        },
+        {
+          "type": "verify",
+          "key": "core:add-change-note"
+        },
+        {
+          "type": "verify",
+          "key": "core:remove-change-note"
+        },
+        {
+          "type": "verify",
+          "key": "core:list-change-notes"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-change-note"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-notes"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-06T17:10:20.442Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:archive-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:archive-repository-port"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-06T17:19:28.166Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-06T17:23:10.525Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-06T17:25:42.026Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-06T17:26:15.503Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-14T14:15:39.207Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'decouple-core-cli-error-hints' was archived with overlapping specs: cli:change-transition, core:transition-change, core:transition-checks",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:change",
+            "core:transition-change",
+            "core:get-status",
+            "cli:change-transition",
+            "skills:skill-templates-source",
+            "cli:change-status",
+            "core:kernel",
+            "core:lifecycle-engine",
+            "core:archive-change",
+            "core:actor-resolver-port",
+            "core:actor-resolver-privacy",
+            "core:actor-resolver",
+            "core:transition-checks"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:transition-change",
+            "core:get-status",
+            "skills:skill-templates-source",
+            "cli:change-status",
+            "core:lifecycle-engine",
+            "core:archive-change",
+            "core:actor-resolver-port",
+            "core:actor-resolver-privacy",
+            "core:actor-resolver",
+            "cli:change-transition",
+            "core:transition-checks"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    }
+  ]
+}

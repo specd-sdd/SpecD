@@ -2,6 +2,7 @@ import { mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { SpecdConfig } from '@specd/core'
 import {
+  addSharedOwner,
   createSkillRepository,
   injectSpecdBlock,
   renderBaseAgentInstruction,
@@ -14,7 +15,7 @@ import type {
 } from '@specd/plugin-manager'
 import type { Frontmatter } from '../../domain/types/frontmatter.js'
 import { skillFrontmatter, agentFrontmatter } from '../../domain/frontmatter/index.js'
-import { resolveSharedFolder } from './shared-folder.js'
+import { resolveSharedFolder } from '@specd/skills'
 
 /**
  * Installs selected skills into the Agent Skills standard project-local skills directory.
@@ -57,6 +58,7 @@ export class InstallSkills {
 
     const installed: Array<{ skill: string; path: string }> = []
     const skipped: Array<{ skill: string; reason: string }> = []
+    let ownerRegistered = false
 
     // Standard capabilities
     const capabilities = ['frontmatter']
@@ -75,9 +77,6 @@ export class InstallSkills {
         agentFrontmatterVars = {
           name: metadata.name ?? name,
           description: metadata.description ?? item.description,
-          ...(metadata['allowed-tools']
-            ? { 'allowed-tools': metadata['allowed-tools'].split(',').map((t) => t.trim()) }
-            : {}),
         }
       }
 
@@ -137,6 +136,11 @@ export class InstallSkills {
         }
 
         const outputPath = path.join(baseDir, finalFilename)
+        if ((file.shared === true || baseDir === sharedDir) && !ownerRegistered) {
+          // Register ownership before the first shared write so a partial failure still leaves the marker.
+          await addSharedOwner(sharedDir, 'standard')
+          ownerRegistered = true
+        }
         await mkdir(path.dirname(outputPath), { recursive: true })
         await writeFile(outputPath, content, 'utf8')
       }

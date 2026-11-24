@@ -1,0 +1,219 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Type is hardcoded'
+  rename: 'Scenario: No type discriminator'
+  content: |
+    - **WHEN** `create()` is called
+    - **THEN** the returned plugin has no `type` property
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Factory export'
+  content: |
+    ### Requirement: Manifest and install context
+
+    #### Scenario: Manifest declares the agents contribution
+
+    - **WHEN** the manifest of the package is read
+    - **THEN** `schemaVersion` is `2`, `pluginType` is absent and `contributes.agents` has the id `opencode`
+
+    #### Scenario: Install receives the context
+
+    - **WHEN** `install({ config, options, contributions: ['opencode'] })` is called
+    - **THEN** the plugin installs using `config` and `options`
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Prompt Injection'
+  content: |
+    #### Scenario: Install writes AGENTS.md prompt block
+
+    - **WHEN** `OpenCodeAgentPlugin.install()` runs
+    - **THEN** `AGENTS.md` contains the shared specd base block referencing `opencode`
+    - **AND** `AGENTS.md` does NOT contain any `<!-- <specd-plugin:opencode> -->` marker block
+
+    #### Scenario: Uninstall keeps the shared block while another plugin references it
+
+    - **GIVEN** `AGENTS.md` contains the shared base block referenced by `opencode` and another agent plugin
+    - **WHEN** `OpenCodeAgentPlugin.uninstall()` runs
+    - **THEN** the `opencode` reference is removed
+    - **AND** the shared base block remains in `AGENTS.md`
+
+    #### Scenario: Uninstall removes the shared block when last reference is dropped
+
+    - **GIVEN** `AGENTS.md` contains the shared base block referenced only by `opencode`
+    - **WHEN** `OpenCodeAgentPlugin.uninstall()` runs
+    - **THEN** the base block is removed from `AGENTS.md`
+
+    #### Scenario: Filtered uninstall keeps the shared block
+
+    - **GIVEN** `AGENTS.md` contains the shared base block referenced by `opencode`
+    - **WHEN** `OpenCodeAgentPlugin.uninstall()` runs with `options.skills`
+    - **THEN** the block remains in `AGENTS.md`
+
+    #### Scenario: Legacy plugin marker removed on install
+
+    - **GIVEN** `AGENTS.md` contains a legacy `<!-- <specd-plugin:opencode> -->` block from a previous install
+    - **WHEN** `OpenCodeAgentPlugin.install()` runs
+    - **THEN** the `<!-- <specd-plugin:opencode> -->` block is removed
+    - **AND** the shared base block is present
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Uninstall without filter removes only specd-managed skills and shared resources'
+  content: |
+    - **GIVEN** specd-managed skills and unrelated user skills are installed under `.opencode/skills/`
+    - **WHEN** `uninstall({ config, options: {}, contributions: ['opencode'] })` is executed
+    - **THEN** all specd-managed skill directories are removed, including legacy flat `<skill>.md` files
+    - **AND** unrelated user skill directories remain
+    - **AND** the shared folder is handled by the owners protocol (see "Shared folder ownership and agent placement")
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Uninstall behavior'
+  content: |
+    #### Scenario: Filtered uninstall keeps the prompt block and the owners marker
+
+    - **GIVEN** the plugin is installed and is an owner of the shared folder
+    - **WHEN** `uninstall` runs with `options.skills` or `options.agents`
+    - **THEN** the `opencode` reference in `AGENTS.md` is kept
+    - **AND** `.owners.json` and every shared file are unchanged
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Uninstall behavior'
+  content: |
+    ### Requirement: Shared folder ownership and agent placement
+
+    #### Scenario: create rejects a manifest without name or version
+
+    - **GIVEN** the resolved `specd-plugin.json` has no non-empty string `name` or `version`
+    - **WHEN** `create` is called
+    - **THEN** `PluginValidationError` is thrown with the field `specd-plugin.json: name` or `specd-plugin.json: version`
+
+    #### Scenario: Install registers the plugin as shared-folder owner
+
+    - **WHEN** `install` writes files into the shared folder
+    - **THEN** `.owners.json` lists `opencode`
+
+    #### Scenario: Filtered install also registers the owner
+
+    - **WHEN** `install` runs with a `skills` filter and writes a shared file
+    - **THEN** `.owners.json` lists `opencode`
+
+    #### Scenario: Owner registered before the first shared write
+
+    - **GIVEN** the first write into the shared folder fails
+    - **WHEN** `install` rejects
+    - **THEN** `.owners.json` already lists `opencode`
+    - **AND** a later full uninstall releases the owner and removes the shared folder when it was the last owner
+
+    #### Scenario: Filtered uninstall removes only the selected agent file in the shared folder
+
+    - **GIVEN** the runtime lacks the `agents` capability so agent files live in the shared folder
+    - **WHEN** `uninstall` runs with `options.agents` selecting one agent
+    - **THEN** only that `<agent-name>.agent.md` is removed from the shared folder
+    - **AND** every other shared file and `.owners.json` remain, and `removeSharedOwner` is not called
+
+    #### Scenario: Other owners keep the shared files
+
+    - **GIVEN** `opencode` and another agent plugin are owners of the shared folder
+    - **WHEN** `opencode` is fully uninstalled
+    - **THEN** `shared.md` and every `<agent>.agent.md` remain
+    - **AND** `.owners.json` lists only the other plugin
+
+    #### Scenario: Last owner removes shared files and the empty folder
+
+    - **GIVEN** `opencode` is the only owner and the folder holds only specd files and the marker
+    - **WHEN** `opencode` is fully uninstalled
+    - **THEN** `shared.md`, the agent files and `.owners.json` are deleted
+    - **AND** the shared folder itself no longer exists
+
+    #### Scenario: Foreign file keeps the shared folder
+
+    - **GIVEN** `opencode` is the only owner and the folder also contains `notes.txt`
+    - **WHEN** `opencode` is fully uninstalled
+    - **THEN** the specd shared files and the marker are deleted
+    - **AND** `notes.txt` and the folder remain
+
+    #### Scenario: Legacy install without marker deletes no shared file
+
+    - **GIVEN** a shared folder with `shared.md` and no `.owners.json`
+    - **WHEN** `opencode` is fully uninstalled
+    - **THEN** `shared.md` still exists
+
+    #### Scenario: Agents go next to shared.md when agents capability is missing
+
+    - **GIVEN** the install is run with a capability list that does not include `agents`
+    - **WHEN** an agent is installed
+    - **THEN** the agent file is written to the shared folder next to `shared.md` and not to `.opencode/agents/`
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Exposes named create factory'
+  content: |
+    - **WHEN** plugin package exports are loaded
+    - **THEN** `create()` is available
+    - **AND** it returns an `AgentPlugin` or a promise of one
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Factory export'
+  content: |
+    #### Scenario: Async factory result is awaited
+
+    - **GIVEN** `create()` returns a promise
+    - **WHEN** the plugin loader resolves the plugin
+    - **THEN** the loader awaits the promise and uses the resolved `AgentPlugin`
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Installs agents to categorized directory'
+  content: |
+    - **GIVEN** a request to install an agent
+    - **WHEN** `install({ config, options, contributions })` runs
+    - **THEN** it installs the agent files to `.opencode/agents/`
+    - **AND** the YAML frontmatter contains `mode: subagent`
+    - **AND** the YAML frontmatter contains the singular key `permission` as a map derived from `allowedTools`
+
+    #### Scenario: Bash pattern restrictions are preserved
+
+    - **GIVEN** an agent whose `allowedTools` contain `Bash(node *)` and `Bash(specd *)`
+    - **WHEN** the agent is installed
+    - **THEN** `permission.bash` is a map with the patterns `"node *"` and `"specd *"` set to `allow`
+    - **AND** no key is duplicated in `permission`
+
+    #### Scenario: Plain tools map to allow
+
+    - **GIVEN** an agent whose `allowedTools` contain `Read`
+    - **WHEN** the agent is installed
+    - **THEN** `permission.read` is `allow`
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Uninstall removes selected skills when filter is provided'
+  content: |
+    - **GIVEN** a `SpecdConfig` and multiple skills installed under `.opencode/skills/`
+    - **WHEN** `uninstall({ config, options: { skills: ['specd-design'] }, contributions })` is executed
+    - **THEN** only the selected specd-managed skill directories are removed
+    - **AND** the shared folder, the owners marker and the shared files remain

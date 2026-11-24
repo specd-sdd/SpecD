@@ -1,0 +1,41 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: KernelOptions supports additive registries'
+  content: |
+    #### Scenario: External registrations extend built-ins
+    - **GIVEN** external registrations provided in `KernelOptions`
+    - **WHEN** `createKernel(config, options)` processes options
+    - **THEN** external registrations extend rather than replace built-ins
+
+    #### Scenario: KernelOptions accepts checks array
+    - **GIVEN** a `KernelOptions` object containing `checks: [pluginCheckRegistration]`
+    - **WHEN** `createKernel` initializes
+    - **THEN** the custom checks are registered into the unified `CheckRegistry`
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: KernelOptions supports additive registries'
+  content: |
+    ### Requirement: Check Registration and KernelBuilder Extension
+
+    #### Scenario: KernelBuilder registers custom check fluently
+    - **GIVEN** a `KernelBuilder` instance
+    - **WHEN** invoking `.registerCheck('acme', customCheck, defaultBindings)`
+    - **THEN** the builder records the check under `'@acme.customCheck'`
+    - **AND** returns `this` for chaining
+
+    #### Scenario: KernelBuilder records governance options including allowDisable
+    - **GIVEN** a `KernelBuilder` instance
+    - **WHEN** invoking `.registerCheck('acme', customCheck, defaultBindings, { allowDisable: false })`
+    - **THEN** the registered check governance records `allowDisable: false`
+
+    #### Scenario: Built kernel exposes active check registry view
+    - **GIVEN** a kernel built with custom checks
+    - **WHEN** reading `kernel.registry.checks`
+    - **THEN** it exposes the registered checks and active bindings

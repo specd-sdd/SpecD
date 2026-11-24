@@ -7,6 +7,7 @@ import {
   captureStdout,
   captureStderr,
   ExitSentinel,
+  makeMockHost,
 } from './helpers.js'
 
 vi.mock('../../src/helpers/cli-context.js', () => ({
@@ -24,7 +25,9 @@ import {
 function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
-  vi.mocked(resolveCliContext).mockResolvedValue({ config, configFilePath: null, kernel })
+  vi.mocked(resolveCliContext).mockResolvedValue(
+    makeMockHost({ config, configFilePath: null, kernel }),
+  )
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
@@ -160,6 +163,36 @@ describe('Error cases', () => {
 
     expect(stderr()).toMatch(/implementing/)
     expect(stderr()).toMatch(/out of sync/)
+    expect(stderr()).toContain('--force')
+  })
+
+  it('includes --force hint in JSON output when historical implementation guard triggers', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.draft.execute.mockRejectedValue(
+      new HistoricalImplementationGuardError('draft', 'my-change'),
+    )
+
+    const program = makeProgram()
+    registerChangeDraft(program.command('change'))
+
+    try {
+      await program.parseAsync([
+        'node',
+        'specd',
+        'change',
+        'draft',
+        'my-change',
+        '--format',
+        'json',
+      ])
+    } catch (err) {
+      expect(err).toBeInstanceOf(ExitSentinel)
+      expect((err as ExitSentinel).code).toBe(1)
+    }
+
+    const parsed = JSON.parse(stdout())
+    expect(parsed.code).toBe('IMPLEMENTATION_DETECTED')
+    expect(parsed.hint).toContain('--force')
   })
 
   it('Force flag is passed through to the use case', async () => {

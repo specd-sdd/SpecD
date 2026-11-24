@@ -1,0 +1,71 @@
+- op: modified
+  description: 'Add a chaining scenario for registerDisposer.'
+  selector:
+    type: section
+    matches: 'Requirement: Builder supports fluent registration methods'
+  content: |
+    #### Scenario: Registration methods are chainable
+
+    - **WHEN** a caller invokes the builder's registration methods in sequence
+    - **THEN** each registration method returns the builder itself
+    - **AND** the caller can continue chaining additional registrations
+
+    #### Scenario: registerDisposer is chainable
+
+    - **WHEN** a caller invokes `registerDisposer(name, dispose)`
+    - **THEN** it returns the builder itself
+- op: added
+  description: 'Scenarios for named disposers and for handing them to the kernel.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Builder supports fluent registration methods'
+  content: |
+    ### Requirement: Builder registers named disposers
+
+    #### Scenario: Disposers reach the kernel options in call order
+
+    - **GIVEN** a builder with `registerDisposer('a', fa)` then `registerDisposer('b', fb)`
+    - **WHEN** `build()` is called
+    - **THEN** the kernel options carry the disposers in the order `a`, `b`
+
+    #### Scenario: Empty name is rejected
+
+    - **WHEN** a caller invokes `registerDisposer('', dispose)`
+    - **THEN** the call fails with an `InvalidDisposerError`
+
+    #### Scenario: Non-callable dispose is rejected
+
+    - **WHEN** a caller invokes `registerDisposer('plugins', undefined)`
+    - **THEN** the call fails with an `InvalidDisposerError`
+
+    #### Scenario: Duplicate name is rejected
+
+    - **GIVEN** a builder where `registerDisposer('plugins', fa)` was already called
+    - **WHEN** a caller invokes `registerDisposer('plugins', fb)`
+    - **THEN** the call fails with a `RegistryConflictError` for the category `disposers`
+    - **AND** the first registration is not overwritten
+
+    ### Requirement: Builder hands disposers to the kernel
+
+    #### Scenario: The kernel runs the disposers after a successful build
+
+    - **GIVEN** a builder with a registered disposer
+    - **WHEN** `build()` succeeds and `kernel.dispose()` is awaited
+    - **THEN** the disposer ran exactly once
+    - **AND** the builder did not run it itself
+
+    #### Scenario: A failed build releases the disposers
+
+    - **GIVEN** a builder with registered disposers and a construction that fails
+    - **WHEN** `build()` rejects
+    - **THEN** the disposers have run in reverse order before the rejection propagates
+
+    #### Scenario: Builder and options produce the same disposal
+
+    - **GIVEN** a kernel built through the builder and a kernel built through `createKernel` with equivalent options
+    - **WHEN** both are disposed
+    - **THEN** their disposers run in the same order

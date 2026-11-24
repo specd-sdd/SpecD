@@ -65,6 +65,7 @@ async function makeConfig(): Promise<SpecdConfig> {
       archiveAdapter: { adapter: 'fs', config: { path: archivePath } },
     },
     approvals: { spec: false, signoff: false },
+    invalidation: { artifacts: 'downstream', workflow: 'preserve' },
   }
 }
 
@@ -135,15 +136,13 @@ describe('createKernel project.getConfig', () => {
       const config = await makeConfig()
       const configWithPlugins: SpecdConfig = {
         ...config,
-        plugins: {
-          agents: [{ name: '@specd/plugin-agent-claude' }],
-        },
+        plugins: [{ name: '@specd/plugin-agent-claude' }],
       }
       const kernel = await createKernel(configWithPlugins)
 
-      expect(kernel.project.getConfig.execute().plugins).toEqual({
-        agents: [{ name: '@specd/plugin-agent-claude' }],
-      })
+      expect(kernel.project.getConfig.execute().plugins).toEqual([
+        { name: '@specd/plugin-agent-claude' },
+      ])
     })
 
     it('keeps listWorkspaces stable when the host mutates the returned snapshot', async () => {

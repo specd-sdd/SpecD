@@ -26,7 +26,9 @@ export class PluginNotFoundError extends SpecdError {
    * @param pluginName - Missing plugin package name.
    */
   constructor(pluginName: string) {
-    super(`Plugin '${pluginName}' was not found`)
+    super(
+      `Plugin '${pluginName}' was not found; install the package (for example with your package manager) and check the name in specd.yaml`,
+    )
     this._pluginName = pluginName
   }
 }

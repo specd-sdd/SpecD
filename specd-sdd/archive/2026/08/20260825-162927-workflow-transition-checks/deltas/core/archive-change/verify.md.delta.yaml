@@ -1,0 +1,290 @@
+- op: added
+  description: 'readOnly same runner as enter ready'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: ReadOnly workspace guard$'
+    after:
+      type: section
+      matches: '^Scenario: Guard runs after archivable check and state transition$'
+  content: |
+    #### Scenario: Enter ready fails the same readOnly runner
+
+    - **GIVEN** a change in `designing` containing a readOnly spec
+    - **WHEN** `GetStatus` evaluates `designing → ready`
+    - **THEN** `workspace.readOnly` fails
+    - **AND** `ArchiveChange` uses the same runner on operation `archive`
+
+- op: added
+  description: 'Open impl fails exit implementing with same runner'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Tracked implementation review guard$'
+    after:
+      type: section
+      matches: '^Scenario: Open tracked implementation file blocks archive$'
+  content: |
+    #### Scenario: Open file also blocks implementing to verifying
+
+    - **GIVEN** the same tracked file remains `open`
+    - **WHEN** `TransitionChange` targets `verifying` from `implementing`
+    - **THEN** `impl.filesResolved` fails
+    - **AND** the runner is the same one archive uses
+
+    #### Scenario: Redesign from implementing is not blocked by open files
+
+    - **GIVEN** the same tracked file remains `open`
+    - **WHEN** `TransitionChange` targets `designing` from `implementing`
+    - **THEN** `impl.filesResolved` does not match
+    - **AND** the transition is not failed for `IMPLEMENTATION_STATE`
+
+- op: added
+  description: 'Out-of-scope skippable on both bindings'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Out-of-scope sidecar update guard$'
+    after:
+      type: section
+      matches: '^Scenario: Explicit override allows out-of-scope sidecar updates$'
+  content: |
+    #### Scenario: Same skippable flag on exit implementing
+
+    - **GIVEN** `impl.linksInScope` would fail
+    - **AND** `--allow-out-of-scope` is in scope for the attempt
+    - **WHEN** exit from `implementing` is evaluated
+    - **THEN** the predicate skips with the same semantics as archive
+
+- op: added
+  description: 'Pre-archive effects selected by phase not check id'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Pre-archive hooks$'
+    after:
+      type: section
+      matches: '^Scenario: Pre-archive hook failure aborts before any writes$'
+  content: |
+    #### Scenario: before-persist slot does not hardcode hook.pre
+
+    - **GIVEN** an archive effect bound with `phase = before-persist`
+    - **WHEN** `ArchiveChange` reaches the pre-persist slot
+    - **THEN** it runs every matching binding for that phase
+    - **AND** it does not filter with `check.id === 'hook.pre'`
+
+- op: added
+  description: 'Post-archive effects selected by after-persist collect'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Post-archive hooks$'
+    after:
+      type: section
+      matches: '^Scenario: Post-archive hook failures collected$'
+  content: |
+    #### Scenario: after-persist slot uses onFailure collect
+
+    - **GIVEN** an archive effect bound with `phase = after-persist` and `onFailure = collect`
+    - **AND** publication already succeeded
+    - **WHEN** that effect fails
+    - **THEN** the archive is not rolled back
+    - **AND** the failure is appended to `postHookFailures`
+
+- op: added
+  description: 'Named archive checks wrap remaining preflight'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Typed errors for archive failures$'
+  content: |
+    ### Requirement: Archive checks share runners and wrap remaining preflight
+
+    #### Scenario: deps.consistent throws ArchiveDependencyMismatchError
+
+    - **GIVEN** extracted `dependsOn` disagrees with the sealed persisted set
+    - **WHEN** operation `archive` evaluates `deps.consistent`
+    - **THEN** `ArchiveDependencyMismatchError` is thrown
+    - **AND** the same runner is `runDepsConsistent`
+    - **AND** enter-`ready` used that runner against `change.specDependsOn` when a publication-plan snapshot existed
+
+    #### Scenario: publication preflight stays in ArchiveChange
+
+    - **GIVEN** a publication preflight failure that is not name/archivable/overlap/readOnly/deps/impl
+    - **WHEN** `ArchiveChange` runs after archive predicates allow the operation
+    - **THEN** it fails with `ArchivePreflightError` or `ArchiveArtifactMissingError`
+    - **AND** that failure is not a registered `archive.publication` check
+
+- op: added
+  description: 'Constructor does not keep unused RunStepHooks'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Ports and constructor$'
+  content: |
+    ### Requirement: Archive bindings not RunStepHooks on the use case
+
+    #### Scenario: ArchiveChange constructor does not take RunStepHooks
+
+    - **GIVEN** `archiveBindings` from `createWorkflowCheckRegistry`
+    - **WHEN** `ArchiveChange` is constructed
+    - **THEN** it uses those bindings for archive predicates and effects
+    - **AND** the constructor does not accept `RunStepHooks`
+    - **AND** `ArchiveChangeDeps` does not include `runStepHooks`
+
+- op: modified
+  description: 'Constructor receives MaterializeSpecMetadata'
+  selector:
+    type: section
+    matches: '^Scenario: Constructor receives RegenerateSpecMetadata instead of GenerateSpecMetadata and SaveSpecMetadata$'
+  rename: 'Scenario: Constructor receives MaterializeSpecMetadata instead of GenerateSpecMetadata and SaveSpecMetadata'
+  content: |
+    #### Scenario: Constructor receives MaterializeSpecMetadata instead of GenerateSpecMetadata and SaveSpecMetadata
+
+    - **GIVEN** the archive workflow is composed for runtime use
+    - **WHEN** `ArchiveChange` is instantiated
+    - **THEN** the constructor receives `MaterializeSpecMetadata`
+    - **AND** it does not receive `GenerateSpecMetadata` or `SaveSpecMetadata` directly
+    - **AND** it does not receive `RunStepHooks`
+
+- op: modified
+  description: 'Archive index is fs-cache jsonl not root index.jsonl'
+  selector:
+    type: section
+    matches: '^Scenario: Archive index entry does not contain workspace field$'
+  content: |
+    #### Scenario: Archive index entry does not contain workspace field
+
+    - **GIVEN** a change is archived
+    - **WHEN** reading the archive list index (`.specd-index.jsonl` under `{configPath}/tmp/fs-cache/archive/`)
+    - **THEN** each entry does NOT contain a `workspace` field
+    - **AND** the workspace can be derived from `specIds[0]` (first entry in the specIds array)
+
+- op: modified
+  description: 'Post-commit metadata via MaterializeSpecMetadata force'
+  selector:
+    type: section
+    matches: '^Scenario: Persisted metadata regeneration runs after archive move via RegenerateSpecMetadata$'
+  rename: 'Scenario: Persisted metadata regeneration runs after archive move via MaterializeSpecMetadata'
+  content: |
+    #### Scenario: Persisted metadata regeneration runs after archive move via MaterializeSpecMetadata
+
+    - **GIVEN** canonical publication and archive move succeed
+    - **WHEN** `ArchiveChange` regenerates persisted `metadata.json`
+    - **THEN** `MaterializeSpecMetadata.execute({ specId, policy: 'force' })` runs after `archiveRepository.archive()` and after all `.specd-archive-backup/` directories for the batch have been deleted
+
+- op: modified
+  description: 'Archive does not call GenerateSpecMetadata'
+  selector:
+    type: section
+    matches: '^Scenario: ArchiveChange does not call GenerateSpecMetadata or write the metadata cache itself$'
+  content: |
+    #### Scenario: ArchiveChange does not call GenerateSpecMetadata or write the metadata cache itself
+
+    - **WHEN** `ArchiveChange` regenerates metadata for an archived spec
+    - **THEN** it delegates generation and guarded cache persistence to `MaterializeSpecMetadata.execute({ specId, policy: 'force' })`
+    - **AND** it does not call `GenerateSpecMetadata` directly or write `metadata.json` itself
+
+- op: modified
+  description: 'Factory resolves archiveBindings and MaterializeSpecMetadata'
+  selector:
+    type: section
+    matches: '^Scenario: createArchiveChange config form derives ArchiveChangeDeps through resolveArchiveChangeDeps$'
+  content: |
+    #### Scenario: createArchiveChange config form derives ArchiveChangeDeps through resolveArchiveChangeDeps
+
+    - **WHEN** `createArchiveChange(config, options?)` is invoked
+    - **THEN** it creates a composition resolver for that composition session
+    - **AND** it derives `ArchiveChangeDeps` through `resolveArchiveChangeDeps(resolver)`
+    - **AND** `resolveArchiveChangeDeps(resolver)` resolves `archiveBindings` from `resolveWorkflowCheckRegistry`
+    - **AND** it resolves `materializeMetadata: MaterializeSpecMetadata`
+    - **AND** it resolves `contentHasher: ContentHasher`
+    - **AND** it does not resolve `runStepHooks` onto the use case
+    - **AND** the factory delegates to canonical `createArchiveChange(deps)`
+
+- op: modified
+  description: 'No-lock initial dependsOn only from disk via resolveInitial'
+  selector:
+    type: section
+    matches: '^Scenario: No-lock spec resolves initial dependsOn through resolveInitialPersistedDependsOn$'
+  content: |
+    - **GIVEN** a spec has no existing `spec-lock.json`
+    - **AND** the spec already exists in canonical storage
+    - **AND** `change.specDependsOn` has no entry for that spec
+    - **WHEN** `ArchiveChange` builds the initial persisted-state base for that spec
+    - **THEN** it resolves the initial dependency set through `resolveInitialPersistedDependsOn()` without `explicitDependsOn`
+    - **AND** it does not read cached `metadata.json` as a fallback
+    - **AND** it does not use merge-extract as the sealed `dependsOn`
+
+    #### Scenario: Publication plan skips resolveInitialPersistedDependsOn
+
+    - **GIVEN** a spec has no existing `spec-lock.json`
+    - **AND** `change.specDependsOn` has an entry for that spec
+    - **WHEN** `ArchiveChange` seals `dependsOn`
+    - **THEN** the sealed set is that snapshot
+    - **AND** it does not call `resolveInitialPersistedDependsOn()`
+
+    #### Scenario: New spec without a plan seals extracted dependsOn
+
+    - **GIVEN** a spec has no existing `spec-lock.json`
+    - **AND** `SpecRepository.get` returns null
+    - **AND** `change.specDependsOn` has no entry for that spec
+    - **AND** merge-extract yields a `dependsOn` list from the artifacts being published
+    - **WHEN** `ArchiveChange` seals `dependsOn`
+    - **THEN** the sealed set is that extracted list
+    - **AND** `spec-lock.json` records that list
+    - **AND** it does not call `resolveInitialPersistedDependsOn()`
+
+    #### Scenario: New spec without a plan seals empty dependsOn
+
+    - **GIVEN** a spec has no existing `spec-lock.json`
+    - **AND** `SpecRepository.get` returns null
+    - **AND** `change.specDependsOn` has no entry for that spec
+    - **AND** merge-extract yields no `dependsOn`
+    - **WHEN** `ArchiveChange` seals `dependsOn`
+    - **THEN** the sealed set is `[]`
+    - **AND** it does not call `resolveInitialPersistedDependsOn()`
+
+    #### Scenario: Lock without a plan keeps lock dependsOn
+
+    - **GIVEN** a spec has an existing `spec-lock.json` `dependsOn`
+    - **AND** `change.specDependsOn` has no entry for that spec
+    - **AND** merge-extract yields a different `dependsOn` list
+    - **WHEN** `ArchiveChange` seals `dependsOn`
+    - **THEN** the sealed set is the lock list
+    - **AND** it does not call `resolveInitialPersistedDependsOn()`
+    - **AND** `deps.consistent` fails against that lock list
+
+- op: added
+  description: 'Additional typed error scenarios'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Typed errors for archive failures$'
+    after:
+      type: section
+      matches: '^Scenario: Open implementation file throws ArchiveImplementationStateError$'
+  content: |
+    #### Scenario: Unknown change throws ChangeNotFoundError
+
+    - **WHEN** `ArchiveChange.execute` is called with a change name that does not exist
+    - **THEN** `ChangeNotFoundError` is thrown
+
+    #### Scenario: Missing parser throws ParserNotRegisteredError
+
+    - **GIVEN** an artifact format requires a parser that is not registered
+    - **WHEN** `ArchiveChange` materializes that artifact
+    - **THEN** `ParserNotRegisteredError` is thrown
+
+    #### Scenario: Batch restore failure throws ArchiveBatchRestoreError
+
+    - **GIVEN** canonical publication partially succeeds and batch restore is required
+    - **AND** restore cannot complete for all affected specs
+    - **WHEN** `ArchiveChange` aborts the batch
+    - **THEN** `ArchiveBatchRestoreError` is thrown

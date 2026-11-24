@@ -1,0 +1,23 @@
+- op: added
+  description: 'Define hasTasks as an operational-content boundary'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: taskCompletionCheck$'
+  content: |
+    ### Requirement: Task artifact validity semantics
+
+    `ArtifactType.hasTasks: true` SHALL identify an artifact whose entire content is mutable operational task state. The marker, not the artifact ID or filename, controls this behaviour.
+
+    Such artifacts SHALL be excluded from approval and verification fingerprints, automatic content-drift invalidation, and review propagation originating in parent artifacts. They remain subject to required presence, structural and cross-artifact validation, live task counting, applicable forward-transition task completion checks, and archive preflight task completion.
+
+    A required task artifact that is missing, unreadable, or structurally invalid is a blocker and MUST NOT be interpreted as zero incomplete tasks. Schemas that require consent over narrative content alongside mutable tasks SHALL model those concerns as separate artifacts rather than set `hasTasks: true` on the combined document.
+
+- op: removed
+  description: 'Remove obsolete unconditional per-spec approval; configured change-level gates own consent'
+  selector:
+    type: section
+    matches: '^Requirement: Per-spec approval$'

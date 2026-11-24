@@ -1,0 +1,64 @@
+- op: modified
+  selector: { type: section, matches: '^Requirement: Command signature$' }
+  content: |
+    Scenarios:
+
+    #### Scenario: Partial policy edit preserves unspecified dimension
+
+    - **WHEN** only one policy flag is supplied
+    - **THEN** only that dimension is sent to `EditChange`
+
+    #### Scenario: At least one edit remains required
+
+    - **WHEN** no scope, description, or policy edit flag is supplied
+    - **THEN** the command fails before calling core
+
+- op: modified
+  selector: { type: section, matches: '^Requirement: Approval invalidation$' }
+  content: |
+    Scenarios:
+
+    #### Scenario: Output reflects canonical gate recovery
+
+    - **GIVEN** a scope edit makes required spec consent stale under preserve
+    - **WHEN** the command succeeds
+    - **THEN** it reports the committed `designing` state, affected evidence, and artifact review
+    - **AND** policy-only edits do not claim invalidation without a reported drift
+
+    #### Scenario: Ungated preserve reports blocker without invented return
+
+    - **GIVEN** scope editing creates review without required spec consent
+    - **WHEN** workflow policy is preserve
+    - **THEN** output shows the retained state and forward-progress blocker
+
+    #### Scenario: Scope change does not imply validity warning
+
+    - **GIVEN** an edit normalizes to the approved canonical scope and causes no projection change
+    - **WHEN** output is rendered
+    - **THEN** `scopeChanged` and actual validity change remain distinct
+    - **AND** no approval-invalidated warning is printed
+
+    #### Scenario: Structured output includes recovery guidance
+
+    - **WHEN** reconciliation returns blockers and next action
+    - **THEN** text, JSON, and TOON render that Core-owned guidance
+
+    #### Scenario: Text output renders blocker codes and next command
+
+    - **GIVEN** an ungated preserve scope edit returns a nonempty blocker list and `/specd-design` or in-place review next action from Core
+    - **WHEN** the default text presenter renders the successful result
+    - **THEN** stdout names every returned blocker code and the exact Core-owned next-action command
+    - **AND** it does not infer a different recovery from lifecycle state
+
+- op: modified
+  description: 'Qualify legacy JSON recovery by required gate and actual validity change'
+  selector:
+    type: section
+    matches: '^Scenario: JSON output with invalidation$'
+  rename: 'Scenario: JSON output reflects required-gate scope recovery'
+  content: |
+    - **GIVEN** a change with valid required spec consent and workflow `preserve`
+    - **WHEN** `changes edit` adds a canonical spec with `--format json`
+    - **THEN** output has `result: "ok"`, updated `specIds` and `workspaces`, `scopeChanged: true`, and `validityChanged: true`
+    - **AND** the compatibility `invalidated` field is true and committed state is `designing`
+    - **AND** blockers, next action, projection changes, and automatic return match the Core result

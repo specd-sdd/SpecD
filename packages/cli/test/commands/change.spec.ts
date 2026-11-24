@@ -17,6 +17,7 @@ import {
   mockProcessExit,
   captureStdout,
   captureStderr,
+  makeMockHost,
 } from './helpers.js'
 
 // Module mocks — hoisted by vitest
@@ -42,11 +43,13 @@ import { registerDraftsRestore } from '../../src/commands/drafts/restore.js'
 function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
-  vi.mocked(resolveCliContext).mockResolvedValue({
-    config: config,
-    configFilePath: null,
-    kernel: kernel,
-  })
+  vi.mocked(resolveCliContext).mockResolvedValue(
+    makeMockHost({
+      config: config,
+      configFilePath: null,
+      kernel: kernel,
+    }),
+  )
   vi.mocked(enrichImplementationTracking).mockResolvedValue({
     trackedFiles: [],
     links: [],
@@ -387,6 +390,7 @@ describe('change status', () => {
   it('displays change info in text format', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change: makeMockChange({ name: 'feat', state: 'designing', specIds: ['auth/login'] }),
       artifactStatuses: [
         { type: 'spec', state: 'in-progress', effectiveStatus: 'in-progress', files: [] },
@@ -426,6 +430,7 @@ describe('change status', () => {
   it('outputs valid JSON in json format', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change: makeMockChange({ name: 'feat', state: 'designing' }),
       artifactStatuses: [
         { type: 'spec', state: 'in-progress', effectiveStatus: 'in-progress', files: [] },
@@ -475,6 +480,7 @@ describe('change status', () => {
   it('JSON output contains schema object with name and version', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change: makeMockChange({
         name: 'add-login',
         state: 'designing',
@@ -513,125 +519,6 @@ describe('change status', () => {
     expect(parsed.schema).toEqual({ name: 'std', version: 1, artifactDag: [] })
     expect(parsed.approvalGates).toEqual({ specEnabled: false, signoffEnabled: false })
   })
-
-  it('renders review output with absolute file paths in text mode', async () => {
-    const { kernel, stdout } = setup()
-    kernel.changes.status.execute.mockResolvedValue({
-      change: makeMockChange({ name: 'add-login', state: 'designing' }),
-      artifactStatuses: [
-        {
-          type: 'tasks',
-          state: 'drifted-pending-review',
-          effectiveStatus: 'drifted-pending-review',
-          files: [{ key: 'tasks', filename: 'tasks.md', state: 'drifted-pending-review' }],
-        },
-      ],
-      review: {
-        required: true,
-        route: 'designing',
-        reason: 'artifact-drift',
-        affectedArtifacts: [
-          {
-            type: 'tasks',
-            files: [
-              {
-                key: 'tasks',
-                filename: 'tasks.md',
-                path: '/project/.specd/changes/add-login/tasks.md',
-              },
-            ],
-          },
-        ],
-      },
-      lifecycle: {
-        validTransitions: [],
-        availableTransitions: [],
-        blockers: [],
-        approvals: { spec: false, signoff: false },
-        nextArtifact: null,
-        changePath: '/project/.specd/changes/add-login',
-        schemaInfo: { name: '@specd/schema-std', version: 1, artifacts: [] },
-      },
-      blockers: [],
-      nextAction: {
-        targetStep: 'designing',
-        actionType: 'cognitive',
-        reason: '...',
-        command: '/specd-design',
-      },
-      specDependsOn: {},
-      implementationTracking: { trackedFiles: [], links: [] },
-    })
-
-    const program = makeProgram()
-    registerChangeStatus(program.command('change'))
-    await program.parseAsync(['node', 'specd', 'change', 'status', 'add-login'])
-
-    const out = stdout()
-    expect(out).toContain('review:')
-    expect(out).toContain('/project/.specd/changes/add-login/tasks.md')
-  })
-
-  it('JSON output includes review files with filename and absolute path', async () => {
-    const { kernel, stdout } = setup()
-    kernel.changes.status.execute.mockResolvedValue({
-      change: makeMockChange({ name: 'add-login', state: 'designing' }),
-      artifactStatuses: [
-        {
-          type: 'tasks',
-          state: 'drifted-pending-review',
-          effectiveStatus: 'drifted-pending-review',
-          files: [{ key: 'tasks', filename: 'tasks.md', state: 'drifted-pending-review' }],
-        },
-      ],
-      review: {
-        required: true,
-        route: 'designing',
-        reason: 'artifact-drift',
-        affectedArtifacts: [
-          {
-            type: 'tasks',
-            files: [
-              {
-                key: 'tasks',
-                filename: 'tasks.md',
-                path: '/project/.specd/changes/add-login/tasks.md',
-              },
-            ],
-          },
-        ],
-      },
-      lifecycle: {
-        validTransitions: [],
-        availableTransitions: [],
-        blockers: [],
-        approvals: { spec: false, signoff: false },
-        nextArtifact: null,
-        changePath: '/project/.specd/changes/add-login',
-        schemaInfo: { name: '@specd/schema-std', version: 1, artifacts: [] },
-      },
-      blockers: [],
-      nextAction: {
-        targetStep: 'designing',
-        actionType: 'cognitive',
-        reason: '...',
-        command: '/specd-design',
-      },
-      specDependsOn: {},
-      implementationTracking: { trackedFiles: [], links: [] },
-    })
-
-    const program = makeProgram()
-    registerChangeStatus(program.command('change'))
-    await program.parseAsync(['node', 'specd', 'change', 'status', 'add-login', '--format', 'json'])
-
-    const parsed = JSON.parse(stdout())
-    expect(parsed.review.affectedArtifacts[0].files[0]).toEqual({
-      key: 'tasks',
-      filename: 'tasks.md',
-      path: '/project/.specd/changes/add-login/tasks.md',
-    })
-  })
 })
 
 // ---------------------------------------------------------------------------
@@ -652,6 +539,7 @@ describe('change transition', () => {
   it('exits 1 when transition is invalid', async () => {
     const { kernel, stderr } = setup()
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change: makeMockChange({ name: 'feat', state: 'drafting' }),
       artifactStatuses: [],
       blockers: [],
@@ -690,6 +578,7 @@ describe('change transition', () => {
   it('exits 2 when hook fails', async () => {
     const { kernel, stderr } = setup()
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change: makeMockChange({ name: 'feat', state: 'designing' }),
       artifactStatuses: [],
       blockers: [],
@@ -721,6 +610,7 @@ describe('change transition', () => {
   it('prints transition confirmation with from → to format', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change: makeMockChange({ name: 'feat', state: 'designing' }),
       artifactStatuses: [],
       blockers: [],
@@ -754,6 +644,7 @@ describe('change transition', () => {
   it('outputs json with new state', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change: makeMockChange({ name: 'feat', state: 'designing' }),
       artifactStatuses: [],
       blockers: [],
@@ -802,6 +693,7 @@ describe('change transition', () => {
   it('JSON output includes from and to fields', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change: makeMockChange({ name: 'my-change', state: 'drafting' }),
       artifactStatuses: [],
       blockers: [],
@@ -857,12 +749,15 @@ describe('change transition', () => {
   it('does not pass approval flags to transition execute (baked at kernel construction)', async () => {
     const config = makeMockConfig({ approvals: { spec: true, signoff: false } })
     const kernel = makeMockKernel()
-    vi.mocked(resolveCliContext).mockResolvedValue({ config, configFilePath: null, kernel })
+    vi.mocked(resolveCliContext).mockResolvedValue(
+      makeMockHost({ config, configFilePath: null, kernel }),
+    )
     captureStdout()
     captureStderr()
     mockProcessExit()
 
     kernel.changes.status.execute.mockResolvedValue({
+      schemaWarnings: [],
       change: makeMockChange({ name: 'feat', state: 'designing' }),
       artifactStatuses: [],
       blockers: [],

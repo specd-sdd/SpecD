@@ -9,11 +9,13 @@ import { type Schema } from '../../domain/value-objects/schema.js'
  */
 export interface SchemaProvider {
   /**
-   * Returns the fully-resolved schema for the current project configuration.
+   * Returns the fully-resolved schema for the current project configuration,
+   * or resolves a specific schema by reference when `ref` is provided.
    *
+   * @param ref - Optional schema reference (e.g. schema name or identity)
    * @returns The resolved schema
    * @throws {SchemaNotFoundError} If the schema reference cannot be resolved
    * @throws {SchemaValidationError} If the resolved schema is invalid
    */
-  get(): Promise<Schema>
+  get(ref?: string): Promise<Schema>
 }

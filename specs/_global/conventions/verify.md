@@ -101,3 +101,25 @@
 
 - **WHEN** a value object exposes a public `string[]` property
 - **THEN** it should be typed as `readonly string[]`
+
+### Requirement: Node.js engine floor
+
+#### Scenario: Published packages declare the floor
+
+- **WHEN** the `package.json` of every workspace package with `"private": false` is inspected
+- **THEN** each declares `engines.node` equal to `>=22`
+
+#### Scenario: One common value
+
+- **WHEN** the `engines.node` values of all published packages are compared
+- **THEN** they are identical
+
+#### Scenario: Floor matches CI
+
+- **WHEN** the Node.js version installed by the CI workflow is compared with the declared floor
+- **THEN** the CI version satisfies the declared floor
+
+#### Scenario: Private packages may omit it
+
+- **WHEN** a package with `"private": true` has no `engines` field
+- **THEN** the convention is not violated

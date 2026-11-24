@@ -6,13 +6,15 @@ import { type ArtifactParserRegistry } from '../../application/ports/artifact-pa
 import { type ChangeRepository } from '../../application/ports/change-repository.js'
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { type SchemaProvider } from '../../application/ports/schema-provider.js'
+import { type ContentHasher } from '../../application/ports/content-hasher.js'
+import { type CheckRegistry } from '../../domain/services/check-registry.js'
 import { ArchiveChange } from '../../application/use-cases/archive-change.js'
+import { type ResolveChangeSchema } from '../../application/services/resolve-change-schema.js'
 import { type MaterializeSpecMetadata } from '../../application/use-cases/materialize-spec-metadata.js'
 import {
   ListWorkspaces,
   type ProjectWorkspace,
 } from '../../application/use-cases/list-workspaces.js'
-import { type RunStepHooks } from '../../application/use-cases/run-step-hooks.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import { type ExtractorTransformRegistry } from '../../domain/services/extract-metadata.js'
 import { type SpecWorkspaceRoute } from '../../application/use-cases/_shared/spec-reference-resolver.js'
@@ -28,6 +30,7 @@ import {
 } from '../composition-resolver.js'
 import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 import { createMaterializeSpecMetadata } from './materialize-spec-metadata.js'
+import { resolveWorkflowCheckRegistry } from './workflow-check-registry.js'
 
 /**
  * Builds workspace spec layout map for {@link FsArchiveBatchSnapshot}.
@@ -67,36 +70,35 @@ export function resolveArchiveBatchSnapshotPort(
     return new FsArchiveBatchSnapshot(layouts)
   }
 
+  let snapshot: Promise<FsArchiveBatchSnapshot> | undefined
+  const resolveSnapshot = (): Promise<FsArchiveBatchSnapshot> => {
+    snapshot ??= listWorkspaces.execute().then((workspaces) => {
+      const derived = buildWorkspaceSpecLayouts(workspaces)
+      return new FsArchiveBatchSnapshot(derived)
+    })
+    return snapshot
+  }
+
   return {
     snapshot: async (specId, changeName) => {
-      const workspaces = await listWorkspaces.execute()
-      const derived = buildWorkspaceSpecLayouts(workspaces)
-      const port = new FsArchiveBatchSnapshot(derived)
+      const port = await resolveSnapshot()
       return port.snapshot(specId, changeName)
     },
-    restoreBatch: async (specIds, publishOrder) => {
-      const workspaces = await listWorkspaces.execute()
-      const derived = buildWorkspaceSpecLayouts(workspaces)
-      const port = new FsArchiveBatchSnapshot(derived)
-      return port.restoreBatch(specIds, publishOrder)
+    restoreBatch: async (specIds, publishOrder, changeName) => {
+      const port = await resolveSnapshot()
+      return port.restoreBatch(specIds, publishOrder, changeName)
     },
     detectOrphans: async (specIds, changeName) => {
-      const workspaces = await listWorkspaces.execute()
-      const derived = buildWorkspaceSpecLayouts(workspaces)
-      const port = new FsArchiveBatchSnapshot(derived)
+      const port = await resolveSnapshot()
       return port.detectOrphans(specIds, changeName)
     },
     recordCreatedFile: async (specId, filename) => {
-      const workspaces = await listWorkspaces.execute()
-      const derived = buildWorkspaceSpecLayouts(workspaces)
-      const port = new FsArchiveBatchSnapshot(derived)
+      const port = await resolveSnapshot()
       return port.recordCreatedFile(specId, filename)
     },
-    cleanup: async (specIds) => {
-      const workspaces = await listWorkspaces.execute()
-      const derived = buildWorkspaceSpecLayouts(workspaces)
-      const port = new FsArchiveBatchSnapshot(derived)
-      return port.cleanup(specIds)
+    cleanup: async (specIds, changeName) => {
+      const port = await resolveSnapshot()
+      return port.cleanup(specIds, changeName)
     },
   }
 }
@@ -105,7 +107,6 @@ export interface ArchiveChangeDeps {
   readonly changes: ChangeRepository
   readonly listWorkspaces: ListWorkspaces
   readonly archive: ArchiveRepository
-  readonly runStepHooks: RunStepHooks
   readonly actor: ActorResolver
   readonly parsers: ArtifactParserRegistry
   readonly schemaProvider: SchemaProvider
@@ -114,6 +115,16 @@ export interface ArchiveChangeDeps {
   readonly workspaceRoutes: readonly SpecWorkspaceRoute[]
   readonly projectRoot: string
   readonly batchSnapshot: ArchiveBatchSnapshotPort
+  readonly archiveBindings: readonly import('../../domain/services/transition-checks.js').CheckBinding[]
+  readonly contentHasher: ContentHasher
+  readonly reconcile: import('../../application/use-cases/reconcile-change-validity.js').ReconcileChangeValidity
+  readonly resolveChangeSchema?: ResolveChangeSchema
+  /** Executable check registry used to resolve effective archive bindings and validate skips. */
+  readonly checkRegistry?: CheckRegistry
+  /** Registry transition checks used to project guidance for a committed recovery. */
+  readonly transitionBindings?: readonly import('../../domain/services/transition-checks.js').CheckBinding[]
+  /** Configured approval gates used to project guidance for a committed recovery. */
+  readonly approvals?: { readonly spec: boolean; readonly signoff: boolean }
 }
 
 export function resolveArchiveChangeDeps(resolver: CompositionResolver): ArchiveChangeDeps {
@@ -129,12 +140,12 @@ export function resolveArchiveChangeDeps(resolver: CompositionResolver): Archive
       specRepo: specRepositories.get(workspace.name) as SpecRepository,
     })),
   )
+  const registry = resolveWorkflowCheckRegistry(resolver, { includeOverlapDetection: true })
 
   return {
     changes: resolver.getChangeRepository(),
     listWorkspaces,
     archive: resolver.getArchiveRepository(),
-    runStepHooks: resolver.getRunStepHooks(),
     actor: resolver.getActorResolver(),
     parsers: resolver.getArtifactParserRegistry(),
     schemaProvider: resolver.getSchemaProvider(),
@@ -143,6 +154,13 @@ export function resolveArchiveChangeDeps(resolver: CompositionResolver): Archive
     workspaceRoutes: resolver.getSpecWorkspaceRoutes(),
     projectRoot: resolver.config.projectRoot,
     batchSnapshot: resolveArchiveBatchSnapshotPort(listWorkspaces, workspaceLayouts),
+    archiveBindings: registry.archiveBindings,
+    contentHasher: resolver.getContentHasher(),
+    reconcile: resolver.getReconcileChangeValidity(),
+    resolveChangeSchema: resolver.getResolveChangeSchema(),
+    transitionBindings: registry.transitionBindings,
+    approvals: resolver.config.approvals,
+    ...(registry.checkRegistry !== undefined ? { checkRegistry: registry.checkRegistry } : {}),
   }
 }
 
@@ -172,7 +190,6 @@ function createArchiveChangeFromNormalized(
       changes,
       listWorkspaces,
       archive,
-      runStepHooks,
       actor,
       parsers,
       schemaProvider,
@@ -181,13 +198,20 @@ function createArchiveChangeFromNormalized(
       workspaceRoutes,
       projectRoot,
       batchSnapshot,
+      archiveBindings,
+      contentHasher,
+      reconcile,
+      resolveChangeSchema,
+      checkRegistry,
+      transitionBindings,
+      approvals,
     } = input.deps
 
     return new ArchiveChange(
       changes,
       listWorkspaces,
       archive,
-      runStepHooks,
+      archiveBindings,
       actor,
       parsers,
       schemaProvider,
@@ -196,6 +220,12 @@ function createArchiveChangeFromNormalized(
       workspaceRoutes,
       projectRoot,
       batchSnapshot,
+      contentHasher,
+      reconcile,
+      resolveChangeSchema,
+      checkRegistry,
+      transitionBindings,
+      approvals,
     )
   }
 
@@ -208,7 +238,7 @@ function isArchiveChangeDeps(value: ArchiveChangeDeps | SpecdConfig): value is A
     'changes' in value &&
     'listWorkspaces' in value &&
     'archive' in value &&
-    'runStepHooks' in value &&
+    'archiveBindings' in value &&
     'actor' in value &&
     'parsers' in value &&
     'schemaProvider' in value &&
@@ -216,6 +246,8 @@ function isArchiveChangeDeps(value: ArchiveChangeDeps | SpecdConfig): value is A
     'extractorTransforms' in value &&
     'workspaceRoutes' in value &&
     'projectRoot' in value &&
-    'batchSnapshot' in value
+    'batchSnapshot' in value &&
+    'contentHasher' in value &&
+    'reconcile' in value
   )
 }

@@ -1,0 +1,24 @@
+- op: added
+  description: 'Verify project metadata remains inspection-only'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: Formatted output'
+  content: |
+    ### Requirement: Inspection only
+
+    #### Scenario: Rejects payload flags
+
+    - **WHEN** `specd project metadata` is invoked with `--input`, `--text`, or `--file`
+    - **THEN** Commander rejects the unknown/unsupported option
+    - **AND** no Kernel write or clear use case is invoked
+
+    #### Scenario: Writers are directed to optimized-context
+
+    - **GIVEN** an agent needs to mutate optimized project context
+    - **WHEN** it consults the project metadata command contract
+    - **THEN** mutation is performed via `project optimized-context set` or `clear`
+    - **AND** `project metadata` remains a read-only dump

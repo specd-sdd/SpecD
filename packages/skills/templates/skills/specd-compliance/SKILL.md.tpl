@@ -14,6 +14,7 @@ The skill supports several modes, determined by the argument passed:
 | ------------------------- | ------------------- | -------------------------------------------------------------- |
 | _(empty)_                 | **Selection Mode**  | Lists available changes and asks the user to select one        |
 | `--change <name>`         | **Specific Change** | Specs in a specd change, checked against code and global specs |
+| `--change <name> --delegated --attempt <id>` | **Delegated Change** | The same change-scoped audit, participating in an outer verification attempt |
 | `--diff`                  | **Git Diff**        | Only specs whose implementation files have uncommitted changes |
 | `--pr 42` or `--pr <url>` | **Pull Request**    | Only specs whose implementation files are touched by the PR    |
 | `--all`                   | **Full Audit**      | Every spec in `specs/` — full project audit                    |
@@ -29,6 +30,11 @@ The skill supports several modes, determined by the argument passed:
 2. Use `specd changes spec-preview <name> <specId>` to read the content of specs belonging to the change (these may contain uncommitted deltas).
 3. Always include project-wide specs (from `specd project context`) and direct dependencies (depth 1) in the scope.
 4. Verify implementation against these specs AND verify that the change's specs are conformant to the global/dependency specs.
+
+**Delegated Change (`--change <name> --delegated --attempt <id>`)** — Uses every
+Specific Change branch above. It is not a report-only or project-wide audit. The
+only difference is attempt ownership: the caller owns the supplied attempt, so
+this invocation must neither start nor complete it.
 
 **Git Diff (`--diff`)** — Scoped audit based on uncommitted changes (staged + unstaged):
 
@@ -82,11 +88,67 @@ For `--diff` and `--pr` modes, map changed files to specs using this algorithm:
 
 3. **Check test coverage.** For each spec requirement, verify that adequate tests exist. Flag requirements with no test coverage, insufficient coverage, or tests that don't actually verify the spec requirement.
 
-4. **Read-only.** Never use Edit or NotebookEdit. Only use Write for the final report to `${REPORT_DIR}`.
+4. **Do not edit product code or specs.** Never use Edit or NotebookEdit on them. Only use Write for the final report to `${REPORT_DIR}`. The only change-scoped mutations this skill may run are the verification attempt commands in "Verification attempt ownership".
 
 5. **Use `specd graph impact` for code intelligence.** This project is indexed by `specd graph`. Use its tools to navigate the codebase structurally instead of relying solely on grep/glob. `specd graph` understands call graphs, execution flows, and symbol relationships — use it to find all code relevant to a spec requirement, not just keyword matches.
 
 ---
+
+## Verification attempt ownership
+
+Trust fresh `specd changes status`. Do not calculate fingerprints, edit validity
+projections, or choose recovery yourself. There is no restart-verification flag.
+
+**Standalone** (`--change <name>` without `--delegated`):
+
+This mode may run from any active lifecycle state. Entering `verifying` is not
+required to produce evidence. An existing active attempt does **not** make this
+invocation delegated. Always start a new attempt:
+
+1. `specd changes verification start <name> --format text` before the audit. Store the attempt id. Start refreshes tracking and runs the registered implementation readiness checks from any active state.
+2. Audit, write the report, and follow applicable hook guidance.
+3. `specd changes verification complete <name> --format text` only after the audit succeeds. Completion records this declaration. It does not run tests.
+4. If checks fail or the session is interrupted, do not complete. Leave the active attempt.
+5. If inputs change or complete reports a fingerprint mismatch, inspect the differences, run `specd changes verification start <name>` again, and repeat the audit against the new baseline before complete. Earlier results cannot complete the new attempt.
+
+`specd changes verification invalidate <name> --reason "<text>"` only withdraws
+completed verification evidence. It never starts or restarts an attempt. For an
+already-stale result, retain the persisted reason returned by Core rather than the
+new request text.
+
+If required spec consent is stale, stop and route to `/specd-design`. Under
+`workflow: preserve` without that recovery, review in place instead of forcing
+design. Verification staleness does not move lifecycle state.
+
+**Delegated** (`--change <name> --delegated --attempt <attemptId>`):
+
+Full `/specd-verify` already started the attempt and passed its id with the
+`--delegated` marker. Require both. Do not infer delegation from an existing
+attempt. Do not run `verification start` or `verification complete`. Return the
+audit result to the caller. Verify alone completes the shared attempt after
+this audit succeeds.
+
+**Report-only** (`--all`, `--diff`, `--pr`, a single spec id, or selection
+before a concrete active change):
+
+Produce the report. Do not run `specd changes verification start` or
+`specd changes verification complete`, and do not claim successful verification
+completion.
+
+### Downstream decision table
+
+Use this table for every later branch. `delegated` deliberately selects the
+same change-scoped values as standalone `change`; only attempt ownership differs.
+
+| mode | status | project context | scope | direct dependencies | merged change specs | report directory | filename kind | starts attempt | completes attempt |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `change` | change status | project context | change specs | depth 1 | changes spec-preview | change reports | change | yes | yes |
+| `delegated` | change status | project context | change specs | depth 1 | changes spec-preview | change reports | change | no | no |
+| `full` / `diff` / `pr` / `single` / `selection` | mode-specific | project context when relevant | mode-specific | depth 1 when scoped | specs show or mode-specific | project compliance reports | mode-specific | no | no |
+
+Do not branch on attempt ownership again after mode detection. In particular,
+do not let delegated mode fall through to report-only paths for scope, merged
+reads, report placement, or naming.
 
 ## Workflow
 
@@ -97,9 +159,15 @@ Parse the argument to determine the audit mode:
 1. **No argument** → `mode = selection`
 2. **Argument is `--all`** → `mode = full`
 3. **Argument is `--diff`** → `mode = diff`
-4. **Argument starts with `--change`** → `mode = change`, extract the change name from the rest of the argument
-5. **Argument starts with `--pr`** → `mode = pr`, extract the PR number/URL from the rest of the argument
-6. **Anything else** → `mode = single`, treat the argument as a spec ID (e.g. `workspace:path`)
+4. **Argument contains `--change` and both `--delegated` and `--attempt <attemptId>`** → `mode = delegated`. Extract the change name and non-empty attempt id. This is not inferred from an existing attempt.
+5. **Argument contains exactly one of `--delegated` or `--attempt`, or either value is missing** → invalid invocation. Report that delegated compliance requires `--change <name> --delegated --attempt <attemptId>` and stop before discovery, report creation, or verification commands.
+6. **Argument starts with `--change`** → `mode = change`, extract the change name from the rest of the argument
+7. **Argument starts with `--pr`** → `mode = pr`, extract the PR number/URL from the rest of the argument
+8. **Anything else** → `mode = single`, treat the argument as a spec ID (e.g. `workspace:path`)
+
+Standalone `mode = change` owns `verification start` and `verification complete`.
+`mode = delegated` runs neither. `full`, `diff`, `pr`, `single`, and `selection`
+are report-only and run neither.
 
 ### Phase 1 — Discovery and Setup
 
@@ -108,7 +176,8 @@ Parse the argument to determine the audit mode:
 2. **Determine the report directory.**
 
 - `TIMESTAMP=$(date +"%Y%m%d-%H%M%S")`
-- If `mode = change`: extract the change path from the status output and set
+- If `mode = change` or `mode = delegated`: run/read
+  `specd changes status <name> --format toon`, extract the change path, and set
   `REPORT_DIR` to `<changePath>/reports/${TIMESTAMP}`. This keeps the audit
   alongside the change.
 - Otherwise: `REPORTS_BASE_DIR` = `{configPath}/reports/spec-compliance`,
@@ -128,7 +197,7 @@ mkdir -p "${REPORT_DIR}"
    - Run `specd changes list --format toon` to see available changes.
    - **ALWAYS** ask the user to specify which change to use from the list. Do not proceed until a change is selected.
 
-   **If `mode = change`:**
+   **If `mode = change` or `mode = delegated`:**
    - Run `specd changes status <name> --format toon` to get the list of affected specs.
    - Run `specd project context --format toon` to get project-wide specs.
    - Identify direct dependencies (depth 1) for all change specs.
@@ -178,7 +247,7 @@ Launch subagents in parallel. Each subagent receives its assigned specs and pack
 **Audit Logic for Subagents:**
 
 1. **Fetch Spec Content:**
-   - If `mode = change` and the spec belongs to the change: use `specd changes spec-preview <changeName> <specId>`.
+   - If `mode = change` or `mode = delegated`, and the spec belongs to the change: use `specd changes spec-preview <changeName> <specId>`.
    - Otherwise: use `specd specs show <specId>`.
 
 2. **Auditing Change Specs:**
@@ -205,7 +274,7 @@ Launch subagents in parallel. Each subagent receives its assigned specs and pack
 
 1. Write the compiled report with a mode-aware filename:
    - **Full mode**: `${REPORT_DIR}/specs-compliance-all-{timestamp}.md`
-   - **Change mode**: `${REPORT_DIR}/specs-compliance-change-{changeName}-{timestamp}.md`
+   - **Change or delegated mode**: `${REPORT_DIR}/specs-compliance-change-{changeName}-{timestamp}.md`
    - **Diff mode**: `${REPORT_DIR}/specs-compliance-diff-{timestamp}.md`
    - **PR mode**: `${REPORT_DIR}/specs-compliance-pr{N}-{timestamp}.md`
    - **Single mode**: `${REPORT_DIR}/specs-compliance-{spec-name}-{timestamp}.md`

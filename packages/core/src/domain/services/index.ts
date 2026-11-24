@@ -102,18 +102,101 @@ export {
   type RuleEvaluatorNode,
   type RuleEvaluatorParser,
 } from './rule-evaluator.js'
-export { detectSpecOverlap } from './detect-spec-overlap.js'
 export {
-  LifecycleEngine,
-  type LifecycleEngineOptions,
+  type AutomaticRecovery,
+  type ChangeValidityVerdict,
+  type ArtifactReviewTarget,
+  type ProjectionChange,
+  type ValidityBlocker,
+  type FingerprintInputFailure,
+} from './change-validity.js'
+export {
+  detectSpecOverlap,
+  specOverlapDetectionForChange,
+  type SpecOverlapDetectionSummary,
+  type SpecOverlapPeerSummary,
+} from './detect-spec-overlap.js'
+export {
+  evaluateLifecycleVerdict,
+  projectArtifacts,
+  findBlockingParent,
+  resolveLifecycleNextHop,
+  recommendedForwardTarget,
+  type ArtifactGraphSource,
+  type LifecycleVerdictInput,
   type LifecycleAffectedFile,
   type LifecycleAffectedArtifact,
   type LifecycleBlocker,
   type LifecycleReviewOverlapEntry,
   type LifecycleReviewSummary,
-  type LifecycleNextAction,
+  type LifecycleNextHop,
+  type LifecycleDomainVerdict,
   type LifecycleArtifactVerdict,
   type LifecycleTransitionBlocker,
   type LifecycleStepVerdict,
-  type LifecycleVerdict,
-} from './lifecycle-engine.js'
+} from './lifecycle-verdict.js'
+export {
+  classifyAlong,
+  checkMatches,
+  CHECK_LABELS,
+  checkLabel,
+  approveSpecAction,
+  approveSignoffAction,
+  startVerificationAction,
+  refreshStatusAction,
+  type BuiltInCheckActionKind,
+  type CheckAction,
+  type CheckId,
+  type BuiltinCheckId,
+  type CustomCheckDefinition,
+  type CheckKind,
+  type CheckOutcome,
+  type CheckResult,
+  type CheckApplicability,
+  type TransitionAlong,
+  type TaskCompletionCounts,
+  type Check,
+  type CheckBinding,
+  type CheckBindingSpec,
+  type CheckExecutionContext,
+  type CheckAttempt,
+  type CheckProgressEvent,
+  type OnCheckProgress,
+  type EffectPipelinePhase,
+  type EffectOnFailure,
+  isEffectCheck,
+  applyBindingSpecs,
+  resolveEffectiveBindings,
+  type ResolveEffectiveBindingsInput,
+} from './transition-checks.js'
+export {
+  TRANSITION_BINDINGS,
+  ARCHIVE_BINDINGS,
+  TRANSITION_BINDING_SPECS,
+  ARCHIVE_BINDING_SPECS,
+  boundFromStates,
+  boundToStates,
+} from './check-bindings.js'
+export {
+  bindingMatches,
+  runDepsConsistent,
+  runWorkspaceReadOnly,
+  runImplFilesResolved,
+  runImplLinksInScope,
+} from './evaluate-transition-predicates.js'
+export { deepMergeConfig, type DeepMergeConfigOptions } from './deep-merge-config.js'
+export {
+  CheckRegistry,
+  type CheckGovernance,
+  type PluginCheckRegistrationOptions,
+} from './check-registry.js'
+export {
+  resolveWorkflowPipeline,
+  isWorkflowStepEnabled,
+  listWorkflowTransitions,
+  isWorkflowTransitionLegal,
+  listBypassedWorkflowSteps,
+  nextWorkflowStep,
+  type ApprovalGates,
+  type PipelineStep,
+} from './workflow-topology.js'

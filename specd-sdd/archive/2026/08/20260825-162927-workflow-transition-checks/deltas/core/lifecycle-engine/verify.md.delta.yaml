@@ -1,0 +1,357 @@
+- op: modified
+  description: 'Missing required artifact uses INCOMPLETE_ARTIFACT'
+  selector:
+    type: section
+    matches: '^Scenario: Engine unifies three validation dimensions$'
+  rename: 'Scenario: Verdict unifies three validation dimensions'
+  content: |
+    #### Scenario: Verdict unifies three validation dimensions
+
+    - **GIVEN** a change in `designing` state with a missing required artifact
+    - **WHEN** `evaluateLifecycleVerdict` is called
+    - **THEN** it returns an `INCOMPLETE_ARTIFACT` blocker (structural)
+    - **AND** `isReady` is `false` for the target state
+    - **AND** `isPermitted` is `true` (protocol allowing the move if artifacts were ready)
+    - **AND** it does not emit `MISSING_ARTIFACT`
+
+- op: added
+  description: 'Engine does not I/O for predicate snapshots'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Centralized validation logic$'
+    after:
+      type: section
+      matches: '^Scenario: Verdict unifies three validation dimensions$'
+  content: |
+    #### Scenario: Verdict projects CheckResults without I/O
+
+    - **GIVEN** predicate `CheckResult`s are supplied by the caller
+    - **WHEN** `evaluateLifecycleVerdict` projects availability
+    - **THEN** it does not open artifact files or spec repositories
+    - **AND** `availableTransitions` reflects those results
+
+    #### Scenario: availableSteps is lookup rows not protocol membership
+
+    - **GIVEN** `workflow[]` omits `implementing`
+    - **AND** the change is in `ready`
+    - **WHEN** `evaluateLifecycle` runs with hop `CheckResult`s
+    - **THEN** `validTransitions` includes `implementing`
+    - **AND** `availableSteps` does not include an `implementing` extras row
+
+    #### Scenario: Requested-target blockers do not dual-write MISSING_ARTIFACT
+
+    - **GIVEN** `requestedTarget` check results include a failed `workflow.requires` with code `INCOMPLETE_ARTIFACT`
+    - **AND** the required artifact is effectively `missing`
+    - **WHEN** `evaluateLifecycleVerdict` projects `blockers`
+    - **THEN** the blocker codes include `INCOMPLETE_ARTIFACT`
+    - **AND** they do not also include `MISSING_ARTIFACT` for the same artifact
+
+- op: added
+  description: 'Recovery is not treated as backward'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Archiving escape transitions in lifecycle verdict$'
+    after:
+      type: section
+      matches: '^Scenario: Incomplete restore recommends designing escape$'
+  content: |
+    #### Scenario: archiving to archivable skips requires
+
+    - **GIVEN** a change in `archiving`
+    - **AND** the `archivable` step declares `requires`
+    - **WHEN** `evaluateLifecycleVerdict` considers `archivable`
+    - **THEN** `along` is `recovery`
+    - **AND** those `requires` do not block the hop
+
+- op: modified
+  description: 'CompileContext is not an evaluate consumer'
+  selector:
+    type: section
+    matches: '^Scenario: Consumers rely on one shared lifecycle verdict$'
+  content: |
+    #### Scenario: Consumers rely on one shared lifecycle verdict
+
+    - **GIVEN** `GetStatus`, `TransitionChange`, `ValidateArtifacts`, and `GetArtifactInstruction`
+    - **WHEN** each consumer needs DAG-aware lifecycle answers for the same change
+    - **THEN** they obtain DAG answers from `evaluateLifecycleVerdict` or public answers from `evaluateLifecycle`
+    - **AND** none of them reimplements dependency-aware lifecycle interpretation locally
+    - **AND** `CompileContext` is not in that consumer list
+
+- op: added
+  description: 'Domain nextHop excludes command; application attaches it'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Shared lifecycle interpretation for consumers$'
+  content: |
+    ### Requirement: Application lifecycle guidance
+
+    #### Scenario: Domain verdict exposes nextHop without command
+
+    - **GIVEN** a change in `implementing` with incomplete tasks
+    - **WHEN** `evaluateLifecycleVerdict` runs
+    - **THEN** `nextHop.targetStep` is `implementing`
+    - **AND** the domain result has no `command` field on `nextHop`
+
+    #### Scenario: evaluateLifecycle attaches command via guidance
+
+    - **GIVEN** the same change and check results
+    - **WHEN** `evaluateLifecycle` runs
+    - **THEN** `nextAction.targetStep` is `implementing`
+    - **AND** `nextAction.command` is `/specd-implement`
+
+    #### Scenario: Historical overlap command comes from guidance
+
+    - **GIVEN** a change history containing unhandled `spec-overlap-conflict` invalidation
+    - **WHEN** `evaluateLifecycle` runs
+    - **THEN** `nextAction.command` is `/specd-design`
+    - **AND** `evaluateLifecycleVerdict` did not embed that command string
+
+- op: modified
+  description: 'Historical overlap is review not OVERLAP_CONFLICT'
+  selector:
+    type: section
+    matches: '^Scenario: Overlap conflict detection from history$'
+  content: |
+    #### Scenario: Overlap conflict detection from history
+
+    - **GIVEN** a change history containing a recent `invalidated` event with `cause: 'spec-overlap-conflict'`
+    - **AND** no subsequent transition out of `designing` has occurred
+    - **WHEN** `evaluateLifecycleVerdict` is called
+    - **THEN** it does not identify an `OVERLAP_CONFLICT` blocker
+    - **AND** `review.reason` is `spec-overlap-conflict`
+
+- op: added
+  description: 'No second gate after evaluate'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Shared lifecycle interpretation for consumers$'
+    after:
+      type: section
+      matches: '^Scenario: Consumers rely on one shared lifecycle verdict$'
+  content: |
+    #### Scenario: TransitionChange does not re-walk requires after green evaluate
+
+    - **GIVEN** `evaluateLifecycleVerdict` already applied `workflow.requires` for the attempt
+    - **WHEN** `TransitionChange` executes the same attempt
+    - **THEN** it maps the first failed predicate to `InvalidStateTransitionError`
+    - **AND** it does not compute a different effective-status walk for the same artifacts
+
+    #### Scenario: CompileContext is not an evaluate consumer
+
+    - **WHEN** `CompileContext` assembles agent context
+    - **THEN** it does not call `evaluateLifecycleVerdict`
+    - **AND** it does not compute hop `availableTransitions`
+
+    #### Scenario: ValidateArtifacts evaluates with empty checksByTarget
+
+    - **WHEN** `ValidateArtifacts` needs DAG-aware artifact status
+    - **THEN** it calls `evaluateLifecycleVerdict` with empty `checksByTarget`
+    - **AND** it still receives `projectArtifacts` / `nextArtifact` answers
+
+- op: added
+  description: 'Verify scenarios for stateless domain lifecycle verdict'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    before:
+      type: section
+      matches: '^Requirement: Centralized validation logic$'
+  content: |
+    ### Requirement: Stateless domain lifecycle verdict
+
+    #### Scenario: No LifecycleEngine class
+
+    - **WHEN** domain lifecycle evaluation runs
+    - **THEN** it is invoked as `evaluateLifecycleVerdict` (plain function)
+    - **AND** there is no `LifecycleEngine` class and no `LifecycleEngineOptions` alias
+    - **AND** there is no injected debug callback or logger port on the input
+
+- op: modified
+  description: 'Rename available steps requirement and update skip bypass scenario'
+  selector:
+    type: section
+    matches: '^Requirement: Available steps and next action$'
+  rename: 'Requirement: Available steps and domain next hop'
+  content: |
+    ### Requirement: Available steps and domain next hop
+
+    #### Scenario: Skip bypass allows transition despite blocker
+
+    - **GIVEN** an `OVERLAP_CONFLICT` blocker that is skippable
+    - **AND** the `--allow-overlap` bypass flag is provided
+    - **WHEN** `evaluateLifecycleVerdict` is called
+    - **THEN** `OVERLAP_CONFLICT` is absent from `blockers`
+    - **AND** the verdict does not include a warning object for that overlap
+    - **AND** `isPermitted` for the target step is `true`
+
+    #### Scenario: Overlap review hop is designing
+
+    - **GIVEN** a change with an unhandled `spec-overlap-conflict` invalidation
+    - **WHEN** `evaluateLifecycleVerdict` runs
+    - **THEN** `review.reason` is `spec-overlap-conflict`
+    - **AND** `nextHop.targetStep` is `designing`
+
+    #### Scenario: Incomplete tasks exclude verifying from availableTransitions
+
+    - **GIVEN** a change in `implementing` with incomplete tasks
+    - **WHEN** `evaluateLifecycle` projects from those check results
+    - **THEN** `validTransitions` includes `verifying`
+    - **AND** `availableTransitions` does not include `verifying`
+    - **AND** `nextAction` recommends `/specd-implement`
+    - **AND** `nextAction.targetStep` is `implementing`
+
+    #### Scenario: Complete tasks recommend verify
+
+    - **GIVEN** a change in `implementing` with complete gated tasks
+    - **AND** verifying requires are satisfied
+    - **WHEN** `evaluateLifecycle` runs
+    - **THEN** `availableTransitions` includes `verifying`
+    - **AND** `nextAction` recommends `/specd-verify`
+    - **AND** `nextAction.targetStep` is `verifying`
+
+    #### Scenario: designing with ready available targets ready
+
+    - **GIVEN** a change in `designing` with all required design artifacts complete
+    - **AND** `ready` is in `availableTransitions`
+    - **WHEN** `evaluateLifecycle` runs
+    - **THEN** `nextAction.targetStep` is `ready`
+    - **AND** `nextAction.command` is `/specd-design`
+
+    #### Scenario: verifying with done available targets done
+
+    - **GIVEN** a change in `verifying`
+    - **AND** `done` is in `availableTransitions`
+    - **WHEN** `evaluateLifecycle` runs
+    - **THEN** `nextAction.targetStep` is `done`
+    - **AND** `nextAction.command` is `/specd-verify`
+
+    #### Scenario: done lists backward hops without making them nextAction
+
+    - **GIVEN** a change in `done` with signoff satisfied or disabled
+    - **WHEN** `evaluateLifecycle` runs
+    - **THEN** `availableTransitions` includes `implementing` and `verifying`
+    - **AND** `nextAction.targetStep` is `archivable`
+    - **AND** `nextAction.command` is `/specd-archive`
+
+    #### Scenario: archivable recommends archive skill
+
+    - **GIVEN** a change in `archivable`
+    - **WHEN** `evaluateLifecycle` runs
+    - **THEN** `nextAction.targetStep` is `archiving`
+    - **AND** `nextAction.command` is `/specd-archive`
+
+- op: modified
+  description: 'Effective status scenarios use evaluateLifecycleVerdict'
+  selector:
+    type: section
+    matches: '^Requirement: Effective artifact status computation$'
+  content: |
+    ### Requirement: Effective artifact status computation
+
+    #### Scenario: Recursive block through dependency chain
+
+    - **GIVEN** Spec B depends on Spec A
+    - **AND** Spec A is in `pending-review`
+    - **AND** Spec B is physically `complete`
+    - **WHEN** `evaluateLifecycleVerdict` is called
+    - **THEN** the returned verdict reports Spec B with effective status `pending-parent-artifact-review`
+    - **AND** the blockers identify Spec A as the cause
+
+    #### Scenario: Mixed review and incomplete parents prefer parent-review
+
+    - **GIVEN** an artifact is physically `complete`
+    - **AND** one required parent is `pending-review`
+    - **AND** another required parent is `in-progress`
+    - **WHEN** `projectArtifacts` derives effective status
+    - **THEN** the artifact effective status is `pending-parent-artifact-review`
+
+- op: modified
+  description: 'Canonical-state scenarios do not name a LifecycleEngine class'
+  selector:
+    type: section
+    matches: '^Requirement: Canonical-state-only lifecycle interpretation$'
+  content: |
+    ### Requirement: Canonical-state-only lifecycle interpretation
+
+    #### Scenario: Complete-with-drift does not create a new blocker state
+
+    - **GIVEN** a file that is canonically `complete`
+    - **AND** status rendering would project it as `complete-with-drift`
+    - **WHEN** `projectArtifacts` derives effective artifact status
+    - **THEN** it treats the file as `complete`
+
+    #### Scenario: Missing still blocks through canonical state
+
+    - **GIVEN** a file with canonical state `missing`
+    - **AND** `hasDrift` is also `true`
+    - **WHEN** `projectArtifacts` derives effective artifact status
+    - **THEN** it uses `missing` as the blocking state
+
+- op: modified
+  description: 'Drift blocker scenario uses evaluateLifecycleVerdict'
+  selector:
+    type: section
+    matches: '^Scenario: Detailed affected artifacts for drift$'
+  content: |
+    #### Scenario: Detailed affected artifacts for drift
+
+    - **GIVEN** a change with two spec-scoped files in the `specs` artifact
+    - **AND** one file has drifted on disk
+    - **WHEN** `evaluateLifecycleVerdict` is called
+    - **THEN** it returns a blocker with code `ARTIFACT_DRIFT`
+    - **AND** `affectedArtifacts` contains exactly the drifted filename and spec ID
+
+- op: modified
+  description: 'Archiving escape scenarios use evaluateLifecycle'
+  selector:
+    type: section
+    matches: '^Scenario: Archiving exposes archivable and designing transitions$'
+  content: |
+    #### Scenario: Archiving exposes archivable and designing transitions
+
+    - **GIVEN** a change in `archiving` state with no blocking restore failure
+    - **WHEN** `evaluateLifecycle` runs
+    - **THEN** `validTransitions` includes `archivable` and `designing`
+    - **AND** `availableTransitions` includes `archivable` and `designing`
+
+- op: modified
+  description: 'Incomplete restore scenario uses evaluateLifecycle'
+  selector:
+    type: section
+    matches: '^Scenario: Incomplete restore recommends designing escape$'
+  content: |
+    #### Scenario: Incomplete restore recommends designing escape
+
+    - **GIVEN** a change in `archiving` state
+    - **AND** the latest `archive-failed` event has `commitStarted: true`
+    - **AND** batch restore did not complete successfully
+    - **WHEN** `evaluateLifecycle` runs
+    - **THEN** `nextAction` recommends transition to `designing` for manual recovery
+
+- op: modified
+  description: 'Next artifact scenarios use evaluateLifecycleVerdict'
+  selector:
+    type: section
+    matches: '^Requirement: Next artifact topological order$'
+  content: |
+    ### Requirement: Next artifact topological order
+
+    #### Scenario: Next artifact prefers DAG order over declaration order
+
+    - **GIVEN** schema-std where `proposal` is effectively complete, `design` is incomplete but its only incomplete dependency is `specs`, and `specs` is incomplete
+    - **WHEN** `evaluateLifecycleVerdict` derives the next artifact
+    - **THEN** the next artifact is `specs` (not `design`)
+
+    #### Scenario: All artifacts complete yields null next artifact
+
+    - **GIVEN** every artifact is effectively `complete` or `skipped`
+    - **WHEN** `evaluateLifecycleVerdict` derives the next artifact
+    - **THEN** the next artifact is `null`

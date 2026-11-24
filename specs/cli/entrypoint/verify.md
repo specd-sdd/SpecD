@@ -81,6 +81,132 @@
 - **WHEN** an unexpected I/O error occurs
 - **THEN** the process exits with code 3 and prints a `fatal:` message to stderr
 
+#### Scenario: Interrupted by SIGINT
+
+- **WHEN** the process receives `SIGINT` and cleanup completes
+- **THEN** the process exits with code 130
+
+#### Scenario: Terminated by SIGTERM
+
+- **WHEN** the process receives `SIGTERM` and cleanup completes
+- **THEN** the process exits with code 143
+
+### Requirement: Cleanup runs before the process exits
+
+#### Scenario: Cleanup runs after normal completion
+
+- **GIVEN** a command that opened a host and completed successfully
+- **WHEN** `parseAsync` settles
+- **THEN** `runCliCleanup()` is awaited before the process exits with code 0
+
+#### Scenario: Helpers throw CliExitError instead of exiting
+
+- **WHEN** `cliError('message', undefined, 1)` is called
+- **THEN** it writes its output and throws a `CliExitError` carrying exit code 1
+- **AND** it does not call `process.exit`
+
+#### Scenario: Cleanup runs before an error exit
+
+- **GIVEN** a command that opened a host and then throws a `CliExitError` with code 1
+- **WHEN** the entrypoint handles it
+- **THEN** `runCliCleanup()` is awaited and the process then exits with code 1
+
+#### Scenario: Unhandled errors still clean up
+
+- **GIVEN** a command that opened a host and then rejects with an unexpected error
+- **WHEN** the entrypoint handles it
+- **THEN** cleanup is awaited and the process exits with code 3 after printing a `fatal:` message
+
+#### Scenario: A failing error handler still cleans up and exits 3
+
+- **GIVEN** a command that opened a host and then rejects with an unexpected error
+- **AND** reporting that error throws something other than a `CliExitError`
+- **WHEN** the entrypoint handles it
+- **THEN** cleanup is awaited and the process exits with code 3
+- **AND** the run does not end as an unhandled rejection
+
+#### Scenario: process.exitCode is respected
+
+- **GIVEN** a command that sets `process.exitCode = 1` and returns normally
+- **WHEN** `parseAsync` settles
+- **THEN** cleanup is awaited and the process exits with code 1
+
+#### Scenario: Commands do not swallow CliExitError
+
+- **GIVEN** a command that wraps its work in a generic `try`/`catch`
+- **WHEN** a nested helper throws a `CliExitError`
+- **THEN** the command rethrows it unchanged
+
+#### Scenario: Only the entrypoint terminates the process
+
+- **WHEN** the CLI sources are inspected
+- **THEN** `process.exit` is called only from the entrypoint
+
+### Requirement: Signal handling
+
+#### Scenario: First SIGINT runs cleanup
+
+- **GIVEN** a running command that opened a host
+- **WHEN** the process receives `SIGINT`
+- **THEN** `runCliCleanup()` is awaited and the process exits with code 130
+
+#### Scenario: Second signal forces exit
+
+- **GIVEN** cleanup is still running after a first `SIGTERM`
+- **WHEN** a second `SIGTERM` arrives
+- **THEN** the process exits immediately with code 143 without waiting
+
+#### Scenario: A different second signal keeps the first exit code
+
+- **GIVEN** cleanup is still running after a first `SIGINT`
+- **WHEN** a `SIGTERM` arrives
+- **THEN** the process exits immediately with code 130, the code of the first signal
+
+#### Scenario: SIGTERM handler is installed on every platform
+
+- **WHEN** the executable entrypoint installs its signal handlers on Windows
+- **THEN** a `SIGTERM` handler is registered like on other platforms
+- **AND** nothing relies on that signal being delivered there
+
+#### Scenario: createProgram installs no handlers
+
+- **WHEN** `createProgram()` is called by a test or documentation tool
+- **THEN** no `SIGINT` or `SIGTERM` handler is installed
+
+#### Scenario: Prompts keep their own cancellation
+
+- **GIVEN** an interactive prompt is active
+- **WHEN** the user presses Ctrl-C
+- **THEN** the prompt library's own cancellation behaviour is not suppressed by the entrypoint handlers
+
+### Requirement: Process exit grace period
+
+#### Scenario: Clean exit prints nothing
+
+- **GIVEN** a command whose process ends by itself right after cleanup
+- **WHEN** the run finishes in under 1000 ms after cleanup
+- **THEN** no grace-period warning is written to stderr
+- **AND** `process.exit` is not called by the grace-period logic
+
+#### Scenario: Waiting hint after 1 second
+
+- **GIVEN** an open handle keeps the process alive after cleanup
+- **WHEN** 1000 ms elapse
+- **THEN** a `warning:` line on stderr says the entrypoint is waiting for open handles to close and when the exit will be forced
+- **AND** the exit code is not changed
+
+#### Scenario: Exit forced after 5 seconds
+
+- **GIVEN** an open handle still keeps the process alive 5000 ms after cleanup
+- **WHEN** the force timer fires
+- **THEN** a `warning:` line on stderr says the process did not exit after cleanup and the exit is being forced
+- **AND** `process.exit` is called with the exit code the run would have used
+
+#### Scenario: Grace timers do not keep the process alive
+
+- **WHEN** the grace-period timers are armed and nothing else keeps the event loop busy
+- **THEN** the process ends without waiting for them
+
 ### Requirement: Error message format
 
 #### Scenario: Domain error prefix
@@ -362,3 +488,18 @@
 - **GIVEN** a CLI invocation that does not run a `guide-sdk` subcommand
 - **WHEN** the process executes
 - **THEN** the SDK catalog module MUST NOT be loaded
+
+### Requirement: Command-aware error hint rendering
+
+#### Scenario: Command context resolves a hint in text and structured output
+
+- **GIVEN** a typed `SpecdError` whose code and command context match a hint entry
+- **WHEN** `handleError` handles the error with that `command` context
+- **THEN** stderr prints `error: <message>` followed by the resolved `hint` on the next line
+- **AND** in `json` or `toon` format the emitted error payload includes `hint` without altering `message`
+
+#### Scenario: Unmatched command context emits no hint
+
+- **GIVEN** a typed `SpecdError` handled without a matching `command` hint rule
+- **WHEN** `handleError` handles the error
+- **THEN** no `hint` line is printed and `hint` is omitted from structured output

@@ -1,6 +1,12 @@
 import { describe, it, expect, vi } from 'vitest'
+import { ResolveChangeSchema } from '../../../src/application/services/resolve-change-schema.js'
 import { makeSpec } from '../../helpers/make-spec.js'
 import { EditChange } from '../../../src/application/use-cases/edit-change.js'
+import { type RefreshImplementationTracking } from '../../../src/application/use-cases/refresh-implementation-tracking.js'
+import { ReconcileChangeValidity } from '../../../src/application/use-cases/reconcile-change-validity.js'
+import { ValidityFingerprintService } from '../../../src/application/services/validity-fingerprint-service.js'
+import { NodeBinaryContentHasher } from '../../../src/infrastructure/node/binary-content-hasher.js'
+import { NodeContentHasher } from '../../../src/infrastructure/node/content-hasher.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { SpecNotInChangeError } from '../../../src/application/errors/spec-not-in-change-error.js'
 import { IncompatibleSchemaError } from '../../../src/domain/errors/incompatible-schema-error.js'
@@ -17,8 +23,11 @@ import {
   makeSchema,
   testActor,
   makeListWorkspaces,
+  makeObservingReconcile,
+  makeSpecApprovalFingerprint,
 } from './helpers.js'
 import { type SpecRepository } from '../../../src/application/ports/spec-repository.js'
+import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 
@@ -44,6 +53,8 @@ function createEditChange(
     defaultWorkspaces(specs, ownership),
     makeActorResolver(),
     makeSchemaProvider(schema),
+    undefined,
+    makeObservingReconcile(repo),
   )
 }
 
@@ -81,7 +92,7 @@ describe('EditChange', () => {
       const uc = createEditChange(repo)
 
       const error = await uc
-        .execute({ name: 'c', invalidationPolicy: 'sugical' })
+        .execute({ name: 'c', invalidation: { artifacts: 'sugical' as never } })
         .catch((e: unknown) => e)
 
       expect(error).toBeInstanceOf(InvalidInputError)
@@ -96,19 +107,23 @@ describe('EditChange', () => {
       const uc = createEditChange(repo)
 
       await expect(
-        uc.execute({ name: 'c', description: 'new', invalidationPolicy: 'bogus' }),
+        uc.execute({
+          name: 'c',
+          description: 'new',
+          invalidation: { artifacts: 'bogus' as never },
+        }),
       ).rejects.toThrow(InvalidInputError)
       expect((await repo.get('c'))!.description).toBe('old')
     })
 
-    it.each(['none', 'surgical', 'downstream', 'global'])('accepts %s', async (policy) => {
+    it.each(['none', 'surgical', 'downstream', 'global'] as const)('accepts %s', async (policy) => {
       const change = makeChange('c', { specIds: ['default:auth/login'] })
       const repo = makeChangeRepository([change])
       const uc = createEditChange(repo)
 
-      const result = await uc.execute({ name: 'c', invalidationPolicy: policy })
+      const result = await uc.execute({ name: 'c', invalidation: { artifacts: policy } })
 
-      expect(result.change.invalidationPolicy).toBe(policy)
+      expect(result.change.invalidationPolicy.artifacts).toBe(policy)
     })
   })
 
@@ -122,7 +137,7 @@ describe('EditChange', () => {
       const result = await uc.execute({
         name: 'c',
         description: 'same',
-        invalidationPolicy: change.invalidationPolicy,
+        invalidation: change.invalidationPolicy,
         addSpecIds: ['auth/login'],
       })
 
@@ -153,7 +168,9 @@ describe('EditChange', () => {
       })
 
       expect(result.change.specIds).toEqual(['default:auth/login', 'default:auth/logout'])
-      expect(result.invalidated).toBe(true)
+      expect(result.scopeChanged).toBe(true)
+      expect(result.validityChanged).toBe(false)
+      expect(result.invalidated).toBe(false)
     })
 
     it('does not duplicate existing specIds', async () => {
@@ -170,7 +187,7 @@ describe('EditChange', () => {
       expect(result.invalidated).toBe(false)
     })
 
-    it('seeds newly added specs from persisted dependencies before metadata fallback', async () => {
+    it('seeds newly added specs from persisted dependencies, ignoring metadata.json', async () => {
       const change = makeChange('c', { specIds: ['default:auth/login'] })
       const repo = makeChangeRepository([change])
       const specs = new Map([
@@ -203,7 +220,7 @@ describe('EditChange', () => {
       ])
     })
 
-    it('seeds newly added specs from stale metadata when persisted dependencies are absent', async () => {
+    it('seeds newly added specs from the persisted spec-lock state of a spec that also has content files', async () => {
       const change = makeChange('c', { specIds: ['default:auth/login'] })
       const repo = makeChangeRepository([change])
       const specs = new Map([
@@ -235,6 +252,75 @@ describe('EditChange', () => {
         'default:shared/metadata',
       ])
     })
+
+    it('seeds an empty list when the added spec has no persisted state, ignoring metadata.json', async () => {
+      const change = makeChange('c', { specIds: ['default:auth/login'] })
+      const repo = makeChangeRepository([change])
+      const specs = new Map([
+        [
+          'default',
+          makeSpecRepository({
+            specs: [
+              makeSpec({ workspace: 'default', name: 'auth/logout', filenames: ['spec.md'] }),
+            ],
+            artifacts: {
+              'auth/logout/spec.md': '# Logout flow',
+              'auth/logout/metadata.json': JSON.stringify({
+                dependsOn: ['default:shared/metadata'],
+              }),
+            },
+          }),
+        ],
+      ])
+      const uc = createEditChange(repo, specs)
+
+      const result = await uc.execute({ name: 'c', addSpecIds: ['default:auth/logout'] })
+
+      expect(result.change.specDependsOn.get('default:auth/logout')).toEqual([])
+    })
+
+    it('seeds an empty list when the added spec does not exist in its repository', async () => {
+      const change = makeChange('c', { specIds: ['default:auth/login'] })
+      const repo = makeChangeRepository([change])
+      const uc = createEditChange(repo)
+
+      const result = await uc.execute({ name: 'c', addSpecIds: ['default:auth/brand-new'] })
+
+      expect(result.change.specDependsOn.get('default:auth/brand-new')).toEqual([])
+    })
+  })
+
+  describe('existing specDependsOn snapshot', () => {
+    it('does not overwrite an already seeded specDependsOn entry when the spec is added', async () => {
+      const change = makeChange('c', {
+        specIds: ['default:auth/login'],
+        specDependsOn: new Map([['default:auth/logout', ['default:shared/existing']]]),
+      })
+      const repo = makeChangeRepository([change])
+      const specs = new Map([
+        [
+          'default',
+          makeSpecRepository({
+            specs: [makeSpec({ workspace: 'default', name: 'auth/logout', filenames: [] })],
+            artifacts: {
+              'auth/logout/spec-lock.json': JSON.stringify({
+                schema: { name: 'test-schema', version: 1 },
+                dependsOn: ['default:shared/persisted'],
+                implementation: [],
+              }),
+            },
+          }),
+        ],
+      ])
+      const uc = createEditChange(repo, specs)
+
+      const result = await uc.execute({ name: 'c', addSpecIds: ['default:auth/logout'] })
+
+      expect(result.change.specIds).toContain('default:auth/logout')
+      expect(result.change.specDependsOn.get('default:auth/logout')).toEqual([
+        'default:shared/existing',
+      ])
+    })
   })
 
   describe('removing specs', () => {
@@ -249,7 +335,9 @@ describe('EditChange', () => {
       })
 
       expect(result.change.specIds).toEqual(['default:auth/login'])
-      expect(result.invalidated).toBe(true)
+      expect(result.scopeChanged).toBe(true)
+      expect(result.validityChanged).toBe(false)
+      expect(result.invalidated).toBe(false)
     })
 
     it('throws SpecNotInChangeError when removing a spec that is not in the change', async () => {
@@ -290,10 +378,15 @@ describe('EditChange', () => {
 
       const result = await uc.execute({
         name: 'c',
-        invalidationPolicy: 'surgical',
+        invalidation: { artifacts: 'surgical' },
       })
 
-      expect(result.change.invalidationPolicy).toBe('surgical')
+      expect(result.change.invalidationPolicy).toEqual({
+        artifacts: 'surgical',
+        workflow: 'preserve',
+      })
+      expect(result.validityChanged).toBe(false)
+      expect(result.automaticReturn).toBeNull()
       expect(result.invalidated).toBe(false)
     })
   })
@@ -308,13 +401,18 @@ describe('EditChange', () => {
         name: 'c',
         addSpecIds: ['auth/logout'],
         description: 'Updated',
-        invalidationPolicy: 'global',
+        invalidation: { artifacts: 'global' },
       })
 
       expect(result.change.specIds).toEqual(['default:auth/login', 'default:auth/logout'])
       expect(result.change.description).toBe('Updated')
-      expect(result.change.invalidationPolicy).toBe('global')
-      expect(result.invalidated).toBe(true)
+      expect(result.change.invalidationPolicy).toEqual({
+        artifacts: 'global',
+        workflow: 'preserve',
+      })
+      expect(result.scopeChanged).toBe(true)
+      expect(result.validityChanged).toBe(false)
+      expect(result.invalidated).toBe(false)
     })
   })
 
@@ -323,7 +421,7 @@ describe('EditChange', () => {
       const change = makeChange('c', { specIds: ['default:auth/login'] })
       change.transition('designing', testActor)
       change.transition('ready', testActor)
-      change.recordSpecApproval('Testing', {}, testActor)
+      change.recordSpecApproval('Testing', makeSpecApprovalFingerprint(change.specIds), testActor)
       const repo = makeChangeRepository([change])
       const uc = createEditChange(repo)
 
@@ -332,8 +430,9 @@ describe('EditChange', () => {
         addSpecIds: ['auth/logout'],
       })
 
-      expect(result.change.activeSpecApproval).toBeUndefined()
-      expect(result.invalidated).toBe(true)
+      expect(result.change.activeSpecApproval).toBeDefined()
+      expect(result.validityChanged).toBe(false)
+      expect(result.invalidated).toBe(false)
     })
 
     it('triggers refresh implementation tracking when specIds change', async () => {
@@ -357,13 +456,16 @@ describe('EditChange', () => {
           return { implementationTracking: {} as never }
         }),
       }
+      const listWorkspaces = makeListWorkspaces()
+      const listWorkspacesSpy = vi.spyOn(listWorkspaces, 'execute')
 
       const uc = new EditChange(
         repo,
-        defaultWorkspaces(),
+        listWorkspaces,
         makeActorResolver(),
         makeSchemaProvider(makeSchema()),
         refresh as never,
+        makeObservingReconcile(repo),
       )
 
       const result = await uc.execute({
@@ -371,13 +473,262 @@ describe('EditChange', () => {
         removeSpecIds: ['auth/logout'],
       })
 
+      expect(listWorkspacesSpy).toHaveBeenCalledOnce()
       expect(refresh.execute).toHaveBeenCalledWith({ name: 'c' })
       expect(result.change.implementationLinks).toEqual([])
+      expect(result.scopeChanged).toBe(true)
+      expect(result.validityChanged).toBe(false)
+      expect(result.invalidated).toBe(false)
+    })
+  })
+
+  describe('reconciled scope edit', () => {
+    function buildReconciledEdit(change: ReturnType<typeof makeChange>) {
+      const repo = makeChangeRepository([change])
+      const schemaProvider = makeSchemaProvider(makeSchema())
+      const reconcile = new ReconcileChangeValidity({
+        changes: repo,
+        resolveChangeSchema: new ResolveChangeSchema(schemaProvider),
+        actor: makeActorResolver(),
+        refreshImplementationTracking: {
+          execute: async () => ({ implementationTracking: null as never }),
+        } as never,
+        fingerprint: new ValidityFingerprintService({
+          changes: repo,
+          hasher: new NodeContentHasher(),
+          binaryHasher: new NodeBinaryContentHasher(),
+          schemaProvider,
+        }),
+        approvals: { spec: true, signoff: false },
+      })
+      const uc = new EditChange(
+        repo,
+        makeListWorkspaces(),
+        makeActorResolver(),
+        schemaProvider,
+        undefined,
+        reconcile,
+      )
+      return { repo, uc }
+    }
+
+    it('returns required spec approval to designing and keeps the approval event', async () => {
+      const change = makeChange('c', { specIds: ['default:auth/login'] })
+      change.transition('designing', testActor)
+      change.transition('ready', testActor)
+      change.transition('implementing', testActor)
+      change.recordSpecApproval(
+        'LGTM',
+        {
+          version: 1,
+          specIds: ['default:auth/login'],
+          artifacts: { version: 1, algorithm: 'artifact-pre-hash-v1', files: {} },
+        },
+        testActor,
+      )
+      const { uc } = buildReconciledEdit(change)
+      const result = await uc.execute({ name: 'c', addSpecIds: ['auth/logout'] })
+      expect(result.scopeChanged).toBe(true)
+      expect(result.validityChanged).toBe(true)
+      expect(result.projectionChanges).toEqual([
+        expect.objectContaining({
+          projection: 'specApproval',
+          cause: 'scope-change',
+          differences: [
+            expect.objectContaining({
+              scope: 'spec',
+              key: 'default:auth/logout',
+              kind: 'spec-added',
+            }),
+          ],
+        }),
+      ])
+      expect(result.automaticReturn).toEqual({
+        cause: 'spec-approval',
+        from: 'implementing',
+        to: 'designing',
+      })
+      expect(result.change.state).toBe('designing')
+      expect(result.change.history.some((event) => event.type === 'spec-approved')).toBe(true)
+      expect(result.change.invalidationPolicy).toEqual({
+        artifacts: 'downstream',
+        workflow: 'preserve',
+      })
+    })
+
+    it('reports stale spec consent in ready without an automatic return', async () => {
+      const change = makeChange('in-ready', { specIds: ['default:auth/login'] })
+      change.transition('designing', testActor)
+      change.transition('ready', testActor)
+      change.recordSpecApproval(
+        'LGTM',
+        {
+          version: 1,
+          specIds: ['default:auth/login'],
+          artifacts: { version: 1, algorithm: 'artifact-pre-hash-v1', files: {} },
+        },
+        testActor,
+      )
+      const { uc } = buildReconciledEdit(change)
+
+      const result = await uc.execute({ name: 'in-ready', addSpecIds: ['auth/logout'] })
+
+      expect(result.scopeChanged).toBe(true)
+      expect(result.validityChanged).toBe(true)
+      expect(result.projectionChanges).toEqual([
+        expect.objectContaining({ projection: 'specApproval', from: 'valid', to: 'stale' }),
+      ])
+      expect(result.change.specApproval?.status).toBe('stale')
+      expect(result.automaticReturn).toBeNull()
+      expect(result.change.state).toBe('ready')
+    })
+
+    it('treats scope reordering as a scope edit without invalidating consent', async () => {
+      const change = makeChange('reorder', { specIds: ['default:auth/a', 'default:auth/b'] })
+      change.transition('designing', testActor)
+      change.transition('ready', testActor)
+      change.transition('implementing', testActor)
+      change.recordSpecApproval(
+        'LGTM',
+        {
+          version: 1,
+          specIds: ['default:auth/a', 'default:auth/b'],
+          artifacts: { version: 1, algorithm: 'artifact-pre-hash-v1', files: {} },
+        },
+        testActor,
+      )
+      const beforeEvents = change.history.filter(
+        (event) => event.type === 'approval-invalidated',
+      ).length
+      const { uc } = buildReconciledEdit(change)
+
+      const result = await uc.execute({
+        name: 'reorder',
+        removeSpecIds: ['auth/a'],
+        addSpecIds: ['auth/a'],
+      })
+
+      expect(result.scopeChanged).toBe(true)
+      expect(result.projectionChanges).toEqual([])
+      expect(result.validityChanged).toBe(false)
+      expect(result.invalidated).toBe(false)
+      expect(result.change.specApproval?.status).toBe('valid')
+      expect(
+        result.change.history.filter((event) => event.type === 'approval-invalidated'),
+      ).toHaveLength(beforeEvents)
+    })
+
+    it('keeps the persisted scope atomic when reconciliation rejects', async () => {
+      const change = makeChange('atomic', { specIds: ['auth/login'] })
+      const repo = makeChangeRepository([change])
+      const failure = new Error('reconciliation failed')
+      const callbackReached = vi.fn()
+      const reconcile = {
+        mutate: vi.fn(
+          async (
+            _input: unknown,
+            operation: (
+              context: import('../../../src/application/use-cases/reconcile-change-validity.js').ReconciledMutationContext,
+            ) => Promise<unknown>,
+          ) => {
+            const fresh = makeChange('atomic', { specIds: [...change.specIds] })
+            return operation({
+              change: fresh,
+              before: {} as never,
+              fingerprint: null,
+              reconcileAfter: async () => {
+                callbackReached()
+                throw failure
+              },
+            })
+          },
+        ),
+      }
+      const uc = new EditChange(
+        repo,
+        makeListWorkspaces(),
+        makeActorResolver(),
+        makeSchemaProvider(makeSchema()),
+        undefined,
+        reconcile as never,
+      )
+
+      await expect(uc.execute({ name: 'atomic', addSpecIds: ['auth/logout'] })).rejects.toBe(
+        failure,
+      )
+      expect(reconcile.mutate).toHaveBeenCalledOnce()
+      expect(callbackReached).toHaveBeenCalledOnce()
+      const persisted = await repo.get('atomic')
+      expect(persisted?.specIds).toEqual(['auth/login'])
+      expect(persisted?.history).toEqual(change.history)
+      expect(persisted?.artifacts).toEqual(change.artifacts)
+      expect(persisted?.specApproval).toEqual(change.specApproval)
+      expect(persisted?.signoff).toEqual(change.signoff)
+      expect(persisted?.verification).toEqual(change.verification)
     })
   })
 
   describe('schema compatibility guardrail', () => {
-    it('allows uninitialized spec fallback when global schema matches change', async () => {
+    it('uses the change schema for compatibility and fresh mutation DAG synchronization', async () => {
+      const schema = makeSchema({ name: 'custom-workflow' })
+      const change = makeChange('c', {
+        specIds: ['auth/login'],
+        schemaName: 'custom-workflow',
+      })
+      const repo = makeChangeRepository([change])
+      const specs = new Map([
+        [
+          'default',
+          makeSpecRepository({
+            specs: [
+              makeSpec({ workspace: 'default', name: 'auth/logout', filenames: ['spec.md'] }),
+            ],
+          }),
+        ],
+      ])
+      const get = vi.fn(async (ref?: string) => {
+        if (ref !== 'custom-workflow') throw new Error('workspace default must not be used')
+        return schema
+      })
+      const uc = new EditChange(
+        repo,
+        makeListWorkspaces(specs),
+        makeActorResolver(),
+        { get } as SchemaProvider,
+        undefined,
+        makeObservingReconcile(repo),
+      )
+
+      const result = await uc.execute({ name: 'c', addSpecIds: ['default:auth/logout'] })
+
+      expect(result.change.specIds).toContain('default:auth/logout')
+      expect(get).toHaveBeenCalledOnce()
+      expect(get).toHaveBeenCalledWith('custom-workflow')
+    })
+
+    it('leaves scope unchanged when sovereign schema resolution fails', async () => {
+      const change = makeChange('c', {
+        specIds: ['default:auth/login'],
+        schemaName: 'missing-workflow',
+      })
+      const repo = makeChangeRepository([change])
+      const failure = new Error('sovereign schema unavailable')
+      const uc = new EditChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+        makeActorResolver(),
+        { get: vi.fn(async () => Promise.reject(failure)) } as SchemaProvider,
+        undefined,
+        makeObservingReconcile(repo),
+      )
+
+      await expect(uc.execute({ name: 'c', addSpecIds: ['default:auth/logout'] })).rejects.toBe(
+        failure,
+      )
+      expect(repo.store.get('c')?.specIds).toEqual(['default:auth/login'])
+    })
+
+    it('allows uninitialized spec fallback when the change schema is resolved by its recorded name', async () => {
       const change = makeChange('c', { specIds: ['default:auth/login'], schemaName: 'test-schema' })
       const repo = makeChangeRepository([change])
       const specs = new Map([
@@ -398,6 +749,52 @@ describe('EditChange', () => {
       })
 
       expect(result.change.specIds).toContain('default:auth/logout')
+    })
+
+    it('resolves the actor once and shares it between the edit and reconciliation', async () => {
+      const change = makeChange('c', { specIds: ['auth/login'], schemaName: 'test-schema' })
+      const repo = makeChangeRepository([change])
+      const specs = new Map([
+        [
+          'default',
+          makeSpecRepository({
+            specs: [
+              makeSpec({ workspace: 'default', name: 'auth/logout', filenames: ['spec.md'] }),
+            ],
+          }),
+        ],
+      ])
+      const schema = makeSchema({ name: 'test-schema' })
+      const schemaProvider = makeSchemaProvider(schema)
+      const identity = vi.fn(async () => testActor)
+      const actor = { identity }
+      const reconcile = new ReconcileChangeValidity({
+        changes: repo,
+        resolveChangeSchema: new ResolveChangeSchema(schemaProvider),
+        actor,
+        refreshImplementationTracking: {
+          execute: async () => undefined,
+        } as unknown as RefreshImplementationTracking,
+        fingerprint: new ValidityFingerprintService({
+          changes: repo,
+          hasher: new NodeContentHasher(),
+          binaryHasher: new NodeBinaryContentHasher(),
+          schemaProvider,
+        }),
+        approvals: { spec: false, signoff: false },
+      })
+      const uc = new EditChange(
+        repo,
+        makeListWorkspaces(specs),
+        actor,
+        schemaProvider,
+        undefined,
+        reconcile,
+      )
+
+      await uc.execute({ name: 'c', addSpecIds: ['default:auth/logout'] })
+
+      expect(identity).toHaveBeenCalledTimes(1)
     })
 
     it('succeeds when adding a spec with identical schema', async () => {
@@ -684,11 +1081,14 @@ describe('EditChange', () => {
       const change = makeChange('c', { specIds: ['default:auth/login'] })
       const actor = makeActorResolver()
       const identity = vi.spyOn(actor, 'identity')
+      const repo = makeChangeRepository([change])
       const uc = new EditChange(
-        makeChangeRepository([change]),
+        repo,
         defaultWorkspaces(),
         actor,
         makeSchemaProvider(makeSchema()),
+        undefined,
+        makeObservingReconcile(repo),
       )
 
       const result = await uc.execute({ name: 'c', addSpecIds: ['auth/login'] })
@@ -701,11 +1101,14 @@ describe('EditChange', () => {
       const change = makeChange('c', { specIds: ['default:auth/login'] })
       const actor = makeActorResolver()
       const identity = vi.spyOn(actor, 'identity')
+      const repo = makeChangeRepository([change])
       const uc = new EditChange(
-        makeChangeRepository([change]),
+        repo,
         defaultWorkspaces(),
         actor,
         makeSchemaProvider(makeSchema()),
+        undefined,
+        makeObservingReconcile(repo),
       )
 
       await uc.execute({ name: 'c', addSpecIds: ['auth/logout'] })

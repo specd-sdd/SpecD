@@ -8,29 +8,24 @@ Artifacts must be structurally valid and conflict-free before a change can progr
 
 ### Requirement: Ports and constructor
 
-`ValidateArtifacts` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `ArtifactParserRegistry`, `ExtractorTransformRegistry`, `ActorResolver`, `ContentHasher`, `LifecycleEngine`, and `SpecWorkspaceRoute[]`.
+`ValidateArtifacts` receives at construction time: `ChangeRepository`, `ListWorkspaces`, `SchemaProvider`, `ArtifactParserRegistry`, `ActorResolver`, `ContentHasher`, `ExtractorTransformRegistry`, and `SpecWorkspaceRoute[]`.
 
 ```typescript
 class ValidateArtifacts {
   constructor(
     changes: ChangeRepository,
-    specs: ReadonlyMap<string, SpecRepository>,
+    listWorkspaces: ListWorkspaces,
     schemaProvider: SchemaProvider,
     parsers: ArtifactParserRegistry,
-    extractorTransforms: ExtractorTransformRegistry,
     actor: ActorResolver,
     hasher: ContentHasher,
-    lifecycle: LifecycleEngine,
+    extractorTransforms: ExtractorTransformRegistry,
     workspaceRoutes: readonly SpecWorkspaceRoute[],
   )
 }
 ```
 
-`SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.
-
-`ArtifactParserRegistry` resolves the parser used to validate concrete artifact content. `ExtractorTransformRegistry` is the shared runtime registry for metadata extraction transforms; `ValidateArtifacts` uses it when validating extracted metadata from merged spec content. `SpecWorkspaceRoute[]` provides the workspace-routing metadata needed to build extraction contexts for transforms that resolve spec references.
-
-`ActorResolver` supplies the identity recorded on approval invalidation events. `ContentHasher` is used both for approval drift detection and for the cleaned hashes persisted when validation succeeds. `LifecycleEngine` is used only for schema-aware dependency interpretation; structural validation, delta preview, metadata extraction, and artifact completion remain owned by `ValidateArtifacts`.
+Workspace lookup uses `ListWorkspaces`, not a `ReadonlyMap` of `SpecRepository` on the use case. `SchemaProvider` is a lazy, caching port that returns the fully-resolved schema. DAG interpretation uses `evaluateLifecycleVerdict` with empty `checksByTarget` (imported as a module function, not a constructor dependency). Structural validation, delta preview, metadata extraction, and artifact completion remain owned by `ValidateArtifacts`.
 
 ### Requirement: Input
 
@@ -42,9 +37,9 @@ When `specPath` is omitted for a `scope: change` artifact, `ValidateArtifacts` M
 
 When `specPath` is provided and the artifact is `scope: change`, the specPath is ignored — the artifact ID is sufficient.
 
-### Requirement: Schema name guard
+### Requirement: Sovereign schema resolution
 
-After obtaining the schema from `SchemaProvider`, `ValidateArtifacts` MUST compare `schema.name()` with `change.schemaName`. If they differ, it MUST throw `SchemaMismatchError`. This MUST happen before any artifact validation logic.
+`ValidateArtifacts` MUST obtain the schema for the change through `ResolveChangeSchema`. The change's recorded schema is the sovereign authority governing its artifact DAG, validation rules, required sections, and delta validations. A different workspace default MUST remain irrelevant. General resolution failures and `SchemaProviderIdentityMismatchError` MUST propagate before validation changes artifact state.
 
 ### Requirement: Required artifacts check
 
@@ -56,9 +51,9 @@ This check is skipped when `artifactId` is provided — single-artifact validati
 
 Before validating an artifact, `ValidateArtifacts` must check that all artifact IDs in its `requires` list are either `complete` or `skipped`.
 
-The dependency-aware status lookup SHALL be interpreted through `LifecycleEngine`, since recursive parent blocking and schema DAG semantics do not belong on the `Change` entity. If a required dependency is neither `complete` nor `skipped`, validation of the dependent artifact is skipped and reported as a dependency-blocked failure. A `skipped` optional artifact satisfies the dependency. `skipped` artifacts are not validated — there is no file to check.
+The dependency-aware status lookup SHALL be interpreted through `evaluateLifecycleVerdict` (empty `checksByTarget`), since recursive parent blocking and schema DAG semantics do not belong on the `Change` entity. If a required dependency is neither `complete` nor `skipped`, validation of the dependent artifact is skipped and reported as a dependency-blocked failure. A `skipped` optional artifact satisfies the dependency. `skipped` artifacts are not validated — there is no file to check.
 
-When `ValidateArtifacts` validates more than one artifact or file in a single `execute` invocation (including batch drivers and full-artifact passes), it MUST recompute lifecycle/effective-status interpretation after each persisted completion so dependents processed later in the same invocation observe parents completed in that pass. It MUST NOT rely on a lifecycle snapshot frozen only at `execute` start.
+When `ValidateArtifacts` validates more than one artifact or file in a single `execute` invocation (including batch drivers and full-artifact passes), it MUST call `evaluateLifecycleVerdict` once at execute start (empty `checksByTarget`) and then patch the in-memory DAG verdict after each successful completion (`markVerdictComplete` or equivalent) so later artifacts in topological order observe the parent as `complete`. It MUST NOT persist-and-re-evaluate between files. That in-memory patch MUST NOT re-walk the recursive pending-parent-artifact-review cascade.
 
 Dependency-blocked failures MUST include the dependency artifact ID and its effective status as observed at validation time.
 
@@ -76,49 +71,31 @@ When `artifactId` is provided but the invocation still validates all tracked fil
 
 ### Requirement: Complete and skipped file bypass
 
-For each tracked artifact file considered by validation, if the file's canonical persisted status is `complete` or `skipped`, `ValidateArtifacts` MUST NOT re-read the file, MUST NOT re-run structural validation or delta preview for that file, and MUST NOT invoke `markComplete` again for that file.
+For each tracked file selected for structural validation, if its canonical persisted state is `complete` or `skipped`, `ValidateArtifacts` MUST NOT re-read it for structural/delta validation, re-run its delta preview, or call `markComplete` again. A fresh validity fingerprint or drift check MAY still read those bytes through the shared evaluator; structural bypass is not a freshness waiver.
 
-Files in review or drift states (`pending-review`, `drifted-pending-review`, and any other non-terminal canonical state except `missing` when no file exists) MUST still be validated when selected by the invocation.
+Files in review or drift states, including `pending-review` and `drifted-pending-review`, MUST be structurally validated when selected. A `missing` file with no bytes remains missing and follows the normal required-file failure path. Materialized drift and approval/verification changes belong to application reconciliation, not repository hydration or the bypass branch.
 
-Approval/signoff drift detection MUST still run for files that are actually validated in the invocation; bypassing `complete`/`skipped` files reduces unnecessary drift comparisons and avoids spurious `artifact-drift` invalidation during batch validation.
+### Requirement: Validity reconciliation around artifact validation
 
-### Requirement: Approval invalidation on content change
+`ValidateArtifacts.execute` SHALL integrate the single application reconciler into the same serialized mutation used to validate files. Reconciliation MUST compare fresh non-task artifact and implementation inputs independently with the materialized spec approval, verification, and sign-off baselines, mark only affected projections stale, append audit evidence, and commit any mandatory gate recovery atomically.
 
-If the change has an active spec approval (`change.activeSpecApproval` is defined) and any artifact file's current content hash (after `preHashCleanup`) differs from the hash recorded in that approval's `artifactHashes`, `ValidateArtifacts` must collect the full set of drifted files before proceeding.
+The use case MUST NOT infer active approvals by replaying event order, call broad `Change.invalidate` on its own, or let a newly written `validatedHash` erase evidence of the drift detected immediately before validation. Revalidation establishes a new artifact baseline only; it MUST NOT restore stale approval, verification, or sign-off projections.
 
-Approval hash keys use the `type:key` format (e.g. `"proposal:proposal"`, `"specs:default:auth/login"`), where `type` is the artifact type ID and `key` is the file key within that artifact.
-
-The same check applies to active signoff (`change.activeSignoff`): if any artifact file's current hash differs from what was recorded in `activeSignoff.artifactHashes`, the validation pass identifies that file as drifted.
-
-A single invalidation call is made per `execute` invocation even if multiple files drift. Before that call, `ValidateArtifacts` MUST:
-
-1. Scan every candidate file and collect all drifted file keys grouped by artifact type.
-2. Mark each drifted file as `drifted-pending-review`.
-3. Recompute the affected parent artifact states.
-4. Invalidate the change with a single structured invalidation covering the full grouped set.
-
-That invalidation rolls the change back to `designing`, preserves `drifted-pending-review` on the drifted files, and downgrades the remaining files to `pending-review` as part of the redesign pass.
+A successful structural validation is not semantic approval. Under `workflow: preserve` and without required spec-gate recovery, validation may occur in the current state. Forward progress remains blocked while any non-task artifact has drift or pending review.
 
 ### Requirement: Policy-aware drift materialization
 
-When ValidateArtifacts compares the current file state to the validated baseline, it SHALL treat any mismatch as drift evidence for that file. This includes changed content and file absence.
+Baseline artifact drift SHALL be evaluated by the shared validity evaluator and applied by the central reconciler, not by a repository side effect or a second detector local to `ValidateArtifacts`.
 
-For drift handling, ValidateArtifacts SHALL:
+The evaluator compares current content to each `validatedHash` after schema cleanup. Artifacts whose type declares `hasTasks: true` are excluded from automatic drift invalidation, approval/verification fingerprint comparison, and downstream propagation. They remain part of structural validation, required-presence checks, and live task counting.
 
-1. collect the focused set of mismatching files grouped by artifact type
-2. preserve canonical `missing` when a file is absent rather than forcing a drift-derived canonical state
-3. call `Change.invalidate()` exactly once per execution with cause `artifact-drift` and the focused grouped payload
-4. rely on the `Change` entity to apply the effective invalidation policy and materialize `hasDrift=true` for the affected files
-
-Under policy `none`, ValidateArtifacts SHALL still detect and report mismatch, but artifact/file reopening is not materialized beyond canonical file-state rules such as `missing`.
+The structured artifact policy controls reopening breadth; the workflow policy controls drift-driven lifecycle movement. Neither policy waives the rule that unresolved non-task drift or review blocks forward transitions.
 
 ### Requirement: Per-file validation
 
 If the expected artifact file does not exist in the change directory and the artifact is required, validation SHALL treat the canonical file state as `missing`.
 
-File presence and canonical file state MUST be established before any interpretation of `validatedHash`.
-
-A missing file MAY still imply `hasDrift=true` because the current file state no longer matches the validated baseline, but it MUST NOT surface as `complete-with-drift` because the canonical state is no longer `complete`.
+File presence and canonical file state MUST be established before any interpretation of `validatedHash`. Whether a previously validated missing file carries `hasDrift` is decided at repository load ([`core:storage`](../storage/spec.md)), not by this use case.
 
 For spec-scoped artifacts, the expected file is determined by Requirement: Expected file path validation.
 
@@ -133,6 +110,10 @@ For a new spec, the expected path is `specs/<workspace>/<capability-path>/<artif
 For change-scoped artifacts, the expected path remains the artifact output basename at the change directory root.
 
 If the expected file does not exist and the artifact is not optional, validation MUST record a failure that includes the expected file path. The file MUST NOT be marked complete.
+
+### Requirement: Host-neutral SpecNotInChangeError
+
+When `ValidateArtifacts` throws `SpecNotInChangeError` (`SPEC_NOT_IN_CHANGE`), the error `message` MUST be host-neutral without embedding CLI commands such as `specd specs show`, and the error MUST expose `specId` and `changeName` metadata properties.
 
 ### Requirement: Delta eligibility uses artifact-level base existence
 
@@ -185,10 +166,15 @@ For artifacts with `delta: true` and an existing base spec in `SpecRepository`:
 4. Call `parser.parse(baseContent)` to produce the base AST.
 5. Call `parser.apply(baseAST, deltaEntries)` to produce the merged AST.
 6. If `apply` throws `DeltaApplicationError`, record it as a validation failure and do not proceed to `validations[]` or `markComplete`.
+7. Verify in memory that each non-`no-op` entry in `deltaEntries` produces an effective change in the serialized output:
+   - Starting from `currentAST = baseAST` and `previousSerialized = parser.serialize(baseAST)`, iterate `deltaEntries` in declaration order.
+   - For each entry where `entry.op !== 'no-op'`, apply that single entry in memory (`stepResult = parser.apply(currentAST, [entry])`) and serialize (`nextSerialized = parser.serialize(stepResult.ast)`).
+   - If `nextSerialized === previousSerialized`, record a validation failure identifying the ineffective operation (operation index and `op`) and do not mark the artifact complete.
+   - Otherwise advance `currentAST = stepResult.ast` and `previousSerialized = nextSerialized`.
 
-**No-op bypass:** When the expected delta contains only `no-op` entries, steps 1–6 are skipped entirely. The delta application preview is not needed because `no-op` produces no changes. `ValidateArtifacts` proceeds directly to hash computation on the raw delta file content.
+**No-op bypass:** When the expected delta contains only `no-op` entries, steps 1–7 are skipped entirely. The delta application preview is not needed because `no-op` produces no changes. `ValidateArtifacts` proceeds directly to hash computation on the raw delta file content.
 
-The merged AST (from `parser.serialize(mergedAST)`) is used for `validations[]` checks. The base spec in `SpecRepository` is **not modified** — archive is the step that writes the merged content.
+The merged AST (from `parser.serialize(mergedAST)` in step 5) is used for `validations[]` checks. The base spec in `SpecRepository` is **not modified** — archive is the step that writes the merged content.
 
 For new files being created in the change, `ValidateArtifacts` validates the expected direct artifact file under `specs/<workspace>/<capability-path>/<filename>` against `validations[]`.
 
@@ -248,9 +234,13 @@ If one or more required participants are not ready yet, `ValidateArtifacts` MUST
 After building the merged preview, `ValidateArtifacts` MUST also validate the extracted metadata:
 
 1. Get `schema.metadataExtraction()`
-2. If defined, call `extractMetadata(extraction, astsByArtifact, renderers, transforms, transformContext, artifactType.id)`
-3. Validate the result against `strictSpecMetadataSchema`
+2. If defined, call `extractMetadata(extraction, astsByArtifact, renderers, transforms, transformContext, artifactType.id)` so only fields sourced from the artifact under validation are extracted
+3. Validate the result against `permissiveSpecMetadataSchema` (shape of fields that are present)
 4. If validation fails, record it as a validation failure
+
+`strictSpecMetadataSchema` is the write schema for a complete `metadata.json`. It MUST NOT be used here.
+
+Metadata fields are bound to artifacts (`field.artifact`). A multi-file spec MAY be validated one artifact at a time. Title, description, or `contentHashes` MAY be produced only by an artifact that does not exist yet. Extraction for the current `artifactType.id` is therefore a partial bag. Completeness belongs to persist/archive, not per-artifact validate.
 
 `transforms` is the shared extractor-transform registry assembled by kernel composition. `transformContext` is the caller-owned origin context bag for the artifact being validated. If a declared transform is unknown, or if a registered transform fails because its required context is absent or invalid, that failure is a validation failure for this artifact.
 
@@ -314,25 +304,34 @@ The config-based `createValidateArtifacts(config, options?)` form MUST derive `V
 - `schemaProvider: SchemaProvider`
 - `parsers: ArtifactParserRegistry`
 - `actor: ActorResolver`
-- `hasher: ContentHasher`
+- `contentHasher: ContentHasher`
 - `extractorTransforms: ExtractorTransformRegistry`
 - `workspaceRoutes: readonly SpecWorkspaceRoute[]`
-- `lifecycle: LifecycleEngine`
 
-The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+It MUST NOT resolve `lifecycle` or `LifecycleEngine`.
+
+The constructor parameter remains `hasher`. The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
+### Requirement: DAG lifecycle from evaluateLifecycleVerdict
+
+When `ValidateArtifacts` needs DAG-aware artifact status or next-artifact order, it MUST call `evaluateLifecycleVerdict` with empty `checksByTarget` (see [`core:lifecycle-engine`](../lifecycle-engine/spec.md)). That path SHALL use `projectArtifacts` / topological order only. It MUST NOT run hop predicates (`executeChecksByLegalTargets` / matching `execute` for legal targets).
+
+It MUST NOT gather a global snapshot bag. `gatherPredicateSnapshots` MUST NOT exist as a use-case step.
+
+### Requirement: Change must exist
+
+When `ChangeRepository.get(name)` returns `null`, `ValidateArtifacts.execute` MUST throw `ChangeNotFoundError` before running validation. It MUST NOT return a validation result object for a missing change.
 
 ## Constraints
 
-- ValidateArtifacts is the only code path that may call Artifact.markComplete(hash) — enforced by convention and test coverage
-- The merged spec is never written to SpecRepository during validate — only during ArchiveChange
-- ValidateArtifacts calls change.invalidate('artifact-drift', actor, ...) at most once per execute invocation, even if multiple files have drifted
-- The drift invalidation payload is focused to the concrete mismatching artifact/files rather than an implicit global artifact set
-- deltaValidations evaluate rules against the normalized YAML AST of the delta file; validations evaluate rules against the normalized artifact AST; both use the same rule evaluation algorithm
-- validations run against the merged artifact content (or direct content for non-delta artifacts)
-- preHashCleanup substitutions are applied only for hash computation, never to the actual file content on disk
-- A missing deltaValidations\[] is not an error — the step is skipped
-- A missing validations\[] is not an error — the step is skipped
-- A missing expected delta file for an existing spec with a delta: true artifact is a validation failure; direct files under specs/... are valid only for new specs or non-delta artifacts
+- `ValidateArtifacts` is the only code path that MAY call `Artifact.markComplete(hash)`; this invariant is enforced by convention and tests.
+- Validation MUST NOT write a merged spec to `SpecRepository`; that happens only during `ArchiveChange`.
+- Repository hydration MAY expose fresh physical file facts against `validatedHash`, but MUST NOT persist approval invalidation or lifecycle recovery. The shared evaluator determines validity from those facts and the application reconciler materializes it within the serialized mutation.
+- `ValidateArtifacts` MUST NOT call broad `Change.invalidate('artifact-drift', ...)` independently. One semantic drift episode MUST produce only the affected projection changes and audit events selected by reconciliation, without duplicate materialization on repeat validation.
+- `deltaValidations` evaluate the normalized YAML AST of the delta; `validations` evaluate the normalized artifact AST. Both use the same rule algorithm. Artifact validations run against merged content, or direct content for non-delta artifacts.
+- `preHashCleanup` affects hash computation only, never bytes written to disk.
+- Missing `deltaValidations[]` or `validations[]` means that step is skipped. A missing expected delta for an existing spec with `delta: true` fails validation; direct files under `specs/...` are valid only for new specs or non-delta artifacts.
+- If `ChangeRepository.get(name)` returns null, `execute` MUST throw `ChangeNotFoundError` before validation rather than return `passed: false`.
 
 ## Spec Dependencies
 
@@ -347,3 +346,5 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:spec-id-format`](../spec-id-format/spec.md)
 - [`core:schema-format`](../schema-format/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)
+- [`core:transition-checks`](../transition-checks/spec.md) — no snapshot bag; hop predicates are not this use case
+- [core:resolve-change-schema](../resolve-change-schema/spec.md) — named sovereign lookup, provider identity validation, and same-name version advisory

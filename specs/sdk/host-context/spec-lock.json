@@ -3,14 +3,22 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["sdk:composition", "core:kernel", "core:composition", "code-graph:composition"],
+  "dependsOn": [
+    "sdk:composition",
+    "core:kernel",
+    "core:kernel-builder",
+    "core:composition",
+    "code-graph:composition",
+    "plugin-manager:register-plugins-use-case",
+    "plugin-manager:plugin-errors"
+  ],
   "implementation": [
     {
       "file": "sdk:src/composition/host-context.ts",
-      "symbols": ["SdkContextOptions", "OpenSpecdHostInput", "createSdkContext", "openSpecdHost"]
+      "symbols": ["createSdkContext", "SdkContextOptions"]
     },
     {
-      "file": "sdk:test/composition/host-context.spec.ts"
+      "file": "sdk:test/composition/host-context-e2e.spec.ts"
     }
   ],
   "optimizations": {

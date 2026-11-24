@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Users and tooling need a quick way to see where a change stands — both its lifecycle state and which artifacts are actually ready — without loading file content. The `GetStatus` use case loads a single change by name and reports its current lifecycle state along with the effective status of each artifact, cascading through dependency chains so that an artifact whose hashes match may still show `in-progress` if any of its required dependencies are not `complete`.
+Users and tooling need a canonical view of lifecycle, artifacts, approvals, verification, and the next valid action. Active status therefore reconciles fresh artifact and linked implementation inputs before projection, while drafted inspection remains read-only.
 
 ## Requirements
 
@@ -25,7 +25,7 @@ On success, `execute()` MUST return a `GetStatusResult` containing:
 - `specDependsOn` — the map of declared spec dependencies from the change manifest
 - `review` — a derived review summary for agents and CLI serializers; when `unchanged` is `true`, review MAY be a minimal stub (`required: false`)
 - `blockers` — an array of active blockers preventing progress; when `unchanged` is `true`, blockers MUST be an empty array
-- `nextAction` — a recommended next action to guide the actor; when `unchanged` is `true`, nextAction MAY indicate the client revision is current
+- `nextAction` — a recommended next action to guide the actor (`targetStep`, `actionType`, `reason`, `intent`, and optional `action`); when `unchanged` is `true`, nextAction MAY indicate the client revision is current
 
 Resolution order:
 
@@ -36,27 +36,19 @@ If both are null, the use case MUST throw `ChangeNotFoundError`.
 
 `GetStatus` MUST NOT call `ChangeRepository.getDiscarded` or load `discarded/` storage. Discarded changes MUST be inspected via `GetDiscarded` (for example `specd discarded show`).
 
-When `draftView` is present, the use case MUST compute artifact and lifecycle projections for inspection only. It MUST NOT expose a mutable `Change` to callers and MUST NOT surface transitions that would mutate the drafted change (`availableTransitions` MUST be empty; `nextAction.command` MUST NOT recommend transition or validate commands).
+When `draftView` is present, the use case MUST compute artifact and lifecycle projections for inspection only. It MUST NOT expose a mutable `Change` to callers and MUST NOT surface transitions that would mutate the drafted change (`availableTransitions` MUST be empty; `nextAction.intent` MUST be `null` and MUST NOT recommend transition or validate actions).
 
 ### Requirement: Revision evaluation for conditional status queries
 
-`GetStatus` SHALL support optional client revision comparison via `ifModifiedSince`.
+`ifModifiedSince` MAY short-circuit expensive response projection only after the active change has completed configured implementation refresh and canonical validity reconciliation. Manifest `updatedAt` alone cannot prove that externally edited artifact or implementation files are unchanged.
 
-When `ifModifiedSince` is provided, `GetStatus` MUST parse it with `Date.parse`. If parsing yields a valid timestamp greater than or equal to `change.updatedAt.getTime()`, `GetStatus` SHALL short-circuit like HTTP 304:
-
-- bypass full status re-evaluation (no full artifact effective-status projection, no full review/blocker recomputation)
-- MUST NOT invoke `RefreshImplementationTracking`
-- return `unchanged: true`
-- return `artifactStatuses` as an empty array
-- still return the loaded `change` and `specDependsOn`
-
-When `ifModifiedSince` is omitted, unparseable (`NaN`), or strictly older than `change.updatedAt`, `GetStatus` MUST perform the normal full status evaluation path.
+After reconciliation, if the parsed client timestamp is at least the reconciled `change.updatedAt`, `GetStatus` MAY return `unchanged: true`, an empty `artifactStatuses`, and minimal review/blocker guidance while still returning the reconciled change and dependency snapshot. Invalid timestamps or older revisions use the full projection path. Drafted read-only status may use its existing revision optimization because it does not authorize progress.
 
 ### Requirement: Drafted change read-only status
 
 When `GetStatus` loads a change exclusively via `getDraft`, the result MUST satisfy [`core:drafted-change-view`](../drafted-change-view/spec.md).
 
-The use case MAY use an internal `Change` loaded from drafted storage to compute artifact effective statuses, but that instance MUST NOT appear on `GetStatusResult`.
+The use case MUST compute artifact effective statuses via `projectArtifacts` only (the same DAG cascade as `evaluateLifecycleVerdict` with empty `checksByTarget`) so parent-review cascade appears. It MUST NOT call `evaluateLifecycle` or `evaluateLifecycleVerdict` on drafts. It MUST NOT expose a mutable `Change` to callers and MUST NOT surface mutating hops (`availableTransitions` / `availableSteps` MUST be empty; `nextArtifact` MUST be `null`; `nextAction.intent` MUST be `null` and MUST NOT recommend transition or validate actions).
 
 Drafted status responses MUST be suitable for `drafts show` and read-only CLI inspection without enabling lifecycle mutation.
 
@@ -71,13 +63,17 @@ That projection MUST include:
 
 ### Requirement: Optional pre-read implementation tracking refresh
 
-When `refreshImplementationTracking` is not `false` (default `true`) and `ChangeRepository.get(name)` returns a non-null active change, `GetStatus` MUST invoke `RefreshImplementationTracking.execute({ name })` before loading status — **except** when the `ifModifiedSince` short-circuit applies (client revision current), in which case `GetStatus` MUST NOT invoke `RefreshImplementationTracking`.
+For an active change, `GetStatus` SHALL invoke `RefreshImplementationTracking.execute({ name })` before canonical validity reconciliation unless `refreshImplementationTracking` is explicitly `false`. Conditional `ifModifiedSince` does not skip this freshness step.
 
-When the change resolves only via `ChangeRepository.getDraft(name)`, or when `refreshImplementationTracking` is `false`, `GetStatus` MUST NOT invoke `RefreshImplementationTracking`.
+Drafted changes never refresh. `GetStatus` MUST NOT invoke `ImplementationDetector` directly or duplicate merge logic. After refresh and reconciliation it projects implementation state from the newly persisted change.
 
-`GetStatus` MUST NOT invoke `ImplementationDetector` directly and MUST NOT duplicate refresh merge logic.
+### Requirement: Operational status reconciliation
 
-After any refresh, `GetStatus` MUST project implementation-tracking data from the persisted change state loaded by `ChangeRepository`.
+For an active change, `GetStatus` SHALL first resolve the active schema without mutating the change. If schema resolution fails, it returns the existing actionable read-only status projection with a `SCHEMA_RESOLUTION_FAILED` blocker, disables lifecycle mutation guidance, and performs neither implementation refresh nor validity reconciliation.
+
+When schema resolution succeeds, `GetStatus` SHALL refresh implementation tracking as configured, then invoke the single application reconciler before constructing its response. Unlike plain repository hydration, status is an operational validity observation and MAY persist newly detected artifact review, stale or revoked projections, audit events, and an automatic lifecycle return.
+
+Detection and recovery MUST be committed atomically. The response SHALL describe the committed change, never the pre-reconciliation state. Repeating status with unchanged facts MUST NOT append duplicate events or repeat an already completed return. Drafted, archived, and schema-unavailable status paths remain read-only and are not reconciled.
 
 ### Requirement: Drift-aware display status
 
@@ -98,9 +94,11 @@ Each ArtifactStatusEntry MUST include:
 
 ### Requirement: Reports task completion counts for task-capable artifacts
 
-When the schema artifact type has `hasTasks: true` and declares `taskCompletionCheck`, `GetStatus` MUST obtain task-completion counts from `CountTasks`.
+When the schema artifact type has `hasTasks: true` and declares `taskCompletionCheck`, `GetStatus` MUST expose task-completion counts from the `workflow.taskCompletion` check (which SHALL call `CountTasks` in its `execute`).
 
-The task completion counts MUST be exposed as an optional `taskCompletion` field on each `ArtifactStatusEntry` that corresponds to a task-capable artifact with qualifying content. `GetStatus` MUST map that field from `CountTasksResult.byArtifact` by artifact type ID.
+`GetStatus` MUST NOT call `evaluateLifecycle` first and then CountTasks only for painting `taskCompletion` on artifacts. `GetStatus` MUST NOT gather a global snapshot bag for all checks.
+
+The task completion counts MUST be exposed as an optional `taskCompletion` field on each `ArtifactStatusEntry` that corresponds to a task-capable artifact with qualifying content. `GetStatus` MUST map that field from `CountTasksResult.byArtifact` by artifact type ID (from the check result details or the same CountTasks outcome that check already produced — it MUST NOT invoke `CountTasks` a second time).
 
 The `taskCompletion` object MUST contain:
 
@@ -110,26 +108,41 @@ The `taskCompletion` object MUST contain:
 
 When the artifact file does not exist or the file content is empty, the `taskCompletion` field MUST be omitted.
 
+### Requirement: Execute matching predicates then project
+
+Before composing lifecycle guidance, `GetStatus` MUST, for each protocol-legal candidate target, select matching **predicates** from the effective bindings resolved for that candidate (`resolveEffectiveBindings`, including schema `checks` / `skipChecks` declarations) and call `check.execute(ctx)` (see [`core:transition-checks`](../transition-checks/spec.md)). GetStatus MUST collect **every** matching predicate for each hop (no `protocol.edge` fail-fast) so blockers and the repair guide show the full why.
+
+When `change.state` is `archivable`, GetStatus MUST also execute the archive-scope predicates of the **effective archive bindings** (`resolveEffectiveBindings` with operation `archive`, including schema `archiveChecks`; not `hook.pre` / `hook.post` effects) without any user bypass (`skipChecks` empty). A check the schema disables on archive is not evaluated and produces no blocker. Live `spec.overlap` failure MAY then appear as public `OVERLAP_CONFLICT`, with `isSkippable: true` and `checkId: 'spec.overlap'` only when the resolved archive binding of `spec.overlap` is skippable (delivery hosts translate that capability into their own bypass syntax; Core carries no flag string). Invalidation-from-another-archive MUST NOT use that blocker (see review).
+
+`CountTasks` MUST be memoized on the **current evaluation pass** so one `GetStatus.execute` counts once for all legal targets. The check MUST NOT cache counts on the Kernel-lived instance across executes.
+
+`GetStatus` MUST NOT gather a global snapshot type for all checks. Each check obtains its own I/O through `create*` ports (`CountTasks` inside `workflow.taskCompletion`, extract inside `deps.consistent`, ownership inside `workspace.readOnly`, impl facts inside `impl.*`).
+
+`evaluateLifecycle` MUST project `availableTransitions` / `nextAction` from those `CheckResult`s. Domain projection MUST remain I/O-free.
+
+`GetStatus` MUST call `evaluateLifecycle` (domain verdict + application guidance) to obtain the public host-neutral `nextAction` (`intent` and optional check-declared `action`). It MUST NOT read command strings from domain `nextHop`, and neither `nextAction` nor any blocker may carry a CLI or slash-command string.
+
+The status result MUST expose check-derived `availableTransitions` and `nextAction`. It MUST expose enough check rows (id, kind, outcome, code/message on fail) that a later dry-run UI does not need a second result type. `effect` rows MUST NOT be required for `allowed` on status.
+
+### Requirement: Shared transition candidate evaluation
+
+For every protocol-legal candidate target, `GetStatus` MUST use the same shared candidate evaluator as `TransitionChange`. The evaluator MUST compute `listBypassedWorkflowSteps(from, to, schema, approvals)`, evaluate the normal transition predicate set, and evaluate each applicable `scope: 'step-skip'` predicate set for optional bypassed steps.
+
+`availableTransitions`, `checksByTarget`, blockers, and `nextAction` MUST be projected only from those complete candidate results. A failed step-skip predicate removes that shortcut from `availableTransitions`; an empty effective step-skip predicate set passes unconditionally.
+
+Status evaluation is projection-only and MUST NOT run effects, hooks, mutation, or persistence. `TransitionChange` MUST recalculate the same candidate through the shared evaluator against fresh state before it owns effects and persistence.
+
 ### Requirement: Throws ChangeNotFoundError for unknown changes
 
 If no change with the given name exists in the repository, `execute()` MUST throw a `ChangeNotFoundError` with code `CHANGE_NOT_FOUND`. It MUST NOT return `null`.
 
 ### Requirement: Constructor dependencies
 
-`GetStatus` MUST accept the following constructor arguments:
+`GetStatus` SHALL receive the change repository, schema provider, approval-gate configuration, `RefreshImplementationTracking`, the central validity reconciler, the composed transition/archive checks needed for projection, and an optional `CheckRegistry` (used when resolving effective bindings for candidate transitions and for the archive operation). It imports pure lifecycle projection functions rather than injecting an alternative lifecycle engine or collecting one shared snapshot bag. All construction paths MUST supply the reconciler; absence MUST fail explicitly rather than enable a legacy invalidation fallback.
 
-- `changes: ChangeRepository` — for loading changes by name
-- `schemaProvider: SchemaProvider` — for obtaining the fully-resolved active schema
-- `lifecycle: LifecycleEngine` — for deriving effective artifact status, blockers, routing, and next-action guidance from the change plus active schema
-- `approvals: { readonly spec: boolean; readonly signoff: boolean }` — whether approval gates are active
-- `refreshImplementationTracking: RefreshImplementationTracking` — primitive used for optional pre-read refresh
-- `countTasks: CountTasks` — required shared query for task-completion counts
+The config factory SHALL resolve these through the existing composition resolver and both established factory signatures. `GetStatus` MUST NOT construct filesystem adapters, invoke `ImplementationDetector` directly, or implement a second invalidation path.
 
-It MUST load the change via `ChangeRepository.get(name)` and, when that returns `null`, via `ChangeRepository.getDraft(name)`. It MUST NOT use `getDiscarded`.
-
-`SchemaProvider` replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple, providing the fully-resolved schema with plugins and overrides applied.
-
-`GetStatus` MUST NOT accept `ImplementationDetector` and MUST NOT invoke implementation autodetection directly.
+Active resolution uses `get` and may reconcile; draft resolution uses `getDraft` and remains read-only. Discarded changes are out of scope.
 
 ### Requirement: Config-based factory preserves complete repository bootstrap
 
@@ -139,37 +152,19 @@ The config-based factory MUST NOT assemble a weaker repository variant that can 
 
 ### Requirement: Reports effective status for every artifact
 
-When `unchanged` is not `true`, the `artifactStatuses` array MUST contain exactly one entry per artifact in the change's artifact map. It MUST NOT omit artifacts and MUST NOT include entries for artifacts that do not exist on the change.
+When `unchanged` is not `true`, the `artifactStatuses` array MUST contain exactly one entry per artifact type declared by the active schema (`schema.artifacts()`). Entries for types not yet attached on the change MUST use persisted/effective status `missing`. It MUST NOT omit schema-declared types on the full evaluation path.
 
 When `unchanged` is `true`, `artifactStatuses` MUST be empty (full projection omitted by the revision short-circuit).
 
-On the full evaluation path, `GetStatus` MUST derive each entry's `effectiveStatus` through `LifecycleEngine` so the reported value reflects recursive dependency blocking, workflow requirements, and approval-gate semantics from the active schema rather than only persisted aggregate artifact state.
+On the full evaluation path, `GetStatus` MUST derive each entry's `effectiveStatus` through `evaluateLifecycle` / `projectArtifacts` so the reported value reflects recursive dependency blocking from the active schema rather than only persisted aggregate artifact state.
 
 ### Requirement: Returns lifecycle context
 
-`GetStatus` MUST compute a `ReviewSummary` that determines whether the change requires artifact review and why.
+`GetStatus` SHALL derive `ReviewSummary`, lifecycle projections, blockers, and next action from the same canonical validity verdict used by transitions and archive.
 
-The review check MUST follow this priority order:
+Drifted or pending-review non-task artifacts set `review.required=true`. The route is the current lifecycle skill under `workflow: preserve` unless required stale or revoked spec consent in a state after `ready` or an explicit redesign requires `designing`; under `workflow: redesign` it is `designing`. In `ready`, stale or revoked spec consent never commits a recovery to `designing`: `approval.spec` blocks leaving `ready` and consent is renewed there, so guidance stays in `ready` with the check-declared `approve-spec` action. Unhandled overlap invalidations remain identifiable with human-readable overlap detail, but their recovery follows the same policy and gate precedence rather than a hard-coded route.
 
-1. **If any artifact file is in `drifted-pending-review` state:** `required` is `true`, `reason` is `'artifact-drift'`, `route` is `'designing'`.
-2. **Else if any artifact file is in `pending-review` state and there are unhandled `spec-overlap-conflict` invalidations:** `required` is `true`, `reason` is `'spec-overlap-conflict'`, `route` is `'designing'`.
-3. **Else if any artifact file is in `pending-review` state:** `required` is `true`, `reason` is `'artifact-review-required'`, `route` is `'designing'`.
-4. **Else:** `required` is `false`, `reason` is `null`, `route` is `null`.
-
-`GetStatus` MAY compute this summary directly from the loaded change facts or obtain it from `LifecycleEngine`, but the outward-facing result MUST reflect the same authoritative lifecycle interpretation used by transition and validation flows.
-
-**Unhandled overlap collection:** To determine unhandled `spec-overlap-conflict` invalidations, `GetStatus` MUST scan `change.history` in reverse (newest to oldest) collecting `invalidated` events with `cause: 'spec-overlap-conflict'`. The scan MUST stop at the first `transitioned` event whose `to` field is not `'designing'` — this indicates the change moved forward from a prior invalidation and those earlier overlaps were already handled. If no such boundary event is found, the scan includes all matching events back to the beginning of history.
-
-`ReviewSummary.reason` type MUST be extended to: `'artifact-drift' | 'artifact-review-required' | 'spec-overlap-conflict' | null`.
-
-When `reason` is `'spec-overlap-conflict'`, `ReviewSummary` MUST additionally include:
-
-- `overlapDetail` — an array of `OverlapEntry` objects, one per unhandled `spec-overlap-conflict` invalidation event, each containing:
-  - `archivedChangeName` — the name of the archived change that caused the overlap (extracted from the `invalidated.message`)
-  - `overlappingSpecIds` — readonly array of spec IDs that overlapped (extracted from the `invalidated.message`)
-    The array is ordered newest-first (matching the reverse scan order). This preserves the full picture when multiple changes were archived with overlapping specs before the current change was able to address any of them.
-
-When `reason` is not `'spec-overlap-conflict'`, `overlapDetail` MUST be an empty array.
+Lifecycle fields and `availableTransitions` SHALL come from check evaluation after reconciliation. Stale verification is reported but does not replace normal guidance before `verifying`; at or after verification it blocks the applicable forward boundary. Drafted status exposes no mutating transitions.
 
 ### Requirement: Identifies blockers
 
@@ -179,24 +174,67 @@ Blockers MUST be collected for:
 
 - **Artifact Drift**: code `'ARTIFACT_DRIFT'` if `review.reason` is `'artifact-drift'`.
 - **Review Required**: code `'REVIEW_REQUIRED'` if `review.reason` is `'artifact-review-required'`.
-- **Overlap Conflict**: code `'OVERLAP_CONFLICT'` if `review.reason` is `'spec-overlap-conflict'`.
-- **Missing Artifacts**: code `'MISSING_ARTIFACT'` for each artifact in the current state's `requires` list that is in `missing` or `in-progress` state.
+- **Artifact review required**: code `'ARTIFACT_REVIEW_REQUIRED'` when the validity verdict reports artifact files pending review.
+- **Incomplete artifacts**: code `'INCOMPLETE_ARTIFACT'` for each required artifact whose effective status is `missing` or `in-progress`. There is no separate `MISSING_ARTIFACT` code — absence and in-progress share `INCOMPLETE_ARTIFACT`.
+  Failed predicates for candidate hops MUST appear on public `blockers` with their check codes (`INCOMPLETE_ARTIFACT`, `APPROVAL_REQUIRED`, `INCOMPLETE_TASKS`, `DEPS_INCONSISTENT`, `READ_ONLY_WORKSPACE`, `IMPLEMENTATION_STATE`, `INVALID_TRANSITION`, archive codes when in scope including `OVERLAP_CONFLICT` **only** from archive predicates while `state === 'archivable'`). `review.reason === 'spec-overlap-conflict'` MUST NOT add `OVERLAP_CONFLICT` to `blockers`. `GetStatus` MUST NOT drop requires or approval failures from `blockers` while omitting those hops from `availableTransitions`.
 
-`GetStatus` MAY assemble these blockers directly or obtain them from `LifecycleEngine`, but the blocker set MUST be derived from the same authoritative lifecycle interpretation used for effective statuses and transition validation.
+A blocker projected from a failed predicate SHALL always carry `checkId` (the failing check's identifier) and `isSkippable`; `isSkippable` is `true` only when the resolved binding of that check for the evaluated candidate is skippable (including skippability declared by the schema) and `false` otherwise (see [`core:lifecycle-engine`](../lifecycle-engine/spec.md) and [`core:transition-checks`](../transition-checks/spec.md)). The blocker SHALL propagate `action?: CheckAction` when the failing check declared one. Blockers MUST NOT carry CLI `bypassFlag` strings. For code `IMPLEMENTATION_STATE`, only `impl.linksInScope` failures are skippable; open-file failures from `impl.filesResolved` MUST NOT be marked `isSkippable` even though they share the same code.
+
+Blockers projected from a failed predicate MUST always include that check’s gerund `label` alongside `code`, `message`, and `checkId`. Review-only blockers (`ARTIFACT_DRIFT`, `REVIEW_REQUIRED`) MAY omit `label`. Agents use `label` as a human hint for what the machine code means (for example `DEPS_INCONSISTENT` → `Checking spec dependencies`).
+
+When `review.required` is true, `review` MUST include a human `message`. For `spec-overlap-conflict` the message MUST explain conflict with archived overlapping specs (not the kebab token alone). `nextAction.reason` SHOULD use that message.
+
+When public `blockers` include `OVERLAP_CONFLICT` and it is the ONLY public blocker (no other blocker remains), `nextAction.intent` MUST remain `'archive'` and `targetStep` MUST remain `archivable`. `nextAction.reason` MUST NOT be `Ready to archive`; it MUST name live overlap in host-neutral terms without embedding CLI `--skip-checks` flags. When any other blocker exists alongside the overlap blocker (for example stale verification or an unresolved review), `GetStatus` MUST keep the guidance `nextAction` unchanged so it points at the real next step (for stale verification: `intent: 'verify'`; the `start-verification` action stays on the verification blocker and `nextAction.action` is not set, because only the failed predicates of the selected hop can supply it and the archive operation is not a hop) and MUST NOT imply an overlap bypass. Overlap is an archive operation predicate, not a hop, so `availableTransitions` MAY still list `archiving`.
+
+When the validity verdict and a failed check describe the same condition, `GetStatus` MUST merge them into one public blocker rather than listing both. The pairing is by condition family, independent of the exact code and wording of either side:
+
+- Family `spec-consent`: validity blockers `APPROVAL_REQUIRED`, `APPROVAL_STALE` and `APPROVAL_REVOKED` pair with failures of the `approval.spec` check.
+- Family `signoff-consent`: validity blockers `SIGNOFF_REQUIRED`, `SIGNOFF_STALE` and `SIGNOFF_REVOKED` pair with failures of the `approval.signoff` check that carry `APPROVAL_*` codes (that check names its consent codes `APPROVAL_*`).
+- Family `verification`: validity blockers `VERIFICATION_REQUIRED`, `VERIFICATION_IN_PROGRESS` and `VERIFICATION_STALE` pair with failures of the `verification.current` check. A `VERIFICATION_*` failure emitted by `approval.signoff` (`details.gate` `'signoff'`) describes the same verification condition: it is dropped in favour of the `verification.current` failure and is kept only when no `verification.current` failure exists.
+
+When at least one check failure of a family exists, every validity blocker of that family MUST be dropped whatever its code (`*_REQUIRED` versus `*_STALE` versus `*_REVOKED`, or any wording difference, does not matter), and the check's message, `label` and `checkId` win in the merged blocker. The merged blocker carries the check's `action`; when the winning check failure declares no `action`, it adopts the `action` of the dropped validity blocker of its family (only the validity `VERIFICATION_*` blockers carry one, `start-verification`). Blockers of different families MUST NOT be merged. `VERIFICATION_VALIDITY_UNAVAILABLE` and all per-artifact and per-spec codes MUST NOT be merged; in particular `ARTIFACT_DRIFT`, `ARTIFACT_REVIEW_REQUIRED` and `REVIEW_REQUIRED` are per-artifact codes and are never merged.
+
+Skippability of a failed-check blocker is evaluated per blocker, keyed by check id AND message (not by check id alone). It is taken from the resolved binding of the target the failure belongs to (archive failures from the archive bindings only), so two blockers of the same check with different messages on different targets each take the skippability of the binding of their own target. Only blockers with the same check id AND the same message are merged, and a merged blocker is skippable only if it is skippable on every target it appears on, including across the transition and archive contexts: when the same check fails on a transition target and in the archive checks with the same code and message, the single merged blocker is skippable only if it is skippable in both contexts (the transition binding and the archive binding); a check locked in either context makes the merged blocker not skippable. A validity-verdict blocker that carries a `checkId` is transition-origin: when no failing predicate of a transition target exists for it, it takes no skippability from archive bindings and keeps its own `isSkippable` (`false` when absent).
+
+`GetStatus` MAY assemble these blockers directly or obtain them from `evaluateLifecycle`, but the blocker set MUST be derived from the same authoritative evaluation used for effective statuses and `availableTransitions`.
+
+### Requirement: Approval, verification, and fingerprint status projection
+
+Status SHALL expose independently:
+
+- structured artifact and workflow policies
+- non-task artifact drift and pending-review details
+- spec-approval and sign-off state as absent, `valid`, `stale`, or `revoked`
+- completed verification as never completed, legacy unknown, `valid`, or `stale`, separately from the active attempt identity, baseline, and freshness
+- changed, missing, added, removed, renamed, or unlinked fingerprint inputs and their causes
+- any automatic return committed during this request
+- the canonical blockers and next action from the shared validity verdict
+
+The public result SHALL expose a rich `ValidityStatusProjection` assembled from the reconciled aggregate and canonical verdict. It SHALL NOT expose the evaluator's raw `ChangeValidityVerdict` as a substitute for status. The projection MUST retain active-attempt and completed-evidence fields simultaneously when both exist. The projection SHALL include `fingerprintIssues` containing unreadable, missing, or unsafe fingerprint input failures as a non-blocking diagnostic, and unreadable fingerprint inputs SHALL NOT synthesize progress blockers in `blockers`.
+
+Required stale or revoked spec consent in a state after `ready` has recovery priority and yields committed `designing` guidance. In `ready` no recovery is committed: the change stays in `ready` and guidance stays in `ready` with the `approve-spec` action, because `approval.spec` blocks leaving `ready` and consent is renewed there. Required stale sign-off alone returns a later change to `done`; stale verification then recommends verification before renewed sign-off. Verification staleness in `designing`, `ready`, or `implementing` remains context and MUST NOT replace the phase's normal next action. At verification-requiring boundaries, missing or stale completed evidence recommends running the verification skill in the current state. A mismatched active attempt requires explicit start and repeated checks before completion, never a forced exit/re-entry. Status MUST NOT call `CompleteVerification` or treat an active attempt as completed evidence.
+
+Under ungated `workflow: preserve`, artifact review remains in the current state, but unresolved non-task drift or review still blocks forward progress. Status MUST NOT suggest that structural validation alone renews human approval or verification.
 
 ### Requirement: Graceful degradation when schema resolution fails
 
-If `SchemaProvider.get()` throws, the `lifecycle` object MUST still be present with degraded values:
+`GetStatus` MUST resolve the active change's sovereign schema through `ResolveChangeSchema` using the recorded name and version (or the corresponding read-only view fields for drafts).
 
-- `validTransitions` MUST be populated normally (it is a static lookup, independent of schema)
+If schema resolution throws, the `lifecycle` object MUST still be present with degraded values:
+
+- `validTransitions` MUST be an empty array because trusted topology cannot be derived
 - `availableTransitions` MUST be an empty array
-- `blockers` MUST be an empty array
+- `lifecycle.blockers` MUST be an empty array because target-specific transition checks cannot run without a schema
 - `approvals` MUST be populated normally (it is injected config, independent of schema)
 - `nextArtifact` MUST be `null`
 - `changePath` MUST be populated normally
 - `schemaInfo` MUST be `null`
 
-The use case MUST NOT throw when schema resolution fails — it degrades the lifecycle fields silently. It MUST wrap the `SchemaProvider.get()` call in a `try/catch` to achieve this.
+A general lookup or resolution failure MUST produce the stable `SCHEMA_RESOLUTION_FAILED` blocker. `SchemaProviderIdentityMismatchError` MUST instead produce `SCHEMA_IDENTITY_MISMATCH` whose structured `details` contain `requestedName` and `returnedName`. The use case MUST NOT throw for either read-only status condition, MUST remain read-only, and MUST NOT project topology, actions, artifact rules, or lifecycle mutations from an unresolved or untrusted schema.
+
+The same degradation applies to drafted changes: drafted status MUST NOT throw for any schema resolution failure (including identity mismatch), MUST report `schemaInfo: null`, and MUST emit the same blocker codes.
+
+Typed advisories returned by `ResolveChangeSchema` (for example same-name version drift) MUST be exposed on the status result as structured warnings rather than only logged.
 
 ### Requirement: Config-based factory delegates through resolveGetStatusDeps
 
@@ -208,18 +246,22 @@ The config-based `createGetStatus(config, options?)` form MUST derive `GetStatus
 - `schemaProvider: SchemaProvider`
 - `approvals: { readonly spec: boolean; readonly signoff: boolean }`
 - `refreshImplementationTracking: RefreshImplementationTracking`
-- `lifecycle: LifecycleEngine`
-- `countTasks: CountTasks`
+- composed workflow checks from `create*` (ports such as `CountTasks`, deps extract, workspace ownership live on those checks, not on a gather helper)
+- `transitionBindings` from `resolveWorkflowCheckRegistry`
+- `archiveBindings` from `resolveWorkflowCheckRegistry`
+- `checkRegistry` from `resolveWorkflowCheckRegistry` (the executable registry, when the composition has one)
+
+It MUST NOT resolve `lifecycle`, `LifecycleEngine`, or `evaluateLifecycle`. `GetStatus` imports `evaluateLifecycle` as a module function.
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
 
 ## Constraints
 
-- The use case does not modify the change — it is a read-only query.
-- Artifact content is not loaded for lifecycle and artifact-status metadata. When task-completion projection is applicable, `GetStatus` delegates the required content reads to `CountTasks`.
-- The effective status computation may be delegated to `LifecycleEngine`; it is not an entity-owned concern of `Change`.
-- The lifecycle computation adds zero additional I/O beyond schema resolution — `VALID_TRANSITIONS` is a static lookup, while derived lifecycle interpretation is computed in memory from the loaded change, schema, and approval config.
-- `changePath` is obtained from `ChangeRepository.changePath(change)` which the repository already exposes.
+- Active `GetStatus` is an operational observation: after successful schema resolution it MAY persist only the validity effects selected by the single application reconciler. It MUST NOT independently mutate approval, verification, artifact, or lifecycle state. Drafted, archived, and schema-unavailable inspection remains read-only.
+- Artifact and linked implementation contents MAY be read to establish fresh validity facts. Ordinary artifact-status projection need not load full content except in the matching check execution. Applicable `workflow.taskCompletion` counts MUST be reused from that check; `CountTasks` MUST NOT run a second time for the same projection.
+- Effective lifecycle and review status MAY be delegated to `evaluateLifecycle` / `projectArtifacts`; the `Change` entity does not own dependency-aware presentation.
+- Schema-provider resolution failures, including `SchemaNotFoundError`, MUST produce the actionable `SCHEMA_RESOLUTION_FAILED` read-only status without refresh or reconciliation. Once schema resolution succeeds, failures of check execution or reconciliation MUST propagate rather than be swallowed by the schema-failure path.
+- `changePath` comes from `ChangeRepository.changePath(change)`.
 
 ## Spec Dependencies
 
@@ -232,3 +274,5 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)
 - [`core:count-tasks`](../count-tasks/spec.md) — supplies shared task-completion counts.
+- [`core:transition-checks`](../transition-checks/spec.md) — shared evaluation consumed by status projections.
+- [core:resolve-change-schema](../resolve-change-schema/spec.md) — named sovereign lookup, provider identity validation, and same-name version advisory

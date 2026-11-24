@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing package-boundary and deliverable scenarios remain valid.'

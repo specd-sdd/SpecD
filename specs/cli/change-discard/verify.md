@@ -72,3 +72,11 @@
 - **WHEN** `specd change discard old-experiment --reason "done" --format json` succeeds
 - **THEN** stdout is valid JSON with `result` equal to `"ok"` and `name` equal to `"old-experiment"`
 - **AND** the process exits with code 0
+
+### Requirement: CLI-rendered historical implementation guard hint
+
+#### Scenario: IMPLEMENTATION_DETECTED renders --force hint in change discard
+
+- **GIVEN** `DiscardChange` throws `HistoricalImplementationGuardError`
+- **WHEN** `specd change discard` handles the error without `--force`
+- **THEN** `handleError` receives the `change.discard` context and renders a `--force` hint on stderr and as `hint` in `json`/`toon` output

@@ -11,41 +11,50 @@
     "core:get-status",
     "core:transition-change",
     "core:archive-change",
-    "core:hook-execution-model"
+    "core:hook-execution-model",
+    "core:workflow-topology",
+    "core:check-registry"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/composition/use-cases/workflow-check-registry.ts"
+    },
+    {
+      "file": "core:src/domain/services/detect-spec-overlap.ts"
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Workflow step semantics: state=step name, requires artifact gating, hooks, taskCompletion checks.",
+      "value": "Schema workflow rows map lifecycle states to topology, artifact/task gates, checks, and boundary hooks.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:5865c596ff1ba22a31321bcd7e50b85d86547a611b595def6d71c0f88fb37864",
-          "lastModified": "2026-05-25T06:02:58.500Z"
+          "hash": "sha256:7626472116bcdb0813de9e011e84eace4d3e78538b7ff5fb5a7559d6410b0ca7",
+          "lastModified": "2026-10-22T15:09:47.156Z"
         },
         "verify.md": {
-          "hash": "sha256:ab90e870ac56a2accb79687d172b57bd9a69484b597848ed1411536ae8ac3e6e",
-          "lastModified": "2026-05-25T06:02:58.500Z"
+          "hash": "sha256:c6b40e39e2b04aaa984fecbd755ac0d35d4433609acfa31cce62a74079dee924",
+          "lastModified": "2026-10-22T14:47:46.158Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Workflow Model\n\n## Rules\n- `workflow[].step` = Change lifecycle state names; invalid → `InvalidStateTransitionError`. Schema selects visibility/order/gating — does not invent states.\n- Roles: designing (per-artifact CompileContext); implementing (once, artifacts review-complete); verifying (outcomes → implementing or designing); archiving (ArchiveChange atomic). `drifted-pending-review` → designing.\n- `requires` artifact IDs: state must be `complete|skipped` else InvalidStateTransitionError. Empty = ungated. missing/in-progress/pending-review/drifted-pending-review fail.\n- `requiresTaskCompletion` ⊂ `requires`, artifacts with `taskCompletionCheck`; validated in `buildSchema`. Check content via `incompletePattern` + `safeRegex` `'m'`; match → InvalidStateTransitionError `incomplete-tasks`. Absent array = no content gate.\n- Availability: `requires.every(id => state ∈ {complete,skipped})` — dynamic, uncached. Array order = display only, not sequential lock.\n- Step name IS target state. Hooks pre/post `run:`/`instruction:`; TransitionChange runs by default unless `skipHooks`. Agent-driven vs deterministic (ArchiveChange) modes.\n- Artifact DAG acyclic via buildSchema; step requires cannot form step cycles.\n\n## Constraints\n- States owned by Change entity. safeRegex fail/nested quantifiers → non-match (no throw). Archiving only step with dedicated use case.",
+      "value": "# Workflow Model\n\n## Rules\n- `workflow[].step` references non-drain `ChangeState`; configures extras only. Omitted canonical states stay enabled. Topology owns legal hops/pipeline.\n- `requires` holds artifact IDs; `requiresTaskCompletion` subset of requires. `workflow.requires` and `workflow.taskCompletion` evaluate gates; task pattern uses `safeRegex`.\n- Optional permits topology bypass only when effective step-skip predicates pass; disabled removes non-bedrock step. Core projects availability dynamically from predicate results.\n- Schema validates state names, declarations, governance, archive-only checks, DAG and task subset. Rows normalized to canonical order.\n- Hooks run at actual boundaries; `TransitionChange` predicates then effects. `ArchiveChange` owns archive operation.\n\n## Constraints\n- No hardcoded lifecycle sequence or agent-inferred bypass.\n- `CompileContext` never evaluates hops.\n- Drain approval states never workflow steps.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:5865c596ff1ba22a31321bcd7e50b85d86547a611b595def6d71c0f88fb37864",
-          "lastModified": "2026-05-25T06:02:58.500Z"
+          "hash": "sha256:7626472116bcdb0813de9e011e84eace4d3e78538b7ff5fb5a7559d6410b0ca7",
+          "lastModified": "2026-10-22T15:09:47.156Z"
         },
         "verify.md": {
-          "hash": "sha256:ab90e870ac56a2accb79687d172b57bd9a69484b597848ed1411536ae8ac3e6e",
-          "lastModified": "2026-05-25T06:02:58.500Z"
+          "hash": "sha256:c6b40e39e2b04aaa984fecbd755ac0d35d4433609acfa31cce62a74079dee924",
+          "lastModified": "2026-10-22T14:47:46.158Z"
         }
       }
     }

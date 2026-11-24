@@ -1,0 +1,21 @@
+- op: modified
+  description: 'Clarify inspection-only role vs project optimized-context mutation surface'
+  selector:
+    type: section
+    matches: '^Purpose$'
+  content: |
+    When debugging project context or verifying optimization status, users need to inspect the persisted state of project-level metadata. The `specd project metadata` command displays the full contents of the `project-metadata.json` file in a structured format. It is a read-only dump of the cache document (optimized, freshness, and generated blocks). Mutating or clearing the optimized context string is owned by `project optimized-context` (`cli:project-optimized-context`), not by this command.
+
+- op: added
+  description: 'Explicit non-mutation constraint for project metadata dump'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: Formatted output'
+  content: |
+    ### Requirement: Inspection only
+
+    The command MUST NOT accept payload flags (`--input`, `--text`, `--file`) and MUST NOT write or delete `project-metadata.json`. Writers MUST use `project optimized-context set` or `project optimized-context clear`.

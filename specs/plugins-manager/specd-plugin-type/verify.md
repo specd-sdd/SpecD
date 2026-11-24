@@ -7,19 +7,20 @@
 #### Scenario: Has required properties
 
 - **WHEN** a SpecdPlugin is created
-- **THEN** it has `name`, `type`, `version`, `configSchema`, `init()`, and `destroy()`
+- **THEN** it has `name`, `version`, `init()` and `destroy()`
+- **AND** it has no `type` and no `configSchema` property
 
 #### Scenario: Name and version sourced from manifest
 
-- **GIVEN** a plugin factory reads `specd-plugin.json` with `name: "my-plugin"` and `version: "1.2.3"`
+- **GIVEN** a plugin factory reads `specd-plugin.json` with `name: "@acme/my-plugin"` and `version: "1.2.3"`
 - **WHEN** the factory creates the plugin
-- **THEN** `plugin.name` is `"my-plugin"` and `plugin.version` is `"1.2.3"`
+- **THEN** `plugin.name` is `"@acme/my-plugin"` and `plugin.version` is `"1.2.3"`
 
-#### Scenario: Type remains hardcoded
+#### Scenario: Optional install hooks
 
-- **GIVEN** a plugin factory creates an AgentPlugin
-- **WHEN** `plugin.type` is accessed
-- **THEN** it returns `'agent'` regardless of manifest content
+- **GIVEN** a plugin that implements neither `install` nor `uninstall`
+- **WHEN** `isSpecdPlugin` is called on it
+- **THEN** it returns `true`
 
 ### Requirement: PluginContext
 
@@ -31,28 +32,198 @@
 
 ### Requirement: isSpecdPlugin type guard
 
-#### Scenario: Rejects unknown plugin type
+#### Scenario: Rejects unscoped name
 
-- **GIVEN** a value with all SpecdPlugin properties but `type` is `'unknown-type'`
+- **GIVEN** a value with all SpecdPlugin properties and `name` is `'my-plugin'`
 - **WHEN** `isSpecdPlugin` is called
 - **THEN** it returns `false`
 
-#### Scenario: Accepts known plugin type
+#### Scenario: Accepts scoped name
 
-- **GIVEN** a value with all SpecdPlugin properties and `type` is `'agent'`
+- **GIVEN** a value with all SpecdPlugin properties and `name` is `'@acme/my-plugin'`
 - **WHEN** `isSpecdPlugin` is called
 - **THEN** it returns `true`
 
-### Requirement: PluginType
+#### Scenario: Rejects non-function install
 
-#### Scenario: PluginType derived from PLUGIN_TYPES array
+- **GIVEN** a value with all SpecdPlugin properties and `install` is a string
+- **WHEN** `isSpecdPlugin` is called
+- **THEN** it returns `false`
 
-- **WHEN** PluginType is referenced
-- **THEN** it is derived from `(typeof PLUGIN_TYPES)[number]`
+### Requirement: Plugin manifest
 
-### Requirement: ConfigSchemaEntry
+#### Scenario: pluginType rejected
 
-#### Scenario: ConfigSchemaEntry defines type, description, and optional fields
+- **GIVEN** a manifest containing `pluginType: "agent"`
+- **WHEN** the manifest is validated
+- **THEN** validation fails with a typed error
 
-- **WHEN** ConfigSchemaEntry is used
-- **THEN** it includes `type`, `description`, and optional `default` and `required`
+#### Scenario: Other schemaVersion rejected
+
+- **GIVEN** a manifest with `schemaVersion: 1`
+- **WHEN** the manifest is validated
+- **THEN** validation fails with a typed error
+
+#### Scenario: contributes must be a map of maps
+
+- **GIVEN** a manifest whose `contributes.checks` is an array
+- **WHEN** the manifest is validated
+- **THEN** validation fails
+
+### Requirement: Plugin name
+
+#### Scenario: Valid scoped names
+
+- **WHEN** `@specd/plugin-agent-claude` and `@acme/specd-compliance` are validated
+- **THEN** both are accepted
+
+#### Scenario: Unscoped name rejected
+
+- **WHEN** `my-plugin` is validated
+- **THEN** it is rejected
+
+#### Scenario: Dot in scope or package rejected
+
+- **WHEN** `@acme/my.plugin` and `@ac.me/plugin` are validated
+- **THEN** both are rejected
+
+#### Scenario: Uppercase rejected
+
+- **WHEN** `@Acme/Plugin` is validated
+- **THEN** it is rejected
+
+### Requirement: Contribution identity and address
+
+#### Scenario: Address format
+
+- **GIVEN** plugin `@acme/specd-compliance` with contribution id `audit`
+- **WHEN** its address is built
+- **THEN** it is `@acme/specd-compliance.audit`
+
+#### Scenario: Id containing a dot rejected
+
+- **WHEN** a contribution id `a.b` is validated
+- **THEN** it is rejected
+
+#### Scenario: Building an address validates its parts
+
+- **WHEN** `buildContributionAddress` is called with an invalid plugin name or an id containing a dot
+- **THEN** `InvalidContributionAddressError` is thrown
+
+#### Scenario: Parsing failures use one error class
+
+- **WHEN** `parseContributionAddress` is called with `@acme/x` (no dot), `@acme/x.a.b`, `acme.a` (invalid plugin part) and `@acme/x.A` (invalid id part)
+- **THEN** each call throws `InvalidContributionAddressError`
+
+#### Scenario: Duplicate id across kinds rejected
+
+- **GIVEN** a manifest with `contributes.checks.audit` and `contributes.cliCommands.audit`
+- **WHEN** the manifest is validated
+- **THEN** validation fails with a duplicate contribution id error naming the plugin
+
+#### Scenario: Address with several dots invalid
+
+- **WHEN** the address `@acme/x.a.b` is parsed
+- **THEN** parsing fails
+
+### Requirement: Plugin configuration schema
+
+#### Scenario: Supported keywords accepted
+
+- **GIVEN** a `configSchema` using only `type`, `properties`, `required`, `items`, `enum`, `default` and `additionalProperties`
+- **WHEN** the manifest is validated
+- **THEN** it is accepted
+
+#### Scenario: Unsupported keyword rejected
+
+- **GIVEN** a `configSchema` containing `$ref` or `oneOf`
+- **WHEN** the manifest is validated
+- **THEN** validation fails with a typed error naming the plugin and the keyword
+
+#### Scenario: Non-object schema node rejected
+
+- **GIVEN** a `configSchema` whose root or a property is not an object
+- **WHEN** the manifest is validated
+- **THEN** `UnsupportedSchemaKeywordError` is thrown naming the plugin
+
+#### Scenario: Node shape validated
+
+- **GIVEN** a `configSchema` with `type: "null"`, a non-array `required`, a non-boolean `additionalProperties`, `items` as an array, an `enum` that is not an array, is empty or contains an object, or a nested node without `type`
+- **WHEN** the manifest is validated
+- **THEN** each is rejected with a typed error naming the plugin
+
+#### Scenario: Properties must be an object and nesting is bounded
+
+- **GIVEN** a `configSchema` whose `properties` is an array, or a schema nested deeper than 32 levels
+- **WHEN** the manifest is validated
+- **THEN** `UnsupportedSchemaKeywordError` is thrown naming the plugin and the keyword, and no stack overflow occurs
+
+#### Scenario: proto property is rejected
+
+- **GIVEN** a `configSchema` whose `properties` has an own `__proto__` key
+- **WHEN** the manifest is validated or the config is resolved
+- **THEN** `UnsupportedSchemaKeywordError` is thrown with the keyword `properties`
+
+#### Scenario: Config resolution validates the schema itself
+
+- **GIVEN** a `configSchema` with `enum: "fast"` that never went through the loader
+- **WHEN** the plugin config is resolved
+- **THEN** a typed error naming the plugin is thrown, not a `TypeError`
+
+#### Scenario: Config without schema rejected
+
+- **GIVEN** a plugin with no `configSchema` and a `config` object in `specd.yaml`
+- **WHEN** the config is validated
+- **THEN** validation fails with a typed error naming the plugin
+
+### Requirement: Contribution kind handler
+
+#### Scenario: Unknown kind rejected
+
+- **GIVEN** a manifest declaring `contributes.widgets` and no handler registered for `widgets`
+- **WHEN** the plugin is loaded
+- **THEN** loading fails with a typed error naming the plugin and the kind
+
+#### Scenario: Handler validatePlugin receives plugin and name
+
+- **GIVEN** a handler with `validatePlugin(plugin, pluginName)` that throws
+- **WHEN** a plugin declaring that kind is loaded
+- **THEN** loading fails with the thrown `PluginValidationError`
+- **AND** the handler was called with the plugin and its name
+
+#### Scenario: Duplicate handler kind rejected
+
+- **GIVEN** two handlers declaring the same `kind`
+- **WHEN** the loader or `registerPlugins` is set up
+- **THEN** `DuplicateHandlerKindError` is thrown
+
+#### Scenario: Install-time-only kind
+
+- **GIVEN** a handler without `activate`
+- **WHEN** the plugin is registered at runtime
+- **THEN** nothing is activated for that kind and no error occurs
+
+### Requirement: Plugin lifecycles
+
+#### Scenario: Install does not call init
+
+- **WHEN** a plugin is installed
+- **THEN** `install` receives the selected contribution ids and `init` is not called
+
+#### Scenario: Install context carries options
+
+- **WHEN** a plugin is installed with plugin-specific options
+- **THEN** `context.options` equals the options passed by the caller
+
+#### Scenario: Mixed-kind plugin receives agents ids only
+
+- **GIVEN** a plugin declaring `agents` contribution `claude` and a `checks` contribution `audit`
+- **WHEN** it is installed with both selected
+- **THEN** `install` receives `contributions` equal to `['claude']`
+- **AND** the install output reports `['claude']`
+
+#### Scenario: Runtime calls init for every plugin
+
+- **GIVEN** two configured plugins
+- **WHEN** a host registers plugins
+- **THEN** `init` is called once on each, in list order

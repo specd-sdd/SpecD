@@ -1,0 +1,22 @@
+- op: added
+  description: Resolve the artifact model from the change's sovereign schema
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Behaviour'
+  content: |
+    ### Requirement: Artifact model from the change's schema
+
+    The artifact DAG walked by `--all`, the artifact IDs accepted by `--artifact`, and the scope of each artifact (`change` or `spec`) SHALL come from the change's sovereign schema, resolved through `ResolveChangeSchema` (directly or through the core use cases). The command MUST NOT build the DAG or resolve artifact IDs from the workspace default schema. When the change's schema cannot be resolved — in every mode, including single-spec validation without `--artifact` where the core use case performs the resolution — the command SHALL exit with code 3 and print a `fatal:` message to stderr, per [`cli:entrypoint`](../entrypoint/spec.md). `SchemaProviderIdentityMismatchError` SHALL be reported as such: structured output SHALL carry the error's own code (`SCHEMA_PROVIDER_IDENTITY_MISMATCH`) rather than the generic `SCHEMA_RESOLUTION_FAILED`. Resolver advisories (`warnings`) SHALL be rendered, not discarded.
+
+- op: added
+  description: Declare the shared sovereign change-schema resolution dependency
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [`core:resolve-change-schema`](../../core/resolve-change-schema/spec.md) — sovereign change schema lookup, identity integrity, and version advisory

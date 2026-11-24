@@ -3,7 +3,7 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["cli:entrypoint", "core:change"],
+  "dependsOn": ["cli:entrypoint", "core:change", "core:transition-checks"],
   "implementation": [
     {
       "file": "cli:src/commands/change/approve.ts"

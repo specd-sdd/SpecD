@@ -4,7 +4,12 @@
     "version": 1
   },
   "dependsOn": ["core:artifact-ast", "core:selector-model", "core:schema-format"],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/infrastructure/artifact-parser/_shared/apply-delta.ts",
+      "symbols": ["applyDelta"]
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Structured YAML deltas atomically modify Markdown, JSON, YAML, and plain-text AST artifacts.",

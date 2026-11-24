@@ -20,7 +20,7 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Application FileReader port reads UTF-8 by absolute path, returning null for missing files without importing node:fs.",
+      "value": "FileReader supplies UTF-8 reads behind a hexagonal port, returning null only for missing files and optionally enforcing a base path.",
       "schema": {
         "name": "schema-std",
         "version": 1
@@ -28,16 +28,16 @@
       "artifactState": {
         "spec.md": {
           "hash": "sha256:a5b2615bf9592696d8bc3e64862d794f04ef510caa700d5e91371abb02136397",
-          "lastModified": "2026-09-25T16:14:41.336Z"
+          "lastModified": "2026-09-28T11:19:59.132Z"
         },
         "verify.md": {
           "hash": "sha256:d60b7f8af081809dfef6153c04a95f6b3146398390e1abb0b20f04d1a219e321",
-          "lastModified": "2026-09-25T16:14:41.337Z"
+          "lastModified": "2026-09-28T11:19:59.133Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# FileReader Port\n\n## Rules\n\n- TypeScript `interface` named `FileReader` with single method `read`. NOT abstract class (no shared constructor invariants).\n- `read(absolutePath: string): Promise<string | null>` — UTF-8 text.\n- Missing file → return `null`; MUST NOT throw for missing files.\n- Non-ENOENT filesystem errors (e.g. permission denied) MUST propagate by throwing. Only `ENOENT` → `null`.\n- Implementations MAY accept optional `basePath` at construction. When configured, reject resolved path escaping base via `PathTraversalError`. Escape detection: after resolve, candidate inside when relative from `basePath` empty OR does not start with `..` and is not absolute. Drive-letter case MUST NOT make inside look outside. String prefix of `basePath` + separator MUST NOT be escape test.\n- MUST `path.resolve` before read or traversal check so `..` normalised.\n\n## Constraints\n\n- Lives in `application/ports/` per hexagonal rule.\n- No direct `node:fs` or I/O at port level.\n- Return type `string | null`, not `Buffer` — all reads UTF-8 text.\n- `null` sentinel for missing file; no custom missing-file error type.\n",
+      "value": "# FileReader Port\n\n## Rules\n- TypeScript interface `FileReader`, not abstract class; single `read(absolutePath: string): Promise<string | null>`.\n- Read UTF-8 text. Missing path (`ENOENT`) returns `null`; every other filesystem error propagates.\n- Implementations resolve input before reading or traversal checks.\n- Optional constructor `basePath` constraint rejects escaped resolved paths with `PathTraversalError`.\n- Inside-root rule: relative path from resolved base is empty, or neither begins with `..` nor is absolute. Handle drive-letter case; never use string-prefix-plus-separator test.\n\n## Constraints\n- Port lives `application/ports/`; no `node:fs` or I/O dependency at port level.\n- Return type `string | null`, never `Buffer`; `null` exclusively means absent file.",
       "schema": {
         "name": "schema-std",
         "version": 1
@@ -45,11 +45,11 @@
       "artifactState": {
         "spec.md": {
           "hash": "sha256:a5b2615bf9592696d8bc3e64862d794f04ef510caa700d5e91371abb02136397",
-          "lastModified": "2026-09-25T16:14:41.336Z"
+          "lastModified": "2026-09-28T11:19:59.132Z"
         },
         "verify.md": {
           "hash": "sha256:d60b7f8af081809dfef6153c04a95f6b3146398390e1abb0b20f04d1a219e321",
-          "lastModified": "2026-09-25T16:14:41.337Z"
+          "lastModified": "2026-09-28T11:19:59.133Z"
         }
       }
     }

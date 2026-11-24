@@ -13,38 +13,34 @@
 
 #### Scenario: Description provided with no spec changes
 
-- **GIVEN** a change with description "Original description"
-- **WHEN** `EditChange.execute` is called with description but no addSpecIds/removeSpecIds
-- **THEN** the change description is updated
-- **AND** `invalidated` returns `false`
+- **GIVEN** a change with description "Original description" and no separate input drift
+- **WHEN** `EditChange.execute` receives only a new description
+- **THEN** the description is updated and `scopeChanged`, `validityChanged`, and `invalidated` are false
 
 #### Scenario: Both add and remove are absent
 
-- **GIVEN** a change exists
-- **WHEN** `EditChange.execute` is called with no addSpecIds, no removeSpecIds, no description
-- **THEN** the use case returns unchanged change
-- **AND** no mutation is performed
+- **GIVEN** a current change with no separate drift or pending recovery
+- **WHEN** `execute` receives no addSpecIds, removeSpecIds, description, or policy changes
+- **THEN** it returns the unchanged change without a persistence-worthy mutation
 
 #### Scenario: Both add and remove are empty arrays
 
-- **GIVEN** a change exists
-- **WHEN** `EditChange.execute` is called with empty arrays for addSpecIds and removeSpecIds
-- **THEN** the use case returns unchanged change
-- **AND** no mutation is performed
+- **GIVEN** a current change with no separate drift or pending recovery
+- **WHEN** `execute` receives empty addSpecIds and removeSpecIds and no other edit
+- **THEN** it returns the unchanged change without a persistence-worthy mutation
 
-#### Scenario: Description and addSpecIds together
+#### Scenario: Description and addSpecIds together without existing evidence
 
-- **GIVEN** a change with description "Original"
-- **WHEN** `EditChange.execute` is called with both addSpecIds and description
-- **THEN** both are applied atomically
-- **AND** `invalidated` is `true` because specIds changed
+- **GIVEN** a change with no approval or completed verification evidence and no separate drift
+- **WHEN** `execute` receives a new spec ID and description together
+- **THEN** both edits are applied and `scopeChanged` is true
+- **AND** `validityChanged` and its compatibility alias `invalidated` are false
 
 #### Scenario: addSpecIds with no effective change
 
-- **GIVEN** a change containing the spec already
-- **WHEN** `EditChange.execute` is called adding a spec already in specIds
-- **THEN** specIds unchanged (idempotent)
-- **AND** `invalidated` is `false` because updateSpecIds was not called
+- **GIVEN** a current change already containing the spec with no separate input drift
+- **WHEN** `execute` adds that same spec again
+- **THEN** scope remains unchanged and `scopeChanged`, `validityChanged`, and `invalidated` are false
 
 ### Requirement: Description update does not invalidate
 
@@ -57,12 +53,14 @@
 
 ### Requirement: Removal precedes addition
 
+Scenarios:
+
 #### Scenario: Remove and add in same call
 
-- **GIVEN** a change with `specIds: ['default:auth/login', 'default:billing/invoices']`
-- **WHEN** `execute` is called with `removeSpecIds: ['default:auth/login']` and `addSpecIds: ['default:auth/signup']`
-- **THEN** the resulting `specIds` are `['default:billing/invoices', 'default:auth/signup']`
-- **AND** `invalidated` is `true`
+- **GIVEN** a change with `specIds: ['default:auth/login', 'default:billing/invoices']`, no approval or completed verification evidence, and no separate drift
+- **WHEN** `execute` receives `removeSpecIds: ['default:auth/login']` and `addSpecIds: ['default:auth/signup']`
+- **THEN** the resulting specIds are `['default:billing/invoices', 'default:auth/signup']` and `scopeChanged` is true
+- **AND** `validityChanged` and `invalidated` are false because no existing evidence became invalid
 
 ### Requirement: Removal of absent spec throws
 
@@ -85,23 +83,9 @@
 
 #### Scenario: Persisted dependency state seeds new spec entry
 
-- **GIVEN** a persisted spec being added to the change has semantic dependency state available through `readPersistedDependsOn(spec)`
+- **GIVEN** a persisted spec being added to the change has persisted state available through `readPersistedState(spec)`
 - **WHEN** `EditChange.execute` adds that spec to the change
-- **THEN** the seeded `change.specDependsOn` entry comes from that semantic persisted state
-
-#### Scenario: Legacy metadata seeds when persisted semantic state is absent
-
-- **GIVEN** a persisted spec being added has no semantic persisted dependency state
-- **AND** `metadata.json.dependsOn` exists for that spec
-- **WHEN** `EditChange.execute` adds that spec
-- **THEN** the seeded `change.specDependsOn` entry comes from `metadata.json.dependsOn`
-
-#### Scenario: Stale metadata still seeds as legacy fallback
-
-- **GIVEN** a persisted spec being added has no semantic persisted dependency state
-- **AND** `metadata.json.dependsOn` exists for that spec but the metadata is marked stale
-- **WHEN** `EditChange.execute` adds that spec
-- **THEN** the seeded `change.specDependsOn` entry still comes from the persisted metadata dependency list
+- **THEN** the seeded `change.specDependsOn` entry equals the `dependsOn` of that persisted state
 
 #### Scenario: Existing in-change dependency snapshot is not overwritten
 
@@ -109,6 +93,13 @@
 - **AND** `change.specDependsOn` already contains an entry for it
 - **WHEN** later scope edits run
 - **THEN** `EditChange` does not overwrite that existing dependency snapshot automatically
+
+#### Scenario: Absent persisted state seeds an empty dependency list
+
+- **GIVEN** a spec being added to the change has no persisted state (or does not exist in its repository)
+- **WHEN** `EditChange.execute` adds that spec
+- **THEN** the seeded `change.specDependsOn` entry is an empty array
+- **AND** `metadata.json.dependsOn` is not consulted
 
 ### Requirement: No-op when specIds unchanged after processing
 
@@ -121,28 +112,31 @@
 
 ### Requirement: Approval invalidation on effective change
 
-#### Scenario: Adding a new spec triggers invalidation
+Scenarios:
 
-- **GIVEN** a change with `specIds: ['default:auth/login']`
-- **WHEN** `execute` is called with `addSpecIds: ['default:billing/invoices']`
-- **THEN** `change.updateSpecIds` is called with the new spec list and the resolved actor
-- **AND** the change is persisted via `ChangeRepository.mutate(input.name, fn)`
-- **AND** `invalidated` is `true`
+#### Scenario: Scope change reconciles fingerprints atomically
 
-#### Scenario: Removing a spec triggers invalidation
+- **WHEN** effective spec scope changes
+- **THEN** affected artifact review and evidence are updated in the same mutation
+- **AND** required stale spec consent returns to design from a state after `ready` while ungated preserve retains state
 
-- **GIVEN** a change with `specIds: ['default:auth/login', 'default:billing/invoices']`
-- **WHEN** `execute` is called with `removeSpecIds: ['default:billing/invoices']`
-- **THEN** `change.updateSpecIds` is called with `['default:auth/login']` and the resolved actor
-- **AND** the change is persisted through the repository mutation callback
-- **AND** `invalidated` is `true`
+#### Scenario: Scope change always affects spec consent but not unrelated evidence
 
-#### Scenario: Effective change is applied on the freshest persisted spec list
+- **WHEN** the canonical spec set changes but verification or sign-off inputs remain equal
+- **THEN** spec approval becomes stale with explicit added or removed spec differences
+- **AND** unaffected verification or sign-off remains unchanged with history retained
 
-- **GIVEN** another operation updates the same change before the edit persistence step starts
-- **WHEN** `EditChange.execute` performs its effective update
-- **THEN** the mutation callback receives the freshest persisted `specIds`
-- **AND** the edit is applied on top of that state instead of overwriting it with an older snapshot
+#### Scenario: Scope reordering is not a semantic change
+
+- **WHEN** an edit only reorders or duplicates inputs that normalize to the approved canonical spec set
+- **THEN** spec approval remains valid and no scope-change invalidation event is appended
+
+#### Scenario: Scope change in ready keeps the change in ready
+
+- **GIVEN** a change in `ready` with valid required spec consent
+- **WHEN** effective spec scope changes
+- **THEN** the approval is reported stale and no automatic return is committed
+- **AND** the change stays in `ready` so consent can be renewed there
 
 ### Requirement: Directory cleanup on removal
 
@@ -172,8 +166,15 @@
 #### Scenario: Spec removal triggers implementation tracking refresh
 
 - **GIVEN** a change with confirmed implementation links and configured `refreshImplementationTracking`
-- **WHEN** `EditChange.execute` is called removing a spec from `specIds`
-- **THEN** `refreshImplementationTracking.execute({ name })` is invoked to sweep dangling links
+- **WHEN** `EditChange.execute` removes a spec from canonical `specIds`
+- **THEN** `refreshImplementationTracking.execute({ name })` sweeps dangling links
+
+#### Scenario: Ungated preserve scope edit refreshes without validity change
+
+- **GIVEN** a change with no existing approval or verification evidence and workflow `preserve`
+- **WHEN** an edit adds a canonical spec ID
+- **THEN** `scopeChanged` is true and tracking refresh runs
+- **AND** `validityChanged` and the compatibility `invalidated` field may remain false
 
 ### Requirement: Input contract
 
@@ -184,37 +185,44 @@
 
 ### Requirement: Invalidation policy edits
 
-#### Scenario: Editing invalidationPolicy persists the new value
+Scenarios:
 
-- **GIVEN** a change persisted with `invalidationPolicy: 'downstream'`
-- **WHEN** `EditChange.execute` is called with `invalidationPolicy: 'none'`
-- **THEN** the saved change uses `invalidationPolicy: 'none'`
+#### Scenario: Policy-only edit changes no current validity
 
-#### Scenario: Editing invalidationPolicy does not invent drift
+- **WHEN** one structured policy dimension is edited without other input changes
+- **THEN** the v2 policy is persisted without invented drift, review, or lifecycle movement
 
-- **GIVEN** a file with `hasDrift: false`
-- **WHEN** only `invalidationPolicy` is updated
-- **THEN** `hasDrift` remains `false`
+#### Scenario: Repeating the same policy is a no-op
+
+- **WHEN** an edit supplies the already persisted structured policy
+- **THEN** no persistence-worthy policy change or invalidation is reported
 
 #### Scenario: Unknown invalidation policy rejected
 
 - **GIVEN** a change exists
-- **WHEN** `execute` is called with `invalidationPolicy: 'sugical'`
+- **WHEN** `execute` is called with `invalidation: { artifacts: 'sugical' }`
 - **THEN** `InvalidInputError` is thrown quoting `sugical` and listing `none`, `surgical`, `downstream`, `global`
 - **AND** nothing is persisted
 
 #### Scenario: Invalid invalidation policy is rejected together with valid edits
 
 - **GIVEN** a change exists
-- **WHEN** `execute` is called with `description: 'x'` and `invalidationPolicy: 'bogus'`
+- **WHEN** `execute` is called with `description: 'x'` and `invalidation: { workflow: 'bogus' }`
 - **THEN** `InvalidInputError` is thrown and the description is not changed
 
 ### Requirement: Output contract
 
-#### Scenario: execute returns EditChangeResult
+Scenarios:
 
-- **WHEN** `EditChange.execute` completes
-- **THEN** it returns `EditChangeResult` with `change` (the Change entity) and `invalidated` (boolean)
+#### Scenario: Result distinguishes edits from invalidation
+
+- **WHEN** description or policy alone changes
+- **THEN** output reports the edit without claiming projection invalidation unless fresh reconciliation found separate drift
+
+#### Scenario: Scope edit reports committed recovery
+
+- **WHEN** a scope edit changes evidence and triggers a return
+- **THEN** result includes `scopeChanged`, actual validity change, affected files, projection changes, effective policy, blockers, next action, and automatic return
 
 ### Requirement: Dependencies
 
@@ -228,10 +236,11 @@
 - **WHEN** `EditChange` is instantiated
 - **THEN** it requires an `ActorResolver` port in its constructor
 
-#### Scenario: Uses spec repositories map for existence checks and dependency seeding
+#### Scenario: Uses ListWorkspaces for repository views and dependency seeding
 
-- **WHEN** `EditChange` is instantiated
-- **THEN** it requires a `ReadonlyMap<string, SpecRepository>` for spec existence checks and persisted dependency seeding
+- **WHEN** `EditChange` is instantiated through direct dependencies or the config factory
+- **THEN** it receives `ListWorkspaces` and obtains the relevant `SpecRepository` views from it
+- **AND** it does not require a separate `ReadonlyMap<string, SpecRepository>` constructor argument
 
 ### Requirement: Config-based factory delegates through resolveEditChangeDeps
 
@@ -249,12 +258,6 @@
 - **AND** the factory delegates to canonical `createEditChange(deps)`
 
 ### Requirement: Schema compatibility guardrail
-
-#### Scenario: Uninitialized spec fallback allows addition if global schema matches change
-
-- **GIVEN** a spec with no persisted semantic state
-- **WHEN** the spec is included in `addSpecIds` on a change using the global project schema
-- **THEN** the edit succeeds
 
 #### Scenario: Adding a spec with identical schema succeeds
 
@@ -275,6 +278,42 @@
 - **AND** the Change uses `schema-ui` (no compat mapping to `schema-api`)
 - **WHEN** the spec is included in `addSpecIds`
 - **THEN** the use case throws `IncompatibleSchemaError` and the change is not modified
+
+#### Scenario: Uninitialized spec is compatible without consulting the global schema
+
+- **GIVEN** a change whose `schemaName` is `custom-workflow`
+- **AND** an added spec with no persisted semantic state
+- **AND** a workspace default schema that is incompatible with `custom-workflow`
+- **WHEN** `EditChange` validates the added spec
+- **THEN** the spec is accepted as compatible
+- **AND** `GetActiveSchema` and the workspace default are never consulted
+
+### Requirement: Sovereign schema resolution
+
+#### Scenario: Added-spec compatibility ignores a different workspace default
+
+- **GIVEN** a change whose `schemaName` is `custom-workflow`
+- **AND** the workspace default is another schema with incompatible compatibility declarations
+- **WHEN** `EditChange` validates an added spec
+- **THEN** it calls `SchemaProvider.get('custom-workflow')`
+- **AND** decides compatibility using the custom schema only
+
+#### Scenario: Serialized reconciliation owns artifact topology
+
+- **GIVEN** the fresh change loaded inside `ChangeRepository.mutate` records `schemaName: 'custom-workflow'`
+- **AND** the workspace default exposes a different artifact DAG
+- **WHEN** `EditChange` applies the canonical scope edit
+- **THEN** it updates the fresh entity through `replaceSpecIds()` and invokes `ctx.reconcileAfter()`
+- **AND** it does not call `updateSpecIds()` or perform a second direct `SchemaProvider.get()` lookup
+- **AND** the reconciler determines artifact topology and validity from the fresh persisted change
+
+#### Scenario: Schema resolution failure leaves scope unchanged
+
+- **GIVEN** the serialized mutation callback has invoked `replaceSpecIds()` on the fresh aggregate
+- **WHEN** `ctx.reconcileAfter()` then rejects
+- **THEN** the corresponding error propagates
+- **AND** no partial scope mutation is persisted
+- **AND** persisted spec IDs, history, artifact topology, and validity remain unchanged
 
 ### Requirement: Spec ID validation
 
@@ -358,3 +397,11 @@
 
 - **WHEN** an SDK caller adds a readOnly spec
 - **THEN** the same rejection applies without the CLI
+
+### Requirement: Host-neutral SpecNotInChangeError
+
+#### Scenario: SpecNotInChangeError omits CLI command syntax
+
+- **WHEN** `EditChange` throws `SpecNotInChangeError` for an absent `specId`
+- **THEN** `error.message` does not contain `specd specs show`
+- **AND** `error.specId` and `error.changeName` are exposed as metadata properties

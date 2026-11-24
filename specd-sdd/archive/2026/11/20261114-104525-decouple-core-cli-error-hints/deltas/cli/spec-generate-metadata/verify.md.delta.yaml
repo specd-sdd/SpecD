@@ -1,0 +1,30 @@
+- op: modified
+  description: 'Verify --force hint rendered by specs generate-metadata on DependsOnOverwriteError'
+  selector:
+    type: section
+    matches: 'Requirement: Error — dependsOn overwrite'
+  content: |
+    #### Scenario: dependsOn change exits 1 with --force hint
+
+    - **GIVEN** existing metadata has `dependsOn: [core:config, core:schema-format]`
+    - **AND** the regenerated metadata has `dependsOn: [core:change]`
+    - **WHEN** `specd spec generate-metadata auth/login` is invoked without `--force`
+    - **THEN** stderr includes `error: dependsOn would change` and a hint mentioning `--force`
+    - **AND** exits with code 1
+    - **AND** stdout is empty
+
+    #### Scenario: JSON output on dependsOn error includes hint
+
+    - **GIVEN** existing metadata has `dependsOn: [core:config]`
+    - **AND** the regenerated metadata has `dependsOn: [core:change]`
+    - **WHEN** `specd spec generate-metadata auth/login --format json` is invoked without `--force`
+    - **THEN** the command exits with code 1
+    - **AND** stderr contains `error: dependsOn would change`
+    - **AND** the structured error payload includes a `hint` mentioning `--force`
+
+    #### Scenario: --force bypasses dependsOn check
+
+    - **GIVEN** existing metadata has `dependsOn: [core:config]`
+    - **AND** the regenerated metadata has `dependsOn: [core:change]`
+    - **WHEN** `specd spec generate-metadata auth/login --force` is invoked
+    - **THEN** the write succeeds

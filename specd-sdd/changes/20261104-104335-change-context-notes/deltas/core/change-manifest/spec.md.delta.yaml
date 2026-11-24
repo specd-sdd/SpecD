@@ -1,0 +1,9 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Current note snapshot and actor IDs
+
+    The manifest SHALL persist top-level notes independently of append-only history; absent legacy notes hydrate as an empty collection without event backfill. Preserve UUID, ISO timestamp, full stored actor (including optional legacy/must-preserve new id), text and the complete anyOf policy. Preserve optional transitioned.reason and note-added/note-removed payloads. Extend shared actor schemas across by, startedBy, completedBy and archivedBy to retain id. Accept legacy missing actor IDs without fabricating pre-privacy IDs or rewriting prior events. Note-only changes SHALL participate in the mutation stamp and atomic writes, including storage moves and archive restore.

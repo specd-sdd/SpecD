@@ -8,14 +8,19 @@ import { type ContextWarning } from './context-warning.js'
  * @param getMetadata - Metadata materialization use case
  * @param specId - Canonical spec identifier
  * @param warnings - Mutable warning sink for materialization diagnostics
+ * @param schemaName - Change schema to extract with when the spec is part of a change
  * @returns Materialized metadata projection
  */
 export async function materializeContextSpecMetadata(
   getMetadata: GetSpecMetadata,
   specId: string,
   warnings: ContextWarning[],
+  schemaName?: string,
 ): Promise<SpecMetadata> {
-  const result = await getMetadata.execute({ specId })
+  const result = await getMetadata.execute({
+    specId,
+    ...(schemaName !== undefined ? { schemaName } : {}),
+  })
   appendMaterializationDiagnostics(specId, result, warnings)
   return result.metadata
 }

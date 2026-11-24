@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Change manifest root schema object serialization requirements reconciled from main merge'

@@ -3,6 +3,7 @@ import { loadConfig } from '../../load-config.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { type SpecdConfig } from '@specd/sdk'
+import { renderConfigShapeHelp } from './config-shape.js'
 
 /**
  * Renders a human-readable text summary of the config.
@@ -58,10 +59,14 @@ function renderText(config: SpecdConfig): string[] {
     lines.push('', `schemaPlugins: ${config.schemaPlugins.join(', ')}`)
   }
 
-  if (config.plugins?.agents !== undefined && config.plugins.agents.length > 0) {
-    lines.push('', 'plugins:', '  agents:')
-    for (const plugin of config.plugins.agents) {
-      lines.push(`    ${plugin.name}  (present)`)
+  if (config.plugins !== undefined && config.plugins.length > 0) {
+    lines.push('', 'plugins:')
+    for (const plugin of config.plugins) {
+      const contributions =
+        plugin.contributions !== undefined && plugin.contributions.length > 0
+          ? ` [contributions: ${plugin.contributions.join(', ')}]`
+          : ''
+      lines.push(`  ${plugin.name}  (present)${contributions}`)
     }
   }
 
@@ -89,14 +94,9 @@ export function registerConfigShow(parent: Command): void {
     .addHelpText(
       'after',
       `
-JSON/TOON output schema:
-  {
-    projectRoot: string
-    schemaRef: string
-    workspaces: Array<{ name: string, specsPath: string, ownership: string, isExternal: boolean }>
-    storage: { changesPath: string, draftsPath: string, discardedPath: string, archivePath: string }
-    approvals: { spec: boolean, signoff: boolean }
-  }
+JSON/TOON output is the resolved SpecdConfig (all fields may be omitted when unset):
+${renderConfigShapeHelp()}
+Plugin names are scoped (@scope/name): ^@[a-z0-9][a-z0-9_-]*/[a-z0-9][a-z0-9_-]*$
 `,
     )
     .action(async (opts: { format: string; config?: string }) => {

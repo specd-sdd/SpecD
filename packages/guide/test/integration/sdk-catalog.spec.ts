@@ -161,7 +161,7 @@ describe('SDK collection', () => {
     const guides = await sdkEngine.listGuides({ scope: { generated: false } })
     expect(guides.pagination.total).toBeGreaterThan(0)
     // The scope still reports what it withholds, so a caller can reveal it.
-    expect(guides.withheld?.generatedTopics).toBe(1490)
+    expect(guides.withheld?.generatedTopics).toBe(1728)
     expect(guides.topics.every((g) => !isGeneratedTopic(g.topic))).toBe(true)
   })
 
@@ -299,7 +299,7 @@ describe('SDK collection', () => {
 describe('Catalog isolation', () => {
   it('serves the same user catalog whether or not the SDK catalog is present', async () => {
     const userCatalog = await userEngine.listGuides()
-    expect(userCatalog.topics).toHaveLength(22)
+    expect(userCatalog.topics).toHaveLength(23)
     expect(userCatalog.topics.every((g) => g.collection === 'guide')).toBe(true)
   })
 

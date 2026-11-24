@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'The transition contract already defines registered checks, effects, and skip-hook behavior; implementation reconciliation only.'

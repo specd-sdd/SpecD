@@ -1,0 +1,22 @@
+- op: added
+  description: Resolve the artifact model from the change's sovereign schema
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Output format'
+  content: |
+    ### Requirement: Artifact listing from the change's schema
+
+    The artifacts listed, their schema-declared order, and their `delta` flags SHALL come from the change's sovereign schema, resolved through `ResolveChangeSchema`. The workspace default schema MUST NOT be consulted. Schema resolution failures and `SchemaProviderIdentityMismatchError` SHALL be reported as errors with a non-zero exit code.
+
+- op: added
+  description: Declare the shared sovereign change-schema resolution dependency
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [`core:resolve-change-schema`](../../core/resolve-change-schema/spec.md) — sovereign change schema lookup, identity integrity, and version advisory

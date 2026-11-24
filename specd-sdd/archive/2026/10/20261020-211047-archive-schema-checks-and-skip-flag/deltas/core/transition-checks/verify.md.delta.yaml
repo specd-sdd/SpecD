@@ -1,0 +1,238 @@
+- op: modified
+  selector:
+    type: section
+    matches: ^Requirement:\ Dynamic\ runtime\ binding\ composition\ and\ cascaded\ config\ resolution$
+  content: |
+    #### Scenario: Target step incorporates schema-declared checks with step-level config
+
+    - **GIVEN** a schema workflow step `implementing` declaring a custom check `@security.code-scan` with `config: { severity: 'critical' }`
+    - **WHEN** `resolveEffectiveBindings` resolves bindings for target step `implementing`
+    - **THEN** a transition binding for `@security.code-scan` is synthesized
+    - **AND** the check receives `{ severity: 'critical' }` in `ctx.config`
+
+    #### Scenario: Schema disabled check is omitted from matching execution
+
+    - **GIVEN** a schema workflow step declaring `impl.linksInScope: { disabled: true }`
+    - **WHEN** `resolveEffectiveBindings` resolves bindings for that step
+    - **THEN** `impl.linksInScope` is excluded from the active evaluation list
+
+    #### Scenario: Bypassed step incorporates schema-declared skipChecks
+
+    - **GIVEN** a schema workflow step `implementing` declaring a skip check `@qa.verify-clean`
+    - **WHEN** `resolveEffectiveBindings` resolves step-skip bindings for bypassed step `implementing`
+    - **THEN** a step-skip binding for `@qa.verify-clean` is synthesized under `scope: 'step-skip'`
+
+    #### Scenario: Synthesized bindings preserve restrictive governance
+
+    - **GIVEN** a registered check whose governance sets `allowBindingOverride`, `allowConfigOverride`, and `allowDisable` to false
+    - **WHEN** `resolveEffectiveBindings` synthesizes a transition or step-skip coordinate for it
+    - **THEN** all three effective lock values remain false
+    - **AND** no synthesized binding relaxes registry governance
+
+    #### Scenario: Cascaded config resolution deep merges check, binding, and step configs
+
+    - **GIVEN** a check with `defaultConfig: { timeout: 1000, tags: ['a'] }`
+    - **AND** a binding with `config: { timeout: 2000, tags: ['b'] }`
+    - **AND** a schema step check with `config: { retries: 3 }`
+    - **WHEN** the binding is resolved by `resolveEffectiveBindings` and then executed by the predicate runner (the real end-to-end path, not the runner alone)
+    - **THEN** `ctx.config` contains exactly `{ timeout: 2000, tags: ['a', 'b'], retries: 3 }`
+    - **AND** no array entry is duplicated (for example `tags` is not `['a', 'b', 'a', 'b']`)
+
+    #### Scenario: Disabling a step check leaves its skip check intact
+
+    - **GIVEN** an optional step `implementing` whose `checks` declares `impl.linksInScope` with `disabled: true`
+    - **AND** whose `skipChecks` declares `impl.linksInScope` enabled
+    - **WHEN** a transition enters `implementing` and, separately, a transition bypasses it
+    - **THEN** `impl.linksInScope` does not run on the transition entering `implementing`
+    - **AND** it runs as a `step-skip` predicate when `implementing` is bypassed
+
+    #### Scenario: Disabling a skip check leaves the step check intact
+
+    - **GIVEN** an optional step whose `skipChecks` disables a Category C check that its `checks` keeps enabled
+    - **WHEN** a transition enters the step
+    - **THEN** the check still runs on that transition coordinate
+
+    #### Scenario: Step checks ignore non-matching along and from
+
+    - **GIVEN** a step `verifying` declaring a check with default `along: forward` and `from: '*'`
+    - **AND** another check on the same step declaring `from: 'implementing'`
+    - **WHEN** the attempts `done → verifying` (backward), `ready → verifying` (forward shortcut), and `implementing → verifying` are evaluated
+    - **THEN** neither check runs on `done → verifying`
+    - **AND** only the first check runs on `ready → verifying`
+    - **AND** both checks run on `implementing → verifying`
+
+    #### Scenario: Overlay of a default-bound check honors the declaration's from and along
+
+    - **GIVEN** `verifying.checks` declares `impl.linksInScope` (which has a code-defined binding entering `verifying`) with `config: { strict: true }` and default `along: forward`
+    - **WHEN** the attempts `done → verifying` (backward), `ready → verifying` (forward shortcut), and `implementing → verifying` are resolved and executed
+    - **THEN** the step-configured binding does not run on `done → verifying`
+    - **AND** it runs with `{ strict: true }` on both forward attempts
+
+    #### Scenario: Wildcard step-skip row is narrowed per bypassed step
+
+    - **GIVEN** a plugin check registered with a default `step-skip` binding for `step: '*'`
+    - **AND** `implementing` and `verifying` are optional and each declares that check in `skipChecks` with a different `config`
+    - **WHEN** a shortcut `ready → done` bypasses both steps
+    - **THEN** each step-skip attempt runs the check once with its own step's configuration
+    - **AND** the binding resolved for `implementing` does not match the `verifying` attempt
+
+    #### Scenario: Predicate runner executes only resolved bindings
+
+    - **GIVEN** a step declaration for a check whose code-defined row is claimed by an overlay that does not match the current attempt
+    - **WHEN** the predicate runner evaluates that attempt
+    - **THEN** the check does not run through any fallback path
+    - **AND** the runner performs no `disabled` filtering or configuration merging of its own
+
+    #### Scenario: Synthesized binding uses the executable instance
+
+    - **GIVEN** a schema embedding `deps.consistent` on a step where no code-defined binding serves it
+    - **WHEN** `resolveEffectiveBindings` synthesizes the binding with the composition registry
+    - **THEN** the binding's check is the application implementation that reads real facts
+
+    #### Scenario: Derived policy is read from resolved bindings
+
+    - **GIVEN** a schema declaration that sets `skippable: true` for a Category C check whose code-defined binding is non-skippable and permits overrides
+    - **WHEN** the check fails in `TransitionChange` and in `GetStatus`
+    - **THEN** `CheckPredicateFailedError.skippable` is `true`, `--skip-checks <checkId>` is accepted, and the status blocker advertises `--skip-checks <checkId>`
+
+    #### Scenario: archiveChecks disabled removes the check from the archive operation only
+
+    - **GIVEN** `spec.overlap` base-bound to `archive` and the `archiving` entry declares `archiveChecks: [{ id: spec.overlap, disabled: true }]`
+    - **WHEN** bindings are resolved with operation `archive`
+    - **THEN** no `spec.overlap` binding is in the effective set
+    - **AND** resolving a transition into any step is unaffected
+
+    #### Scenario: archiveChecks skippable overlays the base binding
+
+    - **GIVEN** `deps.consistent` is not skippable at the base and the entry declares `skippable: true`
+    - **WHEN** bindings are resolved with operation `archive`
+    - **THEN** the effective `deps.consistent` binding is skippable only where the lock permits
+    - **AND** where `allowBindingOverride` is `false` the declaration was already rejected at build
+
+    #### Scenario: Embedded plugin check synthesizes an archive binding
+
+    - **GIVEN** a registered check no base archive binding serves and an `archiveChecks` entry naming it with `skippable: true`
+    - **WHEN** bindings are resolved with operation `archive`
+    - **THEN** a binding with `scope: 'archive'` and `skippable: true` is synthesized from the registry's real check instance
+
+    #### Scenario: Synthesized archive binding defaults to non-skippable
+
+    - **GIVEN** an `archiveChecks` entry without `skippable`
+    - **WHEN** bindings are resolved
+    - **THEN** the synthesized binding is not skippable
+
+    #### Scenario: archiveChecks keep the base failure policy
+
+    - **GIVEN** a base archive binding with its own failure policy
+    - **WHEN** an `archiveChecks` entry overlays `config`
+    - **THEN** the effective binding keeps the base `onFailure`
+
+    #### Scenario: Config cascade applies once on archive
+
+    - **GIVEN** check default config, binding config, and `archiveChecks[].config` with array values
+    - **WHEN** bindings are resolved with operation `archive`
+    - **THEN** the effective config is merged exactly once in order check default, binding, declaration
+
+    #### Scenario: Declaration for an unserved check is dropped without a registry
+
+    - **GIVEN** `archiveChecks` names a registered check no base archive binding serves
+    - **WHEN** bindings are resolved with operation `archive` and no registry
+    - **THEN** no binding is synthesized and no error is raised
+    - **AND** declarations that overlay base archive bindings still apply
+
+    #### Scenario: Archive operation cannot be combined with a transition
+
+    - **WHEN** bindings are resolved with operation `archive` and also a `targetStep` or `bypassedSteps`
+    - **THEN** `InvalidInputError` is thrown
+
+    #### Scenario: Schema without archiveChecks leaves the base bindings unchanged
+
+    - **GIVEN** no `archiving` entry or an entry without `archiveChecks`
+    - **WHEN** bindings are resolved with operation `archive`
+    - **THEN** the result equals the base bindings with only cascaded config applied
+
+    #### Scenario: Disabling a check with no base archive binding is inert
+
+    - **GIVEN** `archiveChecks: [{ id: '@qa.extended-lint', disabled: true }]` for a registered check with no archive binding
+    - **WHEN** bindings are resolved with operation `archive`
+    - **THEN** no binding is added and no error is raised
+
+    #### Scenario: Synthesized archive bindings follow declaration order
+
+    - **GIVEN** two embedded checks declared in the order `@a.lint`, `@b.scan`
+    - **WHEN** bindings are resolved with operation `archive`
+    - **THEN** both are appended after the base bindings, `@a.lint` first
+
+    #### Scenario: archiveChecks and checks on the archiving entry are independent
+
+    - **GIVEN** the `archiving` entry declares `checks: [{ id: deps.consistent }]` and `archiveChecks: [{ id: deps.consistent }]`
+    - **WHEN** a transition into `archiving` and the archive operation are resolved
+    - **THEN** each coordinate receives only its own declaration
+    - **AND** no duplicate-binding error is raised
+
+    #### Scenario: A redundant declaration keeps the base policy
+
+    - **GIVEN** `archiveChecks: [{ id: workspace.readOnly, skippable: false }]`
+    - **WHEN** bindings are resolved with operation `archive`
+    - **THEN** the effective binding keeps `skippable: false` and its governance locks
+- op: modified
+  selector:
+    type: section
+    matches: ^Requirement:\ Archive\ is\ an\ operation\ not\ an\ edge$
+  content: |
+    #### Scenario: Signoff is not an archive predicate
+
+    - **WHEN** `ArchiveChange` evaluates operation `archive`
+    - **THEN** `approval.signoff` is not in the attached predicate list
+
+    #### Scenario: Archive resolves through the same resolver as transitions
+
+    - **WHEN** `ArchiveChange` prepares its checks
+    - **THEN** it calls `resolveEffectiveBindings` with operation `archive` and the registry
+    - **AND** the attempt it evaluates is `{ scope: 'archive' }` with no `from`, `to`, or `along`
+- op: modified
+  selector:
+    type: section
+    matches: ^Requirement:\ Projections$
+  content: |
+    #### Scenario: Incomplete tasks hide verifying from availableTransitions
+
+    - **GIVEN** a change in `implementing` with incomplete `tasks` items
+    - **WHEN** `GetStatus` runs
+    - **THEN** `validTransitions` still includes `verifying`
+    - **AND** `availableTransitions` does not include `verifying`
+    - **AND** `nextAction` still recommends `/specd-implement`
+
+    #### Scenario: Complete tasks recommend verify skill
+
+    - **GIVEN** a change in `implementing` with all gated tasks complete
+    - **AND** `workflow.requires` for `verifying` is satisfied
+    - **WHEN** `GetStatus` runs
+    - **THEN** `availableTransitions` includes `verifying`
+    - **AND** `nextAction` recommends `/specd-verify` not `/specd-implement`
+
+    #### Scenario: Failed spec gate recommends approve not pending
+
+    - **GIVEN** a change in `ready` with spec gate on and no spec approval
+    - **WHEN** `GetStatus` runs
+    - **THEN** `nextAction` recommends `specd changes approve spec`
+    - **AND** it does not recommend a transition to `pending-spec-approval`
+
+    #### Scenario: Backward hops listed but not happy-path nextAction
+
+    - **GIVEN** a change in `done`
+    - **WHEN** `GetStatus` runs
+    - **THEN** `availableTransitions` includes `implementing` and `verifying`
+    - **AND** `nextAction` recommends archive or signoff-approve, not the implement skill
+
+    #### Scenario: Archive blocker carries bypassFlag only for skippable bindings
+
+    - **GIVEN** a change in `archivable` blocked by `spec.overlap` whose resolved binding is skippable
+    - **WHEN** `GetStatus` projects blockers
+    - **THEN** the blocker has `bypassFlag` `--skip-checks spec.overlap`
+
+    #### Scenario: Locked or schema-hardened archive blocker has no bypassFlag
+
+    - **GIVEN** a blocker from `workspace.readOnly`, or from `spec.overlap` with `skippable: false` in the schema
+    - **WHEN** `GetStatus` projects blockers
+    - **THEN** the blocker carries no `bypassFlag`

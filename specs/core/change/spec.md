@@ -34,27 +34,27 @@ The `Change` entity SHALL maintain a `updatedAt` property representing its last 
 
 A Change declares:
 
-- **`specIds`** — zero or more spec IDs being created or modified by this change (e.g. `['auth/login', 'billing:invoices']`). An empty list is allowed (e.g. when a change is first created but specs have not yet been assigned).
-- **`workspaces`** — a **computed getter** derived at runtime from `specIds` by extracting the workspace component of each spec ID via `parseSpecId()`. It is not a declared or persisted field. When `specIds` is empty, `workspaces` is empty.
-- **`specDependsOn`** — an optional map from spec ID to an array of spec IDs representing per-spec declared dependencies. Captured during change authoring to track dependencies independently of `.specd-metadata.yaml`. Used by `CompileContext` as the highest-priority source for `dependsOn` resolution. Not subject to approval invalidation — updating `specDependsOn` does not trigger an `invalidated` event.
+- **`specIds`** — zero or more spec IDs being created or modified by this change (e.g. `['auth/login', 'billing:invoices']`). An empty list is allowed before specs are assigned.
+- **`workspaces`** — a computed getter derived from `specIds` through `parseSpecId()`, never a persisted field. It is empty when `specIds` is empty.
+- **`specDependsOn`** — a map of per-spec declared dependencies, used by `CompileContext` as the highest-priority dependency source. Updating dependencies alone does not trigger approval invalidation.
 
-`specIds` have their workspace component validated against `specd.yaml` at creation time (the spec path itself is not validated against the filesystem, since a change may create new specs that don't yet exist). `specIds` is **mutable** after creation — specs can be added or removed as the change scope evolves. Any modification to `specIds` triggers approval invalidation (see Requirement: History and event sourcing).
+Workspace components MUST be validated against `specd.yaml` at creation; spec paths need not already exist. Scope remains mutable after creation. Active scope edits MUST pass through canonical reconciliation. A canonical set addition or removal makes existing spec consent stale with precise scope differences; reordering or duplicating the same canonical set MUST NOT invalidate consent. Gate recovery and workflow policy determine any lifecycle consequence; a scope edit alone MUST NOT unconditionally return the change to `designing` or revoke unrelated evidence.
 
-When `specIds` is updated via `updateSpecIds()`, any `specDependsOn` entry whose key is not present in the new set of spec IDs SHALL be removed. This prevents orphaned dependency entries from persisting through save/load round-trips and from causing `CompileContext` to resolve unnecessary transitive dependencies.
+Scope replacement SHALL remove `specDependsOn` entries whose keys no longer occur in `specIds`, while preserving remaining entries. The legacy `updateSpecIds` helper may record artifact-review evidence with cause `spec-change`; this is not the active edit orchestration path and MUST NOT independently decide lifecycle recovery.
 
-`CompileContext` derives the active workspaces from `specIds` via the `workspaces` getter. It resolves `dependsOn` entries directly from `change.specIds` by reading each spec's `.specd-metadata.yaml`, then follows links transitively. This resolution happens dynamically on every execution, not as a snapshot. See [`core:spec-metadata`](../spec-metadata/spec.md) for the `.specd-metadata.yaml` format.
+`CompileContext` SHALL derive active workspaces from the current `specIds` and resolve dependencies dynamically, with change-local declarations taking precedence over persisted spec dependencies. See `core:spec-metadata` for dependency metadata.
 
-`workspaces` represents the **plural set of workspaces touched** by this change's `specIds` — it is not, and MUST NOT be treated as, a primary or singular workspace identity for the change. A change has no "home" workspace. Consumers building template variables (see [`core:template-variables`](../template-variables/spec.md)) or archive path patterns (see [`core:storage`](../storage/spec.md)) MUST NOT derive a singular value from `workspaces[0]` (or any other index) to stand in for "the change's workspace" — that concept does not exist. `workspaces` remains valid for uses that genuinely need the touched set, such as compile-context resolution and display of which workspaces a change spans.
+`workspaces` is the plural touched set, never a primary or home workspace. Consumers including template variables and archive paths MUST NOT use `workspaces[0]` or any other index as a singular change identity. This remains true when the set contains only one workspace.
 
 ### Requirement: Lifecycle
 
-A Change progresses through the following states. Two approval gates are configurable in `specd.yaml` (`approvals.spec` and `approvals.signoff`, both default `false`); the dashed paths are only active when the corresponding gate is enabled:
+A Change progresses through the following states. Two approval gates are configurable in `specd.yaml` (`approvals.spec` and `approvals.signoff`, both default `false`). When a gate is on, the change **stays** in `ready` or `done` until `ApproveSpec` / `ApproveSignoff` records consent; `change transition` does not enter pending parking states.
 
 ```
-drafting → designing → ready ──────────────────────────────────────── → implementing ⇄ verifying → done ──────────────────── → archivable → archiving
-                             ╌→ pending-spec-approval → spec-approved ┘                            ╌→ pending-signoff → signed-off ┘
-                               (if approvals.spec: true)                                              (if approvals.signoff: true)
+drafting → designing → ready → implementing ⇄ verifying → done → archivable → archiving
 ```
+
+`pending-spec-approval`, `spec-approved`, `pending-signoff`, and `signed-off` remain valid `ChangeState` values so in-flight changes can drain. New transitions MUST NOT enter `pending-spec-approval` from `ready` or `pending-signoff` from `done`.
 
 | State                   | Meaning                                                                                            |
 | ----------------------- | -------------------------------------------------------------------------------------------------- |
@@ -71,41 +71,57 @@ drafting → designing → ready ───────────────�
 | `archivable`            | Final archival checks have passed; the change may enter archive commit                             |
 | `archiving`             | Archive commit in progress — canonical publication and archive move underway                       |
 
-Valid transitions are defined in `VALID_TRANSITIONS`. From `archiving`, the only permitted targets are `archivable` and `designing`.
-
 - `archiving → archivable` MAY occur automatically when an archive commit fails and batch canonical restore completes successfully, or when a pre-commit archive guard fails before commit begins (change never entered `archiving`).
 - `archiving → designing` MUST remain available as a manual escape when spec or delta revision is required, or when batch restore itself fails.
 
-Transitions from `archiving` to `implementing`, `verifying`, `done`, or other states are invalid.
+`archiving` permits `archivable` after successful batch restore, `designing` as the manual redesign escape, and `done` only as the canonical automatic recovery for required stale or revoked sign-off. It MUST NOT permit manual retry hops to `implementing` or `verifying`.
 
-The `implementing ↔ verifying` loop may repeat any number of times. The transition `implementing → verifying` is only valid when all tasks in the `tasks` artifact are complete. The transition `verifying → implementing` is valid only for implementation-only failures: the current artifacts still describe the intended behavior and the required fix fits within the already-defined tasks. If verification concludes that the artifacts themselves must be revised, or that new tasks are required before implementation can resume, the change returns to `designing` instead.
+Skill-aligned retry hops from `done`, `signed-off`, or `archivable` to `implementing` or `verifying` remain distinct from gate recovery. `archivable → done` and `signed-off → done` are valid only when central reconciliation applies sign-off recovery; callers MUST NOT infer or synthesize those targets independently.
+
+`VALID_TRANSITIONS` MUST also permit skill-aligned backward hops (retry, not redesign):
+
+- `done → implementing`, `done → verifying`
+- `signed-off → implementing`, `signed-off → verifying`
+- `archivable → implementing`, `archivable → verifying`
+
+`VALID_TRANSITIONS['ready']` MUST be `implementing` and `designing` only (no `pending-spec-approval`). `VALID_TRANSITIONS['done']` MUST include `archivable`, `designing`, `implementing`, and `verifying` (no `pending-signoff`). Legacy parking states exit through the same delivery edges as the step they park in front of, and MUST NOT lead into another legacy state: `VALID_TRANSITIONS['pending-spec-approval']` MUST be `implementing` and `designing` (it MUST NOT include `spec-approved`), and `VALID_TRANSITIONS['pending-signoff']` MUST be `archivable`, `designing`, and `done` (it MUST NOT include `signed-off`). The forward exit MUST be listed first. `spec-approved` and `signed-off` keep their existing exits, but no transition leads into them, so only historic manifests can still hold those states. Gate enforcement on these exits belongs to the bound approval checks (see [`core:transition-checks`](../transition-checks/spec.md)); the lifecycle table MUST NOT encode an approval requirement.
+
+The `implementing ↔ verifying` loop may repeat any number of times. The transition `implementing → verifying` is only valid when all tasks in the `tasks` artifact are complete (enforced as the `workflow.taskCompletion` check; see [`core:transition-checks`](../transition-checks/spec.md)). The transition `verifying → implementing` is valid only for implementation-only failures: the current artifacts still describe the intended behavior and the required fix fits within the already-defined tasks. If verification concludes that the artifacts themselves must be revised, or that new tasks are required before implementation can resume, the change returns to `designing` instead.
 
 Every state except `drafting` MAY return to `designing`. This includes `archiving`. However, when the change is already in `designing` (a `designing → designing` transition), this is a state-preserving re-entry and MUST NOT trigger approval invalidation or artifact downgrade.
 
 Returning to `designing` from a later state (e.g. `implementing → designing`, `ready → designing`, `archiving → designing`) does not imply that artifacts drifted; it means the artifact set must be reviewed again before work can proceed.
 
+### Requirement: Neutral designing self-entry
+
+An application request to enter `designing` while the change is already in `designing` SHALL be a neutral no-op. It MUST NOT append a `transitioned` event, change the lifecycle state, downgrade artifacts, or invalidate approval or verification evidence. The `Change` entity SHALL continue to reject a direct real self-transition; the application handles the neutral request before invoking the entity. `verifying → verifying` is not a neutral request and MUST remain an invalid protocol hop.
+
+### Requirement: Skill-aligned backward hops
+
+Transitions from `done`, `signed-off`, or `archivable` to `implementing` or `verifying` SHALL be treated as implementation/verification retry, not as redesign.
+
+Those hops MUST NOT mass-invalidate artifacts (same spirit as `verifying → implementing`). They MUST invalidate an active **signoff** so a later forward move toward `archivable` requires approve again. They MUST NOT invalidate **spec** approval unless artifact files actually change.
+
+The `Change` entity SHALL still reject any pair not listed in `VALID_TRANSITIONS`.
+
 ### Requirement: Archiving escape transitions
 
-From `archiving`, the only valid lifecycle escape targets are `archivable` and `designing`.
+From `archiving`, ordinary manual escape targets are `archivable` and `designing`. Central reconciliation additionally MAY apply `archiving → done` when required sign-off is stale or revoked.
 
 - `archiving → archivable` MAY occur automatically after a failed archive commit when batch canonical restore succeeds.
 - `archiving → designing` MUST remain available as a manual recovery path, including when batch restore fails.
-- Transitions from `archiving` to any other state MUST throw `InvalidStateTransitionError`.
+- `archiving → done` MUST be reserved for the atomic mandatory sign-off recovery selected by the central reconciler; it is not an implementation or verification retry.
+- Transitions from `archiving` to `implementing`, `verifying`, or any other state MUST throw `InvalidStateTransitionError`.
 
 ### Requirement: Implementation and verification loop
 
-The `implementing` and `verifying` states form a loop that repeats until verification passes.
+`implementing` and `verifying` form a repeatable loop. Entry to `verifying` requires applicable task completion and implementation readiness but does not capture a baseline. `verifying → done` requires already-completed current verification through a registered predicate; the transition MUST NOT complete an attempt.
 
-The transition `implementing → verifying` is gated by the workflow model's task completion gating rule (see [`core:workflow-model` — Requirement: Task completion gating](../workflow-model/spec.md)). Because the `verifying` step's `requires` includes `tasks` (which declares `taskCompletionCheck`), the transition is automatically blocked when incomplete task items remain. This is a content-level check on the artifact files, not a check on approval state.
+An implementation-only failure may require returning to implementation for repairs without reopening unchanged artifacts. Lifecycle movement alone preserves unchanged verification evidence. If desired behaviour or design decisions change, reconciliation applies policy-aware artifact review and consent invalidation. Fingerprint mismatch alone permits a new explicit verification attempt in the current state and does not force rollback.
 
-Verification has two distinct outcomes:
+Artifact or implementation drift is reconciled independently. `workflow: preserve` may retain the phase when no mandatory gate recovery applies, while non-task drift still blocks forward progress. Required stale spec consent returns immediately to `designing`. A stale verification record is contextual before `verifying`, requires a fresh attempt in `verifying`, and blocks `done`/archive until renewed.
 
-- **`implementation-failure`** — the code does not satisfy the current artifacts, but the artifacts still correctly describe the intended behavior and the required fix fits within the existing task set. This outcome returns the change to `implementing` without invalidating or downgrading unchanged artifacts.
-- **`artifact-review-required`** — the desired behavior has changed, the current artifacts are no longer sufficient, or the required fix would introduce tasks not already defined. This outcome returns the change to `designing`, where the artifacts are reviewed and updated.
-
-Actual artifact drift is handled separately from verification outcomes. If any validated artifact file changes on disk and enters `drifted-pending-review`, the change is invalidated back to `designing` regardless of the current lifecycle state.
-
-The loop may repeat any number of times. History records each round in full.
+The loop may repeat without deleting prior attempts or approvals; history and materialized invalidity explain every round.
 
 ### Requirement: Implementation tracking state
 
@@ -155,38 +171,56 @@ The `Change` entity MUST:
 
 ### Requirement: Spec approval gate
 
-When `approvals.spec: true`, the transition from `ready` to `implementing` is blocked. The change must first transition to `pending-spec-approval`, receive an explicit approval (approver identity, reason, artifact hashes), and then transition to `spec-approved` before `implementing` becomes reachable.
+When `approvals.spec: true`, forward progress from `ready` requires a materialized spec-approval projection with status `valid` for the current canonical spec scope and non-task artifact fingerprint. Approval is granted only in `ready` after required artifact validation and semantic review with no unresolved drift or pending review. `TransitionChange` never parks new work in pending approval states.
 
-When `approvals.spec: false` (default), `ready → implementing` is a free transition. The `pending-spec-approval` and `spec-approved` states are unreachable.
+When disabled, the approval predicate skips, but artifact freshness still applies. Historic pending/spec-approved states remain drain-only compatibility values.
 
 ### Requirement: Signoff gate
 
-When `approvals.signoff: true`, the transition from `done` to `archivable` is always blocked — regardless of whether the change contains only new specs, modifications, or removals. The change must transition to `pending-signoff`, receive an explicit sign-off (approver identity, reason, artifact hashes), and transition through `signed-off → archivable`.
+When `approvals.signoff: true`, `done → archivable` requires materialized sign-off status `valid` for current non-task artifacts and implementation files, plus valid verification evidence when verification is required by "Verification requirement follows workflow topology". Sign-off is granted only while the change remains in `done`. New work never parks in pending sign-off states.
 
-When `approvals.signoff: false` (default), `done → archivable` is a free transition. Attempting to archive a change that is not in `archivable` state throws `InvalidStateTransitionError`.
+When disabled, the sign-off predicate skips, but required verification, artifact freshness, tasks, and archive checks still apply. Historic pending/signed-off states remain drain-only compatibility values.
+
+### Requirement: Materialized approval and verification projections
+
+A v2 `Change` SHALL own optional current projections for spec approval, sign-off, and verification while preserving its append-only history as audit evidence.
+
+Each approval projection MUST have status `valid`, `stale`, or `revoked`, approval actor, reason, timestamp, and an invalidation cause when not valid. Spec approval carries a scope-aware fingerprint containing the exact canonical `specIds` and reviewed artifact fingerprint. Sign-off carries the reviewed artifact fingerprint plus the implementation fingerprint used at approval time. Absence means the gate has never been approved. A legacy spec approval with no scope snapshot, or legacy sign-off with no implementation fingerprint, is unknown evidence and MUST NOT be fabricated from current state or files.
+
+The verification projection MUST distinguish an active attempt baseline from a completed record. Explicit start captures current non-task artifact and fully resolved implementation fingerprints from any active lifecycle state. Explicit completion succeeds only if current inputs still match that attempt and persists a new `valid` record with completion actor and timestamp. Later drift or explicit invalidation marks completed evidence `stale`; revalidating artifacts or restoring bytes MUST NOT heal it. Lifecycle movement alone neither captures nor completes nor invalidates verification.
+
+Invalidating or renewing a projection SHALL append an explanatory event and update the current projection without deleting its earlier approval or verification events. Once `stale` or `revoked` is materialized, hash equality alone SHALL NOT restore `valid`.
+
+### Requirement: State-independent verification operations and audit
+
+`StartVerification.execute({ name })` SHALL operate from any active lifecycle state. It refreshes implementation tracking and link resolution and executes `impl.filesResolved` and `impl.linksInScope` before capturing a baseline. Missing or unreadable inputs fail explicitly. A successful start appends `verification-attempt-started` with actor, time, current state, attempt identity, and fingerprint algorithm metadata, then persists the active attempt atomically. Starting again supersedes the active attempt while preserving its historical evidence. Start never records successful completion.
+
+`CompleteVerification.execute({ name })` SHALL require an active attempt, acquire fresh inputs, and use the shared fingerprint-validity evaluator to compare them to that attempt's baseline. Missing attempts, unresolvable inputs, or changed fingerprints fail without replacing the baseline or recording success. Success atomically records completed verification, actor, time, attempt identity, and fingerprint with an append-only completion event. The use case records the caller's successful verification declaration and does not run tests itself. Both operations delegate validity and any mandatory gate recovery to the central reconciler; neither performs a lifecycle transition merely to verify.
+
+Both use cases SHALL expose typed input/result/deps contracts, canonical `createX(deps)` and convenience `createX(config, options?)` factories, and `resolveXDeps(resolver)`. They follow the established composition normalization and invalid-factory-arguments contract. `StartVerificationDeps` SHALL include the schema provider required to construct the operation-specific registered-check context. Domain invariants remain free of I/O; application dependencies supply schema, tracking, checks, fingerprint evaluation, actor, reconciliation, and serialized persistence.
+
+Explicit withdrawal of completed verification SHALL append `verification-invalidated` with actor, time, reason, and completed verification identity while retaining the original verified fingerprint.
+
+`verifying → verifying` is never permitted or required. A new explicit start renews the attempt in place. Prior attempts, invalidations, and completed-verification evidence remain in append-only history.
+
+### Requirement: StartVerification sovereign schema resolution
+
+`StartVerification` MUST resolve the change's schema through the shared change-schema resolution boundary before constructing the operation-specific readiness context. Required artifacts, workflow topology, checks, task semantics, and all other schema-derived readiness facts MUST come from the schema recorded on the change.
+
+The workspace default schema MUST NOT affect whether an existing change can start verification when it differs from `change.schemaName`. Schema resolution errors MUST propagate and MUST NOT create an active verification attempt.
+
+### Requirement: Verification requirement follows workflow topology
+
+Whether completed verification evidence is required for a change SHALL be decided from both its lifecycle position and the change's sovereign schema:
+
+- When `verifying` is enabled (`isWorkflowStepEnabled('verifying', schema)`), verification is required at `verifying` and every later state (`done`, `pending-signoff`, `signed-off`, `archivable`, `archiving`).
+- When `verifying` is disabled, verification is never required for that change. The validity reconciler SHALL project verification as `not-required` when no attempt or completed evidence exists, SHALL NOT raise `VERIFICATION_REQUIRED`, `VERIFICATION_IN_PROGRESS`, or `VERIFICATION_STALE` blockers, and `verification.current` (transition and archive) and `approval.signoff` SHALL treat verification as not required.
+
+The reconciler SHALL obtain that schema through `ResolveChangeSchema`, the same boundary every other change-bound operation uses, so identity integrity applies to persisted validity projections.
 
 ### Requirement: Artifacts
 
-A Change holds a set of artifacts — typed files whose types and dependency graph are declared by the active schema. Each artifact is a `ChangeArtifact` that contains zero or more `ArtifactFile` entries — one per file the artifact produces.
-
-A `ChangeArtifact` has:
-
-- **`type`** — the artifact type ID from the schema (e.g. `proposal`, `specs`, `design`, `tasks`)
-- **`optional`** — whether the artifact is required for archiving
-- **`requires`** — ordered list of artifact type IDs that must be complete before this artifact can satisfy downstream dependencies
-- **`state`** — the persisted aggregate state of the artifact
-- **`files`** — a `Map<string, ArtifactFile>` of tracked files, keyed by file key
-
-For `scope: change` artifacts there is typically one file keyed by the artifact type id. For `scope: spec` artifacts there is one file per spec ID in `change.specIds`.
-
-Each `ArtifactFile` value object has:
-
-- **`key`** — identifier for this file within the artifact (artifact type id for `scope: change`, spec ID for `scope: spec`)
-- **`filename`** — the file path within the change directory
-- **`state`** — the persisted file state; this is the source of truth at file level
-- **`validatedHash`** — the hash recorded when the file was last validated, computed after applying `preHashCleanup` if declared in the schema. The sentinel value `"__skipped__"` is used when an optional artifact is explicitly marked as not produced.
-
-Allowed `state` values for both artifacts and files are:
+A Change tracks artifacts declared by the schema. Each `ChangeArtifact` owns a map of `ArtifactFile` records. Canonical file states that MAY be persisted are:
 
 - `missing`
 - `in-progress`
@@ -195,14 +229,7 @@ Allowed `state` values for both artifacts and files are:
 - `pending-review`
 - `drifted-pending-review`
 
-State semantics are:
-
-- `missing` — the expected file is absent or, for backward-compatible loads, no explicit state was persisted
-- `in-progress` — the file exists and is being authored or revised, but has not yet been revalidated
-- `complete` — the file has been validated and remains accepted as the current source of truth
-- `skipped` — the optional file was explicitly marked as not produced
-- `pending-review` — the file was previously validated, but the change returned to `designing` and the file must be reviewed again against the current change intent
-- `drifted-pending-review` — the file was previously validated, later changed on disk, and now requires explicit review
+`pending-parent-artifact-review` is **verdict-derived** on the lifecycle projection (`projectArtifacts` / `evaluateLifecycleVerdict`). It MUST NOT be a persistable file state. `ArtifactFile` MUST reject constructing that token in memory. Load/save MUST **sanitize** (coerce) a wire/legacy file `state` of `pending-parent-artifact-review` to `in-progress` (compatibility), not throw. Aggregate persisted `ChangeArtifact.state` MUST NOT store `pending-parent-artifact-review` — parent-blocked completeness belongs only on the lifecycle verdict projection.
 
 `validatedHash` still participates in drift detection and approval signatures, but it is no longer the source of truth for artifact status. A file's current state is read from its persisted `state`, and hash comparison is one of the mechanisms that may change that state.
 
@@ -217,23 +244,17 @@ The aggregated `state` on `ChangeArtifact` is materialized from file states and 
 
 `skipped` is only valid for `optional: true` artifacts. Attempting to skip a non-optional artifact throws an error.
 
-The `skipped` state must be set explicitly by an actor — human or agent via a CLI command. The agent must be instructed (via the schema `instruction` or skill definition) to call that command when it decides not to produce an optional artifact. The specific CLI command is defined in the CLI spec.
+The `skipped` state must be set explicitly by an actor — human or agent through a delivery adapter. The agent must be instructed (via the schema `instruction` or the delivery host's workflow guidance) to invoke the skip operation when it decides not to produce an optional artifact. The specific delivery-level command is defined in the delivery adapter's spec, not here.
 
 `ChangeArtifact.markComplete(key, hash)` takes two arguments — the file key and the content hash — and delegates to the corresponding `ArtifactFile.markComplete(hash)`. A successful completion sets the file state to `complete`, updates `validatedHash`, and recomputes the parent artifact state. `ChangeArtifact.markSkipped()` marks ALL files in the artifact as `skipped`. These may only be called by the `ValidateArtifacts` and skip use cases respectively. No other code path may set these values.
 
-Returning to `designing` changes review state at file level. Every file in every artifact moves to `pending-review`, except files already marked `drifted-pending-review`, which keep that more specific state. The same downgrade applies when scope changes while the change already remains in `designing`: previously validated files are no longer treated as complete until they are reviewed again.
+Dependency satisfaction for persisted facts uses persisted artifact `state`. Only artifacts in `complete` or `skipped` satisfy `requires` at persist. Verdict effective status (`projectArtifacts` / `evaluateLifecycleVerdict`) MAY additionally report `pending-parent-artifact-review` when a complete file is blocked by an upstream parent that is `pending-review` or `drifted-pending-review`.
 
-Dependency satisfaction is driven by the persisted artifact `state`. Only artifacts in `complete` or `skipped` satisfy `requires`. Artifacts in `missing`, `in-progress`, `pending-review`, or `drifted-pending-review` block dependents.
-
-**Rollback:** `invalidate()` accepts affected artifact/file detail for the files whose validated content actually drifted. When drift is reported, those files are set to `drifted-pending-review`, their parent artifacts are recomputed, and all other files are downgraded to `pending-review` as part of the return to `designing`. Upstream files are not marked drifted unless their own validated content changed.
-
-- `pending-parent-artifact-review`
-- `pending-parent-artifact-review` — the file's upstream dependency in the artifact DAG is `drifted-pending-review` or `pending-review`, recursively blocking this file until the parent is resolved.
-- `pending-parent-artifact-review` — no file is drifted or pending review, and at least one file is `pending-parent-artifact-review`
+**Invalidation:** Drifted files keep focused `hasDrift` and review evidence. Additional reopening follows `invalidation.artifacts`, and lifecycle recovery follows the canonical reconciler. Returning to `designing` does not imply a second unconditional mass downgrade beyond the effective artifact policy. Task artifacts are excluded from automatic drift and parent-propagated reopening.
 
 ### Requirement: Artifact sync
 
-A Change can reconcile its artifact map against the current schema's artifact types via the `syncArtifacts(artifactTypes)` method. This method:
+A Change can reconcile its artifact map against its own schema's artifact types via the `syncArtifacts(artifactTypes)` method. Callers SHALL supply `artifactTypes` resolved from the schema recorded on the change (`change.schemaName`) through `ResolveChangeSchema`; artifact types from the workspace default schema MUST NOT be used to sync an existing change. This method:
 
 1. Compares the current artifact map against the provided `artifactTypes` array.
 2. Adds new artifact types and their expected files (based on scope and specIds).
@@ -252,7 +273,7 @@ The **current lifecycle state** of a Change is derived entirely from its history
 
 The **current draft/active status** is derived from history: if the most recent `drafted` or `restored` event is of type `drafted`, the change is currently stored under `drafts/` and outside the active working set; otherwise it is active under `changes/`.
 
-The **active approval** for each gate is the most recent `spec-approved` or `signed-off` event that has not been superseded by a subsequent `invalidated` event.
+Current approval and verification validity is read from materialized projections. Approval, verification, invalidation, revocation, and recovery events remain append-only audit evidence and adapt legacy v1 records; a broad later event MUST NOT make unrelated evidence disappear implicitly.
 
 All events share common fields:
 
@@ -260,28 +281,30 @@ All events share common fields:
 - **`at`** — ISO 8601 timestamp
 - **`by`** — the `ActorIdentity` of the person or system performing the operation, mandatory on all events
 
+The event table below includes legacy artifact-hash-only approval records and broad scope-review invalidations for compatibility. New v2 approval records SHALL carry the fingerprints defined by the materialized projection requirements. Active scope reconciliation SHALL record changed consent through `approval-invalidated` with cause `scope-change` and `spec-added` or `spec-removed` differences; it MUST NOT require a broad `invalidated` event merely because scope changed. The legacy `invalidated` cause `spec-change` describes artifact-review evidence, not an instruction to clear approvals or roll back lifecycle. Current projection invalidation and artifact review are separate audit facts.
+
 Event types:
 
-| Type                  | Additional fields                                          | When appended                                                                |
-| --------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `created`             | `specIds`, `schemaName`, `schemaVersion`                   | Once, when the change is first created                                       |
-| `transitioned`        | `from: ChangeState`, `to: ChangeState`                     | Each lifecycle state transition                                              |
-| `spec-approved`       | `reason: string`, `artifactHashes: Record<string, string>` | When the spec approval gate is passed                                        |
-| `signed-off`          | `reason: string`, `artifactHashes: Record<string, string>` | When the signoff gate is passed                                              |
-| `invalidated`         | `cause`, `message`, `affectedArtifacts`                    | When scope or artifact review invalidates prior approvals                    |
-| `drafted`             | `reason?: string`                                          | When a change is moved to `drafts/`                                          |
-| `restored`            | _(none beyond common fields)_                              | When a drafted change is moved back to `changes/`                            |
-| `artifact-skipped`    | `artifactId: string`, `reason?: string`                    | When an optional artifact is explicitly marked as not produced               |
-| `artifacts-synced`    | `typesAdded`, `typesRemoved`, `filesAdded`, `filesRemoved` | When artifact sync reconciles the artifact map against schema                |
-| `description-updated` | `description: string`                                      | When the change description is updated via `EditChange` with `--description` |
-| `discarded`           | `reason: string`, `supersededBy?: string[]`                | When a change is permanently abandoned                                       |
+| Type                  | Additional fields                                          | When appended                                                  |
+| --------------------- | ---------------------------------------------------------- | -------------------------------------------------------------- |
+| `created`             | `specIds`, `schemaName`, `schemaVersion`                   | Once, when the change is first created                         |
+| `transitioned`        | `from: ChangeState`, `to: ChangeState`                     | Each lifecycle state transition                                |
+| `spec-approved`       | `reason: string`, `artifactHashes: Record<string, string>` | When the spec approval gate is passed                          |
+| `signed-off`          | `reason: string`, `artifactHashes: Record<string, string>` | When the signoff gate is passed                                |
+| `invalidated`         | `cause`, `message`, `affectedArtifacts`                    | When scope or artifact review invalidates prior approvals      |
+| `drafted`             | `reason?: string`                                          | When a change is moved to `drafts/`                            |
+| `restored`            | _(none beyond common fields)_                              | When a drafted change is moved back to `changes/`              |
+| `artifact-skipped`    | `artifactId: string`, `reason?: string`                    | When an optional artifact is explicitly marked as not produced |
+| `artifacts-synced`    | `typesAdded`, `typesRemoved`, `filesAdded`, `filesRemoved` | When artifact sync reconciles the artifact map against schema  |
+| `description-updated` | `description: string`                                      | When the change description is updated via `EditChange`        |
+| `discarded`           | `reason: string`, `supersededBy?: string[]`                | When a change is permanently abandoned                         |
 
 `invalidated.cause` is explicit and machine-readable:
 
 - `spec-change` — the change scope changed (for example, `specIds` were edited)
 - `artifact-drift` — one or more validated artifact files changed on disk
 - `artifact-review-required` — the change returned to `designing` because the artifacts must be revised even though no drifted file was detected
-- `spec-overlap-conflict` — the change was invalidated because an archived change with overlapping specs was archived with `allowOverlap: true`
+- `spec-overlap-conflict` — the change was invalidated because an archived change with overlapping specs was archived with `spec.overlap` bypassed
 
 `invalidated.message` is a clear human-readable explanation, not a one-word label. `invalidated.affectedArtifacts` is a structured list of the affected artifact types and file keys so callers can explain exactly what triggered the review:
 
@@ -292,12 +315,12 @@ Approval invalidation caused by artifact drift MUST capture the full set of affe
 
 #### Scenario: Overlap conflict invalidation
 
-- **GIVEN** change `beta` targets `core:config`
-- **AND** change `alpha` also targets `core:config` and is archived with `allowOverlap: true`
-- **WHEN** the archive invalidates `beta`
-- **THEN** an `invalidated` event with `cause: 'spec-overlap-conflict'` is appended to `beta`'s history
-- **AND** a `transitioned` event rolling back to `designing` is appended
-- **AND** the `invalidated.message` includes the archived change name and the overlapping spec IDs
+- **GIVEN** active change `beta` overlaps specs archived by `alpha`
+- **WHEN** archive reconciliation records `spec-overlap-conflict` for `beta`
+- **THEN** one focused invalidation event names `alpha` and the overlapping spec IDs
+- **AND** artifact reopening follows `beta`'s artifact policy
+- **AND** lifecycle recovery follows its workflow policy unless required stale spec consent mandates `designing`
+- **AND** repeated observation does not append duplicate invalidation or recovery events
 
 ### Requirement: Archive outcome history
 
@@ -331,9 +354,11 @@ The signal is historical, not state-based. It remains true once reached unless t
 
 The `Change` entity is initialized with `schemaName` and `schemaVersion` as top-level properties hydrated at creation time. These properties are the definitive source of truth, decoupled from the `created` event in the history.
 
-A **`schemaName` mismatch** (e.g. `schema-std` → `custom-schema`) indicates structural incompatibility. When a use case detects that `schema.name() !== change.schemaName`, it MUST throw `SchemaMismatchError` before performing any work.
+Every operation on an existing active, drafted, discarded, or archived change MUST resolve the schema recorded by that object through the shared `ResolveChangeSchema` boundary. A different schema configured as the current workspace default MUST NOT reject loading or operation execution, MUST NOT replace the recorded schema identity, and MUST NOT cause fallback to the workspace default.
 
-A **`schemaVersion` mismatch** within the same schema name is advisory. When a change is loaded and the active schema version differs from the one recorded in the change, the system MUST emit a warning. The change remains fully usable. Archiving with a `schemaVersion` mismatch is allowed.
+After resolving the recorded schema reference, a provider integrity mismatch in which the returned schema identity does not equal the requested `schemaName` indicates a provider contract violation. The operation MUST throw `SchemaProviderIdentityMismatchError` before using that schema-derived topology, artifact model, checks, hooks, or validation rules.
+
+A `schemaVersion` mismatch within the same schema name is advisory. `ResolveChangeSchema` MUST compare the persisted version with the version returned by the sovereign named lookup and return a typed advisory in its `warnings` when they differ. It MUST NOT derive this advisory from the workspace default, and no other component (including change repositories and manifest loaders) SHALL compare a change's schema version against the workspace default. The change remains fully usable and archiving is allowed.
 
 ### Requirement: Drafting and discarding
 
@@ -373,39 +398,37 @@ Attempts to transform a drafted change through active-change APIs MUST fail with
 
 The `Change` entity is the source of truth for persisted lifecycle facts: history, the current persisted state, artifact files, aggregate artifact states, approvals, and invalidation events.
 
-Dependency-aware lifecycle interpretation is a separate concern. Any decision that depends on the schema DAG, workflow `requires`, recursive parent blocking, approval-gate routing, or step availability SHALL be interpreted by `LifecycleEngine`, not by the `Change` entity itself.
+Dependency-aware lifecycle interpretation is a separate concern. Any decision that depends on the schema DAG, workflow `requires`, recursive parent blocking, approval-gate checks, or hop availability SHALL be interpreted by `evaluateLifecycleVerdict` / `projectArtifacts`, not by the `Change` entity itself.
 
 This separation ensures the entity does not need schema knowledge in order to answer questions such as:
 
 - whether an artifact is effectively blocked by an upstream parent
-- which lifecycle step is reachable next under the active schema
-- whether a requested transition must route through an approval boundary
-- which blocker or next action should be surfaced to callers
+- which lifecycle hop is protocol-legal next (`VALID_TRANSITIONS`) and which of those hops pass blocking predicates (`availableTransitions`)
+- whether a requested forward leave of `ready` / `done` is blocked by an in-place approval check
+- which blocker or domain `nextHop` should be surfaced (`evaluateLifecycle` attaches the host-neutral `nextAction.intent` and optional check-declared `nextAction.action`; core never emits a command string)
+
+Schema `workflow[]` lookup rows MUST NOT be treated as the set of participating states.
 
 ### Requirement: Policy-aware invalidation
 
-`Change.invalidate()` SHALL accept:
+`Change.invalidate()` SHALL accept a structured policy with independent `artifacts` and `workflow` dimensions, a domain cause, a human-readable message, a focused `affectedArtifacts` payload, and the schema-derived `ArtifactDag` used for expansion.
 
-- a domain invalidation cause
-- a human-readable message
-- a focused `affectedArtifacts` payload identifying the concrete artifact/file entries that triggered invalidation
-- an optional `invalidationPolicyOverride`
-- a required `artifactDag: ArtifactDag` argument supplying schema-derived DAG structure for policy expansion
+Artifact review SHALL follow `invalidation.artifacts`:
 
-The effective invalidation policy is resolved from the override when present, otherwise from the change's persisted `invalidationPolicy`.
+- `none` reopens no additional file, but does not make existing drift or pending review acceptable for forward progress
+- `surgical` reopens only the normalized affected set
+- `downstream` reopens the normalized affected set and its DAG descendants
+- `global` reopens every non-task artifact file
 
-Regardless of policy, invalidation SHALL append an `invalidated` history event and return the change to `designing` when the change was previously in another lifecycle state.
+Artifacts whose schema type has `hasTasks: true` SHALL be excluded from drift-driven reopening and from propagation originating in another artifact. Explicit task review remains permitted.
 
-Artifact/file-state consequences follow the effective policy:
+Lifecycle movement SHALL follow `invalidation.workflow`: `preserve` retains the current state and `redesign` requests a return to `designing`. The aggregate MUST NOT infer approval-gate recovery from this policy. A central reconciler supplies the final recovery decision, where required stale spec approval returns to `designing`, required stale sign-off returns a later state to `done`, and spec recovery has priority when both gates are invalid. One reconciliation commits at most one recovery, highest priority first (spec consent, then sign-off, then workflow redesign); a further recovery that applies to the recovered state is committed by the next reconciliation, never in the same pass. For example, with required sign-off stale, policy `workflow: redesign`, non-task drift, and the spec gate off, an `archivable` change returns to `done` first and then, on the next status or reconcile, from `done` to `designing`. Recovery MUST NOT advance a change that is already earlier than its target.
 
-- `none` — no artifact/file enters a reopened review state solely because of invalidation
-- `surgical` — only the normalized affected target set is reopened
-- `downstream` — the normalized affected target set and all artifact ids returned by `artifactDag.descendantsOf()` for the normalized target artifact types are reopened
-- `global` — every artifact/file in the change is reopened
+Spec-consent recovery is requested only from states after `ready`. `ready` is the state where the `approval.spec` check blocks forward progress and where consent is renewed, so a stale or revoked spec consent in `ready` (whether it was recovered from a later state earlier or became stale there) does not request a return to `designing`; the change stays in `ready` until consent is renewed. Without this exemption a consent already recovered to `designing` could never be renewed, because every reconciliation in `ready` would return the change to `designing` again. This exemption does not affect sign-off recovery or the `workflow: redesign` recovery.
 
-The entity SHALL deduplicate the final affected set before applying reopened state transitions.
+Every state later than a recovery's target (except `ready` for spec-consent recovery, see above) is a valid recovery source for that cause, including the legacy parking states: a stale or revoked sign-off returns `pending-signoff` and `signed-off` to `done`, and a stale or revoked spec approval returns `pending-spec-approval` and `spec-approved` to `designing`. A recovery MUST NOT fail because its source is a legacy parking state.
 
-`Change` MUST NOT derive DAG edges from persisted artifact `requires` maps or private BFS helpers; downstream expansion MUST use the supplied `artifactDag`.
+Invalidation SHALL append audit evidence without deleting or rewriting prior events. Applying the same invalidity and recovery more than once SHALL be idempotent.
 
 ### Requirement: Per-file drift tracking
 
@@ -423,37 +446,46 @@ When a file is canonically `complete` and `hasDrift=true`, human-facing read mod
 
 When a file is canonically `missing`, `missing` remains the canonical state even if `hasDrift=true`.
 
+### Requirement: Task completion scope
+
+A change MUST require task completion only for artifact types that declare `hasTasks: true` and a task-completion check. It MUST NOT infer that every task-like statement belongs to the tasks artifact or block a lifecycle transition for an artifact without a declared task check.
+
+### Requirement: Validity fingerprint scope
+
+Approval and verification evidence SHALL record a scope-aware fingerprint covering the change's required inputs. The fingerprint structure separates artifacts from linked implementation files:
+
+- **`artifacts`** — map of artifact file paths to their SHA-256 content hashes, excluding task-capable artifacts.
+- **`implementation`** — map of linked implementation file paths to their normalized content hashes.
+
+A change with no linked implementation files SHALL record `implementation: {}`. Path keys use canonical repo-relative paths with POSIX separators. Order does not affect equality, so adding, removing, renaming, or unlinking a file changes the fingerprint. An empty map is a valid observed snapshot; missing or `null` is legacy unknown evidence.
+
+Text fingerprint algorithm `text-v1` removes an initial UTF-8 BOM, converts CRLF and CR to LF, removes trailing horizontal whitespace, turns whitespace-only lines into empty lines, and normalizes the final newline. It MUST NOT parse source languages, format code, strip internal whitespace, or hash only symbol ranges. Binary inputs SHALL be hashed byte-for-byte with their algorithm recorded. Missing or unreadable linked files SHALL fail fingerprint calculation rather than being omitted.
+
+Artifacts marked `hasTasks: true` SHALL be excluded from approval and verification fingerprints and automatic content-drift invalidation. They remain required when declared, structurally validated, live-counted for task completion, and checked again before archive.
+
+When fingerprint calculation fails due to missing, unreadable, or unsafe inputs, fingerprint calculation returns `null` and records the input failures. Such failures invalidate existing approval or verification evidence, but SHALL NOT synthesize an unconditional progress blocker on the change. Checks and operations that specifically require a valid fingerprint SHALL enforce that requirement directly.
+
+### Requirement: Sovereign schema for validity fingerprints
+
+Every artifact or complete validity fingerprint computed for an existing change MUST use the shared change-schema resolution boundary. The fingerprint's artifact type set, task-artifact exclusions, and file selection MUST be derived exclusively from the schema recorded on that change.
+
+The workspace default schema MUST NOT influence approval, verification, sign-off, archive, or reconciliation fingerprints when it differs from `change.schemaName`. Schema resolution errors MUST propagate as fingerprint collection failures or operation failures according to the calling contract; the service MUST NOT retry with the workspace default or produce evidence from another schema.
+
 ## Constraints
 
-- name and createdAt are set at creation and never changed
-- workspaces is a computed getter derived from specIds via parseSpecId() — it is not a declared or persisted field
-- specIds may be empty (empty specIds results in empty workspaces)
-- workspaces is the plural set of touched workspaces; it MUST NOT be used to derive a singular "primary workspace" for template variables or archive path patterns
-- Current lifecycle state is derived from history (last transitioned event); no state snapshot is stored
-- Any modification to the spec list or any artifact content appends an invalidated event followed by a transitioned event back to designing — this may be triggered by use cases or automatically by FsChangeRepository.get() using SYSTEM_ACTOR
-- A designing → designing transition MUST NOT trigger approval invalidation or artifact downgrade — re-entering the same step is not a backward transition
-- ChangeArtifact contains a files: Map\<string, ArtifactFile> — artifact status is aggregated from per-file statuses
-- ArtifactFile status is never inferred from validatedHash alone; canonical file state is determined from explicit state plus current file presence
-- validatedHash is the last successfully validated baseline only; it does not prove that the file still exists or is still complete on disk
-- hasDrift is persisted per file and reflects whether the current file state matches the validated baseline
-- skipped is only valid for optional: true artifacts; attempting to skip a non-optional artifact throws an error
-- skipped satisfies the dependency in requires chains and workflow step availability checks — treated as resolved
-- On invalidated event, artifact/file reopening is policy-driven rather than always global
-- On verifying → implementing: only artifacts in implementing.requires are reset
-- ChangeArtifact.markComplete(key, hash) may only be called from ValidateArtifacts
-- ChangeArtifact.markSkipped() marks ALL files and may only be called from the skip use case
-- syncArtifacts(artifactTypes) reconciles the artifact map against the schema; appends artifacts-synced event with SYSTEM_ACTOR when changes occur
-- archivable is the only state from which a change may be archived; attempting to archive from any other state throws InvalidStateTransitionError
-- Both approval gates default to false — teams opt in via approvals in specd.yaml
-- When approvals.spec: true, spec approval is required before implementing
-- When approvals.signoff: true, sign-off is always required before archivable, regardless of change content
-- Task completion gating is enforced generically by the workflow model — any step that requires an artifact with taskCompletionCheck is automatically gated (see [core:workflow-model](../workflow-model/spec.md))
-- verifying → implementing does not trigger approval invalidation
-- History events are never modified or deleted; invalidated approvals are identifiable by a subsequent invalidated event
-- Historical implementation detection is derived from append-only history by scanning for any transitioned event whose to field is implementing
-- Drafting or discarding after historical implementation requires an explicit force override because implementation may already exist and specs and code could otherwise be left out of sync
-- Discarding a change requires a discarded event with mandatory reason and by; it is irreversible
-- Schema-aware effective artifact status, recursive blocker resolution, and workflow-step availability are not entity-owned concerns; they are interpreted by LifecycleEngine from persisted change facts plus the active schema
+- `name` and `createdAt` are immutable; `workspaces` is derived from `specIds`, never persisted independently.
+- Lifecycle state is derived from append-only transition history; approval and verification validity is read from materialized projections whose audit events are never erased.
+- Scope or artifact changes append focused invalidation evidence and are applied by the central reconciler. Lifecycle recovery follows structured workflow policy and mandatory gate precedence, never an unconditional repository-read return to `designing`.
+- Re-entering `designing` from `designing` does not invalidate consent or reopen artifacts.
+- File state is explicit and aggregated into `ChangeArtifact`; `validatedHash` is only the last structural baseline and `hasDrift` is persisted independently.
+- `skipped` is valid only for optional artifacts and satisfies declared artifact dependencies.
+- Artifact reopening is policy-driven. `verifying → implementing` does not mass-reopen unchanged artifacts or invalidate unchanged verification or spec approval; movement below sign-off retains its independent sign-off invalidation rules.
+- `ChangeArtifact.markComplete` is reserved for validation and `markSkipped` for the skip use case.
+- `syncArtifacts` reconciles schema-declared artifact/file shape and appends an actor-attributed audit event when it changes persisted state.
+- `archivable` and `archiving` remain the only archive-operation source states.
+- Approval gates default off. When enabled, spec approval requires current valid consent before implementation and sign-off requires current valid consent before archivable.
+- Task completion is controlled by schema `hasTasks`, `taskCompletionCheck`, and workflow `requiresTaskCompletion`; task content is not approval evidence.
+- Archive is an operation evaluated by shared transition checks, not a normal lifecycle edge.
 
 ## Spec Dependencies
 
@@ -465,3 +497,5 @@ When a file is canonically `missing`, `missing` remains the canonical state even
 - [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — interprets schema-aware lifecycle and dependency status from persisted change facts
 - [`default:_global/logging`](../../_global/logging/spec.md) — debug logging conventions for archive-attempt diagnostics reflected in change history
 - [`core:implementation-detector-port`](../implementation-detector-port/spec.md) — triggers autodetection before status load and transitions
+- [`core:transition-checks`](../transition-checks/spec.md) — shared transition-attempt evaluation consumed by status and execute
+- [`core:workflow-topology`](../workflow-topology/spec.md) — step enablement (`isWorkflowStepEnabled`) used to decide verification and hook applicability

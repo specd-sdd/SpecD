@@ -13,6 +13,7 @@ import {
   captureStdout,
   captureStderr,
   ExitSentinel,
+  makeMockHost,
 } from './helpers.js'
 
 vi.mock('../../src/helpers/cli-context.js', async (importOriginal) => {
@@ -28,6 +29,7 @@ import { registerChangeCreate } from '../../src/commands/change/create.js'
 import {
   ChangeAlreadyExistsError,
   createKernel,
+  DEFAULT_INVALIDATION_POLICY,
   InvalidInputError,
   InvalidSpecIdError,
   ReadOnlyWorkspaceError,
@@ -40,7 +42,9 @@ import { buildCliKernelOptions } from '../../src/helpers/cli-context.js'
 function setup(configOverrides: Record<string, unknown> = {}) {
   const config = makeMockConfig(configOverrides)
   const kernel = makeMockKernel()
-  vi.mocked(resolveCliContext).mockResolvedValue({ config, configFilePath: null, kernel })
+  vi.mocked(resolveCliContext).mockResolvedValue(
+    makeMockHost({ config, configFilePath: null, kernel }),
+  )
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
@@ -50,23 +54,16 @@ function setup(configOverrides: Record<string, unknown> = {}) {
 afterEach(() => vi.restoreAllMocks())
 
 describe('Invalid invalidation policy', () => {
-  it('forwards the raw value and maps the use case error to exit 1', async () => {
+  it('rejects an unknown --artifact-policy value with exit 1', async () => {
     const { kernel, stderr } = setup()
-    kernel.changes.create.execute.mockRejectedValue(
-      new InvalidInputError(
-        "invalid invalidation policy 'sugical' — allowed values: none, surgical, downstream, global",
-      ),
-    )
 
     const program = makeProgram()
     registerChangeCreate(program.command('change'))
     await program
-      .parseAsync(['node', 'specd', 'change', 'create', 'feat', '--invalidation-policy', 'sugical'])
+      .parseAsync(['node', 'specd', 'change', 'create', 'feat', '--artifact-policy', 'sugical'])
       .catch(() => {})
 
-    expect(kernel.changes.create.execute).toHaveBeenCalledWith(
-      expect.objectContaining({ invalidationPolicy: 'sugical' }),
-    )
+    expect(kernel.changes.create.execute).not.toHaveBeenCalled()
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain('sugical')
   })
@@ -526,15 +523,18 @@ describe('Integration (real kernel)', () => {
         archiveAdapter: { adapter: 'fs', config: { path: archivePath } },
       },
       approvals: { spec: false, signoff: false },
+      invalidation: DEFAULT_INVALIDATION_POLICY,
     }
     kernel = await createKernel(config, buildCliKernelOptions())
-    vi.mocked(resolveCliContext).mockResolvedValue({
-      config,
-      configFilePath: config.configPath,
-      kernel,
-    })
+    vi.mocked(resolveCliContext).mockResolvedValue(
+      makeMockHost({
+        config,
+        configFilePath: config.configPath,
+        kernel,
+      }),
+    )
     mockProcessExit()
-  })
+  }, 20_000)
 
   afterEach(async () => {
     await fs.rm(tmpDir, { recursive: true, force: true })
@@ -570,7 +570,7 @@ describe('Integration (real kernel)', () => {
     const created = manifest.history.find((event) => event.type === 'created')
     expect(created?.schemaName).toBe('schema-std')
     expect(created?.schemaVersion).toBe(1)
-  })
+  }, 20_000)
 
   it('emits overlap warning from real DetectOverlap when another change targets the spec', async () => {
     await kernel.changes.create.execute({
@@ -597,10 +597,148 @@ describe('Integration (real kernel)', () => {
     expect(stderr()).toContain('warning: spec overlap detected')
     expect(stderr()).toContain('existing-change')
     expect(stdout()).toContain('created change my-change')
+  }, 20_000)
+})
+
+describe('structured invalidation policy flags', () => {
+  it('passes config defaults when neither policy flag is set', async () => {
+    const { kernel } = setup({
+      invalidation: { artifacts: 'global', workflow: 'redesign' },
+    })
+    kernel.changes.create.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'drafting' }),
+      changePath: '/tmp/test-changes/my-change',
+    })
+
+    const program = makeProgram()
+    registerChangeCreate(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'create', 'my-change'])
+
+    expect(kernel.changes.create.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        invalidation: { artifacts: 'global', workflow: 'redesign' },
+      }),
+    )
+  })
+
+  it('overlays only the artifact flag and keeps the configured workflow', async () => {
+    const { kernel } = setup({
+      invalidation: { artifacts: 'global', workflow: 'preserve' },
+    })
+    kernel.changes.create.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'drafting' }),
+      changePath: '/tmp/test-changes/my-change',
+    })
+
+    const program = makeProgram()
+    registerChangeCreate(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'create',
+      'my-change',
+      '--artifact-policy',
+      'surgical',
+    ])
+
+    expect(kernel.changes.create.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        invalidation: { artifacts: 'surgical', workflow: 'preserve' },
+      }),
+    )
+  })
+
+  it('overlays only the workflow flag and keeps the configured artifact policy', async () => {
+    const { kernel } = setup({
+      invalidation: { artifacts: 'surgical', workflow: 'preserve' },
+    })
+    kernel.changes.create.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'drafting' }),
+      changePath: '/tmp/test-changes/my-change',
+    })
+    const program = makeProgram()
+    registerChangeCreate(program.command('change'))
+
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'create',
+      'my-change',
+      '--workflow-policy',
+      'redesign',
+    ])
+
+    expect(kernel.changes.create.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        invalidation: { artifacts: 'surgical', workflow: 'redesign' },
+      }),
+    )
+  })
+
+  it('passes both explicit policy dimensions together', async () => {
+    const { kernel } = setup()
+    kernel.changes.create.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'drafting' }),
+      changePath: '/tmp/test-changes/my-change',
+    })
+    const program = makeProgram()
+    registerChangeCreate(program.command('change'))
+
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'create',
+      'my-change',
+      '--artifact-policy',
+      'none',
+      '--workflow-policy',
+      'redesign',
+    ])
+
+    expect(kernel.changes.create.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        invalidation: { artifacts: 'none', workflow: 'redesign' },
+      }),
+    )
+  })
+
+  it('rejects an unknown workflow policy before create', async () => {
+    const { kernel, stderr } = setup()
+    const program = makeProgram()
+    registerChangeCreate(program.command('change'))
+
+    await program
+      .parseAsync(['node', 'specd', 'change', 'create', 'my-change', '--workflow-policy', 'rewind'])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toContain("invalid --workflow-policy 'rewind'")
+    expect(kernel.changes.create.execute).not.toHaveBeenCalled()
+  })
+
+  it('rejects an unknown artifact policy before create', async () => {
+    const { kernel, stderr } = setup()
+
+    const program = makeProgram()
+    registerChangeCreate(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'create', 'my-change', '--artifact-policy', 'wide'])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toContain("invalid --artifact-policy 'wide'")
+    expect(kernel.changes.create.execute).not.toHaveBeenCalled()
   })
 
   it('outputs TOON format with --format toon', async () => {
-    const stdout = captureStdout()
+    const { kernel, stdout } = setup()
+    kernel.changes.create.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-toon-change', state: 'drafting' }),
+      changePath: '/tmp/test-changes/my-toon-change',
+    })
 
     const program = makeProgram()
     registerChangeCreate(program.command('change'))

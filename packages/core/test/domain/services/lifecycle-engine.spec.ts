@@ -1,354 +1,363 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Logger } from '../../../src/application/logger.js'
+import { describe, expect, it } from 'vitest'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
-import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
-import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
-import { LifecycleEngine } from '../../../src/domain/services/lifecycle-engine.js'
-import { makeArtifactType, makeSchema, testActor } from '../../application/use-cases/helpers.js'
+import {
+  evaluateLifecycleVerdict,
+  type LifecycleVerdictInput,
+} from '../../../src/domain/services/lifecycle-verdict.js'
+import { resolveLifecycleIntent } from '../../../src/application/services/lifecycle-guidance.js'
+import { approveSignoffAction, fail } from '../../../src/domain/services/transition-checks.js'
+import { type ChangeValidityVerdict } from '../../../src/domain/services/change-validity.js'
+import { SchemaValidationError } from '../../../src/domain/errors/schema-validation-error.js'
+import { makeSchema, makeWorkflowStep, testActor } from '../../application/use-cases/helpers.js'
 
-function makeChange(): Change {
-  const created: ChangeEvent = {
-    type: 'created',
-    at: new Date('2024-01-01T00:00:00Z'),
-    by: testActor,
-    specIds: ['default:auth/login'],
-    schemaName: '@specd/schema-std',
-    schemaVersion: 1,
+describe('LifecycleEngine with disabled verification', () => {
+  const disabledVerifyingSchema = makeSchema(
+    [],
+    [
+      makeWorkflowStep('drafting'),
+      makeWorkflowStep('designing'),
+      makeWorkflowStep('ready'),
+      makeWorkflowStep('implementing'),
+      makeWorkflowStep('verifying', { disabled: true }),
+      makeWorkflowStep('done'),
+      makeWorkflowStep('archivable'),
+      makeWorkflowStep('archiving'),
+    ],
+  )
+
+  function makeChange(state: 'implementing' | 'done'): Change {
+    const history: ChangeEvent[] = [
+      {
+        type: 'created' as const,
+        at: new Date(),
+        by: testActor,
+        specIds: ['auth/login'],
+        schemaName: 'test',
+        schemaVersion: 1,
+      },
+      {
+        type: 'transitioned' as const,
+        from: 'drafting' as const,
+        to: 'designing' as const,
+        at: new Date(),
+        by: testActor,
+      },
+      {
+        type: 'transitioned' as const,
+        from: 'designing' as const,
+        to: 'ready' as const,
+        at: new Date(),
+        by: testActor,
+      },
+      {
+        type: 'transitioned' as const,
+        from: 'ready' as const,
+        to: 'implementing' as const,
+        at: new Date(),
+        by: testActor,
+      },
+    ]
+    if (state === 'done') {
+      history.push({
+        type: 'transitioned' as const,
+        from: 'implementing' as const,
+        to: 'done' as const,
+        at: new Date(),
+        by: testActor,
+      })
+    }
+    return new Change({
+      name: 'disabled-verif-change',
+      createdAt: new Date(),
+      specIds: ['auth/login'],
+      schemaName: 'test',
+      schemaVersion: 1,
+      history,
+    })
   }
-  return new Change({
-    name: 'my-change',
-    createdAt: new Date('2024-01-01T00:00:00Z'),
-    specIds: ['default:auth/login'],
-    schemaName: '@specd/schema-std',
-    schemaVersion: 1,
-    history: [created],
-  })
-}
 
-function makeArtifact(type: string, status: ArtifactFile['status'], key = type): ChangeArtifact {
-  return new ChangeArtifact({
-    type,
-    files: new Map([
-      [
-        key,
-        new ArtifactFile({
-          key,
-          filename: `${type}.md`,
-          status,
-        }),
-      ],
-    ]),
-  })
-}
+  function evaluate(
+    change: Change,
+    schema = disabledVerifyingSchema,
+    options: Partial<LifecycleVerdictInput> = {},
+  ) {
+    return evaluateLifecycleVerdict(change, schema, {
+      approvals: { spec: false, signoff: false },
+      checksByTarget: {},
+      ...options,
+    })
+  }
 
-describe('LifecycleEngine', () => {
-  afterEach(() => {
-    Logger.resetImplementation()
+  it('excludes verifying from availableSteps in verdict', () => {
+    const change = makeChange('implementing')
+    const verdict = evaluate(change)
+
+    const stepNames = verdict.availableSteps.map((s) => s.step)
+    expect(stepNames).not.toContain('verifying')
+    expect(stepNames).toContain('implementing')
+    expect(stepNames).toContain('done')
   })
 
-  it('computes effective status across dependency chains', () => {
-    const change = makeChange()
-    const proposal = makeArtifact('proposal', 'in-progress')
-    const design = makeArtifact('design', 'complete')
-    const tasks = makeArtifact('tasks', 'complete')
-    change.setArtifact(proposal)
-    change.setArtifact(design)
-    change.setArtifact(tasks)
+  it('computes legal forward transitions skipping verifying to done', () => {
+    const change = makeChange('implementing')
+    const verdict = evaluate(change)
 
-    const schema = makeSchema({
-      artifacts: [
-        makeArtifactType('proposal'),
-        makeArtifactType('design', { requires: ['proposal'] }),
-        makeArtifactType('tasks', { requires: ['design'] }),
-      ],
+    expect(verdict.validTransitions).toContain('done')
+    expect(verdict.validTransitions).not.toContain('verifying')
+    expect(verdict.validTransitions).toContain('designing')
+  })
+
+  it('recommends nextHop targetStep done from implementing without mandating verification evidence', () => {
+    const change = makeChange('implementing')
+    const validity: ChangeValidityVerdict = {
+      artifactReviewRequired: false,
+      affectedArtifacts: [],
+      projectionChanges: [],
+      specApproval: 'not-required',
+      signoff: 'not-required',
+      verification: 'absent',
+      fingerprintIssues: [],
+      blockers: [],
+      recovery: null,
+    }
+
+    const verdict = evaluate(change, disabledVerifyingSchema, {
+      validity,
+      checksByTarget: {
+        done: [{ id: 'protocol.edge', kind: 'predicate', outcome: 'pass', label: 'Protocol' }],
+      },
     })
 
-    const verdict = new LifecycleEngine().evaluate(change, schema)
-    expect(verdict.artifacts.find((artifact) => artifact.type === 'tasks')?.effectiveStatus).toBe(
-      'in-progress',
+    // When verifying is disabled, isAtOrAfterVerificationBoundary returns false so it does not recommend
+    // "Renew verification in place". It advances straight to done.
+    expect(verdict.nextHop.targetStep).toBe('done')
+    expect(verdict.nextHop.reason).not.toContain('verification')
+  })
+
+  it('recommends the `archive` intent from implementing when verifying is disabled and next hop is done', () => {
+    const change = makeChange('implementing')
+    const validity: ChangeValidityVerdict = {
+      artifactReviewRequired: false,
+      affectedArtifacts: [],
+      projectionChanges: [],
+      specApproval: 'not-required',
+      signoff: 'not-required',
+      verification: 'absent',
+      fingerprintIssues: [],
+      blockers: [],
+      recovery: null,
+    }
+
+    const verdict = evaluate(change, disabledVerifyingSchema, {
+      validity,
+      checksByTarget: {
+        done: [{ id: 'protocol.edge', kind: 'predicate', outcome: 'pass', label: 'Protocol' }],
+      },
+    })
+    const result = resolveLifecycleIntent(
+      change,
+      verdict.nextHop,
+      verdict.review,
+      ['done', 'designing'],
+      { spec: false, signoff: false },
+      disabledVerifyingSchema,
+      validity,
     )
+
+    expect(result).toEqual({ intent: 'archive' })
   })
 
-  it('downgrades complete artifacts to pending-parent-artifact-review for upstream review blockers', () => {
-    const change = makeChange()
-    change.setArtifact(makeArtifact('proposal', 'pending-review'))
-    change.setArtifact(makeArtifact('specs', 'complete'))
-    change.setArtifact(makeArtifact('verify', 'complete'))
+  it('recommends nextHop targetStep archivable from done when verifying is disabled', () => {
+    const change = makeChange('done')
+    const validity: ChangeValidityVerdict = {
+      artifactReviewRequired: false,
+      affectedArtifacts: [],
+      projectionChanges: [],
+      specApproval: 'not-required',
+      signoff: 'not-required',
+      verification: 'absent',
+      fingerprintIssues: [],
+      blockers: [],
+      recovery: null,
+    }
 
-    const schema = makeSchema({
-      artifacts: [
-        makeArtifactType('proposal'),
-        makeArtifactType('specs', { requires: ['proposal'] }),
-        makeArtifactType('verify', { requires: ['specs'] }),
-      ],
-    })
-
-    const engine = new LifecycleEngine()
-    const verdict = engine.evaluate(change, schema)
-    expect(verdict.artifacts.find((artifact) => artifact.type === 'verify')?.effectiveStatus).toBe(
-      'pending-parent-artifact-review',
-    )
-    expect(engine.findBlockingParent(change, schema, 'verify')).toEqual({
-      artifactId: 'proposal',
-      status: 'pending-review',
-    })
-  })
-
-  it('routes gated targets through the pending approval step', () => {
-    const change = makeChange()
-    change.transition('designing', testActor)
-    change.transition('ready', testActor)
-
-    const schema = makeSchema({
-      workflow: [
-        {
-          step: 'implementing',
-          requires: [],
-          requiresTaskCompletion: [],
-          hooks: { pre: [], post: [] },
-        },
-      ],
-    })
-
-    const verdict = new LifecycleEngine().evaluate(change, schema, {
-      requestedTarget: 'implementing',
-      approvals: { spec: true, signoff: false },
-    })
-
-    expect(verdict.effectiveTarget).toBe('pending-spec-approval')
-    expect(verdict.blockers.some((blocker) => blocker.code === 'APPROVAL_REQUIRED')).toBe(true)
-  })
-
-  it('treats skipped dependencies as satisfied for next-artifact resolution', () => {
-    const change = makeChange()
-    const optional = new ChangeArtifact({
-      type: 'optional',
-      optional: true,
-      files: new Map([
-        [
-          'optional',
-          new ArtifactFile({ key: 'optional', filename: 'optional.md', status: 'in-progress' }),
+    const verdict = evaluate(change, disabledVerifyingSchema, {
+      validity,
+      checksByTarget: {
+        archivable: [
+          { id: 'protocol.edge', kind: 'predicate', outcome: 'pass', label: 'Protocol' },
         ],
-      ]),
+      },
     })
-    optional.markSkipped()
-    change.setArtifact(optional)
-    change.setArtifact(makeArtifact('design', 'in-progress'))
+    expect(verdict.nextHop.targetStep).toBe('archivable')
 
-    const schema = makeSchema({
-      artifacts: [
-        makeArtifactType('optional', { optional: true }),
-        makeArtifactType('design', { requires: ['optional'] }),
-      ],
-    })
+    const result = resolveLifecycleIntent(
+      change,
+      verdict.nextHop,
+      verdict.review,
+      ['archivable', 'designing', 'implementing'],
+      { spec: false, signoff: false },
+      disabledVerifyingSchema,
+      validity,
+    )
 
-    const verdict = new LifecycleEngine().evaluate(change, schema)
-    expect(verdict.nextArtifact).toBe('design')
+    expect(result).toEqual({ intent: 'archive' })
   })
 
-  it('emits debug logs for lifecycle evaluation boundaries', () => {
-    const change = makeChange()
-    change.setArtifact(makeArtifact('proposal', 'pending-review'))
-    change.setArtifact(makeArtifact('specs', 'complete'))
+  it('never recommends the `verify` intent from done when verifying is disabled', () => {
+    const change = makeChange('done')
+    const validity: ChangeValidityVerdict = {
+      artifactReviewRequired: false,
+      affectedArtifacts: [],
+      projectionChanges: [],
+      specApproval: 'not-required',
+      signoff: 'not-required',
+      verification: 'absent',
+      fingerprintIssues: [],
+      blockers: [],
+      recovery: null,
+    }
+    const hop = {
+      targetStep: 'designing' as const,
+      actionType: 'cognitive' as const,
+      reason: 'Return to design',
+    }
+    const review = evaluate(change, disabledVerifyingSchema, { validity }).review
 
-    const schema = makeSchema({
-      artifacts: [
-        makeArtifactType('proposal'),
-        makeArtifactType('specs', { requires: ['proposal'] }),
-      ],
-    })
-
-    const debug = vi.fn<(message: string, context?: object) => void>()
-    new LifecycleEngine(debug).evaluate(change, schema, {
-      requestedTarget: 'implementing',
-      approvals: { spec: false, signoff: false },
-    })
-
-    expect(debug).toHaveBeenCalled()
+    expect(
+      resolveLifecycleIntent(
+        change,
+        hop,
+        review,
+        [],
+        { spec: false, signoff: false },
+        disabledVerifyingSchema,
+        validity,
+      ),
+    ).toEqual({ intent: 'design' })
+    expect(
+      resolveLifecycleIntent(
+        change,
+        { ...hop, targetStep: 'done' },
+        review,
+        [],
+        { spec: false, signoff: false },
+        disabledVerifyingSchema,
+        validity,
+      ),
+    ).toEqual({ intent: 'archive' })
   })
 
-  it('downgrades overlap blockers when the allow-overlap bypass is active', () => {
-    const createdAt = new Date('2024-01-01T00:00:00Z')
-    const change = new Change({
-      name: 'my-change',
-      createdAt,
-      specIds: ['default:auth/login'],
-      schemaName: '@specd/schema-std',
-      schemaVersion: 1,
-      history: [
-        {
-          type: 'created',
-          at: createdAt,
-          by: testActor,
-          specIds: ['default:auth/login'],
-          schemaName: '@specd/schema-std',
-          schemaVersion: 1,
-        },
-        {
-          type: 'invalidated',
-          at: new Date('2024-01-02T00:00:00Z'),
-          by: testActor,
-          cause: 'spec-overlap-conflict',
-          message: "Overlaps with archived change 'alpha' on specs: default:auth/login",
-          affectedArtifacts: [],
-        },
-      ],
-    })
-    change.setArtifact(makeArtifact('proposal', 'pending-review'))
+  it('uses the normalized approvals snapshot for every topology projection', () => {
+    const schema = makeSchema([], [makeWorkflowStep('ready', { disabled: true })])
+    const change = makeChange('implementing')
 
-    const schema = makeSchema()
-    const withoutBypass = new LifecycleEngine().evaluate(change, schema, {
-      requestedTarget: 'designing',
-      approvals: { spec: false, signoff: false },
-    })
-    const withBypass = new LifecycleEngine().evaluate(change, schema, {
-      requestedTarget: 'designing',
-      approvals: { spec: false, signoff: false },
-      bypassFlags: ['allow-overlap'],
-    })
-
-    expect(withoutBypass.blockers.some((blocker) => blocker.code === 'OVERLAP_CONFLICT')).toBe(true)
-    expect(withBypass.blockers.some((blocker) => blocker.code === 'OVERLAP_CONFLICT')).toBe(false)
-  })
-
-  it('treats complete-with-drift as complete for lifecycle interpretation', () => {
-    const change = makeChange()
-    const driftedFile = new ArtifactFile({
-      key: 'proposal',
-      filename: 'proposal.md',
-      status: 'complete',
-      validatedHash: 'sha256:abc',
-    })
-    driftedFile.markDrifted()
-    change.setArtifact(
-      new ChangeArtifact({
-        type: 'proposal',
-        files: new Map([['proposal', driftedFile]]),
+    expect(() =>
+      evaluate(change, schema, {
+        approvals: { spec: true, signoff: false },
       }),
-    )
-    change.setArtifact(makeArtifact('design', 'complete'))
-
-    const schema = makeSchema({
-      artifacts: [
-        makeArtifactType('proposal'),
-        makeArtifactType('design', { requires: ['proposal'] }),
-      ],
-    })
-
-    const verdict = new LifecycleEngine().evaluate(change, schema)
-    const proposal = verdict.artifacts.find((a) => a.type === 'proposal')
-    expect(proposal?.effectiveStatus).toBe('complete')
-    expect(proposal?.state).toBe('complete')
-    const driftBlockers = verdict.blockers.filter((b) => b.code === 'ARTIFACT_DRIFT')
-    expect(driftBlockers).toHaveLength(0)
+    ).toThrow(SchemaValidationError)
   })
-
-  it('selects next artifact in topological order, not schema declaration order', () => {
-    const change = makeChange()
-    change.setArtifact(makeArtifact('proposal', 'complete'))
-    change.setArtifact(makeArtifact('design', 'in-progress'))
-    change.setArtifact(makeArtifact('specs', 'in-progress'))
-    change.setArtifact(makeArtifact('verify', 'in-progress'))
-
-    const schema = makeSchema({
-      artifacts: [
-        makeArtifactType('design', { requires: ['proposal', 'specs', 'verify'] }),
-        makeArtifactType('proposal'),
-        makeArtifactType('specs', { requires: ['proposal'] }),
-        makeArtifactType('verify', { requires: ['specs'] }),
-      ],
+  it('routes blocked done with verifying disabled to the real blocker', () => {
+    const change = makeChange('done')
+    const gated = { spec: false, signoff: true }
+    const validity = (signoff: ChangeValidityVerdict['signoff']): ChangeValidityVerdict => ({
+      artifactReviewRequired: false,
+      affectedArtifacts: [],
+      projectionChanges: [],
+      specApproval: 'not-required',
+      signoff,
+      verification: 'not-required',
+      fingerprintIssues: [],
+      blockers: [],
+      recovery: null,
     })
+    const hop = {
+      targetStep: 'done' as const,
+      actionType: 'mechanical' as const,
+      reason: 'blocked',
+    }
+    const review = evaluate(change, disabledVerifyingSchema, { validity: validity('valid') }).review
 
-    const verdict = new LifecycleEngine().evaluate(change, schema)
-    expect(verdict.nextArtifact).toBe('specs')
-  })
-
-  it('uses canonical missing state even when hasDrift is true', () => {
-    const change = makeChange()
-    const missingDriftedFile = new ArtifactFile({
-      key: 'proposal',
-      filename: 'proposal.md',
-      status: 'missing',
-    })
-    missingDriftedFile.markDrifted()
-    change.setArtifact(
-      new ChangeArtifact({
-        type: 'proposal',
-        files: new Map([['proposal', missingDriftedFile]]),
-      }),
+    const signoffFailure = fail(
+      'approval.signoff',
+      'APPROVAL_STALE',
+      'Signoff is stale',
+      { gate: 'signoff' },
+      undefined,
+      undefined,
+      approveSignoffAction(),
     )
 
-    const schema = makeSchema({
-      artifacts: [makeArtifactType('proposal')],
-    })
-
-    const verdict = new LifecycleEngine().evaluate(change, schema)
-    const proposal = verdict.artifacts.find((a) => a.type === 'proposal')
-    expect(proposal?.state).toBe('missing')
-    expect(proposal?.effectiveStatus).toBe('missing')
+    expect(
+      resolveLifecycleIntent(
+        change,
+        hop,
+        review,
+        [],
+        gated,
+        disabledVerifyingSchema,
+        validity('stale'),
+        [signoffFailure],
+      ),
+    ).toEqual({ intent: null, action: approveSignoffAction() })
+    expect(
+      resolveLifecycleIntent(
+        change,
+        hop,
+        review,
+        [],
+        { spec: false, signoff: false },
+        disabledVerifyingSchema,
+        validity('valid'),
+      ),
+    ).toEqual({ intent: 'archive' })
+    expect(
+      resolveLifecycleIntent(
+        change,
+        { ...hop, targetStep: 'archivable' },
+        review,
+        [],
+        { spec: false, signoff: false },
+        disabledVerifyingSchema,
+        validity('valid'),
+      ),
+    ).toEqual({ intent: 'archive' })
   })
-
-  it('exposes archiving escape transitions without archivable requires blockers', () => {
-    const createdAt = new Date('2024-01-01T00:00:00Z')
-    const change = new Change({
-      name: 'my-change',
-      createdAt,
-      specIds: ['default:auth/login'],
-      schemaName: '@specd/schema-std',
-      schemaVersion: 1,
-      history: [
-        {
-          type: 'created',
-          at: createdAt,
-          by: testActor,
-          specIds: ['default:auth/login'],
-          schemaName: '@specd/schema-std',
-          schemaVersion: 1,
-        },
-        { type: 'transitioned', from: 'done', to: 'archivable', at: createdAt, by: testActor },
-        { type: 'transitioned', from: 'archivable', to: 'archiving', at: createdAt, by: testActor },
+  it('derives guidance from the pipeline when workflow rows are in noncanonical order', () => {
+    const noncanonical = makeSchema(
+      [],
+      [
+        makeWorkflowStep('done'),
+        makeWorkflowStep('verifying', { disabled: true }),
+        makeWorkflowStep('implementing'),
+        makeWorkflowStep('ready'),
       ],
-    })
-
-    const verdict = new LifecycleEngine().evaluate(change, makeSchema())
-    expect(verdict.validTransitions).toEqual(['archivable', 'designing'])
-    expect(verdict.availableTransitions).toContain('archivable')
-    expect(verdict.transitionBlockers.some((blocker) => blocker.transition === 'archivable')).toBe(
-      false,
     )
-  })
+    const validity: ChangeValidityVerdict = {
+      artifactReviewRequired: false,
+      affectedArtifacts: [],
+      projectionChanges: [],
+      specApproval: 'not-required',
+      signoff: 'not-required',
+      verification: 'absent',
+      fingerprintIssues: [],
+      blockers: [],
+      recovery: null,
+    }
+    const hop = { targetStep: 'done' as const, actionType: 'mechanical' as const, reason: 'next' }
+    const approvals = { spec: false, signoff: false }
 
-  it('recommends designing when archive commit failed and change remains archiving', () => {
-    const createdAt = new Date('2024-01-01T00:00:00Z')
-    const change = new Change({
-      name: 'my-change',
-      createdAt,
-      specIds: ['default:auth/login'],
-      schemaName: '@specd/schema-std',
-      schemaVersion: 1,
-      history: [
-        {
-          type: 'created',
-          at: createdAt,
-          by: testActor,
-          specIds: ['default:auth/login'],
-          schemaName: '@specd/schema-std',
-          schemaVersion: 1,
-        },
-        { type: 'transitioned', from: 'archivable', to: 'archiving', at: createdAt, by: testActor },
-        {
-          type: 'archive-failed',
-          at: createdAt,
-          by: testActor,
-          step: 'commit',
-          message: 'partial restore',
-          commitStarted: true,
-        },
-      ],
-    })
-
-    const verdict = new LifecycleEngine().evaluate(change, makeSchema())
-    expect(verdict.nextAction.targetStep).toBe('designing')
-    expect(verdict.nextAction.command).toBe('/specd-design')
+    for (const state of ['implementing', 'done'] as const) {
+      const change = makeChange(state)
+      const review = evaluate(change, noncanonical, { validity }).review
+      expect(
+        resolveLifecycleIntent(change, hop, review, [], approvals, noncanonical, validity).intent,
+      ).not.toBe('verify')
+    }
+    // Canonical order comes from the pipeline, not from the declared row order.
+    expect(
+      evaluate(makeChange('implementing'), noncanonical).availableSteps.map((entry) => entry.step),
+    ).toEqual(['ready', 'implementing', 'done'])
   })
 })

@@ -22,9 +22,11 @@ Options:
 - Initializes project config and storage via core `InitProject`.
 - Supports interactive setup when run in TTY text mode with no flags:
   - asks schema/workspace/specs path
-  - offers multi-select plugin installation
+  - offers multi-select plugin installation (an empty selection is valid and installs nothing)
+  - when `specd.yaml` already exists, asks for confirmation naming its path and warning that overwriting replaces the configuration, including its declared plugins and workspaces
+- Cancelling any prompt, or declining the overwrite, writes nothing and exits with code `0`.
 - Plugin installation after init uses the same orchestration as `plugins install`.
-- Plugin declarations are persisted under `plugins.agents`.
+- Plugin declarations are persisted in the flat `plugins` list. `specd project init` writes `configVersion: 2`.
 - Creates `.specd/metadata/` and appends `/.specd/metadata/` to the root `.gitignore` (idempotent).
 - Exits with code `1` if any selected plugin installation fails.
 

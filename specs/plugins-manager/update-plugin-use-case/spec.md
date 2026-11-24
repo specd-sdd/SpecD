@@ -14,18 +14,20 @@ Same as `InstallPluginInput` (using `SpecdConfig`):
 interface UpdatePluginInput {
   readonly pluginName: string
   readonly config: SpecdConfig
+  readonly contributions?: readonly string[] // the currently selected ids; omitted = all declared
   readonly options?: Record<string, unknown>
 }
 ```
 
 ### Requirement: Output
 
-Same as `InstallPluginOutput`:
+Same as `InstallPluginOutput` (without persisting `defaultConfig`):
 
 ```typescript
 interface UpdatePluginOutput {
   readonly success: boolean
   readonly message: string
+  readonly contributions: readonly string[]
   readonly data?: unknown
 }
 ```
@@ -34,11 +36,13 @@ interface UpdatePluginOutput {
 
 The use case MUST:
 
-1. Load the plugin via `PluginLoader`
-2. Verify the loaded plugin is an `AgentPlugin` using the `isAgentPlugin` type guard
-3. If the plugin is not an `AgentPlugin`, throw `PluginValidationError`
-4. Call the plugin's `install()` method with the provided `SpecdConfig` (same as install, but no config mutation)
-5. Return a generic result
+1. Load the plugin and its validated manifest via `PluginLoader`
+2. Resolve the contribution ids as in `InstallPlugin`; an id that the updated manifest no longer declares throws `UnknownContributionError`
+3. If the manifest declares `contributes.agents`, verify the loaded plugin is an `AgentPlugin` using `isAgentPlugin`; otherwise throw `PluginValidationError`
+4. Call the plugin's `install()` method, when implemented, with the selected contribution ids (same context, same `agents`-only filtering and same options forwarding as install, but no config mutation)
+5. Return a generic result whose `contributions` is exactly the list passed to the hook
+
+The use case does not read `specd.yaml`: when `contributions` is omitted it selects every declared id. An update MUST NOT activate a contribution that was not already selected, so callers that know the allowlist (the CLI) MUST pass it as `contributions`. Updating twice with the same input is idempotent: the use case adds no state of its own and delegates idempotency to the plugin's `install`.
 
 ### Requirement: Idempotency
 
@@ -49,8 +53,9 @@ The use case MUST be idempotent — calling it multiple times produces the same 
 On failure, the use case MUST throw an appropriate error:
 
 - `PluginNotFoundError` — when the plugin package cannot be resolved
-- `PluginValidationError` — when the plugin fails type guard validation (not an `AgentPlugin`)
-- `PluginValidationError` — when `install()` throws
+- `PluginValidationError` — when the plugin declares `agents` but is not an `AgentPlugin`
+- `UnknownContributionError` — when a selected id is no longer declared
+- `PluginValidationError` naming the plugin, with the original error as `cause`, when `install()` throws an error that is not already a `SpecdError`; a `SpecdError` thrown by the hook propagates unchanged
 
 ## Constraints
 
@@ -60,5 +65,7 @@ On failure, the use case MUST throw an appropriate error:
 ## Spec Dependencies
 
 - [`core:config`](../../core/core/config/spec.md) — defines SpecdConfig type
-- [`plugin-manager:agent-plugin-type`](../agent-plugin-type/spec.md) — plugin interface
 - [`plugin-manager:plugin-loader`](../plugin-loader/spec.md) — loads plugins
+- [`plugin-manager:install-plugin-use-case`](../install-plugin-use-case/spec.md) — install semantics reused by update
+- [`plugin-manager:plugin-errors`](../plugin-errors/spec.md) — typed errors thrown by the use case
+- [`plugin-manager:agent-plugin-type`](../agent-plugin-type/spec.md) — `AgentPlugin` and `isAgentPlugin`

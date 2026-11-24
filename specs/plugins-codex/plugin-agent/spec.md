@@ -8,17 +8,22 @@ This spec defines the Codex agent plugin contract for install/uninstall behavior
 
 ### Requirement: Factory export
 
-The package MUST export `create(options: PluginLoaderOptions): AgentPlugin` as default or named export.
+The package MUST export `create(options: PluginLoaderOptions): AgentPlugin | Promise<AgentPlugin>` as default or named export. `create` MUST read `name` and `version` from the package `specd-plugin.json` and MUST throw `PluginValidationError` (fields `specd-plugin.json: name` or `specd-plugin.json: version`) when the manifest it resolves lacks a non-empty string for either; the resulting plugin has no `type`.
 
-The factory function MUST read `specd-plugin.json` at the infrastructure boundary to obtain `name` and `version`. It MUST search for the manifest in its own directory first, then the parent directory as fallback. The `type` field MUST remain hardcoded as `'agent'`.
+The factory function MUST read `specd-plugin.json` at the infrastructure boundary to obtain `name` and `version`. It MUST search for the manifest in its own directory first, then the parent directory as fallback. The loader awaits the result, so `create` MAY be `async`. The returned plugin MUST NOT carry a `type` discriminator.
+
+### Requirement: Manifest and install context
+
+The manifest `specd-plugin.json` MUST declare `schemaVersion: 2`, MUST NOT declare `pluginType`, and MUST declare one contribution of kind `agents` with the local id `codex` (`contributes: { "agents": { "codex": {} } }`), addressable as `@specd/plugin-agent-codex.codex`.
+
+`install` and `uninstall` receive an `AgentInstallContext` (`config`, `options`, `contributions`) as defined by `plugin-manager:agent-plugin-type`. Wherever this spec refers to `config` and `options` of `install` and `uninstall`, they are `context.config` and `context.options`. The plugin declares no `configSchema`, so it accepts no plugin `config`.
 
 ### Requirement: Plugin runtime contract
 
 The implementation MUST return a valid `AgentPlugin` that:
 
-- has `type: 'agent'` (hardcoded for type safety)
 - has `name` and `version` sourced from `specd-plugin.json` via the factory — not hardcoded in the class
-- implements `install(config, options)` and `uninstall(config, options)` with real filesystem behavior, using the provided `SpecdConfig`
+- implements `install(context)` and `uninstall(context)` with real filesystem behavior, using `context.config` and `context.options`
 - uses a stable structured metadata value model for generated skill files
 - declares only Codex-supported capability identifiers to `@specd/skills`
 
@@ -73,22 +78,31 @@ The resolved shared location MUST NOT contain a `SKILL.md` file.
 
 `CodexAgentPlugin.install()` MUST inject the base agent instruction prompt into the shared `AGENTS.md` file under the project root.
 
-- `install()` MUST inject the base prompt using `injectSpecdBlock(agentsMdPath, prompt)`.
-- `install()` MUST call `removeSpecdBlock(agentsMdPath, "codex")` to purge any legacy plugin marker blocks left by previous versions.
-- `uninstall()` MUST call `removeSpecdBlock(agentsMdPath, "codex")` (no-op if not present), then `removeSpecdBlock(agentsMdPath)` to remove the base block.
-- No plugin marker block (`<!-- <specd-plugin:codex> -->`) is injected during install.
+- `install()` MUST call `injectSpecdBlock(agentsMdPath, prompt, 'codex')`. The base `<!-- <specd agents="…"> -->` block in `AGENTS.md` is shared and reference-counted by plugin id, so several agent plugins can target the same file.
+- `uninstall()` MUST call `removeSpecdBlock(agentsMdPath, 'codex')`, which drops the `codex` reference, purges any legacy `<!-- <specd-plugin:codex> -->` block, and removes the shared base block only when no other agent plugin still references it.
+- No separate plugin marker block (`<!-- <specd-plugin:codex> -->`) is injected during install.
+- Only a full `uninstall()` calls `removeSpecdBlock`; a filtered `uninstall()` keeps the block.
 
 ### Requirement: Uninstall behavior
 
-`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.codex/skills/` and agent files from `.codex/agents/` relative to `config.projectRoot`.
+`uninstall(context: AgentInstallContext)` MUST remove installed skill directories from `.codex/skills/` and agent files from `.codex/agents/` relative to `context.config.projectRoot`, honouring `context.options`.
 
-When `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory at the resolved `sharedFolder` location MUST remain in place because other installed skills may still reference it.
+**Filtered uninstall.** An empty `skills` or `agents` array counts as not provided. Selected names MUST be validated against the specd-managed skill and agent names: a name that is not managed (including any name with a path separator or `..`) is skipped, reported in the result of `uninstallWithResult()` (the plugin method that returns the report; `uninstall()` itself resolves to nothing, as the `AgentPlugin` contract requires), and never touches the filesystem. A full uninstall removes the managed agent files from both the runtime agents directory (when the runtime has one) and the shared folder, whatever `capabilities` it receives. When `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. When `options.agents` is provided, uninstall MUST remove only the selected specd-managed agent files from `.codex/agents/`. A filtered uninstall MUST NOT remove the shared folder, any file in it (except the `<agent-name>.agent.md` files selected through `options.agents` that live there because the runtime lacks the `agents` capability; uninstall evaluates `capabilities` the way install does, and the default set includes `agents`), or the owners marker (`.owners.json`), and MUST NOT call `removeSharedOwner`. It MUST keep the `codex` reference in the prompt block of `AGENTS.md`.
 
-When `options.agents` is provided, uninstall MUST remove only the selected specd-managed agent files from `.codex/agents/`.
+**Full uninstall.** When neither `options.skills` nor `options.agents` is provided, uninstall MUST:
 
-When no filters are provided, uninstall MUST remove all specd-managed skill directories, all specd-managed agent files under `.codex/agents/`, and the resolved sharedFolder location.
+1. remove all specd-managed skill directories under `.codex/skills/`, including legacy flat `<skill>.md` files left by previous versions;
+2. remove all specd-managed agent files under `.codex/agents/`;
+3. call `removeSpecdBlock` for `AGENTS.md`, which drops only this plugin's `codex` reference (the block itself disappears only when no other agent plugin references it);
+4. follow the uninstall protocol of `skills:shared-folder-owners` for the resolved `sharedFolder` location: call `removeSharedOwner(sharedDir, 'codex')`; when `hadMarker` is `false` (legacy install or unreadable marker) every shared file MUST be left untouched; when other owners remain every shared file MUST be left untouched; when no owner remains, delete `shared.md`, every managed `<agent>.agent.md` file and the marker, and then call `removeSharedFolderIfEmpty` so that the folder survives when foreign files remain. Errors other than `ENOTEMPTY` and `ENOENT` MUST propagate.
 
-Uninstall MUST NOT remove unrelated directories or files under `.codex/skills/` or `.codex/agents/` that are not part of the specd-managed skill or agent set.
+Uninstall MUST NOT remove unrelated directories or files under `.codex/skills/`, `.codex/agents/` or the shared folder that are not part of the specd-managed set.
+
+### Requirement: Shared folder ownership and agent placement
+
+Before writing the first file into the resolved `sharedFolder` location (including agent files placed there as a fallback), `install()` MUST call `addSharedOwner(sharedDir, 'codex')` from `@specd/skills`, for filtered and unfiltered installs alike, so that `skills:shared-folder-owners` can tell when the last owner leaves.
+
+The target directory for agent files MUST be derived from the `capabilities` declared to `@specd/skills`: when they include `agents`, agents are written to `.codex/agents/`; otherwise they are written next to `shared.md` in the resolved `sharedFolder` location. The declared set normally includes `agents`, but the install routine MUST honour the fallback when it does not (so the branch is exercisable by passing a capability list without `agents`).
 
 ### Requirement: Fast-track skill installation
 
@@ -105,14 +119,14 @@ The Codex fast-track frontmatter description MUST state that the skill is manual
 - The plugin MUST depend on `@specd/skills` for skill operations.
 - The plugin MUST implement concrete install and uninstall behavior.
 - `name` and `version` MUST be read from `specd-plugin.json` by the factory and passed to the plugin constructor — never hardcoded in the class.
-- `type` MUST remain hardcoded as `'agent'` for type safety.
 
 ## Spec Dependencies
 
 - [`core:config`](../../core/core/config/spec.md) — defines SpecdConfig type
 - [`plugin-manager:agent-plugin-type`](../plugin-manager/agent-plugin-type/spec.md) — plugin interface
 - [`skills:skill-bundle`](../skills/skill-bundle/spec.md) — shared bundle file routing contract
-- [`skills:skill-templates-source`](../skills/skill-templates-source/spec.md) — skill source
+- [`skills:skill-templates-source`](../skills/skill-templates-source/spec.md) — source of the bundled skill templates consumed through the skill repository
 - [`skills:resolve-bundle`](../skills/resolve-bundle/spec.md) — canonical install-time bundle resolution
 - [`skills:agents`](../skills/agents/spec.md) — defines specialized optimizer agents
 - [`skills:agent-instruction-template`](../skills/agent-instruction-template/spec.md) — shared base prompt rendering and block management
+- [`skills:shared-folder-owners`](../skills/shared-folder-owners/spec.md) — owners marker for the shared folder

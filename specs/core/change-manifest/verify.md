@@ -4,77 +4,56 @@
 
 ### Requirement: Manifest structure
 
-#### Scenario: Manifest stores artifact and file state explicitly
+Scenarios:
 
-- **WHEN** a change manifest is written
-- **THEN** each persisted artifact entry includes `state`
-- **AND** each persisted file entry includes `state`
+#### Scenario: Native v2 round trip preserves projections
 
-#### Scenario: Missing state defaults to missing on load
+- **GIVEN** a v2 change with structured policy, approvals, an active verification attempt, completed evidence, and history
+- **WHEN** it is serialized and loaded again
+- **THEN** every projection, fingerprint algorithm, attempt identity, and audit event is preserved
+- **AND** lifecycle state remains derived from transition history
 
-- **GIVEN** a manifest entry without a `state` field
-- **WHEN** the manifest is loaded
-- **THEN** the missing state is treated as `missing`
+#### Scenario: Native absence differs from legacy unknown evidence
 
-#### Scenario: specDependsOn is seeded when an existing spec enters the change
+- **WHEN** v2 projections are absent
+- **THEN** they mean never approved or completed
+- **AND** adapted legacy missing implementation fingerprints remain explicitly unknown
 
-- **GIVEN** an existing persisted spec is added to a change
-- **AND** the spec has a canonical `spec-lock.json`
-- **WHEN** the manifest is persisted after scope entry
-- **THEN** `specDependsOn` contains that spec's seeded dependency snapshot
+#### Scenario: Scope-aware approval round trip retains audit scopes
 
-#### Scenario: Legacy metadata seeds specDependsOn when sidecar is absent
+- **GIVEN** approval was renewed after its canonical spec scope changed
+- **WHEN** the v2 manifest is serialized and loaded
+- **THEN** the current projection retains the renewed scope and artifact fingerprint
+- **AND** each approval event retains the scope approved at that earlier decision
 
-- **GIVEN** an existing persisted spec has no `spec-lock.json`
-- **AND** legacy `metadata.json.dependsOn` exists for that spec
-- **WHEN** the spec first enters the change scope
-- **THEN** the manifest seeds `specDependsOn` from `metadata.json.dependsOn`
+#### Scenario: Scope invalidation events survive strict v2 round trip
 
-#### Scenario: Invalidated event stores message and affectedArtifacts
+- **GIVEN** a v2 manifest contains `approval-invalidated` evidence for scope `spec`
+- **AND** its kind is `spec-added` or `spec-removed`
+- **WHEN** strict v2 decoding and serialization run
+- **THEN** the valid event round-trips without coercion or loss
+- **AND** an unknown scope or invalidation kind still fails strict validation
 
-- **WHEN** a change is invalidated because validated files drifted
-- **THEN** the invalidated event includes `cause`
-- **AND** it includes a human-readable message
-- **AND** it includes `affectedArtifacts` with artifact types and file keys
+### Requirement: Manifest format compatibility
 
-#### Scenario: Manifest persists invalidationPolicy and hasDrift per file
+#### Scenario: Missing version adapts as v1 without eager write
 
-- **WHEN** a change with `invalidationPolicy: 'surgical'` and one drift-visible file is saved
-- **THEN** the serialized manifest includes `invalidationPolicy`
-- **AND** the file entry includes `hasDrift`
+- **GIVEN** a legacy manifest without `manifestVersion`
+- **WHEN** it is inspected
+- **THEN** it is adapted in memory with conservative legacy policy and unknown implementation evidence
+- **AND** no migration write occurs
 
-#### Scenario: Validated hash is not treated as proof of current presence
+#### Scenario: Unsupported future version fails closed
 
-- **GIVEN** a file entry with a non-null `validatedHash`
-- **AND** canonical file state `missing`
-- **WHEN** the manifest is loaded
-- **THEN** the file remains `missing`
-- **AND** `validatedHash` is interpreted only as the last validated baseline
+- **WHEN** the loader sees a version above the supported maximum
+- **THEN** it returns the typed unsupported-version error before domain hydration
 
-#### Scenario: Manifest stores tracked implementation files with explicit state
+#### Scenario: Approval without scope stays legacy unknown
 
-- **WHEN** a change manifest is written
-- **THEN** tracked implementation files are persisted with raw project-relative `file` values
-- **AND** each tracked entry includes an explicit `state` (one of `open`, `resolved`, `ignored`, or `removed`)
-
-#### Scenario: Manifest stores confirmed links with fileLinkExplicit semantics
-
-- **WHEN** confirmed implementation links are persisted
-- **THEN** each link stores `specId`, raw project-relative `file`, and `fileLinkExplicit`
-- **AND** `symbols` is omitted for file-level-only links
-- **AND** `fileLinkExplicit: false` is only valid when `symbols` is present and non-empty
-
-#### Scenario: Valid manifest containing updatedAt
-
-- **GIVEN** a `manifest.json` file containing a valid `updatedAt` ISO string
-- **WHEN** the manifest is validated against the schema
-- **THEN** validation succeeds
-
-#### Scenario: Manifest round-trips implementationTrackingStartedAt and handles legacy fallback
-
-- **WHEN** a change with active implementation tracking is saved
-- **THEN** `implementationTrackingStartedAt` is serialized as an ISO 8601 string
-- **AND** loading a legacy manifest without `implementationTrackingStartedAt` falls back to historical implementing timestamp if present
+- **GIVEN** a v1 or transitional v2 approval record has artifact hashes but no approved `specIds`
+- **WHEN** it is adapted
+- **THEN** scope freshness is unknown and cannot authorize the spec gate
+- **AND** the loader does not copy current scope into historical evidence
 
 ### Requirement: Archive outcome history events
 
@@ -142,26 +121,56 @@
 
 ### Requirement: Schema version
 
-#### Scenario: Schema unchanged
+#### Scenario: Loading never compares the version with the workspace default
 
-- **WHEN** a change is loaded and its manifest schema matches the active schema name and version
-- **THEN** no warning is emitted
+- **GIVEN** a manifest recording `schema-std` version 1
+- **AND** the workspace default is `schema-std` version 2
+- **WHEN** the change is loaded
+- **THEN** loading emits no schema-version warning
+- **AND** the change is hydrated with version 1
 
-#### Scenario: Schema version bumped
+#### Scenario: Same-name version drift is reported only by ResolveChangeSchema
 
-- **WHEN** a change is loaded and the active schema has a higher version than recorded in the manifest
-- **THEN** specd emits a warning indicating the schema has changed since the change was created and the user should review whether the change artifacts are still compatible
+- **GIVEN** a manifest recording `custom-workflow` version 1
+- **AND** the sovereign named lookup returns `custom-workflow` version 2
+- **WHEN** a change-bound operation resolves the change's schema
+- **THEN** `ResolveChangeSchema` returns a typed advisory naming versions 1 and 2
+- **AND** the change repository emits no separate version warning
 
-#### Scenario: Schema name changed
+#### Scenario: Schema name differs from workspace default
 
-- **WHEN** a change is loaded and the active schema name differs from the one recorded in the manifest
-- **THEN** loading fails with `SchemaMismatchError`
+- **WHEN** a change is loaded and the workspace default schema name differs from the one recorded in the manifest
+- **THEN** loading succeeds
+- **AND** the change domain entity is hydrated with its recorded schema identity
 
 #### Scenario: Archiving with schema version mismatch remains allowed
 
-- **WHEN** archive is attempted on a change with a schema version mismatch
-- **THEN** the mismatch warning is surfaced
-- **AND** archiving is not blocked solely because of that version mismatch
+- **WHEN** archive is attempted on a change whose recorded version differs from the resolved same-name schema version
+- **THEN** archive is not blocked by the mismatch
+- **AND** the advisory comes from `ResolveChangeSchema`
+
+### Requirement: Fingerprint serialization
+
+#### Scenario: Equality includes paths and algorithms
+
+- **WHEN** equivalent fingerprint maps are serialized from different insertion orders
+- **THEN** their canonical lexical representation is identical
+- **AND** adding, removing, renaming, or changing an entry changes equality
+
+#### Scenario: Spec scope equality ignores only ordering
+
+- **WHEN** scope-aware fingerprints contain the same canonical spec set in different input order
+- **THEN** scope equality holds
+- **AND** an added or removed spec yields the corresponding explicit difference
+
+### Requirement: Verification attempt event serialization
+
+#### Scenario: Explicit attempt lifecycle remains auditable
+
+- **GIVEN** verification is started twice and the second attempt completes
+- **WHEN** the manifest is inspected
+- **THEN** both starts and the completion retain actor, time, lifecycle state, attempt identity, and algorithm metadata
+- **AND** no event contains source content or represents a lifecycle self-transition
 
 ### Requirement: Atomic writes
 

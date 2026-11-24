@@ -15,7 +15,7 @@ Options:
 
 ## Behavior
 
-- Reads declarations from `specd.yaml` (`plugins.agents`).
+- Reads declarations from the flat `plugins` list in `specd.yaml`.
 - Runs plugin update orchestration for each declared plugin.
 - Emits `plugins:`-prefixed text rows to show per-plugin status.
 - Returns empty plugin list when project has no declared plugins.
@@ -27,7 +27,7 @@ Text output:
 
 ```text
 plugins: updated <plugin-name>
-plugins: <skipped|error> <plugin-name> (<detail>)
+plugins: error <plugin-name> (<detail>)
 ```
 
 When no plugins are declared:
@@ -46,6 +46,7 @@ JSON/TOON output:
       "status": "updated",
       "detail": "updated '@specd/plugin-agent-claude'"
     }
-  ]
+  ],
+  "hasErrors": false
 }
 ```

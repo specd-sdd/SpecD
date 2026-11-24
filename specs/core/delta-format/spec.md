@@ -209,24 +209,26 @@ Example (`verify.md.delta.yaml` — no-op):
 
 Delta entries are applied in declaration order after all selectors are validated. For each entry:
 
-- `modified`: replace the targeted node body (`content`) and/or rename the identifying field (`rename`)
+- `modified`: replace the targeted node body (`content`), replace or merge its structured `value`, and/or rename the identifying field (`rename`)
 - `removed`: remove the targeted node
 - `added`: insert new node(s) according to `position` semantics
   `apply` first resolves selectors against the original AST to guarantee atomicity. If any selector is invalid or ambiguous, `apply` fails with `DeltaApplicationError` and applies nothing.
 
 `no-op` entries are never passed to `apply` — they are handled entirely by the caller (e.g. `ValidateArtifacts`). When the caller detects that all parsed delta entries are `no-op`, it MUST skip loading the base artifact, skip calling `apply`, skip `deltaValidations`, and skip structural `validations`. The caller proceeds directly to hash computation on the raw delta file content and calls `markComplete`. The `no-op` operation declares that the existing artifact content is already valid — there is nothing to parse, apply, or validate.
 
-During `modified` operations on markdown artifacts, replacing node body content must not destroy inline formatting metadata for unaffected sibling/ancestor nodes. Implementations must preserve representable inline structure so serialization does not strip backticks or rewrite emphasis/strong markers in untouched nodes.
+During `modified` operations on markdown artifacts, replacing node body content must not destroy inline formatting metadata for unaffected sibling/ancestor nodes. Implementations must preserve representable inline structure so serialization does not strip backticks or rewrite emphasis/strong markers in untouched nodes. However, when a node itself is mutated (via `value`, `content`, or `rename`) or when an ancestor/root node's `children` are mutated, any cached serialization metadata on that mutated node or ancestor (such as `_inlines`, `_blockquoteChildren`, or `_yaml`) MUST be invalidated so `serialize()` emits the updated content rather than stale cached output.
 
 For markdown serialization after delta apply, list/emphasis/strong marker output should track source style when unambiguous. If the source is mixed/ambiguous for a construct, the serializer must choose deterministic project markdown conventions.
 
 ### Requirement: Delta conflict detection
 
-`apply` must detect and reject conflicting delta entries before applying any changes:
+`apply` must detect and reject conflicting or structurally invalid delta entries before applying any changes:
 
 - Two `modified` or `removed` operations whose selectors resolve to the same node — error
 - A `rename` target that matches an existing sibling node's identifying property — error
 - A `rename` target that matches another `modified` entry's `rename` value within the same parent scope — error
+- A `modified` entry with none of `content`, `value`, or `rename` — error
+- A `rename` field on a node whose `NodeTypeDescriptor.identifiedBy` does not include `'matches'` (for example `contains`-only nodes such as markdown `paragraph` or plaintext `paragraph`/`line`) — error
 - An `added` entry with more than one of `position.after`, `position.before`, `position.first`, `position.last` — error
 - An `added` entry with `position.parent` that resolves to no node — error
 - `content` and `value` both present in the same entry — error

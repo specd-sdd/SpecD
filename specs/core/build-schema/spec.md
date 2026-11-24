@@ -123,6 +123,19 @@ This function is currently in `infrastructure/zod/selector-schema.ts` and MUST b
 
 After all validation passes, `buildSchema` SHALL construct and return a `Schema` entity by calling `new Schema(name, version, artifacts, workflow, metadataExtraction)` with the fully converted domain objects, passing `kind` and `extends` to the Schema constructor. Workflow steps include the `requiresTaskCompletion` array when declared.
 
+### Requirement: Check declarations and governance validation
+
+When compiling the `workflow` array in `buildSchema`:
+
+1. **Check Existence**: Every check ID referenced in a step's `checks` array MUST be registered in the active `CheckRegistry`. Referencing an unregistered check identifier MUST throw an `UnknownCheckError`.
+2. **Coordinate Uniqueness**: Within the compiled workflow, duplicate check declarations on the exact same coordinate (`{ checkId, to, along }`) MUST be rejected with a `DuplicateCheckBindingError`.
+3. **Check-Level Confinement (`allowBindingOverride`)**: Check embedding permissions MUST be determined strictly through the check's registered governance (`allowBindingOverride`). The engine SHALL NOT reject check declarations based on string naming conventions or prefix inspection (such as requiring an `@` prefix). Built-in Category A and Category B checks (`protocol.edge`, `verification.current`, `workflow.requires`, `workflow.taskCompletion`, etc.) enforce `allowBindingOverride: false` and MUST NOT be declared on workflow steps outside declared bindings (`CheckEmbeddingForbiddenError`). Built-in Category C checks (`impl.linksInScope`, `deps.consistent`, `impl.filesResolved`, `workspace.readOnly`, `spec.overlap`) declare `allowBindingOverride: true` and MAY be declared or specialized on workflow steps.
+4. **Binding-Level Policy Lock (`allowBindingOverride`)**: If a specific binding coordinate has `allowBindingOverride: false`, attempting to alter its `onFailure` or `skippable` values in `schema.yaml` MUST throw a `CheckBindingOverrideForbiddenError`.
+5. **Configuration Override Lock (`allowConfigOverride`)**: If `allowConfigOverride: false` is enforced on the check definition or binding specification, attempting to supply `config` in `schema.yaml` MUST throw a `CheckConfigOverrideForbiddenError`.
+6. **Hook Failure Policy Validation**: For all `run` and `external` hooks declared in `pre` or `post` arrays, `buildSchema` MUST validate the `onFailure` property. The value MUST be either `'abort'` or `'warn'`. Any other value MUST throw a schema syntax error.
+7. **Disablement Governance (`allowDisable` & `disabled: true`)**: If a step's check declaration specifies `disabled: true`, `buildSchema` MUST verify that neither the check definition nor any matching existing binding enforces `allowDisable: false`. Violations MUST throw a `CheckDisableForbiddenError`. A schema declaration CANNOT relax, alter, or bypass an existing binding's `allowDisable: false` lock.
+8. **Monotonic Governance Rule Across Mergers and Layers**: Governance restrictions (`allowBindingOverride: false`, `allowConfigOverride: false`, `allowDisable: false`) operate strictly under monotonic restriction: once enforced by a check or prior binding, they CANNOT be erased, relaxed, or overwritten by subsequent schema layers, redeclarations of the same binding, or AST mergers (`merge-schema-layers`). Merged schema layers MUST preserve step check declarations without collision or accidental clobbering.
+
 ## Constraints
 
 - `buildSchema` is a pure function — no I/O, no `fs`, no `yaml`, no `zod` imports

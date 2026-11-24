@@ -692,4 +692,30 @@ describe('YamlParser', () => {
       expect(instructions).toContain('pair')
     })
   })
+
+  describe('apply + serialize cache invalidation', () => {
+    it('serializes mutated YAML after modified, added, and removed instead of returning stale _yaml', () => {
+      const ast = parser.parse('name: old-name\nversion: 1.0.0\nobsolete: true\n')
+      const res = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'pair', matches: '^name$' },
+          value: 'new-name',
+        },
+        {
+          op: 'added',
+          content: 'author: specd',
+        },
+        {
+          op: 'removed',
+          selector: { type: 'pair', matches: '^obsolete$' },
+        },
+      ])
+      const serialized = parser.serialize(res.ast)
+      expect(serialized).toContain('name: new-name')
+      expect(serialized).toContain('author: specd')
+      expect(serialized).not.toContain('old-name')
+      expect(serialized).not.toContain('obsolete')
+    })
+  })
 })

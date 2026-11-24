@@ -1,0 +1,388 @@
+- op: modified
+  description: 'Make scope recovery conditional while preserving workspace scenarios'
+  selector:
+    type: section
+    matches: '^Requirement: Workspaces and specs$'
+  content: |
+    #### Scenario: Workspaces derived from specIds
+
+    - **WHEN** a Change has `specIds: ['default:auth/login', 'billing:invoices']`
+    - **THEN** `workspaces` returns `['default', 'billing']` derived via `parseSpecId()`
+
+    #### Scenario: Workspaces empty when specIds empty
+
+    - **WHEN** a Change has an empty `specIds` list
+    - **THEN** `workspaces` returns an empty list
+
+    #### Scenario: Empty specIds allowed at creation
+
+    - **WHEN** a Change is created with an empty `specIds` list
+    - **THEN** creation succeeds and `workspaces` is empty
+
+    #### Scenario: Single workspace derived from specIds
+
+    - **WHEN** a Change has `specIds: ['default:auth/login']`
+    - **THEN** only the `default` workspace is active for `CompileContext`
+
+    #### Scenario: Multi-workspace derived from specIds
+
+    - **WHEN** a Change has `specIds: ['default:auth/login', 'billing:invoices']`
+    - **THEN** both workspace-level context patterns are applied
+
+    #### Scenario: Scope addition without required gates preserves the working phase
+
+    - **GIVEN** a change in `implementing` with workflow `preserve` and both approval gates disabled
+    - **WHEN** `EditChange` adds a spec and canonical reconciliation evaluates the new scope
+    - **THEN** the change remains in `implementing`
+    - **AND** any existing spec consent covering a different scope becomes stale with a `spec-added` difference
+    - **AND** missing or unvalidated required artifacts for the added spec still block forward progress
+    - **AND** the edit does not invent approval evidence when none exists
+
+    #### Scenario: Scope addition or removal requires renewed mandatory spec consent
+
+    - **GIVEN** a change in `implementing` with valid spec consent and the spec gate enabled
+    - **WHEN** canonical reconciliation detects an added or removed spec even with identical artifact bytes
+    - **THEN** consent becomes stale with the corresponding `spec-added` or `spec-removed` difference
+    - **AND** the change returns to `designing` exactly once, even with workflow `preserve`
+    - **AND** the original approval and approved scope remain in audit history
+
+    #### Scenario: Scope reordering and duplicates do not invalidate consent
+
+    - **GIVEN** a valid approval for a canonical spec set and unchanged artifacts
+    - **WHEN** an edit only reorders or repeats members of that same set
+    - **THEN** consent remains valid and no scope-driven recovery or approval-invalidated event occurs
+
+    #### Scenario: Orphaned specDependsOn removed when spec removed from specIds
+
+    - **GIVEN** scope contains `auth/login` and `auth/session` with dependencies for both
+    - **WHEN** scope replacement retains only `auth/login`
+    - **THEN** the `auth/session` dependency entry is removed and the `auth/login` entry is preserved
+
+    #### Scenario: workspaces is not usable as a singular primary workspace
+
+    - **GIVEN** a Change touches both `default` and `billing`
+    - **WHEN** a consumer builds template variables or archive paths
+    - **THEN** neither `workspaces[0]` nor another member is treated as a primary or home workspace
+
+    #### Scenario: Single-workspace change still has no primary-workspace semantics
+
+    - **GIVEN** a Change touches only `default`
+    - **WHEN** a consumer inspects `workspaces`
+    - **THEN** the single-member touched set does not establish a primary workspace identity
+
+- op: removed
+  description: 'Move the obsolete eventful designing self-entry scenario under the new neutral contract'
+  selector:
+    type: section
+    matches: '^Scenario: Designing to designing does not downgrade artifacts or approvals$'
+
+- op: added
+  description: 'Require an exact no-op with unchanged history and evidence'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Lifecycle$'
+  content: |
+    ### Requirement: Neutral designing self-entry
+
+    #### Scenario: Designing self-entry preserves history and validated evidence
+
+    - **GIVEN** an application request for `designing` while a Change is already in `designing` with validated artifacts and a current spec approval
+    - **WHEN** `TransitionChange` handles the request
+    - **THEN** the state, artifact/file states, and approval projection remain unchanged
+    - **AND** no `transitioned`, `invalidated`, or `approval-invalidated` event is appended
+
+    #### Scenario: Direct entity self-transition remains invalid
+
+    - **GIVEN** a Change already in `designing`
+    - **WHEN** a caller invokes the entity's real `transition('designing')`
+    - **THEN** it rejects the self-transition without changing history
+    - **AND** the neutral application behavior does not make `verifying → verifying` legal
+
+- op: modified
+  description: 'Replace unconditional design-return reopening with focused policy scenarios'
+  selector:
+    type: section
+    matches: '^Requirement: Artifacts$'
+  content: |
+    #### Scenario: File state is persisted explicitly
+
+    - **GIVEN** an artifact file persisted with `state: 'pending-review'`
+    - **WHEN** the Change is loaded
+    - **THEN** its state remains `pending-review`, not recomputed from `validatedHash` alone
+
+    #### Scenario: Artifact aggregates to drifted-pending-review when any file drifted
+
+    - **GIVEN** an artifact has one complete file and another in `drifted-pending-review`
+    - **WHEN** its aggregate state is computed
+    - **THEN** the artifact state is `drifted-pending-review`
+
+    #### Scenario: Surgical drift recovery does not reopen unrelated files
+
+    - **GIVEN** validated non-task files A and B and a validated artifact marked `hasTasks: true`
+    - **AND** only A has drifted, artifact policy is `surgical`, workflow is `redesign`, and no gate recovery is required
+    - **WHEN** the central reconciler applies the focused drift and returns the change to `designing`
+    - **THEN** A remains drifted and requires review
+    - **AND** B and the task artifact retain their complete state
+    - **AND** the lifecycle return causes no second mass downgrade
+
+    #### Scenario: Downstream propagation excludes task artifacts
+
+    - **GIVEN** artifact policy is `downstream` and a drifted non-task artifact has both task and non-task descendants
+    - **WHEN** canonical reconciliation expands review through the schema DAG
+    - **THEN** the affected non-task descendants reopen for review
+    - **AND** task artifacts and unrelated complete files are not reopened by that propagation
+
+    #### Scenario: Global artifact review still excludes automatic task reopening
+
+    - **GIVEN** artifact policy is `global` and a non-task artifact drifts
+    - **WHEN** canonical reconciliation applies automatic artifact review
+    - **THEN** every non-task artifact file is selected for reopening
+    - **AND** artifacts marked `hasTasks: true` remain excluded
+
+    #### Scenario: No-reopening policy does not waive freshness
+
+    - **GIVEN** artifact policy is `none` and a non-task file has drifted
+    - **WHEN** canonical reconciliation evaluates the change
+    - **THEN** no additional file reopens merely because of the invalidation
+    - **AND** unresolved drift still blocks forward progress
+
+    #### Scenario: markComplete sets file and artifact state to complete
+
+    - **GIVEN** an artifact file in `in-progress`
+    - **WHEN** `markComplete(key, hash)` is called through validation
+    - **THEN** the file becomes complete and the parent aggregate state is recomputed
+
+- op: modified
+  description: 'Separate scope approval audit from legacy artifact-review events'
+  selector:
+    type: section
+    matches: '^Requirement: History and event sourcing$'
+  content: |
+    #### Scenario: History is append-only
+
+    - **WHEN** any operation is performed on a Change
+    - **THEN** new events are appended; existing events are never modified or removed
+
+    #### Scenario: Invalidated event records artifact drift details
+
+    - **GIVEN** two validated spec files drift in one reconciliation pass
+    - **WHEN** artifact drift is materialized
+    - **THEN** the `invalidated` event uses `artifact-drift` with a human-readable message
+    - **AND** `affectedArtifacts` records both file keys and their artifact types
+
+    #### Scenario: Scope consent invalidation records precise projection differences
+
+    - **GIVEN** valid spec consent and unchanged artifact bytes
+    - **WHEN** `EditChange` adds or removes a canonical spec ID
+    - **THEN** reconciliation appends `approval-invalidated` with cause `scope-change` and the precise scope difference
+    - **AND** the prior approval event and its original fingerprint remain available
+    - **AND** a broad `invalidated` event with cause `spec-change` is not required solely to represent stale consent
+
+    #### Scenario: Legacy scope helper records artifact review without lifecycle recovery
+
+    - **GIVEN** a Change in `implementing`
+    - **WHEN** the legacy entity helper `updateSpecIds` is called with a changed spec set and artifact DAG
+    - **THEN** its artifact-review event has cause `spec-change`
+    - **AND** that helper does not independently roll the lifecycle back or clear approval projections
+
+    #### Scenario: Review-required invalidation remains distinguishable from drift
+
+    - **GIVEN** explicit artifact review is requested without physical drift
+    - **WHEN** reconciliation records the review invalidation
+    - **THEN** its cause is `artifact-review-required`, not `artifact-drift`
+
+    #### Scenario: Description update appends description-updated event
+
+    - **GIVEN** a Change with description "Original"
+    - **WHEN** `updateDescription("New description", actor)` is called
+    - **THEN** a `description-updated` event contains the new description and full resolved actor identity
+
+    #### Scenario: Description update does not append invalidated event
+
+    - **GIVEN** a Change in `spec-approved` with active approval
+    - **WHEN** its description changes
+    - **THEN** no invalidated event is appended and the lifecycle remains `spec-approved`
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Policy-aware invalidation$'
+  content: |
+    Scenarios:
+
+    #### Scenario: Preservation does not waive drift
+
+    - **GIVEN** workflow policy is `preserve` and artifact policy is `none`
+    - **WHEN** non-task artifact drift is reconciled without a mandatory gate recovery
+    - **THEN** lifecycle state is preserved
+    - **AND** forward progress remains blocked by the focused drift
+
+    #### Scenario: Gate recovery overrides workflow preservation
+
+    - **GIVEN** required spec consent becomes stale
+    - **WHEN** invalidation is applied with workflow `preserve`
+    - **THEN** the change returns to `designing` exactly once and history is retained
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Signoff gate$'
+  content: |
+    ### Requirement: Materialized approval and verification projections
+
+    #### Scenario: Projection status is independent of history retention
+
+    - **GIVEN** valid approval and verification evidence
+    - **WHEN** fresh inputs make both stale
+    - **THEN** current projections become `stale` with causes
+    - **AND** their original actors, fingerprints, times, and audit events remain available
+
+    #### Scenario: Lifecycle movement preserves unchanged verification
+
+    - **GIVEN** completed verification still matches current inputs
+    - **WHEN** the change moves to an earlier lifecycle state
+    - **THEN** the completed evidence remains valid
+
+    #### Scenario: Scope-aware consent detects additions and removals
+
+    - **GIVEN** approved artifacts remain byte-identical
+    - **WHEN** the canonical spec scope adds or removes one spec
+    - **THEN** spec consent becomes stale with the matching scope difference
+    - **AND** reordering the same canonical set remains valid
+
+    ### Requirement: State-independent verification operations and audit
+
+    #### Scenario: Starting again supersedes only the active attempt
+
+    - **GIVEN** an active verification attempt exists in any active lifecycle state
+    - **WHEN** `StartVerification` passes input checks again
+    - **THEN** a new attempt becomes active and the earlier attempt remains in history
+    - **AND** no successful evidence or lifecycle transition is recorded
+
+    #### Scenario: Completion rejects changed inputs
+
+    - **GIVEN** an active attempt whose fingerprint no longer matches fresh inputs
+    - **WHEN** `CompleteVerification` executes
+    - **THEN** it fails without replacing the baseline or recording completion
+    - **AND** another explicit start may begin a new attempt in the same state
+
+    #### Scenario: Start dependencies include schema check context
+
+    - **WHEN** `StartVerification` is constructed through either supported factory
+    - **THEN** its deps include the schema provider and reconciler used for operation-specific readiness checks
+    - **AND** no fake transition context is required
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Implementation and verification loop$'
+  content: |
+    Scenarios:
+
+    #### Scenario: Transition checks evidence but does not create it
+
+    - **GIVEN** the change is `verifying` with only an unfinished attempt
+    - **WHEN** `verifying → done` is requested
+    - **THEN** the transition fails because completed current evidence is absent
+    - **AND** the attempt can be restarted and completed without a self-transition
+
+    #### Scenario: Completed current evidence permits exit
+
+    - **GIVEN** completed verification matches fresh resolved inputs
+    - **WHEN** `verifying → done` is requested
+    - **THEN** the verification predicate permits the transition without creating new evidence
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Archiving escape transitions$'
+  content: |
+    Scenarios:
+
+    #### Scenario: Canonical signoff recovery may return archiving to done
+
+    - **GIVEN** a change in `archiving` whose required sign-off becomes stale or revoked
+    - **WHEN** the central reconciler applies mandatory gate recovery
+    - **THEN** `archiving → done` succeeds exactly once
+    - **AND** the recovery event identifies sign-off invalidity as its cause
+
+    #### Scenario: Manual archiving to done remains forbidden
+
+    - **WHEN** a caller requests `archiving → done` outside central gate recovery
+    - **THEN** `InvalidStateTransitionError` is thrown
+    - **AND** manual `archiving → implementing` and `archiving → verifying` remain forbidden
+
+    #### Scenario: Existing archive escapes remain valid
+
+    - **WHEN** archive restoration or manual redesign requires `archiving → archivable` or `archiving → designing`
+    - **THEN** the existing escape remains permitted
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Spec approval gate$'
+  content: |
+    Scenarios:
+
+    #### Scenario: Current consent is required only when enabled
+
+    - **GIVEN** the spec gate is enabled and approval fingerprint is stale
+    - **WHEN** forward progress from `ready` is evaluated
+    - **THEN** progress is blocked and recovery returns through design and renewed ready approval
+    - **AND** disabling the gate skips consent without waiving artifact freshness
+
+    #### Scenario: Ready approval remains in place
+
+    - **WHEN** current spec consent is granted in `ready`
+    - **THEN** the approval projection becomes valid without entering a pending state
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Signoff gate$'
+  content: |
+    Scenarios:
+
+    #### Scenario: Signoff cannot rely on stale verification
+
+    - **GIVEN** signoff is enabled and verification evidence is stale
+    - **WHEN** `done → archivable` is evaluated
+    - **THEN** the transition is blocked until verification is renewed and signoff is valid for current inputs
+
+    #### Scenario: Disabled signoff still preserves other archive checks
+
+    - **WHEN** signoff gate is disabled
+    - **THEN** approval check skips while verification, freshness, tasks, and archive checks still apply
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Task completion scope$'
+  content: |
+    ### Requirement: Validity fingerprint scope
+
+    #### Scenario: Conservative normalization ignores only declared whitespace differences
+
+    - **GIVEN** two linked text files differ only by BOM, line endings, trailing horizontal whitespace, blank-line whitespace, or final newline
+    - **WHEN** `text-v1` fingerprints them
+    - **THEN** they compare equal
+    - **AND** internal whitespace or any binary-byte difference remains significant
+
+    #### Scenario: Task artifacts do not invalidate evidence
+
+    - **GIVEN** an artifact type declares `hasTasks: true`
+    - **WHEN** only its task content changes
+    - **THEN** approval and verification fingerprints remain unchanged
+    - **AND** live task completion can still block transition or archive

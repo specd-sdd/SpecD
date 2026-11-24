@@ -25,6 +25,14 @@ vi.mock('../../src/commands/graph/with-provider.js', () => ({
   withProvider: vi.fn(),
 }))
 
+vi.mock('../../src/commands/graph/host-context.js', () => ({
+  createGraphHostContext: vi.fn(async (config, kernel) => ({
+    config,
+    kernel,
+    dispose: async () => {},
+  })),
+}))
+
 vi.mock('@specd/sdk', async () => {
   const actual = await vi.importActual<typeof import('@specd/sdk')>('@specd/sdk')
   return {
@@ -60,6 +68,7 @@ function setup() {
     config,
     configFilePath: '/project/specd.yaml',
     kernel,
+    host: null,
     projectRoot: '/project',
     vcsRoot: '/project',
   })

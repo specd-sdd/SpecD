@@ -18,6 +18,14 @@ vi.mock('../../src/commands/graph/with-provider.js', () => ({
   withProvider: vi.fn(),
 }))
 
+vi.mock('../../src/commands/graph/host-context.js', () => ({
+  createGraphHostContext: vi.fn(async (config, kernel) => ({
+    config,
+    kernel,
+    dispose: async () => {},
+  })),
+}))
+
 import { type RunGraphWhyResult } from '@specd/sdk'
 import { resolveGraphCliContext } from '../../src/commands/graph/resolve-graph-cli-context.js'
 import { withProvider } from '../../src/commands/graph/with-provider.js'
@@ -106,6 +114,7 @@ function setup(result: RunGraphWhyResult = EXCLUDED, reasonCodes: string[] = [])
     config,
     configFilePath: '/project/specd.yaml',
     kernel,
+    host: null,
     projectRoot: '/project',
     vcsRoot: '/project',
   })

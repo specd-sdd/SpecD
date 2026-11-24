@@ -1,0 +1,10 @@
+- op: added
+  description: Preserve fallback archive rollback state across a composed operation.
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Shared fallback batch snapshot lifetime
+
+    When archive composition cannot derive explicit workspace layouts, `resolveArchiveBatchSnapshotPort` MUST lazily create one fallback `FsArchiveBatchSnapshot` and reuse it for every snapshot-port method of that composed archive operation. A snapshot, recorded created file, and restore sequence MUST operate on the same fallback manifest so restore removes files created after the snapshot.

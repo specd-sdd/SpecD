@@ -1,0 +1,21 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: identity returns the current actor$'
+  content: |
+    identity() MUST return a `Promise<ActorIdentity>`, where `ActorIdentity` is defined in the Change domain entity.
+
+    ```typescript
+    export interface ActorIdentity {
+      readonly id: string
+      readonly name: string
+      readonly email: string
+      readonly provider?: string
+      readonly providerId?: string
+      readonly metadata?: Record<string, string>
+    }
+    ```
+
+    `name` MUST be a non-empty string when the promise resolves successfully. `email` MUST be a non-empty string for providers that have an email source (e.g. git, hg with `Name <email>` format); it MAY be an empty string for providers that do not store email natively (e.g. SVN, LDAP without email attribute). provider, providerId and metadata remain optional. Newly resolved actors MUST have a v1:<64 lowercase hexadecimal characters> ID generated before privacy. Legacy persisted actors may omit it during hydration; they are not a valid newly resolved identity without finalization.
+
+    ID SHALL be HMAC-SHA256 over canonical raw name/email/provider/providerId/metadata excluding id, keyed by canonical raw name/email. Canonical bytes SHALL be UTF-8 compact JSON with recursively lexically sorted object keys, undefined-valued object properties omitted, and JSON string escaping preserved; do not normalize Unicode/case/internal whitespace or distinguish absent from undefined. Same input representation yields the same ID independent of property order. Changing any included field changes the representation ID. Actor comparison SHALL use full versioned IDs when both exist, otherwise SHA-256 of canonical persisted fields excluding id, without fabricating original IDs or rewriting historical records.

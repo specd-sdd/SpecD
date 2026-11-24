@@ -1,0 +1,45 @@
+- op: modified
+  description: 'Accept structured invalidation policy edits'
+  selector:
+    type: section
+    matches: '^Requirement: Command signature$'
+  content: |
+    The canonical command is:
+
+    ```text
+    specd changes edit <name>
+      [--add-spec <id> ...] [--remove-spec <id> ...]
+      [--description <text>]
+      [--artifact-policy none|surgical|downstream|global]
+      [--workflow-policy preserve|redesign]
+      [--format text|json|toon]
+    ```
+
+    Scope options remain repeatable and use canonical spec IDs. At least one edit flag is required. The CLI maps only supplied policy dimensions to the structured `EditChange` input and does not synthesize unspecified values.
+
+- op: modified
+  description: 'Report canonical approval and recovery consequences'
+  selector:
+    type: section
+    matches: '^Requirement: Approval invalidation$'
+  content: |
+    The command SHALL delegate scope and policy edits to `EditChange` and MUST NOT invalidate approvals or move lifecycle state itself.
+
+    Output SHALL report `scopeChanged` separately from actual validity changes, which approval or verification projections became stale or revoked, which artifact files require review, canonical blockers and next action, and any automatic return committed by reconciliation. With a required stale spec approval, it SHALL report `designing` even when the workflow policy is `preserve`. Without that gate, a preserved state remains visible together with the forward-progress blocker.
+
+    The command SHALL warn that approval was invalidated only when Core reports a committed projection change. A scope edit that leaves the approved canonical spec set and all fingerprinted inputs unchanged MUST NOT emit that warning. Any retained legacy `invalidated` field is deprecated and reflects actual validity change, not merely scope mutation.
+
+    Description-only and policy-only edits MUST NOT be described as approval invalidation unless core reports a separately detected fresh drift.
+
+- op: modified
+  description: 'Declare edit use-case and config dependencies'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, and output conventions
+    - [`core:change`](../../core/change/spec.md) — mutable fields and validity projections
+    - [`core:edit-change`](../../core/edit-change/spec.md) — canonical structured edit and reconciliation result
+    - [`core:config`](../../core/config/spec.md) — structured invalidation policy contract
+    - [`cli:change-create`](../change-create/spec.md) — shared spec ID option conventions
+    - [`core:spec-id-format`](../../core/spec-id-format/spec.md) — canonical spec ID format

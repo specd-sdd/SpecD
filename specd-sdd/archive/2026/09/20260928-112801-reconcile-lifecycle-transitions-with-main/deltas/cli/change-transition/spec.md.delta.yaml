@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'The transition command contract already covers lifecycle and hook selectors; command registration and generated metadata are reconciled without new requirements.'

@@ -70,15 +70,17 @@ For all other step/phase combinations, if `ChangeRepository.get(name)` returns n
 
 Neither lookup path reads or derives a workspace value for template variables — see Requirement: HookVariables construction.
 
-### Requirement: Schema name guard
+### Requirement: Sovereign schema resolution
 
-After obtaining the schema from `SchemaProvider`, `RunStepHooks` MUST compare `schema.name()` with `change.schemaName`. If they differ, it MUST throw `SchemaMismatchError`. This MUST happen before any hook resolution or execution.
+`RunStepHooks` MUST obtain the change's sovereign schema through `ResolveChangeSchema`. The change's recorded schema is the sovereign authority defining workflow steps and hooks. A different workspace default MUST remain irrelevant. General resolution failures and `SchemaProviderIdentityMismatchError` MUST propagate before any hook executes.
 
 ### Requirement: Step resolution
 
 `RunStepHooks` validates that `step` is a valid `ChangeState` (a lifecycle state defined by the domain, which includes `archiving`). If it is not, it MUST throw `StepNotValidError`.
 
 If the step is a valid lifecycle state, `RunStepHooks` looks up the workflow step entry via `schema.workflowStep(step)`. If no matching entry exists (the schema does not declare hooks for this step), the use case returns `{ hooks: [], success: true, failedHooks: [] }` — no error is thrown.
+
+If the change's schema declares the step `disabled: true` (`isWorkflowStepEnabled(step, schema)` is `false`, see [`core:workflow-topology`](../workflow-topology/spec.md)), the step is absent from the change's lifecycle. `RunStepHooks` MUST return `{ hooks: [], success: true, failedHooks: [] }` for either phase without executing any `run:` or external hook declared on that row, including when `--only` names one of them. This matches `GetHookInstructions`, which returns no instructions for a disabled step.
 
 ### Requirement: Hook collection
 
@@ -180,3 +182,5 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:template-variables`](../template-variables/spec.md)
 - [`core:archive-repository-port`](../archive-repository-port/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)
+- [core:resolve-change-schema](../resolve-change-schema/spec.md) — named sovereign lookup, provider identity validation, and same-name version advisory
+- [core:workflow-topology](../workflow-topology/spec.md) — `isWorkflowStepEnabled` decides whether a step's hooks exist for the change

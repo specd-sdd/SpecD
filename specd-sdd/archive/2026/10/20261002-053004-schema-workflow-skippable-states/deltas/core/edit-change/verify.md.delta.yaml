@@ -1,0 +1,59 @@
+- op: added
+  description: Verify that both EditChange schema call sites use the change's sovereign schema
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Schema compatibility guardrail'
+  content: |
+    ### Requirement: Sovereign schema resolution
+
+    #### Scenario: Added-spec compatibility ignores a different workspace default
+
+    - **GIVEN** a change whose `schemaName` is `custom-workflow`
+    - **AND** the workspace default is another schema with incompatible compatibility declarations
+    - **WHEN** `EditChange` validates an added spec
+    - **THEN** it calls `SchemaProvider.get('custom-workflow')`
+    - **AND** decides compatibility using the custom schema only
+
+    #### Scenario: Serialized reconciliation owns artifact topology
+
+    - **GIVEN** the fresh change loaded inside `ChangeRepository.mutate` records `schemaName: 'custom-workflow'`
+    - **AND** the workspace default exposes a different artifact DAG
+    - **WHEN** `EditChange` applies the canonical scope edit
+    - **THEN** it updates the fresh entity through `replaceSpecIds()` and invokes `ctx.reconcileAfter()`
+    - **AND** it does not call `updateSpecIds()` or perform a second direct `SchemaProvider.get()` lookup
+    - **AND** the reconciler determines artifact topology and validity from the fresh persisted change
+
+    #### Scenario: Schema resolution failure leaves scope unchanged
+
+    - **GIVEN** the serialized mutation callback has invoked `replaceSpecIds()` on the fresh aggregate
+    - **WHEN** `ctx.reconcileAfter()` then rejects
+    - **THEN** the corresponding error propagates
+    - **AND** no partial scope mutation is persisted
+    - **AND** persisted spec IDs, history, artifact topology, and validity remain unchanged
+- op: removed
+  description: Uninitialized specs no longer fall back to the global schema
+  selector:
+    type: section
+    matches: 'Scenario: Uninitialized spec fallback allows addition if global schema matches change'
+    parent:
+      type: section
+      matches: 'Requirement: Schema compatibility guardrail'
+- op: added
+  description: Uninitialized specs adopt the change schema without consulting the workspace default
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Schema compatibility guardrail'
+  content: |
+    #### Scenario: Uninitialized spec is compatible without consulting the global schema
+
+    - **GIVEN** a change whose `schemaName` is `custom-workflow`
+    - **AND** an added spec with no persisted semantic state
+    - **AND** a workspace default schema that is incompatible with `custom-workflow`
+    - **WHEN** `EditChange` validates the added spec
+    - **THEN** the spec is accepted as compatible
+    - **AND** `GetActiveSchema` and the workspace default are never consulted

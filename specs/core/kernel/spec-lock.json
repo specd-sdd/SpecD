@@ -32,6 +32,19 @@
     "core:get-spec",
     "core:get-active-schema",
     "core:validate-specs",
+    "core:generate-metadata",
+    "core:materialize-spec-metadata",
+    "core:get-spec-metadata",
+    "core:regenerate-spec-metadata",
+    "core:initialize-persisted-spec-state",
+    "core:get-persisted-spec-schema",
+    "core:update-persisted-spec-schema",
+    "core:get-persisted-spec-deps",
+    "core:update-persisted-spec-deps",
+    "core:get-persisted-spec-implementation",
+    "core:update-persisted-spec-implementation",
+    "core:get-persisted-spec-optimizations",
+    "core:update-persisted-spec-optimizations",
     "core:get-spec-context",
     "core:config-writer-port",
     "core:list-workspaces",
@@ -43,20 +56,7 @@
     "core:spec-overlap",
     "core:get-specs-health",
     "core:count-tasks",
-    "core:regenerate-spec-metadata",
-    "core:get-spec-metadata",
-    "core:get-persisted-spec-deps",
-    "core:update-persisted-spec-deps",
-    "core:get-persisted-spec-implementation",
-    "core:update-persisted-spec-implementation",
-    "core:get-persisted-spec-optimizations",
-    "core:update-persisted-spec-optimizations",
-    "core:materialize-spec-metadata",
-    "core:get-persisted-spec-schema",
-    "core:update-persisted-spec-schema",
-    "core:initialize-persisted-spec-state",
-    "core:generate-metadata",
-    "core:get-project-summary",
+    "core:check-registry",
     "core:archive-repository-port",
     "core:get-draft",
     "core:get-discarded",
@@ -68,46 +68,65 @@
     "core:get-spec-outline",
     "core:validate-schema",
     "core:resolve-context-specs",
+    "core:get-project-summary",
     "core:actor-resolver"
   ],
   "implementation": [
     {
       "file": "core:src/composition/kernel.ts",
-      "symbols": ["getProjectSummary"]
+      "symbols": ["createKernel", "Kernel", "KernelOptions"]
+    },
+    {
+      "file": "core:src/composition/kernel-disposal.ts",
+      "symbols": [
+        "runDisposers",
+        "createDispose",
+        "validateDisposers",
+        "releaseAfterFailedConstruction",
+        "KernelDisposer"
+      ]
+    },
+    {
+      "file": "core:src/application/errors/disposer-failed-error.ts",
+      "symbols": ["DisposerFailedError"]
+    },
+    {
+      "file": "core:src/application/errors/invalid-disposer-error.ts",
+      "symbols": ["InvalidDisposerError"]
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Core kernel composes typed change, spec, and project use cases from shared resolver dependencies, registries, repositories, schema, VCS, and actors.",
+      "value": "Immutable Kernel facade wires grouped domain use cases; ConfigWriter separately owns configuration mutation.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:7653b95c92c1d8497118d78a63815f3c33de76ec5b6afc6ae208519c272d46e6",
-          "lastModified": "2026-09-29T08:24:11.743Z"
+          "hash": "sha256:408a307be675fbe45019fc749f0f8300e481b8e0dabeb151f9d7c510ab2b4b60",
+          "lastModified": "2026-10-22T14:47:46.145Z"
         },
         "verify.md": {
-          "hash": "sha256:99adcc16cbab72db5b37b53515b0d5039eada2be7eb264f278bf3ff9d1acfabd",
-          "lastModified": "2026-09-29T08:24:11.762Z"
+          "hash": "sha256:527f67f8e19c96866d7f2bcc34ca4a51be304622e2187cac4037addd61549cad",
+          "lastModified": "2026-10-22T15:09:46.155Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Core Kernel\n\n## Rules\n- `createKernel(config, options?)` returns immutable plain `Kernel` object: nested `changes`, `specs`, `project`; no business logic, state, lifecycle, top-level use cases. Config writes use `createConfigWriter()`.\n- Every exported `application/use-cases/` class mounts typed concrete entry in `Kernel`; `_shared` exempt. Adding/removing kernel use case follows this mapping contract.\n- Shared resolver/factory composition creates/reuses one `ChangeRepository`, workspace `SpecRepository` map, `SchemaRegistry`, lazy caching `SchemaProvider`, `HookRunner`, `RunStepHooks`, `ContentHasher`, `ArtifactParserRegistry`. No constructor calls `SchemaRegistry.resolve()`; `SchemaProvider.get()` resolves plugins/extends/overrides, does not cache failure.\n- Expose `changes.repo`, `changes.archiveRepo`, `specs.repos`; kernel `specs` excludes `SaveSpecMetadata`/`InvalidateSpecMetadata`/internal `PersistSpecMetadata`. `project.getConfig` is readonly snapshot incl `plugins`; declarations read there.\n- Use same composition-owned merged registry helpers as `CompositionResolver`/`createKernelBuilder()`, no second registry source. `KernelOptions` supports repository overrides, `extraNodeModulesPaths`, additive storage/VCS/actor/parser/external-hook registrations; expose final merged core registry view and reject duplicate/unknown registrations. Graph-store registration stays code-graph.\n- Project VCS via `CompositionResolver.getVcsAdapter()` calling `createVcsAdapter(config.projectRoot, registry.vcsProviders)` and cached promise. Actor: `createLazyVcsActorResolver(() => getVcsAdapter())`, wrap `PrivacyActorResolver` if configured. No `createKernelInternals`, `GitVcsAdapter`, or `GitActorResolver` construction.\n- On `ChangeRepository.get()`, validated artifact drift triggers `change.invalidate(\"artifact-drift\", SYSTEM_ACTOR, ...)` and persistence when beyond `designing` or active non-superseded approval. Preserve all drifted file keys. Read legacy `\"artifact-change\"` invalidations as artifact-drift.\n- `RunStepHooks`/`GetHookInstructions` get merged schema hooks, never `config.workflow`. No-input `execute()` use cases conform without input validation.\n\n## Constraints\n- Kernel mandatory domain entrypoint; config mutation excluded.\n- `Kernel` and `createKernel` public `@specd/core` exports.\n- Removing kernel entry breaking change; kernel never exports `createKernelInternals`.",
+      "value": "# Kernel\n\n## Rules\n- `Kernel` mounts concrete use cases under `changes`, `specs`, `project`; public application use cases require entry and wiring, except `_shared/` and ConfigWriter operations.\n- `createKernel(config, options?)` returns immutable plain object through shared `CompositionResolver`: repositories, lazy `SchemaProvider`, hooks, hashing, parsers, registries.\n- Use cases receive `SchemaProvider`, never direct `SchemaRegistry.resolve()`. Schema failures not cached; hooks derive resolved schema/overrides.\n- Composition owns VCS/actor resolution and additive registries. Kernel exposes merged registry views plus `changes.repo` and `specs.repos`.\n- `FsChangeRepository.get()` detects artifact drift after `designing` or active approval, persists `artifact-drift`, accepts legacy `artifact-change`.\n- Config mutation uses `createConfigWriter()`; runtime execute inputs never re-pass creation config.\n\n## Constraints\n- Mandatory public domain facade; no business logic.\n- Config mutation and graph store outside Kernel.\n- `Kernel` and `createKernel` public; no `createKernelInternals` export.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:7653b95c92c1d8497118d78a63815f3c33de76ec5b6afc6ae208519c272d46e6",
-          "lastModified": "2026-09-29T08:24:11.743Z"
+          "hash": "sha256:408a307be675fbe45019fc749f0f8300e481b8e0dabeb151f9d7c510ab2b4b60",
+          "lastModified": "2026-10-22T14:47:46.145Z"
         },
         "verify.md": {
-          "hash": "sha256:99adcc16cbab72db5b37b53515b0d5039eada2be7eb264f278bf3ff9d1acfabd",
-          "lastModified": "2026-09-29T08:24:11.762Z"
+          "hash": "sha256:527f67f8e19c96866d7f2bcc34ca4a51be304622e2187cac4037addd61549cad",
+          "lastModified": "2026-10-22T15:09:46.155Z"
         }
       }
     }

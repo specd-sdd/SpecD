@@ -8,6 +8,8 @@ import {
   type FsConfigLoaderOptions,
 } from '../../../src/infrastructure/fs/config-loader.js'
 import { ConfigValidationError } from '../../../src/domain/errors/config-validation-error.js'
+import { LegacyConfigFormatError } from '../../../src/domain/errors/legacy-config-format-error.js'
+import { UnsupportedConfigVersionError } from '../../../src/domain/errors/unsupported-config-version-error.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -953,6 +955,27 @@ context:
       expect(config.context?.[1]).toEqual({ instruction: 'Always prefer editing existing files.' })
     })
 
+    it('preserves the id of a context entry', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+context:
+  - id: agents-guide
+    file: AGENTS.md
+  - id: house-rule
+    instruction: 'Be nice.'
+`),
+      )
+
+      const config = await createLoader({ configPath }).load()
+
+      const configDir = path.dirname(configPath)
+      expect(config.context?.[0]).toEqual({
+        id: 'agents-guide',
+        file: path.resolve(configDir, 'AGENTS.md'),
+      })
+      expect(config.context?.[1]).toEqual({ id: 'house-rule', instruction: 'Be nice.' })
+    })
+
     it('omits context from SpecdConfig when not declared', async () => {
       const configPath = await writeConfig(minimalYaml())
 
@@ -1236,6 +1259,15 @@ approvals:
       expect(config.approvals).toEqual({ spec: true, signoff: false })
     })
 
+    it('defaults approvals to false when section omitted', async () => {
+      const configPath = await writeConfig(minimalYaml(''))
+
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.approvals).toEqual({ spec: false, signoff: false })
+    })
+
     it('parses llmOptimizedContext boolean from config', async () => {
       const configPath = await writeConfig(
         minimalYaml(`
@@ -1288,44 +1320,250 @@ skills:
   })
 
   describe('Requirement: plugins section validation', () => {
-    it('parses plugins.agents entries with optional config', async () => {
+    it('parses a flat plugins list with config and contributions', async () => {
       const configPath = await writeConfig(
         minimalYaml(`
 plugins:
-  agents:
-    - name: '@specd/plugin-agent-claude'
-    - name: '@specd/plugin-agent-codex'
-      config:
-        commandsDir: .codex/commands
+  - name: '@specd/plugin-agent-claude'
+  - name: '@specd/plugin-agent-codex'
+    config:
+      commandsDir: .codex/commands
+    contributions:
+      - codex
 `),
       )
 
       const loader = createLoader({ configPath })
       const config = await loader.load()
 
-      expect(config.plugins).toEqual({
-        agents: [
-          { name: '@specd/plugin-agent-claude' },
-          {
-            name: '@specd/plugin-agent-codex',
-            config: { commandsDir: '.codex/commands' },
-          },
-        ],
-      })
+      expect(config.plugins).toEqual([
+        { name: '@specd/plugin-agent-claude' },
+        {
+          name: '@specd/plugin-agent-codex',
+          config: { commandsDir: '.codex/commands' },
+          contributions: ['codex'],
+        },
+      ])
+    })
+
+    it('does not load plugins: a config naming an absent plugin package loads', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+plugins:
+  - name: '@specd-test/definitely-not-installed'
+    config:
+      anything: true
+`),
+      )
+
+      const config = await createLoader({ configPath }).load()
+
+      expect(config.plugins).toEqual([
+        { name: '@specd-test/definitely-not-installed', config: { anything: true } },
+      ])
     })
 
     it('rejects invalid plugin entries missing required name', async () => {
       const configPath = await writeConfig(
         minimalYaml(`
 plugins:
-  agents:
-    - config:
-        commandsDir: .codex/commands
+  - config:
+      commandsDir: .codex/commands
 `),
       )
 
       const loader = createLoader({ configPath })
-      await expect(loader.load()).rejects.toThrow(/plugins\.agents\[0\]\.name/)
+      await expect(loader.load()).rejects.toBeInstanceOf(ConfigValidationError)
+    })
+
+    it('rejects an empty contributions list', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+plugins:
+  - name: '@acme/x'
+    contributions: []
+`),
+      )
+
+      await expect(createLoader({ configPath }).load()).rejects.toBeInstanceOf(
+        ConfigValidationError,
+      )
+    })
+
+    it('rejects an unscoped plugin name', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+plugins:
+  - name: my-plugin
+`),
+      )
+
+      const loader = createLoader({ configPath })
+      await expect(loader.load()).rejects.toBeInstanceOf(ConfigValidationError)
+    })
+
+    it('rejects a duplicate plugin name', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+plugins:
+  - name: '@acme/x'
+  - name: '@acme/x'
+`),
+      )
+
+      const loader = createLoader({ configPath })
+      await expect(loader.load()).rejects.toBeInstanceOf(ConfigValidationError)
+    })
+
+    it('rejects plugins.agents before the strict schema and includes a migration snippet', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+plugins:
+  agents:
+    - name: '@specd/plugin-agent-claude'
+      config:
+        instructionsDir: .claude
+`),
+      )
+
+      const loader = createLoader({ configPath })
+      await expect(loader.load()).rejects.toBeInstanceOf(LegacyConfigFormatError)
+      await expect(loader.load()).rejects.toBeInstanceOf(ConfigValidationError)
+      await expect(loader.load()).rejects.toMatchObject({ code: 'LEGACY_CONFIG_FORMAT' })
+      try {
+        await loader.load()
+      } catch (error) {
+        expect(error).toBeInstanceOf(LegacyConfigFormatError)
+        const legacy = error as LegacyConfigFormatError
+        expect(legacy.code).toBe('LEGACY_CONFIG_FORMAT')
+        expect(legacy.message).toContain('configVersion: 2')
+        expect(legacy.message).toContain('@specd/plugin-agent-claude')
+        expect(legacy.suggestedSnippet).toContain('instructionsDir')
+      }
+    })
+
+    it('rejects configVersion newer than the supported version', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+configVersion: 3
+`),
+      )
+
+      const loader = createLoader({ configPath })
+      await expect(loader.load()).rejects.toBeInstanceOf(UnsupportedConfigVersionError)
+      await expect(loader.load()).rejects.toBeInstanceOf(ConfigValidationError)
+      await expect(loader.load()).rejects.toMatchObject({ code: 'UNSUPPORTED_CONFIG_VERSION' })
+    })
+
+    it('accepts a current-shaped config without configVersion', async () => {
+      const configPath = await writeConfig(minimalYaml(''))
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+      expect(config.schemaRef).toBe('@specd/schema-std')
+    })
+
+    it('rejects configVersion 0 as a schema error', async () => {
+      const configPath = await writeConfig(minimalYaml('configVersion: 0\n'))
+      const loader = createLoader({ configPath })
+      await expect(loader.load()).rejects.toBeInstanceOf(ConfigValidationError)
+    })
+
+    it('rejects plugins.skills as a generic schema error', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+plugins:
+  skills: []
+`),
+      )
+      const loader = createLoader({ configPath })
+      await expect(loader.load()).rejects.toBeInstanceOf(ConfigValidationError)
+      await expect(loader.load()).rejects.not.toBeInstanceOf(LegacyConfigFormatError)
+    })
+
+    it('reports a newer configVersion before a legacy plugins shape', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+configVersion: 3
+plugins:
+  agents:
+    - name: '@specd/plugin-agent-claude'
+`),
+      )
+      const loader = createLoader({ configPath })
+      await expect(loader.load()).rejects.toBeInstanceOf(UnsupportedConfigVersionError)
+    })
+
+    it('rejects a newer configVersion on an extending layer before merge', async () => {
+      await writeConfig(minimalYaml('configVersion: 2\n'))
+      await writeConfig(
+        `
+extends: true
+configVersion: 3
+`.trim(),
+        'specd.local.yaml',
+      )
+      const loader = createLoader({ startDir: tmpDir })
+      await expect(loader.load()).rejects.toBeInstanceOf(UnsupportedConfigVersionError)
+    })
+
+    it('rejects a legacy plugins shape on the root layer even when an extend removes plugins', async () => {
+      await writeConfig(
+        minimalYaml(`
+plugins:
+  agents:
+    - name: '@specd/plugin-agent-claude'
+`),
+      )
+      await writeConfig(
+        `
+extends: true
+remove:
+  plugins:
+    - name: '@specd/plugin-agent-claude'
+`.trim(),
+        'specd.local.yaml',
+      )
+      const loader = createLoader({ startDir: tmpDir })
+      await expect(loader.load()).rejects.toBeInstanceOf(LegacyConfigFormatError)
+    })
+
+    it('rejects fractional and non-positive configVersion values', async () => {
+      await writeConfig(minimalYaml('configVersion: 1.5\n'))
+      const loader = createLoader({ startDir: tmpDir })
+      await expect(loader.load()).rejects.toBeInstanceOf(ConfigValidationError)
+
+      await writeConfig(minimalYaml('configVersion: -1\n'))
+      await expect(loader.load()).rejects.toBeInstanceOf(ConfigValidationError)
+
+      await writeConfig(minimalYaml('configVersion: 3.5\n'))
+      await expect(loader.load()).rejects.toBeInstanceOf(ConfigValidationError)
+
+      await writeConfig(minimalYaml('configVersion: 2.5\n'))
+      await expect(loader.load()).rejects.toBeInstanceOf(ConfigValidationError)
+    })
+
+    it('reports UnsupportedConfigVersionError for a fractional version above the supported one', async () => {
+      await writeConfig(minimalYaml('configVersion: 3.5\n'))
+      const loader = createLoader({ startDir: tmpDir })
+      const err = await loader.load().catch((e: unknown) => e)
+      expect(err).toBeInstanceOf(UnsupportedConfigVersionError)
+      expect(err).toBeInstanceOf(ConfigValidationError)
+    })
+
+    it('reports plain ConfigValidationError for a fractional version below the supported one', async () => {
+      await writeConfig(minimalYaml('configVersion: 1.5\n'))
+      const loader = createLoader({ startDir: tmpDir })
+      const err = await loader.load().catch((e: unknown) => e)
+      expect(err).toBeInstanceOf(ConfigValidationError)
+      expect(err).not.toBeInstanceOf(UnsupportedConfigVersionError)
+    })
+
+    it('reports a fractional version above the supported one (2.5) as UnsupportedConfigVersionError', async () => {
+      await writeConfig(minimalYaml('configVersion: 2.5\n'))
+      const loader = createLoader({ startDir: tmpDir })
+      const err = await loader.load().catch((e: unknown) => e)
+      expect(err).toBeInstanceOf(ConfigValidationError)
+      expect(err).toBeInstanceOf(UnsupportedConfigVersionError)
     })
   })
 
@@ -2071,7 +2309,7 @@ storage:
           /workspaces\.default\.graph\.maxFileBytes/,
         )
       }
-    })
+    }, 15_000)
 
     it('rejects workspace graph.largeFilePaths when given non-array or non-string array', async () => {
       const configPath1 = await writeConfig(`
@@ -2283,7 +2521,7 @@ graph:
         await expect(loader.load()).rejects.toThrow(ConfigValidationError)
         await expect(createLoader({ configPath }).load()).rejects.toThrow(/graph\.maxFileBytes/)
       }
-    })
+    }, 15_000)
 
     it('rejects project graph.largeFilePaths when given non-array or non-string array', async () => {
       const configPath1 = await writeConfig(
@@ -2715,13 +2953,12 @@ remove:
       expect(config.context?.[0]).toEqual({ file: path.resolve(tmpDir, 'AGENTS.md') })
     })
 
-    it('remove.plugins.agents strips by name', async () => {
+    it('remove.plugins strips by name', async () => {
       await writeConfig(
         minimalYaml(`
 plugins:
-  agents:
-    - name: '@specd/plugin-agent-claude'
-    - name: '@specd/plugin-agent-copilot'
+  - name: '@specd/plugin-agent-claude'
+  - name: '@specd/plugin-agent-copilot'
 `),
       )
       await writeConfig(
@@ -2729,8 +2966,7 @@ plugins:
 extends: true
 remove:
   plugins:
-    agents:
-      - name: '@specd/plugin-agent-copilot'
+    - name: '@specd/plugin-agent-copilot'
 `.trim(),
         'specd.local.yaml',
       )
@@ -2738,8 +2974,253 @@ remove:
       const loader = createLoader({ startDir: tmpDir })
       const config = await loader.load()
 
-      expect(config.plugins?.agents).toHaveLength(1)
-      expect(config.plugins?.agents?.[0]?.name).toBe('@specd/plugin-agent-claude')
+      expect(config.plugins).toHaveLength(1)
+      expect(config.plugins?.[0]?.name).toBe('@specd/plugin-agent-claude')
+    })
+
+    it('replaces a same-name plugin in place and appends a new name', async () => {
+      await writeConfig(
+        minimalYaml(`
+plugins:
+  - name: '@acme/first'
+  - name: '@acme/x'
+    config:
+      a: 1
+  - name: '@acme/last'
+`),
+      )
+      await writeConfig(
+        `
+extends: true
+plugins:
+  - name: '@acme/x'
+    config:
+      a: 2
+  - name: '@acme/y'
+`.trim(),
+        'specd.local.yaml',
+      )
+
+      const loader = createLoader({ startDir: tmpDir })
+      const config = await loader.load()
+
+      expect(config.plugins).toEqual([
+        { name: '@acme/first' },
+        { name: '@acme/x', config: { a: 2 } },
+        { name: '@acme/last' },
+        { name: '@acme/y' },
+      ])
+    })
+
+    it('rejects a legacy plugins object in an extending layer', async () => {
+      await writeConfig(minimalYaml('configVersion: 2\n'))
+      await writeConfig(
+        `
+extends: true
+plugins:
+  agents:
+    - name: '@specd/plugin-agent-claude'
+`.trim(),
+        'specd.local.yaml',
+      )
+      const loader = createLoader({ startDir: tmpDir })
+      await expect(loader.load()).rejects.toBeInstanceOf(LegacyConfigFormatError)
+      await expect(loader.load()).rejects.toThrow(/specd\.local\.yaml/)
+    })
+
+    it('rejects duplicate names in remove.plugins', async () => {
+      await writeConfig(
+        minimalYaml(`
+plugins:
+  - name: '@acme/x'
+`),
+      )
+      await writeConfig(
+        `
+extends: true
+remove:
+  plugins:
+    - name: '@acme/x'
+    - name: '@acme/x'
+`.trim(),
+        'specd.local.yaml',
+      )
+      const loader = createLoader({ startDir: tmpDir })
+      const dupErr = await loader.load().catch((e: unknown) => e)
+      expect(dupErr).toBeInstanceOf(ConfigValidationError)
+      expect((dupErr as Error).message).toMatch(/duplicate plugin name '@acme\/x'/)
+    })
+
+    it('rejects a configVersion that differs from the root layer', async () => {
+      await writeConfig(minimalYaml('configVersion: 2\n'))
+      await writeConfig(
+        `
+extends: true
+configVersion: 1
+`.trim(),
+        'specd.local.yaml',
+      )
+
+      const loader = createLoader({ startDir: tmpDir })
+      await expect(loader.load()).rejects.toBeInstanceOf(ConfigValidationError)
+    })
+
+    it('rejects remove.plugins when the name is absent', async () => {
+      await writeConfig(
+        minimalYaml(`
+plugins:
+  - name: '@acme/x'
+`),
+      )
+      await writeConfig(
+        `
+extends: true
+remove:
+  plugins:
+    - name: '@acme/missing'
+`.trim(),
+        'specd.local.yaml',
+      )
+
+      const loader = createLoader({ startDir: tmpDir })
+      await expect(loader.load()).rejects.toThrow(/'@acme\/missing' not found/)
+    })
+
+    it('rejects a duplicate plugin name inside one extending layer (not collapsed)', async () => {
+      await writeConfig(minimalYaml(`plugins:\n  - name: '@acme/x'\n`))
+      await writeConfig(
+        `
+extends: true
+plugins:
+  - name: '@acme/x'
+    config: { a: 1 }
+  - name: '@acme/x'
+    config: { a: 2 }
+`.trim(),
+        'specd.local.yaml',
+      )
+      const err = await createLoader({ startDir: tmpDir })
+        .load()
+        .catch((e: unknown) => e)
+      expect(err).toBeInstanceOf(ConfigValidationError)
+      expect((err as Error).message).toMatch(/duplicate plugin name '@acme\/x'/)
+      expect((err as Error).message).toMatch(/specd\.local\.yaml/)
+    })
+
+    it('rejects a duplicate plugin name inside an extending layer with no inherited plugins', async () => {
+      await writeConfig(minimalYaml())
+      await writeConfig(
+        `extends: true\nplugins:\n  - name: '@acme/y'\n  - name: '@acme/y'\n`,
+        'specd.local.yaml',
+      )
+      const err = await createLoader({ startDir: tmpDir })
+        .load()
+        .catch((e: unknown) => e)
+      expect(err).toBeInstanceOf(ConfigValidationError)
+      expect((err as Error).message).toMatch(/duplicate plugin name '@acme\/y'/)
+    })
+
+    it('rejects removing a plugin the same layer declares itself', async () => {
+      await writeConfig(minimalYaml(`plugins:\n  - name: '@acme/x'\n`))
+      await writeConfig(
+        `
+extends: true
+plugins:
+  - name: '@acme/y'
+remove:
+  plugins:
+    - name: '@acme/y'
+`.trim(),
+        'specd.local.yaml',
+      )
+      const err = await createLoader({ startDir: tmpDir })
+        .load()
+        .catch((e: unknown) => e)
+      expect(err).toBeInstanceOf(ConfigValidationError)
+      expect((err as Error).message).toMatch(/'@acme\/y'.*not inherited/)
+    })
+
+    it('rejects a duplicate in the root layer even when a later layer removes the name twice', async () => {
+      await writeConfig(minimalYaml(`plugins:\n  - name: '@acme/x'\n  - name: '@acme/x'\n`))
+      await writeConfig(
+        `extends: true\nremove:\n  plugins:\n    - name: '@acme/x'\n    - name: '@acme/x'\n`,
+        'specd.local.yaml',
+      )
+      const err = await createLoader({ startDir: tmpDir })
+        .load()
+        .catch((e: unknown) => e)
+      expect(err).toBeInstanceOf(ConfigValidationError)
+      expect((err as Error).message).toMatch(/duplicate plugin name '@acme\/x'/)
+    })
+
+    it('moves a removed and re-declared inherited plugin to the end of the list', async () => {
+      await writeConfig(minimalYaml(`plugins:\n  - name: '@acme/x'\n  - name: '@acme/z'\n`))
+      await writeConfig(
+        `extends: true\nplugins:\n  - name: '@acme/x'\n    config: { a: 2 }\nremove:\n  plugins:\n    - name: '@acme/x'\n`,
+        'specd.local.yaml',
+      )
+      const config = await createLoader({ startDir: tmpDir }).load()
+      expect(config.plugins).toEqual([{ name: '@acme/z' }, { name: '@acme/x', config: { a: 2 } }])
+    })
+
+    it('accepts the current configVersion in an extending layer over a root without one', async () => {
+      await writeConfig(minimalYaml())
+      await writeConfig(`extends: true\nconfigVersion: 2\n`, 'specd.local.yaml')
+      await expect(createLoader({ startDir: tmpDir }).load()).resolves.toBeDefined()
+    })
+
+    it('rejects a mismatching configVersion in an extending layer over a root without one', async () => {
+      await writeConfig(minimalYaml())
+      await writeConfig(`extends: true\nconfigVersion: 1\n`, 'specd.local.yaml')
+      await expect(createLoader({ startDir: tmpDir }).load()).rejects.toBeInstanceOf(
+        ConfigValidationError,
+      )
+    })
+
+    it('rejects an unsupported newer configVersion in an extending layer over a root without one', async () => {
+      await writeConfig(minimalYaml())
+      await writeConfig(`extends: true\nconfigVersion: 3\n`, 'specd.local.yaml')
+      await expect(createLoader({ startDir: tmpDir }).load()).rejects.toBeInstanceOf(
+        ConfigValidationError,
+      )
+    })
+
+    it('reports a config path that is a directory as ConfigValidationError', async () => {
+      const dirPath = path.join(tmpDir, 'specd.yaml')
+      await fs.mkdir(dirPath)
+      const err = await createLoader({ configPath: dirPath })
+        .load()
+        .catch((e: unknown) => e)
+      expect(err).toBeInstanceOf(ConfigValidationError)
+    })
+
+    it('still allows a layer to remove an inherited plugin and re-declare it', async () => {
+      await writeConfig(minimalYaml(`plugins:\n  - name: '@acme/x'\n    config: { a: 1 }\n`))
+      await writeConfig(
+        `
+extends: true
+plugins:
+  - name: '@acme/x'
+    config: { a: 2 }
+remove:
+  plugins:
+    - name: '@acme/x'
+`.trim(),
+        'specd.local.yaml',
+      )
+      const config = await createLoader({ startDir: tmpDir }).load()
+      expect(config.plugins).toEqual([{ name: '@acme/x', config: { a: 2 } }])
+    })
+
+    it('rejects remove.plugins when no plugins are inherited at all', async () => {
+      await writeConfig(minimalYaml())
+      await writeConfig(
+        `extends: true\nremove:\n  plugins:\n    - name: '@acme/x'\n`,
+        'specd.local.yaml',
+      )
+      await expect(createLoader({ startDir: tmpDir }).load()).rejects.toThrow(
+        /no plugins in inherited config/,
+      )
     })
 
     it('rejects remove without extends', async () => {
@@ -2983,12 +3464,38 @@ context:
 
   describe('Requirement: Invalidation policy configuration', () => {
     it('accepts valid invalidationPolicy values', async () => {
-      for (const policy of ['none', 'surgical', 'downstream', 'global']) {
+      for (const policy of ['none', 'surgical', 'downstream', 'global'] as const) {
         const configPath = await writeConfig(minimalYaml(`invalidationPolicy: ${policy}`))
         const loader = createLoader({ configPath })
         const config = await loader.load()
-        expect(config.invalidationPolicy).toBe(policy)
+        expect(config.invalidation).toEqual({ artifacts: policy, workflow: 'redesign' })
       }
+    })
+
+    it('uses the native preserve default when both shapes are omitted', async () => {
+      const configPath = await writeConfig(minimalYaml(''))
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+      expect(config.invalidation).toEqual({ artifacts: 'downstream', workflow: 'preserve' })
+    })
+
+    it('accepts a structured invalidation policy', async () => {
+      const configPath = await writeConfig(
+        minimalYaml('invalidation:\n  artifacts: surgical\n  workflow: preserve'),
+      )
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+      expect(config.invalidation).toEqual({ artifacts: 'surgical', workflow: 'preserve' })
+    })
+
+    it('rejects ambiguous invalidation shapes', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(
+          'invalidationPolicy: global\ninvalidation:\n  artifacts: none\n  workflow: preserve',
+        ),
+      )
+      const loader = createLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow(ConfigValidationError)
     })
 
     it('rejects unknown invalidationPolicy value', async () => {
@@ -3460,5 +3967,21 @@ describe('Requirement: Privacy settings and Environment support', () => {
     const loader = createLoader({ configPath })
     const config = await loader.load()
     expect(config.actorProvider).toBe('ldap')
+  })
+
+  it('rejects invalid YAML', async () => {
+    const configPath = await writeConfig('schema: [\n')
+    await expect(createLoader({ configPath }).load()).rejects.toBeInstanceOf(ConfigValidationError)
+  })
+
+  it('rejects a config that omits schema', async () => {
+    const configPath = await writeConfig('workspaces:\n  default:\n    specs:\n      adapter: fs\n')
+    await expect(createLoader({ configPath }).load()).rejects.toBeInstanceOf(ConfigValidationError)
+  })
+
+  it('accepts a non-fs specs adapter name', async () => {
+    const configPath = await writeConfig(minimalYaml().replace('adapter: fs', 'adapter: s3'))
+    const config = await createLoader({ configPath }).load()
+    expect(config.workspaces[0]?.specsAdapter.adapter).toBe('s3')
   })
 })

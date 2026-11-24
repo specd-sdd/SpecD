@@ -17,6 +17,18 @@
 - **THEN** it includes `metadata`, `metadataFingerprint`, `source`, `regenerated`, and `warnings`
 - **AND** `source` is exactly one of `'persisted'` or `'generated'`
 
+#### Scenario: schemaName is forwarded to generation
+
+- **GIVEN** `MaterializeSpecMetadata.execute({ specId, policy: 'force', schemaName: 'custom-workflow' })`
+- **WHEN** the use case regenerates metadata
+- **THEN** `GenerateSpecMetadata` receives `schemaName: 'custom-workflow'`
+
+#### Scenario: if-needed freshness uses the same schema selection
+
+- **GIVEN** persisted metadata generated with `custom-workflow`
+- **WHEN** `execute({ specId, policy: 'if-needed', schemaName: 'custom-workflow' })` is called with unchanged sources
+- **THEN** the persisted metadata is reused (`source: 'persisted'`) instead of being regenerated with the project default
+
 ### Requirement: if-needed reuses fresh metadata and self-heals everything else
 
 #### Scenario: Fresh persisted snapshot is reused without generation

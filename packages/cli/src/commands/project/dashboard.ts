@@ -2,9 +2,10 @@ import path from 'node:path'
 import { type Command } from 'commander'
 import chalk from 'chalk'
 import boxen from 'boxen'
-import { openSpecdHost, buildProjectStatusSnapshot } from '@specd/sdk'
+import { buildProjectStatusSnapshot } from '@specd/sdk'
 import { buildCliKernelOptions } from '../../helpers/cli-context.js'
 import { handleError } from '../../handle-error.js'
+import { openCliHost } from '../../helpers/cli-host.js'
 import { output, parseFormat } from '../../formatter.js'
 import { renderBanner } from '../../banner.js'
 import { CLI_VERSION, CODE_GRAPH_VERSION, CORE_VERSION, SDK_VERSION } from '../../version.js'
@@ -154,7 +155,7 @@ JSON/TOON output schema:
         const fmt = parseFormat(opts.format)
 
         if (fmt !== 'text') {
-          const host = await openSpecdHost({
+          const host = await openCliHost({
             ...(opts.config !== undefined ? { configPath: opts.config } : {}),
             options: {
               kernel: buildCliKernelOptions(),
@@ -202,7 +203,7 @@ JSON/TOON output schema:
           return
         }
 
-        const host = await openSpecdHost({
+        const host = await openCliHost({
           ...(opts.config !== undefined ? { configPath: opts.config } : {}),
           options: {
             kernel: buildCliKernelOptions(),

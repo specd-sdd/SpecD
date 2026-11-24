@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'The integrated Change contract already captures the lifecycle, approval, verification, and validity behavior; implementation reconciliation only.'

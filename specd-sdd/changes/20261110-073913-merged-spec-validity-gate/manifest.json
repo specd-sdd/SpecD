@@ -1,0 +1,346 @@
+{
+  "manifestVersion": 2,
+  "name": "merged-spec-validity-gate",
+  "createdAt": "2026-11-10T07:39:13.834Z",
+  "updatedAt": "2026-11-24T11:13:58.248Z",
+  "description": "Block designing→ready and archive unless change-scoped merged/created specs pass ValidateSpecs-equivalent validation including metadata materialization.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:transition-checks",
+    "core:validate-specs",
+    "core:archive-change",
+    "core:preview-spec",
+    "core:get-spec-metadata"
+  ],
+  "specDependsOn": {
+    "core:transition-checks": [
+      "core:change",
+      "core:workflow-model",
+      "core:workflow-topology",
+      "core:schema-format",
+      "default:_global/architecture",
+      "core:check-registry",
+      "core:archive-change",
+      "core:get-status",
+      "core:validate-specs"
+    ],
+    "core:validate-specs": [
+      "core:validate-artifacts",
+      "core:schema-format",
+      "core:storage",
+      "core:workspace",
+      "core:spec-id-format",
+      "core:composition-resolver",
+      "core:validation-result-cache-port",
+      "core:spec-lock",
+      "core:spec-repository-port",
+      "core:spec-optimization",
+      "core:get-spec-metadata"
+    ],
+    "core:archive-change": [
+      "core:change",
+      "core:schema-format",
+      "core:delta-format",
+      "core:validate-artifacts",
+      "core:storage",
+      "core:run-step-hooks",
+      "core:hook-execution-model",
+      "core:template-variables",
+      "core:spec-metadata",
+      "core:content-extraction",
+      "default:_global/architecture",
+      "core:workspace",
+      "core:spec-id-format",
+      "core:spec-overlap",
+      "default:_global/logging",
+      "core:spec-lock",
+      "default:_global/error-handling-conventions",
+      "core:materialize-spec-metadata",
+      "core:spec-optimization",
+      "core:initialize-persisted-spec-state",
+      "core:composition-resolver",
+      "core:transition-checks",
+      "core:resolve-change-schema",
+      "core:check-registry",
+      "core:validate-specs"
+    ],
+    "core:preview-spec": [
+      "core:delta-format",
+      "core:artifact-parser-port",
+      "core:change-layout",
+      "core:file-reader-port",
+      "core:composition-resolver",
+      "core:diff-generator",
+      "core:resolve-change-schema",
+      "core:validate-specs"
+    ],
+    "core:get-spec-metadata": [
+      "core:materialize-spec-metadata",
+      "core:spec-metadata",
+      "core:spec-id-format"
+    ]
+  },
+  "invalidation": {
+    "artifacts": "downstream",
+    "workflow": "preserve"
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "missing",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "core:transition-checks",
+          "filename": "deltas/core/transition-checks/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:validate-specs",
+          "filename": "deltas/core/validate-specs/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:archive-change",
+          "filename": "deltas/core/archive-change/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:preview-spec",
+          "filename": "deltas/core/preview-spec/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:get-spec-metadata",
+          "filename": "deltas/core/get-spec-metadata/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "core:transition-checks",
+          "filename": "deltas/core/transition-checks/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:validate-specs",
+          "filename": "deltas/core/validate-specs/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:archive-change",
+          "filename": "deltas/core/archive-change/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:preview-spec",
+          "filename": "deltas/core/preview-spec/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:get-spec-metadata",
+          "filename": "deltas/core/get-spec-metadata/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-11-10T07:39:13.834Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "core:transition-checks",
+        "core:validate-specs",
+        "core:archive-change",
+        "core:preview-spec",
+        "core:get-spec-metadata"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-10T07:39:13.852Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:transition-checks"
+        },
+        {
+          "type": "specs",
+          "key": "core:validate-specs"
+        },
+        {
+          "type": "specs",
+          "key": "core:archive-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:preview-spec"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-spec-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "core:transition-checks"
+        },
+        {
+          "type": "verify",
+          "key": "core:validate-specs"
+        },
+        {
+          "type": "verify",
+          "key": "core:archive-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:preview-spec"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-spec-metadata"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-14T14:15:39.358Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'decouple-core-cli-error-hints' was archived with overlapping specs: core:preview-spec, core:transition-checks",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:transition-checks", "core:preview-spec"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:transition-checks", "core:preview-spec"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-24T11:13:58.246Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'decouple-core-cli-workflow-guidance' was archived with overlapping specs: core:archive-change, core:transition-checks",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:transition-checks", "core:archive-change"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:transition-checks", "core:archive-change"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    }
+  ]
+}

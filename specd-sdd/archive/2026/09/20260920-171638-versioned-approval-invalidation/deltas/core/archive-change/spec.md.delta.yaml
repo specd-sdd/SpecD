@@ -1,0 +1,78 @@
+- op: added
+  description: 'Enforce fresh validity and live task completion before archive'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    before:
+      type: section
+      matches: '^Requirement: Deferred transition to archiving$'
+  content: |
+    ### Requirement: Canonical validity archive preflight
+
+    After pre-archive hooks and before permanent writes, `ArchiveChange` SHALL refresh implementation tracking, run the single application reconciler against fresh artifact and implementation files, rerun live predicates and task counting, and only then construct the publication plan, preflight snapshot, spec-lock sidecars, and canonical write batch. The accepted verdict and the publication plan MUST describe the same post-hook snapshot.
+
+    The reconciler is a mandatory dependency in every constructor and factory form. Missing explicit dependencies MUST fail through the standard composition-configuration error. `ArchiveChange` MUST NOT call `Change.invalidate` or another legacy mutation path as a fallback.
+
+    Archive SHALL fail when required approval is absent, stale, or revoked; verification is absent, legacy-unknown, or stale; any non-task artifact has unresolved drift or pending review; or a required task artifact is missing, unreadable, structurally invalid, or contains incomplete tasks.
+
+    If reconciliation commits a mandatory return to `designing` or `done`, archive SHALL stop and return a typed application diagnostic containing the committed state, automatic return, canonical blockers, and next action. It MUST NOT reduce recovery to a generic invalid-state error. Missing or stale verification recommends renewing evidence in the current state; it does not force a transition to `verifying`. A failed archive MUST NOT undo committed gate recovery.
+
+    Task artifacts remain excluded from approval fingerprints, but archive MUST live-count them again so tasks added after approval or verification cannot bypass completion.
+
+- op: added
+  description: 'Preserve versioned evidence in archived changes'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    before:
+      type: section
+      matches: '^Requirement: Archive repository call$'
+  content: |
+    ### Requirement: Versioned validity evidence preservation
+
+    The archived manifest SHALL retain `manifestVersion`, structured invalidation policy, materialized approval and verification projections, artifact and implementation fingerprints with algorithm identifiers, and the complete append-only history. Archive inspection of a legacy manifest is read-only; it MUST NOT rewrite solely to migrate format.
+
+    An active legacy change whose verification or required sign-off freshness cannot be proven MUST repeat the relevant operation before archive. Existing archived legacy records remain readable historical evidence and are not retroactively repaired from current files.
+
+- op: modified
+  description: 'Resolve overlapping peers through policy-aware canonical reconciliation'
+  selector:
+    type: section
+    matches: '^Requirement: Overlap guard$'
+  content: |
+    After the archivable guard passes and before pre-archive hooks execute, `ArchiveChange` MUST evaluate `spec.overlap` while the subject change remains `archivable`. Overlap is archive-only and MUST NOT become an enter-`ready` predicate.
+
+    The check MUST list active changes, exclude the change being archived by name, call `detectSpecOverlap` with the remaining changes and subject, and retain only report entries involving the subject. When overlap exists and `allowOverlap` is false, it MUST throw `SpecOverlapError` naming each overlapping spec and peer change before any publication. Without overlap, archive proceeds regardless of the flag.
+
+    When overlap exists and `allowOverlap` is true, each affected peer MUST receive a `spec-overlap-conflict` reconciliation intent through the single application reconciler. The peer's configured artifact and workflow policies and any mandatory gate recovery determine its persisted review state and lifecycle target; overlap alone MUST NOT unconditionally move every peer to `designing`. Peer invalidation and the resulting audit evidence MUST be committed atomically per peer. `ArchiveChange` MUST NOT call broad `Change.invalidate` directly.
+
+- op: modified
+  description: 'Replace obsolete regeneration dependency with materialization dependency'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`core:change`](../change/spec.md)
+    - [`core:schema-format`](../schema-format/spec.md)
+    - [`core:delta-format`](../delta-format/spec.md)
+    - [`core:validate-artifacts`](../validate-artifacts/spec.md)
+    - [`core:storage`](../storage/spec.md)
+    - [`core:run-step-hooks`](../run-step-hooks/spec.md)
+    - [`core:hook-execution-model`](../hook-execution-model/spec.md)
+    - [`core:template-variables`](../template-variables/spec.md)
+    - [`core:spec-metadata`](../spec-metadata/spec.md)
+    - [`core:content-extraction`](../content-extraction/spec.md)
+    - [`default:_global/architecture`](../../_global/architecture/spec.md)
+    - [`core:workspace`](../workspace/spec.md)
+    - [`core:spec-id-format`](../spec-id-format/spec.md)
+    - [`core:spec-overlap`](../spec-overlap/spec.md)
+    - [`default:_global/logging`](../../_global/logging/spec.md)
+    - [`core:spec-lock`](../spec-lock/spec.md)
+    - [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md)
+    - [`core:materialize-spec-metadata`](../materialize-spec-metadata/spec.md) — forced post-commit metadata materialization
+    - [`core:spec-optimization`](../spec-optimization/spec.md)
+    - [`core:initialize-persisted-spec-state`](../initialize-persisted-spec-state/spec.md)
+    - [`core:composition-resolver`](../composition-resolver/spec.md)
+    - [`core:transition-checks`](../transition-checks/spec.md) — canonical archive predicates and reconciliation

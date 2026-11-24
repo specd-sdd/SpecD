@@ -116,3 +116,12 @@
 
 - **WHEN** any spec has validation failures
 - **THEN** exit code is 1
+
+### Requirement: Error — dependsOn overwrite hint
+
+#### Scenario: specs validate does not suggest --force on itself
+
+- **GIVEN** `specs validate` encounters `DependsOnOverwriteError` (`DEPENDS_ON_OVERWRITE`)
+- **WHEN** the error is reported to the user
+- **THEN** the rendered hint suggests `specd specs deps` or `specd specs generate-metadata --force`
+- **AND** it does NOT suggest passing `--force` to `specs validate`

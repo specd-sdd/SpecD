@@ -78,3 +78,11 @@
 - **WHEN** `specd change artifact-instruction add-auth` is run without an explicit artifact ID
 - **THEN** the returned instruction block is for `specs`
 - **AND** the CLI does not walk artifact dependencies on its own
+
+### Requirement: Artifact instruction retrieval timing
+
+#### Scenario: Workflow fetches instruction after context for current artifact
+
+- **WHEN** an agent prepares an artifact
+- **THEN** it loads change context first
+- **AND** it fetches only that artifact's instruction immediately before authoring

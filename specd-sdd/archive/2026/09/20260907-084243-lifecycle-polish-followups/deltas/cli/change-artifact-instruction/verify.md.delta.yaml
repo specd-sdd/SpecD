@@ -1,0 +1,11 @@
+- op: added
+  position:
+    parent: { type: section, matches: '^Requirements$' }
+  content: |
+    ### Requirement: Artifact instruction retrieval timing
+
+    #### Scenario: Workflow fetches instruction after context for current artifact
+
+    - **WHEN** an agent prepares an artifact
+    - **THEN** it loads change context first
+    - **AND** it fetches only that artifact's instruction immediately before authoring

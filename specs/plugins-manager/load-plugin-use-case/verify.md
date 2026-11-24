@@ -14,12 +14,12 @@
 #### Scenario: Plugin loaded
 
 - **WHEN** LoadPlugin is executed with valid plugin
-- **THEN** it returns `{ plugin: SpecdPlugin }`
+- **THEN** it returns `{ plugin, manifest }`
 
 #### Scenario: Plugin not found
 
 - **WHEN** LoadPlugin is executed with non-existent plugin
-- **THEN** it returns `{ error: PluginNotFoundError }`
+- **THEN** it throws `PluginNotFoundError`
 
 ### Requirement: Behavior
 
@@ -27,4 +27,9 @@
 
 - **WHEN** LoadPlugin is executed
 - **THEN** it loads the plugin via `PluginLoader`
-- **AND** validates the plugin implements the expected interface
+- **AND** validates the plugin implements the base contract
+
+#### Scenario: No lifecycle calls
+
+- **WHEN** LoadPlugin is executed
+- **THEN** `init`, `install` and `destroy` are not called

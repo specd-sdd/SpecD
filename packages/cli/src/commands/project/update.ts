@@ -3,6 +3,7 @@ import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { updatePluginsWithKernel } from '../plugins/update.js'
+import { CliExitError } from '../../helpers/cli-exit-error.js'
 
 /**
  * Registers the `project update` subcommand on the given parent command.
@@ -23,27 +24,25 @@ export function registerProjectUpdate(parent: Command): void {
       `
 JSON/TOON output schema:
   {
-    plugins: Array<{ name: string, status: "updated" | "skipped" | "error", detail: string }>
+    plugins: Array<{ name: string, status: "updated" | "error", detail: string }>
+    hasErrors: boolean
   }
 `,
     )
     .action(async (opts: { format: string; config?: string }) => {
       try {
         const fmt = parseFormat(opts.format)
-        const { config, configFilePath } = await resolveCliContext({
+        const { config } = await resolveCliContext({
           configPath: opts.config,
+          plugins: false,
         })
-        const configPath = configFilePath ?? `${config.projectRoot}/specd.yaml`
-        const result = await updatePluginsWithKernel({
-          config,
-          configPath,
-        })
+        const result = await updatePluginsWithKernel({ config })
 
         if (result.plugins.length === 0) {
           if (fmt === 'text') {
             output('project is up to date', 'text')
           } else {
-            output({ plugins: [] }, fmt)
+            output({ plugins: [], hasErrors: false }, fmt)
           }
           return
         }
@@ -57,11 +56,11 @@ JSON/TOON output schema:
             }
           }
         } else {
-          output({ plugins: result.plugins }, fmt)
+          output({ plugins: result.plugins, hasErrors: result.hasErrors }, fmt)
         }
 
         if (result.hasErrors) {
-          process.exit(1)
+          throw new CliExitError(1)
         }
       } catch (err) {
         handleError(err, opts.format)

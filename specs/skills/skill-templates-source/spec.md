@@ -165,6 +165,69 @@ Archive-oriented templates MAY use `specs metadata` to inspect `source`, `regene
 
 Template contract tests MUST assert the exact commands and output fields required by these roles, not only the presence of command-group or configuration keywords.
 
+### Requirement: In-place approval gates in workflow templates
+
+Workflow skill templates that own a hop (`specd-new`, `specd-design`, `specd-implement`, `specd-verify`, `specd-archive`) and `templates/shared/shared.md.tpl` MUST describe approval gates as in-place checks on `ready` / `done` (see [`core:transition-checks`](../../core/transition-checks/spec.md)). They MUST NOT mention a `change transition` into `pending-spec-approval` or `pending-signoff` — those hops are not protocol. Teach stay-in-`ready` / `done` plus human `approve`. The `specd` entry skill is a router only and MUST NOT duplicate that copy.
+
+- **`shared.md.tpl`:** agents MUST NEVER run `changes approve`. When the spec or signoff gate is on and no consent is recorded, the change **stays** in `ready` or `done`; the agent MUST tell the human to run `specd changes approve spec|signoff`. Pending states MAY be mentioned only as **drain** for in-flight changes already in those states. Hook guidance MUST NOT list pending parking states as intermediates the happy path “passes through”. Skills that skip auto-hooks MUST NOT run `source.post` on `along` backward / redesign / recovery. The shared `nextAction` documentation (the "Next Action engine" section) MUST list `targetStep`, `actionType`, `reason`, `intent`, `action`, `command`, and `guidance`, and state that actions without a command mapping yield `command: null` plus a `guidance` field (agents follow the guidance and never invent a command).
+- **`specd-design`:** when `approvals.spec` is on after entering `ready`, stay in `ready` and stop for human `approve spec`. MUST NOT mention a hop to `pending-spec-approval`.
+- **`specd-implement`:** MUST NOT `transition implementing` from `ready` while the spec gate is on and no spec approval is recorded. Redirect to human `approve spec`. `pending-spec-approval` and `spec-approved` are drain entry states only: with spec consent recorded the skill transitions to `implementing` from either; without consent it redirects to human `approve spec` and MUST NOT transition (approving in a drain state no longer moves the change, so the skill is the next hop).
+- **`specd-verify`:** when `approvals.signoff` is on after entering `done`, stay in `done` and stop for human `approve signoff`. MUST NOT mention `pending-signoff` or a transition into it. After consent, this skill still owns `done → archivable`.
+- **`specd-new`:** the `nextAction.targetStep` routing table MUST treat `pending-spec-approval` / `pending-signoff` as drain-only rows (in-flight leftovers) that follow `nextAction`: the matching `approve` command while consent is missing, otherwise the hop that `nextAction` names (the template follows `nextAction` and need not name the hop skill literally). For `ready` / `done` with an active unsatisfied gate, suggest the matching `approve` command. MUST NOT present those names as transition targets.
+- **`specd`:** router only. MUST NOT teach spec/signoff approval or pending parking; those belong in the skills that own the hop (`specd-design`, `specd-implement`, `specd-verify`, `specd-archive`) and in `shared.md.tpl`.
+- **`specd-archive`:** MUST say the change must already be `archivable` or `archiving` (retry after a failed commit) and that signoff wait is `/specd-verify` in `done`. MUST NOT mention a `change transition` into `pending-signoff`.
+
+Template contract tests for the routing rows and the state gate MUST assert both consent branches (consent missing: approve command / no transition; consent recorded: follow `nextAction` / transition to `implementing`), not only the presence of state names.
+
+Template contract tests MUST assert the absence of happy-path parking copy (for example “routes to `pending-signoff`”, “reaches `pending-spec-approval`” as the normal wait).
+
+### Requirement: Reconciled invalidation protocol in lifecycle templates
+
+Shared, design, implement, verify, compliance, and archive templates SHALL instruct agents to obtain fresh status and follow its committed state and next action before change-scoped substantive work or progression.
+
+The shared protocol SHALL explain that:
+
+- artifact and workflow invalidation policies are independent
+- unresolved non-task drift or pending review blocks forward progress even under `artifacts: none`
+- `preserve` permits in-place semantic review and revalidation only when no mandatory gate recovery overrides it
+- validation establishes structure and a baseline but does not approve content
+- required stale spec consent returns to design and must be renewed in `ready`
+- stale sign-off returns a later change to `done`, with verification repeated first when stale
+- entering `verifying` checks implementation readiness but does not capture a baseline; explicit verification start does so after resolving files and links from any active state
+- independent verify and change-scoped compliance use start/checks/report/complete; delegated compliance shares verify's explicitly supplied attempt and never starts or completes it
+- verify completes the outer attempt only after scenario checks and optional audit succeed; changed inputs require a new start and repeated verification work in place
+- transitions and status only check already-completed current evidence, never complete an unfinished attempt
+- `changes verification invalidate` only withdraws completed verification evidence and never starts or restarts an attempt
+- `hasTasks` artifacts are live operational state excluded from fingerprints but still structurally validated and completion-checked at transition and archive
+
+Templates MUST NOT teach skills to calculate fingerprints, edit manifest projections, append invalidation events, or choose recovery separately from core. Generated and installed skill copies SHALL be refreshed from these templates through the normal build/sync path.
+
+The compliance template SHALL implement delegated mode as change-scoped for report placement, scope discovery, project context, dependency expansion, merged `changes spec-preview` reads, and filename generation. Its only behavioural difference from standalone change mode is attempt ownership: delegated mode requires the caller-supplied attempt ID and runs neither verification start nor completion. Template contract tests MUST exercise every detected mode through those downstream decisions; phrase-presence assertions alone are insufficient.
+
+### Requirement: Implementation tracking in verify and implement templates
+
+`impl.filesResolved` gates `implementing → verifying` (and archive). Command syntax for listing, adding, resolving, and ignoring tracked files MUST live in `templates/shared/shared.md.tpl` so every skill that already loads shared context can drain tracking without duplicating the CLI cookbook.
+
+- **`shared.md.tpl`:** MUST document `changes implementation list|review|add|resolve|ignore`, the difference between **resolve** (in-scope, reviewed) and **ignore** (not this change’s implementation surface; linked files cannot be ignored), and that open tracked files block entering `verifying`. `add` guidance MUST prefer top-level symbols that realize the spec, MUST NOT treat locals/variables or incidental files as links, and MUST NOT dump catch-all links.
+- **`specd-verify`:** this skill owns the hop into `verifying`. When status or a failed `transition verifying` shows `IMPLEMENTATION_STATE` / open tracked files, it MUST drain tracking using shared guidance (`resolve` vs `ignore`) and retry the transition. It MUST NOT redirect to `/specd-implement` solely for open files, and MUST NOT paste the full command cookbook (point at `shared.md`).
+- **`specd-implement`:** after the last task checkbox and post-hooks, it MUST `implementation list` (or equivalent) and leave **zero open** tracked files before telling the user to run `/specd-verify`. Linking workflow MUST prefer top-level `--symbol` targets that actually implement the spec; skip unrelated names. Resolve/ignore command details belong in shared.
+
+Template contract tests MUST assert these ownership and drain rules exist in the templates.
+
+### Requirement: Archive skill skips only pre hooks
+
+`specd-archive` MUST run `archiving` pre `run:` / `instruction:` itself, then call `changes archive` with `--skip-hooks pre` (not `all`). After persist, `ArchiveChange` MUST run post `run:` hooks. After a successful archive the skill MUST NOT call `run-hooks <name> archiving --phase post` (that would double-run). It MAY still call `hook-instruction` for post `instruction:` entries.
+
+### Requirement: Design skill review scope without review file lists
+
+`specd-design` MAY key off `review: required: yes` plus `route` / `reason`. It MUST NOT tell agents that artifact files are listed under the text `review:` header. First review scope is artifacts with `pending-review` / `[drift]` under `artifacts (details):` (and JSON/TOON `review.affectedArtifacts` when using structured status).
+
+### Requirement: Overlap invalidation vs live archive overlap in templates
+
+`OVERLAP_CONFLICT` is a **live archive** blocker (`spec.overlap` while `archivable`, skippable with `--skip-checks spec.overlap`). Skill templates for `specd-design`, `specd-implement`, `specd-verify`, and `specd-new` MUST NOT list `OVERLAP_CONFLICT` as a typical status blocker. Invalidation from another archive is `review.reason: spec-overlap-conflict` and routes to `/specd-design`; it MUST NOT be taught as the `--skip-checks spec.overlap` bypass (or its `--allow-overlap` alias).
+
+`specd-archive` MAY list `OVERLAP_CONFLICT` as a typical blocker and MUST tell the agent that the bypass `--skip-checks <id>` shown by `specd changes status` (for overlap, `--skip-checks spec.overlap`) applies only to a live blocker, never to `spec-overlap-conflict` review, and that no bypass is offered for a blocker whose status shows none.
+
 ### Requirement: Fast-track workflow template
 
 `templates/skills/` MUST contain a `specd-fasttrack/` standard-skill directory with `SKILL.md.tpl` and `skill.meta.json`.
@@ -192,6 +255,10 @@ The template MUST use `specd project context-specs` to discover configured proje
 
 The template MUST declare that fast-track is manual-only: it MUST be used only when the user explicitly invokes `/specd-fasttrack`, and MUST NOT be selected or invoked for normal specd work.
 
+### Requirement: Fast-track Step 2 confirmation and dependents terminology
+
+The rendered fast-track workflow MUST stop after Step 2 and ask the user to select the next working mode before it creates formal design artifacts. Its blast-radius guidance MUST call affected callers and modules `dependents` and use `--direction dependents`; it MUST NOT describe that guidance as a downstream search.
+
 ## Constraints
 
 - Templates in the skills package MUST NOT contain static frontmatter YAML blocks.
@@ -211,3 +278,4 @@ The template MUST declare that fast-track is manual-only: it MUST be used only w
 - [`skills:skill`](../skill/spec.md) — base skill type
 - [`cli:spec-optimizations`](../../cli/spec-optimizations/spec.md) — the command optimizer-agent templates must direct persistence through
 - [`skills:workflow-automation`](../workflow-automation/spec.md) — agent-facing command selection and context-loading policy rendered into shared workflow guidance
+- [`core:transition-checks`](../../core/transition-checks/spec.md) — in-place `approval.spec` / `approval.signoff`; pending states are drain-only

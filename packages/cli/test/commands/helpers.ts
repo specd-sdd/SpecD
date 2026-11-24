@@ -6,14 +6,17 @@
  * test files stay focused on what they're testing.
  */
 import type { Stats } from 'node:fs'
-import { vi } from 'vitest'
+import { expect, vi } from 'vitest'
 import { Command } from 'commander'
-import type {
-  SpecdConfig,
-  Kernel,
-  SpecRepository,
-  ChangeRepository,
-  ArchiveRepository,
+import { CliExitError } from '../../src/helpers/cli-exit-error.js'
+import { type CliContext } from '../../src/helpers/cli-context-types.js'
+import {
+  DEFAULT_INVALIDATION_POLICY,
+  type SpecdConfig,
+  type Kernel,
+  type SpecRepository,
+  type ChangeRepository,
+  type ArchiveRepository,
 } from '@specd/sdk'
 
 /**
@@ -45,6 +48,9 @@ export class ExitSentinel extends Error {
   }
 }
 
+/** The real `parseAsync`, captured once so repeated `mockProcessExit()` calls never wrap a wrapper. */
+const ORIGINAL_PARSE_ASYNC = Command.prototype.parseAsync
+
 /**
  * Replaces `process.exit` with a spy that throws an {@link ExitSentinel}
  * instead of silently continuing execution. Call in `beforeEach` or a
@@ -54,6 +60,36 @@ export function mockProcessExit(): void {
   vi.spyOn(process, 'exit').mockImplementation(((code: number) => {
     throw new ExitSentinel(code)
   }) as never)
+
+  // Mirror the entrypoint (`run()`): a `CliExitError` that reaches `parseAsync` ends the
+  // process with its exit code, which here is the mocked `process.exit`.
+  vi.spyOn(Command.prototype, 'parseAsync').mockImplementation(async function (
+    this: Command,
+    ...args: Parameters<Command['parseAsync']>
+  ) {
+    try {
+      return await ORIGINAL_PARSE_ASYNC.apply(this, args)
+    } catch (error) {
+      if (error instanceof CliExitError) process.exit(error.exitCode)
+      throw error
+    }
+  })
+}
+
+/**
+ * Runs a command action the way the entrypoint does: awaits `fn` and turns a thrown
+ * `CliExitError` into a call to the (mocked) `process.exit`.
+ *
+ * @param fn - Code under test that may throw a `CliExitError`
+ * @returns Whatever `fn` resolves to
+ */
+export async function runCommand<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn()
+  } catch (error) {
+    if (error instanceof CliExitError) process.exit(error.exitCode)
+    throw error
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -88,6 +124,7 @@ export function makeMockConfig(overrides: Partial<SpecdConfig> = {}): SpecdConfi
       archiveAdapter: { adapter: 'fs', config: { path: '/project/.specd/archive' } },
     },
     approvals: { spec: false, signoff: false },
+    invalidation: DEFAULT_INVALIDATION_POLICY,
     ...overrides,
   }
 }
@@ -255,7 +292,36 @@ export function makeMockDiscardedView(
 // Mock kernel factory
 // ---------------------------------------------------------------------------
 
-export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel & MockKernel {
+/** Verification use cases added to the mock kernel before they exist on every Kernel build. */
+export type VerificationKernelMethods = {
+  startVerification: { execute: ReturnType<typeof vi.fn> }
+  completeVerification: { execute: ReturnType<typeof vi.fn> }
+  invalidateVerification: { execute: ReturnType<typeof vi.fn> }
+}
+
+/**
+ * Builds a complete mock `CliContext` (the SDK host plus config): `createGraphProvider` and the
+ * disposal members are Vitest mocks, so tests can assert on them.
+ *
+ * @param overrides - Fields to override on the default mock host
+ * @returns A mock host usable wherever a `CliContext` is expected
+ */
+export function makeMockHost(overrides: Partial<CliContext> = {}): CliContext {
+  return {
+    config: makeMockConfig(),
+    configFilePath: null,
+    kernel: makeMockKernel(),
+    createGraphProvider: vi.fn(),
+    dispose: vi.fn(async () => {}),
+    [Symbol.asyncDispose]: vi.fn(async () => {}),
+    ...overrides,
+  } as CliContext
+}
+
+/** Kernel mock including verification methods. */
+export type TestKernel = Kernel & MockKernel & { changes: VerificationKernelMethods }
+
+export function makeMockKernel(overrides: Record<string, unknown> = {}): TestKernel {
   const emptyList = makeListResult([])
 
   const changes = {
@@ -283,6 +349,14 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
     discard: { execute: vi.fn() },
     archive: { execute: vi.fn() },
     validate: { execute: vi.fn() },
+    // The change schema defaults to whatever `specs.getActiveSchema` is mocked to return,
+    // so tests configure one schema fixture for both paths.
+    resolveSchema: {
+      execute: vi.fn(async () => {
+        const active = (await specs.getActiveSchema.execute()) as { schema: unknown }
+        return { schema: active.schema, warnings: [] }
+      }),
+    },
     validateBatch: { execute: vi.fn() },
     edit: { execute: vi.fn() },
     skipArtifact: { execute: vi.fn() },
@@ -306,6 +380,9 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
     preview: { execute: vi.fn() },
     approveSpec: { execute: vi.fn() },
     approveSignoff: { execute: vi.fn() },
+    startVerification: { execute: vi.fn() },
+    completeVerification: { execute: vi.fn() },
+    invalidateVerification: { execute: vi.fn() },
   }
 
   const specs = {
@@ -392,7 +469,7 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
   // The mock satisfies Kernel structurally at runtime (every group has every
   // key with an { execute } stub). A single cast is enough — MockKernel
   // mirrors Kernel's shape with mock execute functions.
-  return { schemas, changes, specs, project, ...overrides } as unknown as Kernel & MockKernel
+  return { schemas, changes, specs, project, ...overrides } as unknown as TestKernel
 }
 
 // ---------------------------------------------------------------------------
@@ -489,4 +566,46 @@ export function makeMockUseCase<
 >(execute: ReturnType<typeof vi.fn> = vi.fn()): T {
   // Single-point cast: the mock structurally satisfies any use-case with an execute method
   return { execute } as unknown as T
+}
+
+/** Spies for the kernel plugin-management methods the CLI must never call. */
+export interface KernelPluginSpies {
+  /** `kernel.project.listPlugins` */
+  readonly listPlugins: ReturnType<typeof vi.fn>
+  /** `kernel.project.addPlugin` */
+  readonly addPlugin: ReturnType<typeof vi.fn>
+  /** `kernel.project.removePlugin` */
+  readonly removePlugin: ReturnType<typeof vi.fn>
+  /** `kernel.project.init` */
+  readonly init: ReturnType<typeof vi.fn>
+}
+
+/**
+ * Attaches spies for `kernel.project.listPlugins`, `addPlugin`, `removePlugin` and `init`
+ * so a test can prove a command never reaches them.
+ *
+ * @param kernel - Mock kernel to extend
+ * @returns The attached spies
+ */
+export function attachKernelPluginSpies(kernel: unknown): KernelPluginSpies {
+  const spies: KernelPluginSpies = {
+    listPlugins: vi.fn(),
+    addPlugin: vi.fn(),
+    removePlugin: vi.fn(),
+    init: vi.fn(),
+  }
+  Object.assign((kernel as { project: object }).project, spies)
+  return spies
+}
+
+/**
+ * Asserts none of the kernel plugin-management spies was called.
+ *
+ * @param spies - Spies returned by {@link attachKernelPluginSpies}
+ */
+export function expectNoKernelPluginCalls(spies: KernelPluginSpies): void {
+  expect(spies.listPlugins).not.toHaveBeenCalled()
+  expect(spies.addPlugin).not.toHaveBeenCalled()
+  expect(spies.removePlugin).not.toHaveBeenCalled()
+  expect(spies.init).not.toHaveBeenCalled()
 }

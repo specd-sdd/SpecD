@@ -33,6 +33,8 @@ describe('createApproveSpec', () => {
       schemaProvider: {} as never,
       contentHasher: {} as never,
       approvals: { spec: false, signoff: false },
+      reconcile: {} as never,
+      fingerprint: {} as never,
     }
 
     expect(createApproveSpec(deps)).toBeInstanceOf(ApproveSpec)
@@ -45,6 +47,8 @@ describe('createApproveSpec', () => {
       schemaProvider: {} as never,
       contentHasher: {} as never,
       approvals: { spec: false, signoff: false },
+      reconcile: {} as never,
+      fingerprint: {} as never,
     }
 
     expect(() =>

@@ -1,0 +1,13 @@
+- op: added
+  description: 'Document command-appropriate repair hint when DependsOnOverwriteError occurs during specs validate'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Error — workspace not found'
+  content: |
+    ### Requirement: Error — dependsOn overwrite hint
+
+    When `specs validate` surfaces a `DependsOnOverwriteError` (`DEPENDS_ON_OVERWRITE`), it MUST NOT suggest passing `--force` to `specs validate` (which has no `--force` flag). Instead, the CLI SHALL render a command-appropriate hint guiding the user to update dependencies via `specd specs deps add/set` or regenerate metadata via `specd specs generate-metadata --force`.

@@ -4,6 +4,7 @@ import { type ValidateSchemaResult } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError, handleError } from '../../handle-error.js'
+import { CliExitError } from '../../helpers/cli-exit-error.js'
 
 /**
  * Registers the `schema validate` subcommand on the given parent command.
@@ -67,6 +68,7 @@ export function registerSchemaValidate(parent: Command): void {
  * @param result - The validation result from the use case
  * @param mode - The mode label for output
  * @param fmt - The output format
+ * @throws {CliExitError} With exit code 1 when the validation result is a failure
  */
 function formatResult(
   result: ValidateSchemaResult,
@@ -117,6 +119,6 @@ function formatResult(
         fmt,
       )
     }
-    process.exit(1)
+    throw new CliExitError(1)
   }
 }

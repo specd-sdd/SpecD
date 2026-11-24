@@ -1,0 +1,49 @@
+- op: modified
+  description: 'Replace local approval invalidation with canonical reconciliation'
+  selector:
+    type: section
+    matches: '^Requirement: Approval invalidation on content change$'
+  rename: 'Requirement: Validity reconciliation around artifact validation'
+  content: |
+    `ValidateArtifacts.execute` SHALL integrate the single application reconciler into the same serialized mutation used to validate files. Reconciliation MUST compare fresh non-task artifact and implementation inputs independently with the materialized spec approval, verification, and sign-off baselines, mark only affected projections stale, append audit evidence, and commit any mandatory gate recovery atomically.
+
+    The use case MUST NOT infer active approvals by replaying event order, call broad `Change.invalidate` on its own, or let a newly written `validatedHash` erase evidence of the drift detected immediately before validation. Revalidation establishes a new artifact baseline only; it MUST NOT restore stale approval, verification, or sign-off projections.
+
+    A successful structural validation is not semantic approval. Under `workflow: preserve` and without required spec-gate recovery, validation may occur in the current state. Forward progress remains blocked while any non-task artifact has drift or pending review.
+
+- op: modified
+  description: 'Exclude operational task artifacts from automatic drift invalidation'
+  selector:
+    type: section
+    matches: '^Requirement: Policy-aware drift materialization$'
+  content: |
+    Baseline artifact drift SHALL be evaluated by the shared validity evaluator and applied by the central reconciler, not by a repository side effect or a second detector local to `ValidateArtifacts`.
+
+    The evaluator compares current content to each `validatedHash` after schema cleanup. Artifacts whose type declares `hasTasks: true` are excluded from automatic drift invalidation, approval/verification fingerprint comparison, and downstream propagation. They remain part of structural validation, required-presence checks, and live task counting.
+
+    The structured artifact policy controls reopening breadth; the workflow policy controls drift-driven lifecycle movement. Neither policy waives the rule that unresolved non-task drift or review blocks forward transitions.
+
+- op: modified
+  description: 'Assign physical drift observation and persisted validity to their respective owners'
+  selector:
+    type: section
+    matches: '^Constraints$'
+  content: |
+    - `ValidateArtifacts` is the only code path that MAY call `Artifact.markComplete(hash)`; this invariant is enforced by convention and tests.
+    - Validation MUST NOT write a merged spec to `SpecRepository`; that happens only during `ArchiveChange`.
+    - Repository hydration MAY expose fresh physical file facts against `validatedHash`, but MUST NOT persist approval invalidation or lifecycle recovery. The shared evaluator determines validity from those facts and the application reconciler materializes it within the serialized mutation.
+    - `ValidateArtifacts` MUST NOT call broad `Change.invalidate('artifact-drift', ...)` independently. One semantic drift episode MUST produce only the affected projection changes and audit events selected by reconciliation, without duplicate materialization on repeat validation.
+    - `deltaValidations` evaluate the normalized YAML AST of the delta; `validations` evaluate the normalized artifact AST. Both use the same rule algorithm. Artifact validations run against merged content, or direct content for non-delta artifacts.
+    - `preHashCleanup` affects hash computation only, never bytes written to disk.
+    - Missing `deltaValidations[]` or `validations[]` means that step is skipped. A missing expected delta for an existing spec with `delta: true` fails validation; direct files under `specs/...` are valid only for new specs or non-delta artifacts.
+    - If `ChangeRepository.get(name)` returns null, `execute` MUST throw `ChangeNotFoundError` before validation rather than return `passed: false`.
+
+- op: modified
+  description: 'Retain structural complete-file bypass without claiming repository-owned invalidation'
+  selector:
+    type: section
+    matches: '^Requirement: Complete and skipped file bypass$'
+  content: |
+    For each tracked file selected for structural validation, if its canonical persisted state is `complete` or `skipped`, `ValidateArtifacts` MUST NOT re-read it for structural/delta validation, re-run its delta preview, or call `markComplete` again. A fresh validity fingerprint or drift check MAY still read those bytes through the shared evaluator; structural bypass is not a freshness waiver.
+
+    Files in review or drift states, including `pending-review` and `drifted-pending-review`, MUST be structurally validated when selected. A `missing` file with no bytes remains missing and follows the normal required-file failure path. Materialized drift and approval/verification changes belong to application reconciliation, not repository hydration or the bypass branch.

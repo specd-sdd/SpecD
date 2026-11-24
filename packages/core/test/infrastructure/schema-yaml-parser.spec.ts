@@ -141,6 +141,11 @@ describe('parseSchemaYaml — schema-plugin restrictions', () => {
     expect(() => parseSchemaYaml('#bad', yaml)).toThrow(SchemaValidationError)
   })
 
+  it('rejects schema-plugin with metadataExtraction', () => {
+    const yaml = `kind: schema-plugin\nname: bad\nversion: 1\nmetadataExtraction:\n  title:\n    artifact: specs\n    extractor:\n      selector: { type: section, level: 1 }\n`
+    expect(() => parseSchemaYaml('#bad', yaml)).toThrow(SchemaValidationError)
+  })
+
   it('rejects schema-plugin with extends', () => {
     const yaml = `kind: schema-plugin\nname: bad\nversion: 1\nextends: '@specd/schema-std'\n`
     expect(() => parseSchemaYaml('#bad', yaml)).toThrow(SchemaValidationError)
@@ -808,5 +813,230 @@ describe('formatZodPath', () => {
 
   it('returns empty string for empty path', () => {
     expect(formatZodPath([])).toBe('')
+  })
+})
+
+describe('parseSchemaYaml — workflow step checks and skipChecks', () => {
+  it('parses valid checks and skipChecks blocks with all attributes', () => {
+    const yaml = `
+kind: schema
+name: test
+version: 1
+artifacts:
+  - id: spec
+    scope: spec
+    output: spec.md
+workflow:
+  - step: implementing
+    optional: true
+    disabled: false
+    checks:
+      - id: '@security.code-scan'
+        from: '*'
+        along: forward
+        onFailure: abort
+        skippable: true
+        disabled: false
+        config:
+          minSeverity: critical
+      - id: 'impl.linksInScope'
+        along: '*'
+        onFailure: collect
+        disabled: true
+    skipChecks:
+      - id: 'workflow.tasksEmpty'
+        onFailure: abort
+        skippable: false
+        disabled: false
+      - id: '@qa.allow-bypass'
+        skippable: true
+        config:
+          requireSignoff: true
+`
+    const data = parseSchemaYaml('#test', yaml)
+    expect(data.workflow).toHaveLength(1)
+    const step = data.workflow![0]!
+    expect(step.step).toBe('implementing')
+    expect(step.optional).toBe(true)
+    expect(step.disabled).toBe(false)
+    expect(step.checks).toEqual([
+      {
+        id: '@security.code-scan',
+        from: '*',
+        along: 'forward',
+        onFailure: 'abort',
+        skippable: true,
+        disabled: false,
+        config: { minSeverity: 'critical' },
+      },
+      {
+        id: 'impl.linksInScope',
+        along: '*',
+        onFailure: 'collect',
+        disabled: true,
+      },
+    ])
+    expect(step.skipChecks).toEqual([
+      {
+        id: 'workflow.tasksEmpty',
+        onFailure: 'abort',
+        skippable: false,
+        disabled: false,
+      },
+      {
+        id: '@qa.allow-bypass',
+        skippable: true,
+        config: { requireSignoff: true },
+      },
+    ])
+  })
+
+  it('rejects an unknown workflow checks.from lifecycle state', () => {
+    const yaml = `
+kind: schema
+name: test
+version: 1
+artifacts: []
+workflow:
+  - step: implementing
+    checks:
+      - id: '@qa.guard'
+        from: reviewing
+`
+    expect(() => parseSchemaYaml('#test', yaml)).toThrow(/reviewing/)
+  })
+
+  it('rejects invalid enum values for along in checks', () => {
+    const yaml = `
+kind: schema
+name: test
+version: 1
+artifacts:
+  - id: spec
+    scope: spec
+    output: spec.md
+workflow:
+  - step: implementing
+    checks:
+      - id: 'impl.linksInScope'
+        along: sideways
+`
+    expect(() => parseSchemaYaml('#test', yaml)).toThrow(SchemaValidationError)
+  })
+
+  it('rejects invalid enum values for onFailure in checks', () => {
+    const yaml = `
+kind: schema
+name: test
+version: 1
+artifacts:
+  - id: spec
+    scope: spec
+    output: spec.md
+workflow:
+  - step: implementing
+    checks:
+      - id: 'impl.linksInScope'
+        onFailure: explode
+`
+    expect(() => parseSchemaYaml('#test', yaml)).toThrow(SchemaValidationError)
+  })
+
+  it('rejects invalid enum values for onFailure in skipChecks', () => {
+    const yaml = `
+kind: schema
+name: test
+version: 1
+artifacts:
+  - id: spec
+    scope: spec
+    output: spec.md
+workflow:
+  - step: implementing
+    skipChecks:
+      - id: 'workflow.tasksEmpty'
+        onFailure: ignore
+`
+    expect(() => parseSchemaYaml('#test', yaml)).toThrow(SchemaValidationError)
+  })
+})
+
+describe('parseSchemaYaml — workflow archiveChecks', () => {
+  const withArchive = (block: string): string =>
+    minimal(`workflow:\n  - step: archiving\n    archiveChecks:\n${block}`)
+
+  it('parses archiveChecks with all supported attributes', () => {
+    const data = parseSchemaYaml(
+      '#test',
+      withArchive(
+        `      - id: spec.overlap\n        skippable: false\n      - id: '@security.code-scan'\n        disabled: false\n        config:\n          minSeverity: critical\n`,
+      ),
+    )
+    expect(data.workflow![0]!.archiveChecks).toEqual([
+      { id: 'spec.overlap', skippable: false },
+      { id: '@security.code-scan', disabled: false, config: { minSeverity: 'critical' } },
+    ])
+  })
+
+  it('keeps archiveChecks absent when not declared (including when checks is declared on archiving)', () => {
+    const data = parseSchemaYaml('#test', minimal('workflow:\n  - step: archiving\n'))
+    expect(data.workflow![0]!.archiveChecks).toBeUndefined()
+
+    const withChecksOnly = parseSchemaYaml(
+      '#test',
+      minimal('workflow:\n  - step: archiving\n    checks:\n      - id: impl.linksInScope\n'),
+    )
+    expect(withChecksOnly.workflow![0]!.checks).toEqual([{ id: 'impl.linksInScope' }])
+    expect(withChecksOnly.workflow![0]!.archiveChecks).toBeUndefined()
+  })
+
+  it('accepts an empty archiveChecks array', () => {
+    const data = parseSchemaYaml(
+      '#test',
+      minimal('workflow:\n  - step: archiving\n    archiveChecks: []\n'),
+    )
+    expect(data.workflow![0]!.archiveChecks).toEqual([])
+  })
+
+  it('rejects onFailure instead of stripping it', () => {
+    expect(() =>
+      parseSchemaYaml(
+        '#test',
+        withArchive('      - id: spec.overlap\n        onFailure: collect\n'),
+      ),
+    ).toThrow(SchemaValidationError)
+  })
+
+  it('rejects unknown keys', () => {
+    expect(() =>
+      parseSchemaYaml('#test', withArchive('      - id: spec.overlap\n        from: ready\n')),
+    ).toThrow(SchemaValidationError)
+  })
+
+  it('rejects wrongly typed fields and a missing id', () => {
+    expect(() =>
+      parseSchemaYaml('#test', withArchive('      - id: spec.overlap\n        skippable: "yes"\n')),
+    ).toThrow(SchemaValidationError)
+    expect(() =>
+      parseSchemaYaml('#test', withArchive('      - id: spec.overlap\n        disabled: 1\n')),
+    ).toThrow(SchemaValidationError)
+    expect(() =>
+      parseSchemaYaml('#test', withArchive('      - id: spec.overlap\n        config: [1]\n')),
+    ).toThrow(SchemaValidationError)
+    expect(() => parseSchemaYaml('#test', withArchive('      - skippable: true\n'))).toThrow(
+      SchemaValidationError,
+    )
+  })
+
+  it('still accepts checks, skipChecks, optional and disabled', () => {
+    const data = parseSchemaYaml(
+      '#test',
+      minimal(
+        'workflow:\n  - step: implementing\n    optional: true\n    disabled: false\n    checks:\n      - id: impl.linksInScope\n    skipChecks:\n      - id: workflow.tasksEmpty\n',
+      ),
+    )
+    expect(data.workflow![0]!.optional).toBe(true)
+    expect(data.workflow![0]!.checks).toHaveLength(1)
+    expect(data.workflow![0]!.skipChecks).toHaveLength(1)
   })
 })

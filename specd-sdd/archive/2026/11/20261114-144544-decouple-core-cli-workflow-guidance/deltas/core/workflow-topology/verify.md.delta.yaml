@@ -1,0 +1,37 @@
+- op: modified
+  description: 'Drain exits come from the transition table only'
+  selector:
+    type: section
+    matches: 'Scenario: Drain states gain no forward shortcuts'
+  content: |
+    - **GIVEN** a change in `pending-signoff` or `pending-spec-approval`
+    - **WHEN** `listWorkflowTransitions(state, schema, approvals)` is evaluated
+    - **THEN** it returns only the exits `VALID_TRANSITIONS` defines for that exact state, filtered by step enablement
+    - **AND** `pending-spec-approval` yields `implementing` and `designing`, and `pending-signoff` yields `archivable`, `designing`, and `done`
+    - **AND** neither result contains `spec-approved` or `signed-off`
+    - **AND** `isWorkflowTransitionLegal('pending-spec-approval', 'verifying', schema, approvals)` is `false`
+
+- op: modified
+  description: 'nextWorkflowStep applies one rule to every drain state'
+  selector:
+    type: section
+    matches: 'Scenario: Drain states only return legal next steps'
+  content: |
+    - **GIVEN** a schema where `implementing` is `disabled: true`
+    - **WHEN** `nextWorkflowStep('spec-approved', schema, approvals)` and `nextWorkflowStep('pending-spec-approval', schema, approvals)` are called
+    - **THEN** both return `null`
+    - **AND** with `implementing` enabled both return `'implementing'`
+    - **AND** `nextWorkflowStep('signed-off', schema, approvals)` and `nextWorkflowStep('pending-signoff', schema, approvals)` return `'archivable'`
+
+- op: modified
+  description: 'Export scenario lists the drain-state accessors'
+  selector:
+    type: section
+    matches: 'Scenario: Topology is consumed as named function imports'
+  content: |
+    - **GIVEN** the `workflow-topology` domain module
+    - **WHEN** its public exports are inspected
+    - **THEN** it exports `resolveWorkflowPipeline`, `isWorkflowStepEnabled`, `listWorkflowTransitions`, `isWorkflowTransitionLegal`, `listBypassedWorkflowSteps`, and `nextWorkflowStep` as plain functions
+    - **AND** it exports the drain-state accessors `drainAnchorOf` and `isDrainState`
+    - **AND** no `WorkflowTopology` class with static methods is exported
+    - **AND** internal helpers (raw pipeline construction, forward-target computation) are not exported

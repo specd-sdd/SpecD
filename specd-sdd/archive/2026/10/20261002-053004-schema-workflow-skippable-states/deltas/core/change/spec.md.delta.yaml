@@ -1,0 +1,96 @@
+- op: added
+  description: Bind StartVerification readiness evaluation to the change's sovereign schema
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: State-independent verification operations and audit'
+  content: |
+    ### Requirement: StartVerification sovereign schema resolution
+
+    `StartVerification` MUST resolve the change's schema through the shared change-schema resolution boundary before constructing the operation-specific readiness context. Required artifacts, workflow topology, checks, task semantics, and all other schema-derived readiness facts MUST come from the schema recorded on the change.
+
+    The workspace default schema MUST NOT affect whether an existing change can start verification when it differs from `change.schemaName`. Schema resolution errors MUST propagate and MUST NOT create an active verification attempt.
+- op: modified
+  description: Distinguish an allowed workspace-default mismatch from provider integrity failure
+  selector:
+    type: section
+    matches: 'Requirement: Schema version'
+  content: |
+    The `Change` entity is initialized with `schemaName` and `schemaVersion` as top-level properties hydrated at creation time. These properties are the definitive source of truth, decoupled from the `created` event in the history.
+
+    Every operation on an existing active, drafted, discarded, or archived change MUST resolve the schema recorded by that object through the shared `ResolveChangeSchema` boundary. A different schema configured as the current workspace default MUST NOT reject loading or operation execution, MUST NOT replace the recorded schema identity, and MUST NOT cause fallback to the workspace default.
+
+    After resolving the recorded schema reference, a provider integrity mismatch in which the returned schema identity does not equal the requested `schemaName` indicates a provider contract violation. The operation MUST throw `SchemaProviderIdentityMismatchError` before using that schema-derived topology, artifact model, checks, hooks, or validation rules.
+
+    A `schemaVersion` mismatch within the same schema name is advisory. `ResolveChangeSchema` MUST compare the persisted version with the version returned by the sovereign named lookup and return a typed advisory in its `warnings` when they differ. It MUST NOT derive this advisory from the workspace default, and no other component (including change repositories and manifest loaders) SHALL compare a change's schema version against the workspace default. The change remains fully usable and archiving is allowed.
+- op: added
+  description: Bind validity fingerprint artifact selection to the change's sovereign schema
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Validity fingerprint scope'
+  content: |
+    ### Requirement: Sovereign schema for validity fingerprints
+
+    Every artifact or complete validity fingerprint computed for an existing change MUST use the shared change-schema resolution boundary. The fingerprint's artifact type set, task-artifact exclusions, and file selection MUST be derived exclusively from the schema recorded on that change.
+
+    The workspace default schema MUST NOT influence approval, verification, sign-off, archive, or reconciliation fingerprints when it differs from `change.schemaName`. Schema resolution errors MUST propagate as fingerprint collection failures or operation failures according to the calling contract; the service MUST NOT retry with the workspace default or produce evidence from another schema.
+- op: added
+  description: Verification requirement follows the change schema's workflow topology
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: StartVerification sovereign schema resolution'
+  content: |
+    ### Requirement: Verification requirement follows workflow topology
+
+    Whether completed verification evidence is required for a change SHALL be decided from both its lifecycle position and the change's sovereign schema:
+
+    - When `verifying` is enabled (`isWorkflowStepEnabled('verifying', schema)`), verification is required at `verifying` and every later state (`done`, `pending-signoff`, `signed-off`, `archivable`, `archiving`).
+    - When `verifying` is disabled, verification is never required for that change. The validity reconciler SHALL project verification as `not-required` when no attempt or completed evidence exists, SHALL NOT raise `VERIFICATION_REQUIRED`, `VERIFICATION_IN_PROGRESS`, or `VERIFICATION_STALE` blockers, and `verification.current` (transition and archive) and `approval.signoff` SHALL treat verification as not required.
+
+    The reconciler SHALL obtain that schema through `ResolveChangeSchema`, the same boundary every other change-bound operation uses, so identity integrity applies to persisted validity projections.
+
+- op: modified
+  description: Verification under sign-off follows topology
+  selector:
+    type: section
+    matches: 'Requirement: Signoff gate'
+  content: |
+    When `approvals.signoff: true`, `done → archivable` requires materialized sign-off status `valid` for current non-task artifacts and implementation files, plus valid verification evidence when verification is required by "Verification requirement follows workflow topology". Sign-off is granted only while the change remains in `done`. New work never parks in pending sign-off states.
+
+    When disabled, the sign-off predicate skips, but required verification, artifact freshness, tasks, and archive checks still apply. Historic pending/signed-off states remain drain-only compatibility values.
+
+- op: modified
+  description: Artifact sync uses the change's sovereign schema
+  selector:
+    type: section
+    matches: 'Requirement: Artifact sync'
+  content: |
+    A Change can reconcile its artifact map against its own schema's artifact types via the `syncArtifacts(artifactTypes)` method. Callers SHALL supply `artifactTypes` resolved from the schema recorded on the change (`change.schemaName`) through `ResolveChangeSchema`; artifact types from the workspace default schema MUST NOT be used to sync an existing change. This method:
+
+    1. Compares the current artifact map against the provided `artifactTypes` array.
+    2. Adds new artifact types and their expected files (based on scope and specIds).
+    3. Removes artifact types no longer in the schema.
+    4. For existing artifacts, adds files for new spec IDs and removes files for spec IDs no longer in the change.
+    5. Returns `true` if any changes were made, `false` if the artifact map was already in sync.
+    6. When changes are made, appends an `ArtifactsSyncedEvent` to history with the `SYSTEM_ACTOR` identity.
+
+    `SYSTEM_ACTOR` is a constant `{ name: 'specd', email: 'system@getspecd.dev', provider: 'system' }` used for automated operations.
+- op: added
+  description: Declare the workflow-topology dependency used for step enablement
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [`core:workflow-topology`](../workflow-topology/spec.md) — step enablement (`isWorkflowStepEnabled`) used to decide verification and hook applicability

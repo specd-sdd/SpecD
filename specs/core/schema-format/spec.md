@@ -17,7 +17,7 @@ A schema file must be a valid YAML document with the following top-level fields:
 - `extends` (string, optional) — reference to a parent schema; see Requirement: Schema extends
 - `artifacts` (array, required for `kind: schema`) — one entry per artifact type
 - `crossArtifactValidations` (array, optional, only valid for `kind: schema`) — relational structural rules evaluated across multiple artifacts of the same spec and scope; see Requirement: Cross-artifact validation rules
-- `workflow` (array, optional, only valid for `kind: schema`) — named phases of the change lifecycle, each with optional artifact prerequisites and hooks; see Requirement: Workflow
+- `workflow` (array, optional, only valid for `kind: schema`) — lookup rows that attach prerequisites and hooks to existing Change lifecycle states; see Requirement: Workflow
 
 ### Requirement: Schema kind field
 
@@ -84,7 +84,7 @@ Each entry in `artifacts` must include:
 - `description` (string, optional) — human-readable summary for tooling
 - `template` (string, optional) — path to a template file, relative to the schema directory; see Requirement: Template resolution
 - `instruction` (string, optional) — AI instruction text assembled by `GetArtifactInstruction`
-- `requires` (array of artifact IDs, optional) — artifacts that must be resolved before this one; used to compute `Change.effectiveStatus()` and to build `Schema.artifactDag()`. A dependency is resolved when its status is `complete` or `skipped`. `skipped` is only reachable for `optional: true` artifacts. Any other state (`missing`, `in-progress`) blocks the dependent artifact.
+- `requires` (array of artifact IDs, optional) — artifacts that must be resolved before this one; used by `projectArtifacts` (DAG effective status) and to build `Schema.artifactDag()`. A dependency is resolved when its status is `complete` or `skipped`. `skipped` is only reachable for `optional: true` artifacts. If the dependent is `complete` and a required artifact is not `complete` or `skipped`, `projectArtifacts` cascades: incomplete, missing, or `in-progress` parents → dependent `in-progress`; parents in `pending-review`, `drifted-pending-review`, or `pending-parent-artifact-review` → dependent `pending-parent-artifact-review`. There is no `Change.effectiveStatus()` method.
 - `format` (`markdown` | `json` | `yaml` | `plaintext`, optional) — declares the file format of this artifact. Used by `GetArtifactInstruction` to select the correct `ArtifactParser` adapter when injecting delta instructions. If omitted, the format is inferred from the file extension of the derived output filename (`.md` → `markdown`, `.json` → `json`, `.yaml` / `.yml` → `yaml`); any other extension defaults to `plaintext`. Must be declared explicitly when the extension is ambiguous or non-standard.
 - `delta` (boolean, optional, default `false`) — declares that this artifact supports delta files. Only valid when `scope: spec`; `SchemaRegistry.resolve()` must throw a `SchemaValidationError` if `delta: true` is combined with `scope: change`. When `true`, a delta file for this artifact (`deltas/<workspace>/<capability-path>/<filename>.delta.yaml`) may be present in the change directory. When `false`, delta files for this artifact are rejected at validation time.
 - `deltaInstruction` (string, optional) — domain-specific guidance injected by `GetArtifactInstruction` alongside the format-level delta instructions when `delta: true`. Describes which domain concepts to add, modify, or remove (e.g. requirements, scenarios) without repeating the technical delta format, which is provided automatically by the `ArtifactParser` adapter. Only valid when `delta: true`.
@@ -108,6 +108,7 @@ A resolved `Schema` MUST expose `artifactDag(): ArtifactDag` — the single cano
 
 - `roots()` — artifact ids whose `requires` list is empty
 - `childrenOf(id)` — direct dependents (artifacts that list `id` in `requires`), ordered with stable tie-break using schema declaration order among children
+- `parentsOf(id)` — direct requirements of `id` (`requires` edges), ordered with stable tie-break using schema declaration order among parents
 - `topologicalOrder()` — every artifact id exactly once, parents before children, stable tie-break using schema declaration order
 - `descendantsOf(ids)` — transitive dependents of the given ids, deduplicated, ordered with the same stable tie-break
 
@@ -115,11 +116,13 @@ Cycle detection at schema load remains owned by schema build/validation; `Artifa
 
 ### Requirement: Canonical artifact DAG derivation
 
-Runtime code that needs artifact DAG structure (roots, children, topological order, descendants, or equivalent adjacency) MUST obtain it through `schema.artifactDag()` and MUST NOT rebuild parallel graphs from `requires` via local `includes` filters, private BFS/DFS helpers, or declaration-order scans used as a proxy for dependency order.
+Runtime code that needs artifact DAG structure (roots, children, parents, topological order, descendants, or equivalent adjacency) MUST obtain it through `schema.artifactDag()` and MUST NOT rebuild parallel graphs from `requires` via local `includes` filters, private BFS/DFS helpers, or declaration-order scans used as a proxy for dependency order.
+
+Required-upstream walks (`projectArtifacts` / `findBlockingParent`) MUST use `artifactDag().parentsOf(id)`. Next-artifact selection MUST use `artifactDag().topologicalOrder()` and MUST test dependency readiness with `parentsOf(id)`, not `ArtifactType.requires` on that path.
 
 This constraint applies to validation batching, lifecycle next-artifact selection, invalidation downstream expansion, status DAG rendering, affected-set reporting order, and **`EditChange.updateSpecIds`** (scope edits that trigger invalidation).
 
-Non-exhaustive consumers that MUST use `schema.artifactDag()` (or receive it from a caller that resolved the active schema): `ValidateArtifacts`, `InvalidateChange`, `TransitionChange`, `ArchiveChange`, `ChangeRepository` mutation paths, `LifecycleEngine`, `EditChange`, and CLI commands that emit DAG structure when the active `Schema` is available.
+Non-exhaustive consumers that MUST use `schema.artifactDag()` (or receive it from a caller that resolved the active schema): `ValidateArtifacts`, `InvalidateChange`, `TransitionChange`, `ArchiveChange`, `ChangeRepository` mutation paths, `evaluateLifecycleVerdict` / `projectArtifacts`, `EditChange`, and CLI commands that emit DAG structure when the active `Schema` is available.
 
 `artifactDagFromChangeArtifacts()` remains a test/helper for building a DAG from persisted change artifacts only; production use cases MUST NOT use it when an active schema is available.
 
@@ -141,6 +144,14 @@ The fields are optional and default to standard markdown checkbox syntax:
 
 - `incompletePattern` (string, regex, default `^\s*-\s+\[ \]`) — matches an incomplete task item.
 - `completePattern` (string, regex, default `^\s*-\s+\[[xX]\]`) — matches a complete task item, including both `[x]` and `[X]`.
+
+### Requirement: Task artifact validity semantics
+
+`ArtifactType.hasTasks: true` SHALL identify an artifact whose entire content is mutable operational task state. The marker, not the artifact ID or filename, controls this behaviour.
+
+Such artifacts SHALL be excluded from approval and verification fingerprints, automatic content-drift invalidation, and review propagation originating in parent artifacts. They remain subject to required presence, structural and cross-artifact validation, live task counting, applicable forward-transition task completion checks, and archive preflight task completion.
+
+A required task artifact that is missing, unreadable, or structurally invalid is a blocker and MUST NOT be interpreted as zero incomplete tasks. Schemas that require consent over narrative content alongside mutable tasks SHALL model those concerns as separate artifacts rather than set `hasTasks: true` on the combined document.
 
 ### Requirement: Template resolution
 
@@ -338,14 +349,6 @@ crossArtifactValidations:
         ordering: ignore
 ```
 
-### Requirement: Per-spec approval
-
-Any spec file touched by a delta — whether created via an `added` operation or modified via a `modified` or `removed` operation — requires explicit approval before the change can be archived. Approval is tracked per spec ID, not per change.
-
-`specd archive` must refuse to proceed if any spec touched by the change has not been approved. `specd approve <spec-path>` records the approval for that spec within the current change.
-
-A spec created by an `added` operation also requires approval: someone must take ownership of the new spec, even if ownership is granted by the same person who submitted the change.
-
 ### Requirement: Metadata extraction
 
 `metadataExtraction` is a top-level schema field that declares how to extract metadata fields from artifact content using selectors and the existing parser infrastructure. It enables deterministic metadata generation without LLM involvement. `CompileContext` and `GetProjectContext` use these declarations as a fallback when `.specd-metadata.yaml` is absent or stale.
@@ -386,12 +389,37 @@ Supported metadata fields: `title`, `description`, `dependsOn`, `keywords` (sing
 
 ### Requirement: Workflow
 
-A `workflow` defines the sequence of steps a change follows. Each entry must include:
+A `workflow` array SHALL attach configuration to existing Change lifecycle states. It MUST NOT define the set of states a change may occupy and MUST NOT add or remove protocol hops. Each entry accepts the options below; `step` is the only required one:
 
-- `step` (string, required) — name of the phase (e.g., `designing`, `implementing`)
-- `requires` (array of strings, optional) — IDs of artifacts that must be `complete` before the step is available
+- `step` (string, required) — lookup key naming an existing lifecycle state (e.g., `designing`, `implementing`)
+- `optional` (boolean, optional, default `false`) — marks the step as skippable in the topology
+- `disabled` (boolean, optional, default `false`) — removes the step from the active pipeline
+- `requires` (array of strings, optional) — IDs of artifacts that must be `complete` or `skipped` before the step is available
 - `requiresTaskCompletion` (array of strings, optional) — IDs of artifacts where all tasks MUST be complete before the step can be finished. **Invariant**: Every artifact ID listed here MUST have `hasTasks: true` declared in its artifact definition. `SchemaRegistry.resolve()` SHALL throw a `SchemaValidationError` if this invariant is violated.
 - `hooks` (object, optional) — `pre` and `post` hooks for the step
+- `checks` (array, optional) — check declarations for the transition into the step. Each declaration has `id` (string, required) and MAY have `from` (a lifecycle state or `*`, default `*`), `along` (`forward`, `backward`, `recovery`, `redesign`, or `*`, default `forward`), `onFailure` (`abort` | `collect`, default `abort`), `skippable` (boolean), `disabled` (boolean), and `config` (object)
+- `skipChecks` (array, optional) — check declarations evaluated when the step is bypassed. Each declaration has `id` (string, required) and MAY have `onFailure` (`abort` | `collect`), `skippable` (boolean), `disabled` (boolean), and `config` (object)
+- `archiveChecks` (array, optional) — check declarations for the archive operation. Valid only on the entry whose `step` is `archiving`; on any other entry `buildSchema` MUST throw `SchemaValidationError` naming that step. Each declaration has `id` (string, required) and MAY have `skippable` (boolean), `disabled` (boolean), and `config` (object). No other key is accepted: in particular `onFailure` is rejected, because archive predicate failures have no abort/collect distinction. A declaration with any other key MUST be rejected with `SchemaValidationError`; the parser MUST NOT silently strip it. `@specd/schema-std` declares no `archiveChecks` by default.
+
+`checks`, `skipChecks`, and `archiveChecks` are independent surfaces: `checks` applies when entering the step, `skipChecks` when bypassing it, and `archiveChecks` to the archive operation itself. Checks declared in the `archiving` entry's `checks` apply to entering `archiving`, never to the archive operation. `id` is a canonical check identifier, built-in (for example `spec.overlap`) or plugin (for example `@security.code-scan`). The entries of each of these arrays are identified by `id` for schema layering (`extends`, schema plugins, `schemaOverrides`); an `id` that a later layer introduces and an earlier layer already declared is rejected with `SchemaValidationError`, exactly as for `checks` and `skipChecks`. `archiveChecks` MUST be an array and each declaration MUST be an object with a string `id`; `skippable` and `disabled` MUST be booleans and `config` MUST be an object. An empty `archiveChecks` array is equivalent to omitting it. This requirement defines the options a schema may declare; how checks are registered, governed, and evaluated is defined by the workflow and check specs, not here.
+
+Example:
+
+```yaml
+workflow:
+  - step: archiving
+    archiveChecks:
+      - id: spec.overlap
+        skippable: false
+      - id: impl.linksInScope
+        disabled: true
+      - id: '@security.code-scan'
+        skippable: true
+        config:
+          minSeverity: critical
+```
+
+Declaration order is display order and the listed names on the `along` progress axis. Missing delivery states MUST be spliced by canonical fallback index (see [`core:transition-checks`](../transition-checks/spec.md)). It MUST NOT enforce sequential occupancy of adjacent entries. An omitted `step` MUST NOT delete that state from the domain machine. A `step` that is not a `ChangeState` MUST NOT occupy an axis slot. `buildSchema` MUST throw `SchemaValidationError` for such a `step`; the name MUST NOT reach hop evaluation.
 
 ### Requirement: Explicit external hook entries
 
@@ -414,8 +442,11 @@ A schema document MAY declare `kind: schema-plugin`.
 - A schema-plugin MUST NOT declare `workflow`
 - A schema-plugin MUST NOT declare `extends`
 - A schema-plugin MUST NOT declare `compat`
-- A schema-plugin MAY declare `validations`, `deltaValidations`, `preHashCleanup`, `taskCompletionCheck`, `crossArtifactValidations`, and `metadataExtraction`
+- A schema-plugin MUST NOT declare or mutate `metadataExtraction`
+- A schema-plugin MAY declare `validations`, `deltaValidations`, `preHashCleanup`, `taskCompletionCheck`, and `crossArtifactValidations`
 - Parsers MUST reject schema-plugin documents that declare forbidden fields with `SchemaValidationError`
+
+Schema `metadataExtraction` defines declarative extraction only. A schema plugin MAY contribute transforms or resolved schema layers through the documented plugin merge path, but those extension points MUST NOT mutate `metadataExtraction`.
 
 ### Requirement: Schema resolution
 
@@ -484,11 +515,12 @@ The `verify` artifact in the schema should declare `requires: [spec]` — scenar
 - `workflow[].requiresTaskCompletion` MUST ONLY reference artifacts with `hasTasks: true`
 - `artifact.rules.pre` and `artifact.rules.post` are optional arrays of `{ id, instruction }` entries
 - `workflow[].step` must be unique — duplicate step names in the same `workflow` array are a schema validation error
-- Every hook entry must include an `id` field alongside its `instruction` or `run` field
+- Every hook entry must include an `id` field alongside exactly one of its `instruction`, `run`, or `external` fields
 - `requires` must not contain cycles; circular dependencies in the artifact graph are a schema validation error
+- Artifact `requires` feeds `projectArtifacts` DAG effective status and `Schema.artifactDag()`. There is no `Change.effectiveStatus()` method.
 - If artifact A is `optional: true`, any artifact that lists A in its `requires` must also be `optional: true`
 - `deltaValidations` is only valid on artifacts with `delta: true`; declaring `deltaValidations` on a non-delta artifact is a schema validation error
-- The order of entries in `workflow` is the intended display order for tooling; it does not enforce sequential blocking between consecutive steps
+- The order of entries in `workflow` is the intended display order for tooling and listed names on the `along` progress axis; missing delivery states are spliced by canonical fallback index; it does not remove unlisted states from the protocol and does not enforce sequential blocking between consecutive steps
 - Delta file format, selector model, and application constraints are defined in `specs/core/delta-format/spec.md`
 
 ## Schema Example

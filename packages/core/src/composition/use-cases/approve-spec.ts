@@ -3,7 +3,10 @@ import { type ChangeRepository } from '../../application/ports/change-repository
 import { type ContentHasher } from '../../application/ports/content-hasher.js'
 import { type SchemaProvider } from '../../application/ports/schema-provider.js'
 import { type ApprovalGates } from '../../application/use-cases/transition-change.js'
+import { type ReconcileChangeValidity } from '../../application/use-cases/reconcile-change-validity.js'
+import { type ValidityFingerprintService } from '../../application/services/validity-fingerprint-service.js'
 import { ApproveSpec } from '../../application/use-cases/approve-spec.js'
+import { type ResolveChangeSchema } from '../../application/services/resolve-change-schema.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import {
   createCompositionResolver,
@@ -26,6 +29,12 @@ export interface ApproveSpecDeps {
   readonly contentHasher: ContentHasher
   /** Approval gate configuration used by the use case. */
   readonly approvals: ApprovalGates
+  /** Canonical validity reconciler. */
+  readonly reconcile: ReconcileChangeValidity
+  /** Shared artifact fingerprint collector. */
+  readonly fingerprint: ValidityFingerprintService
+  /** Shared change schema resolver. */
+  readonly resolveChangeSchema?: ResolveChangeSchema
 }
 
 /**
@@ -41,6 +50,9 @@ export function resolveApproveSpecDeps(resolver: CompositionResolver): ApproveSp
     schemaProvider: resolver.getSchemaProvider(),
     contentHasher: resolver.getContentHasher(),
     approvals: resolver.config.approvals,
+    reconcile: resolver.getReconcileChangeValidity(),
+    fingerprint: resolver.getValidityFingerprintService(),
+    resolveChangeSchema: resolver.getResolveChangeSchema(),
   }
 }
 
@@ -92,8 +104,24 @@ function createApproveSpecFromNormalized(
   input: FactoryInput<ApproveSpecDeps, CompositionResolutionOptions>,
 ): ApproveSpec {
   if (input.kind === 'deps') {
-    const { changes, actor, schemaProvider, contentHasher, approvals } = input.deps
-    return new ApproveSpec(changes, actor, schemaProvider, contentHasher, approvals)
+    const {
+      changes,
+      actor,
+      schemaProvider,
+      approvals,
+      reconcile,
+      fingerprint,
+      resolveChangeSchema,
+    } = input.deps
+    return new ApproveSpec(
+      changes,
+      actor,
+      schemaProvider,
+      approvals,
+      reconcile,
+      fingerprint,
+      resolveChangeSchema,
+    )
   }
 
   const resolver = createCompositionResolver(input.config, input.options)
@@ -112,6 +140,8 @@ function isApproveSpecDeps(value: ApproveSpecDeps | SpecdConfig): value is Appro
     'actor' in value &&
     'schemaProvider' in value &&
     'contentHasher' in value &&
-    'approvals' in value
+    'approvals' in value &&
+    'reconcile' in value &&
+    'fingerprint' in value
   )
 }

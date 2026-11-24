@@ -1,6 +1,6 @@
 import { SpecdError } from './specd-error.js'
 
-/** Structured reason for why a state transition failed. */
+/** Structured reason for why a state transition or approval eligibility check failed. */
 export type TransitionFailureReason =
   | { readonly type: 'invalid-transition' }
   | {
@@ -8,25 +8,6 @@ export type TransitionFailureReason =
       readonly artifactId: string
       readonly status?: string
       readonly blockedBy?: { readonly artifactId: string; readonly status: string }
-    }
-  | {
-      readonly type: 'incomplete-tasks'
-      readonly artifactId: string
-      readonly incomplete: number
-      readonly complete: number
-      readonly total: number
-    }
-  | {
-      readonly type: 'missing-task-capability'
-      readonly artifactId: string
-    }
-  | {
-      readonly type: 'approval-required'
-      readonly gate: 'spec' | 'signoff'
-    }
-  | {
-      readonly type: 'gate-not-required'
-      readonly gate: 'spec' | 'signoff'
     }
 
 /**
@@ -72,10 +53,6 @@ function buildMessage(from: string, to: string, reason?: TransitionFailureReason
   if (reason === undefined) return base
 
   switch (reason.type) {
-    case 'approval-required':
-      return `${base}: ${approvalRequiredMessage(reason.gate)}`
-    case 'gate-not-required':
-      return `${base}: ${gateNotRequiredMessage(reason.gate)}`
     case 'incomplete-artifact': {
       const artifact = `'${reason.artifactId}'`
       switch (reason.status) {
@@ -97,10 +74,6 @@ function buildMessage(from: string, to: string, reason?: TransitionFailureReason
           return `${base}: artifact ${artifact} is not complete [status: ${reason.status ?? 'unknown'}]`
       }
     }
-    case 'incomplete-tasks':
-      return `${base}: ${reason.artifactId} has incomplete items (${reason.complete}/${reason.total} tasks complete)`
-    case 'missing-task-capability':
-      return `${base}: artifact '${reason.artifactId}' is not marked as containing tasks (hasTasks: true)`
     case 'invalid-transition':
       return base
     default: {
@@ -108,28 +81,4 @@ function buildMessage(from: string, to: string, reason?: TransitionFailureReason
       return `${base}: unknown reason '${(_exhaustive as TransitionFailureReason).type}'`
     }
   }
-}
-
-/**
- * Builds the human-readable message for approval-boundary failures.
- *
- * @param gate - The active approval gate that blocks the transition
- * @returns The approval-specific explanation
- */
-function approvalRequiredMessage(gate: 'spec' | 'signoff'): string {
-  return gate === 'spec'
-    ? 'change is waiting for human spec approval'
-    : 'change is waiting for human signoff'
-}
-
-/**
- * Builds the human-readable message for approval-gates failures.
- *
- * @param gate - The active approval gate that blocks the transition
- * @returns The approval-specific explanation
- */
-function gateNotRequiredMessage(gate: 'spec' | 'signoff'): string {
-  return gate === 'spec'
-    ? 'change does not require spec approval'
-    : 'change does not require signoff'
 }

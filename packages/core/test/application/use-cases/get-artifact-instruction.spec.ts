@@ -1,13 +1,15 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { GetArtifactInstruction } from '../../../src/application/use-cases/get-artifact-instruction.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
-import { SchemaMismatchError } from '../../../src/application/errors/schema-mismatch-error.js'
 import { ArtifactNotFoundError } from '../../../src/application/errors/artifact-not-found-error.js'
 import { TemplateExpander } from '../../../src/application/template-expander.js'
+import { SchemaProviderIdentityMismatchError } from '../../../src/application/errors/schema-provider-identity-mismatch-error.js'
+import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
+import * as lifecycleVerdict from '../../../src/domain/services/lifecycle-verdict.js'
 import {
   makeChangeRepository,
   makeSpecRepository,
@@ -101,8 +103,14 @@ describe('GetArtifactInstruction', () => {
       const schema = makeSchema({ name: 'test-schema', artifacts: [artifactType] })
       const change = makeChange('my-change', { schemaName: 'test-schema' })
       const { sut } = makeSut({ change, schema })
-
+      const evaluateSpy = vi.spyOn(lifecycleVerdict, 'evaluateLifecycleVerdict')
       const result = await sut.execute({ name: 'my-change', artifactId: 'spec' })
+      expect(evaluateSpy).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ checksByTarget: {} }),
+      )
+      evaluateSpy.mockRestore()
 
       expect(result.template).toBe('Hello my-change')
     })
@@ -162,11 +170,13 @@ describe('GetArtifactInstruction', () => {
       )
     })
 
-    it('throws SchemaMismatchError when change schema differs from active schema', async () => {
-      const change = makeChange('my-change', { schemaName: 'old-schema' })
-      const schema = makeSchema({ name: 'new-schema', artifacts: [makeArtifactType('spec')] })
+    it('resolves sovereign schema by change.schemaName', async () => {
+      const change = makeChange('my-change', { schemaName: 'custom-schema' })
+      const schema = makeSchema({ name: 'custom-schema', artifacts: [makeArtifactType('spec')] })
       const changeRepo = makeChangeRepository([change])
-      const schemaProvider = makeSchemaProvider(schema)
+      const schemaProvider: SchemaProvider = {
+        get: vi.fn().mockResolvedValue(schema),
+      }
       const templates = makeTemplateExpander()
 
       const sut = new GetArtifactInstruction(
@@ -177,8 +187,31 @@ describe('GetArtifactInstruction', () => {
         templates,
       )
 
-      await expect(sut.execute({ name: 'my-change', artifactId: 'spec' })).rejects.toThrow(
-        SchemaMismatchError,
+      const result = await sut.execute({ name: 'my-change', artifactId: 'spec' })
+      expect(result.artifactId).toBe('spec')
+      expect(schemaProvider.get).toHaveBeenCalledWith('custom-schema')
+    })
+
+    it('fails closed on a provider identity mismatch instead of using the default schema', async () => {
+      const change = makeChange('my-change', { schemaName: 'custom-schema' })
+      const schemaProvider: SchemaProvider = {
+        get: vi.fn().mockImplementation(async (ref?: string) =>
+          makeSchema({
+            name: ref === 'custom-schema' ? 'other-schema' : 'default-schema',
+            artifacts: [makeArtifactType('spec')],
+          }),
+        ),
+      }
+      const sut = new GetArtifactInstruction(
+        makeChangeRepository([change]),
+        new Map([['default', makeSpecRepository()]]),
+        schemaProvider,
+        makeParsers(),
+        makeTemplateExpander(),
+      )
+
+      await expect(sut.execute({ name: 'my-change', artifactId: 'spec' })).rejects.toBeInstanceOf(
+        SchemaProviderIdentityMismatchError,
       )
     })
 
@@ -294,6 +327,56 @@ describe('GetArtifactInstruction', () => {
       const result = await sut.execute({ name: 'my-change' })
 
       expect(result.artifactId).toBe('specs')
+    })
+
+    it('does not auto-select a persisted-complete child blocked by parent review', async () => {
+      const change = makeChange('my-change', { schemaName: 'test-schema' })
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'proposal',
+          files: new Map([
+            [
+              'proposal',
+              new ArtifactFile({
+                key: 'proposal',
+                filename: 'proposal.md',
+                status: 'pending-review',
+                validatedHash: 'sha256:p',
+              }),
+            ],
+          ]),
+        }),
+      )
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'specs',
+          requires: ['proposal'],
+          files: new Map([
+            [
+              'specs',
+              new ArtifactFile({
+                key: 'specs',
+                filename: 'spec.md',
+                status: 'complete',
+                validatedHash: 'sha256:s',
+              }),
+            ],
+          ]),
+        }),
+      )
+
+      const schema = makeSchema({
+        name: 'test-schema',
+        artifacts: [
+          makeArtifactType('proposal'),
+          makeArtifactType('specs', { requires: ['proposal'] }),
+        ],
+      })
+      const { sut } = makeSut({ change, schema })
+
+      const result = await sut.execute({ name: 'my-change' })
+
+      expect(result.artifactId).toBe('proposal')
     })
 
     it('throws ArtifactNotFoundError when every artifact is complete or skipped', async () => {

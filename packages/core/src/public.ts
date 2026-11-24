@@ -2,11 +2,19 @@ import { createRequire } from 'module'
 
 // Bootstrap
 export { createKernel, type Kernel, type KernelOptions } from './composition/kernel.js'
+export { type KernelDisposer } from './composition/kernel-disposal.js'
+export { createKernelBuilder, type KernelBuilder } from './composition/kernel-builder.js'
+export { type PluginCheckRegistration } from './composition/composition-registries.js'
 export {
   createDefaultConfigLoader,
   type FsConfigLoaderOptions,
 } from './composition/config-loader.js'
 export { createConfigWriter, type FsConfigWriterOptions } from './composition/config-writer.js'
+export type {
+  AddPluginOptions,
+  ConfigDeclaredPlugin,
+  ConfigWriter,
+} from './application/ports/config-writer.js'
 export { createVcsAdapter } from './composition/vcs-adapter.js'
 export { createVcsActorResolver } from './composition/actor-resolver.js'
 export {
@@ -65,6 +73,7 @@ export type {
   SpecRepository,
   SchemaRegistry,
   ArchiveRepository,
+  BinaryContentHasher,
 } from './application/ports/index.js'
 export { InvalidCompositionFactoryArgumentsError } from './domain/errors/index.js'
 
@@ -124,6 +133,14 @@ export {
   type GetStatus,
   type GetStatusInput,
   type GetStatusResult,
+  type ArtifactFileStatus,
+  type ReviewArtifactSummary,
+  type ReviewArtifactFileSummary,
+  type ValidityStatusProjection,
+  type ApprovalStatusProjection,
+  type VerificationStatusProjection,
+  type NextAction,
+  type Blocker,
   type ArtifactStatusEntry,
   type LifecycleContext,
   type TransitionBlocker,
@@ -159,10 +176,26 @@ export {
   type ApproveSpecInput,
   type ApproveSignoff,
   type ApproveSignoffInput,
+  type StartVerification,
+  type StartVerificationInput,
+  type StartVerificationResult,
+  type CompleteVerification,
+  type CompleteVerificationInput,
+  type CompleteVerificationResult,
+  type InvalidateVerification,
+  type InvalidateVerificationInput,
+  type InvalidateVerificationResult,
+  type ReconcileChangeValidity,
+  type ReconcileChangeValidityInput,
+  type ReconcileChangeValidityResult,
+  type ReconciliationIntent,
+  type ReconciledMutationContext,
+  type ReconciledMutationResult,
   type ArchiveHookPhaseSelector,
   type ArchiveChange,
   type ArchiveChangeInput,
   type ArchiveChangeResult,
+  type OnArchiveProgress,
   type InvalidatedChangesEntry,
   type ValidateArtifacts,
   type ValidateArtifactsInput,
@@ -325,6 +358,8 @@ export {
   type GetStatusDeps,
   createCountTasks,
   type CountTasksDeps,
+  createResolveChangeSchema,
+  type ResolveChangeSchemaDeps,
   createTransitionChange,
   type TransitionChangeDeps,
   createDraftChange,
@@ -337,6 +372,14 @@ export {
   type ApproveSpecDeps,
   createApproveSignoff,
   type ApproveSignoffDeps,
+  createStartVerification,
+  type StartVerificationDeps,
+  createCompleteVerification,
+  type CompleteVerificationDeps,
+  createInvalidateVerification,
+  type InvalidateVerificationDeps,
+  createReconcileChangeValidity,
+  type ReconcileChangeValidityDeps,
   createArchiveChange,
   type ArchiveChangeDeps,
   createValidateArtifacts,
@@ -428,10 +471,23 @@ export {
   WorkspaceNotFoundError,
   InvalidInvalidateTargetError,
   InvalidateRequiresForceError,
+  type ForceInvalidationRecovery,
   ImplementationLinksExistError,
   ImplementationFileNotFoundError,
   ConfigNotFoundError,
   ProjectMetadataNotFoundError,
+  FingerprintInputError,
+  VerificationAttemptNotFoundError,
+  VerificationNotFoundError,
+  VerificationFingerprintMismatchError,
+  VerificationInProgressError,
+  VerificationStaleError,
+  ReconciledOperationBlockedError,
+  type ReconciledOperation,
+  type ReconciledOperationBlockedInput,
+  SchemaProviderIdentityMismatchError,
+  InvalidDisposerError,
+  DisposerFailedError,
 } from './application/errors/index.js'
 
 // Domain entities
@@ -444,6 +500,7 @@ export {
   type TransitionedEvent,
   type SpecApprovedEvent,
   type SignedOffEvent,
+  type SignoffInvalidatedEvent,
   type InvalidatedEvent,
   type DraftedEvent,
   type RestoredEvent,
@@ -458,6 +515,20 @@ export {
   Delta,
   type DeltaProps,
   type ArchivedChange,
+  type ProjectionStatus,
+  type ApprovalDecision,
+  type VerificationAttempt,
+  type CompletedVerification,
+  type ProjectionInvalidation,
+  type ValidityInvalidationCause,
+  type InvalidatedArtifactEntry,
+  type ArchiveFailedEvent,
+  type ArchiveFailureStep,
+  type DescriptionUpdatedEvent,
+  type ApprovalInvalidatedEvent,
+  type VerificationAttemptStartedEvent,
+  type VerificationCompletedEvent,
+  type VerificationInvalidatedEvent,
 } from './domain/entities/index.js'
 
 // Domain value objects
@@ -470,10 +541,19 @@ export {
   SpecArtifact,
   type ChangeState,
   VALID_TRANSITIONS,
+  HAPPY_PATH_NEXT,
   isValidTransition,
   type ArtifactStatus,
   type ArtifactDisplayStatus,
   type InvalidationPolicy,
+  type ArtifactInvalidationPolicy,
+  type WorkflowInvalidationPolicy,
+  type InvalidationPolicyOverride,
+  type SpecApprovalFingerprint,
+  type ArtifactFingerprint,
+  type ImplementationFingerprint,
+  type ValidityFingerprint,
+  type FingerprintDifference,
   DEFAULT_INVALIDATION_POLICY,
   isInvalidationPolicy,
   type Selector,
@@ -514,12 +594,14 @@ export {
   type OverlapChange,
   OverlapReport,
 } from './domain/value-objects/index.js'
+export { PLUGIN_NAME_REGEX, isPluginName } from './domain/plugin-name.js'
 
 // Domain errors
 export {
   SpecdError,
   InvalidStateTransitionError,
   type TransitionFailureReason,
+  HappyPathNextUnavailableError,
   ApprovalRequiredError,
   InvalidSpecPathError,
   InvalidSpecIdError,
@@ -531,6 +613,9 @@ export {
   HookFailedError,
   SchemaValidationError,
   ConfigValidationError,
+  LegacyConfigFormatError,
+  UnsupportedConfigVersionError,
+  CURRENT_CONFIG_VERSION,
   DeltaApplicationError,
   UnsupportedPatternError,
   CorruptedManifestError,
@@ -544,15 +629,26 @@ export {
   MissingDefaultWorkspaceError,
   StepNotValidError,
   HookNotFoundError,
-  SpecOverlapError,
   SpecPublicationError,
-  ArchiveDependencyMismatchError,
   ArchiveArtifactMissingError,
   ArchiveImplementationStateError,
   HistoricalImplementationGuardError,
   type GuardedChangeOperation,
   InvalidInputError,
   DraftedChangeReadOnlyError,
+  UnsupportedManifestVersionError,
+  InvalidPluginNameError,
+  InvalidCheckIdError,
+  DuplicateCheckError,
+  DuplicateCheckBindingError,
+  InvalidCheckKindError,
+  CheckEmbeddingForbiddenError,
+  CheckBindingOverrideForbiddenError,
+  CheckConfigOverrideForbiddenError,
+  CheckNotSkippableError,
+  CheckDisableForbiddenError,
+  UnknownCheckError,
+  CheckPredicateFailedError,
 } from './domain/errors/index.js'
 
 export {
@@ -686,19 +782,75 @@ export {
 } from './domain/services/rule-evaluator.js'
 export { detectSpecOverlap } from './domain/services/detect-spec-overlap.js'
 export {
-  LifecycleEngine,
-  type LifecycleEngineOptions,
+  type AutomaticRecovery,
+  type ChangeValidityVerdict,
+  type ArtifactReviewTarget,
+  type ProjectionChange,
+  type ValidityBlocker,
+  type FingerprintInputFailure,
+} from './domain/services/change-validity.js'
+export {
+  type LifecycleVerdictInput,
   type LifecycleAffectedFile,
   type LifecycleAffectedArtifact,
   type LifecycleBlocker,
   type LifecycleReviewOverlapEntry,
   type LifecycleReviewSummary,
-  type LifecycleNextAction,
   type LifecycleArtifactVerdict,
   type LifecycleTransitionBlocker,
   type LifecycleStepVerdict,
-  type LifecycleVerdict,
 } from './domain/services/lifecycle-engine.js'
+export {
+  evaluateLifecycle,
+  type LifecycleActionIntent,
+  type LifecycleVerdict,
+  type LifecycleNextAction,
+} from './application/services/lifecycle-evaluation.js'
+export {
+  ResolveChangeSchema,
+  type ResolveChangeSchemaInput,
+  type ResolvedChangeSchema,
+  type ChangeSchemaAdvisory,
+  type ChangeSchemaVersionAdvisory,
+} from './application/services/resolve-change-schema.js'
+export {
+  evaluateTransitionCandidate,
+  type TransitionCandidateEvaluationInput,
+  type TransitionCandidateEvaluation,
+} from './application/services/evaluate-transition-candidate.js'
+export {
+  classifyAlong,
+  checkMatches,
+  CHECK_LABELS,
+  checkLabel,
+  approveSpecAction,
+  approveSignoffAction,
+  startVerificationAction,
+  refreshStatusAction,
+  type BuiltInCheckActionKind,
+  type CheckAction,
+  type CheckId,
+  type CheckKind,
+  type CheckOutcome,
+  type CheckResult,
+  type CheckProgressEvent,
+  type OnCheckProgress,
+  type Check,
+  type CustomCheckDefinition,
+  type CheckBindingSpec,
+  type CheckBinding,
+  type CheckExecutionContext,
+} from './domain/services/transition-checks.js'
+export {
+  CheckRegistry,
+  type CheckGovernance,
+  type PluginCheckRegistrationOptions,
+} from './domain/services/check-registry.js'
+export {
+  deepMergeConfig,
+  isRecord,
+  type DeepMergeConfigOptions,
+} from './domain/services/deep-merge-config.js'
 
 const _require = createRequire(import.meta.url)
 /** Installed version of `@specd/core`. */

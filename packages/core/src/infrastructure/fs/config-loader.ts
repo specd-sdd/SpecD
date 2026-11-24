@@ -1,8 +1,13 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { stringify as yamlStringify } from 'yaml'
 import { z } from 'zod'
 import { ConfigLoader } from '../../application/ports/config-loader.js'
-import { isInvalidationPolicy } from '../../domain/value-objects/invalidation-policy.js'
+import {
+  DEFAULT_INVALIDATION_POLICY,
+  fromLegacyInvalidationPolicy,
+  type InvalidationPolicy,
+} from '../../domain/value-objects/invalidation-policy.js'
 import {
   type SpecdConfig,
   type SpecdAdapterBinding,
@@ -14,6 +19,11 @@ import {
 } from '../../application/specd-config.js'
 import { type SchemaOperations } from '../../domain/services/merge-schema-layers.js'
 import { ConfigValidationError } from '../../domain/errors/config-validation-error.js'
+import { LegacyConfigFormatError } from '../../domain/errors/legacy-config-format-error.js'
+import {
+  CURRENT_CONFIG_VERSION,
+  UnsupportedConfigVersionError,
+} from '../../domain/errors/unsupported-config-version-error.js'
 import { isPathInside } from './path-platform.js'
 import { isValidWorkspaceName } from '../../domain/services/spec-id-rules.js'
 import { StorageDirectoryNotFoundError } from '../../domain/errors/index.js'
@@ -252,6 +262,9 @@ export class FsConfigLoader extends ConfigLoader {
    */
   async load(options?: { readonly skipDirCheck?: boolean }): Promise<SpecdConfig> {
     const cascade = await this._resolveCascade()
+    for (const layer of cascade.activeLayers) {
+      assertCurrentConfigFormat(layer.raw, layer.path)
+    }
     const mergedRaw = mergeActiveLayers(cascade)
 
     const configDir = path.dirname(cascade.rootPath)
@@ -664,23 +677,88 @@ export class FsConfigLoader extends ConfigLoader {
       ...(data.schemaOverrides !== undefined
         ? { schemaOverrides: data.schemaOverrides as SchemaOperations }
         : {}),
-      ...(data.invalidationPolicy !== undefined && isInvalidationPolicy(data.invalidationPolicy)
-        ? { invalidationPolicy: data.invalidationPolicy }
-        : {}),
+      invalidation: resolveConfiguredInvalidation(data),
       ...(data.plugins !== undefined
         ? {
-            plugins: {
-              ...(data.plugins.agents !== undefined
-                ? {
-                    agents: data.plugins.agents.map((plugin) => ({
-                      name: plugin.name,
-                      ...(plugin.config !== undefined ? { config: plugin.config } : {}),
-                    })),
-                  }
+            plugins: data.plugins.map((plugin) => ({
+              name: plugin.name,
+              ...(plugin.config !== undefined ? { config: plugin.config } : {}),
+              ...(plugin.contributions !== undefined
+                ? { contributions: plugin.contributions }
                 : {}),
-            },
+            })),
           }
         : {}),
     }
   }
+}
+
+/**
+ * Rejects config versions this build cannot read and the removed `plugins.agents` shape.
+ *
+ * Runs on each cascade layer before the strict project schema, so a legacy object
+ * is reported as {@link LegacyConfigFormatError} rather than a generic schema error.
+ *
+ * @param raw - Parsed YAML mapping for one layer
+ * @param layerPath - Absolute path of that layer
+ * @throws {UnsupportedConfigVersionError} When `configVersion` is newer than supported
+ * @throws {LegacyConfigFormatError} When `plugins` is an object that contains `agents`
+ */
+export function assertCurrentConfigFormat(raw: Record<string, unknown>, layerPath: string): void {
+  const version = raw['configVersion']
+  if (typeof version === 'number' && version > CURRENT_CONFIG_VERSION) {
+    throw new UnsupportedConfigVersionError(layerPath, version, CURRENT_CONFIG_VERSION)
+  }
+  const plugins = raw['plugins']
+  if (isRecord(plugins) && 'agents' in plugins) {
+    throw new LegacyConfigFormatError(layerPath, legacyPluginsSnippet(plugins['agents']))
+  }
+}
+
+/**
+ * Builds the flat `plugins` snippet suggested in the legacy-format error.
+ *
+ * @param agents - The old `plugins.agents` value
+ * @returns YAML for `configVersion` and the flat plugin list
+ */
+function legacyPluginsSnippet(agents: unknown): string {
+  const entries: Array<{ name: string; config?: Record<string, unknown> }> = []
+  if (Array.isArray(agents)) {
+    for (const entry of agents) {
+      if (!isRecord(entry) || typeof entry['name'] !== 'string') continue
+      const config = entry['config']
+      if (isRecord(config)) entries.push({ name: entry['name'], config })
+      else entries.push({ name: entry['name'] })
+    }
+  }
+  return yamlStringify({ configVersion: CURRENT_CONFIG_VERSION, plugins: entries }).trimEnd()
+}
+
+/**
+ * Resolves the single effective invalidation policy from raw configuration.
+ *
+ * Native `invalidation` is stored as given. A legacy scalar `invalidationPolicy`
+ * maps to `{ artifacts: scalar, workflow: 'redesign' }`. Absence uses the native
+ * default. Documents that contain both shapes are rejected earlier, during schema
+ * validation, so this function never sees both set.
+ *
+ * @param data - Parsed raw project configuration
+ * @param data.invalidation - Native structured invalidation policy, when present
+ * @param data.invalidationPolicy - Legacy scalar invalidation policy, when present
+ * @returns Frozen structured policy
+ */
+function resolveConfiguredInvalidation(data: {
+  readonly invalidation?: InvalidationPolicy | undefined
+  readonly invalidationPolicy?: string | undefined
+}): InvalidationPolicy {
+  if (data.invalidation !== undefined) {
+    return Object.freeze({
+      artifacts: data.invalidation.artifacts,
+      workflow: data.invalidation.workflow,
+    })
+  }
+  if (data.invalidationPolicy !== undefined) {
+    return fromLegacyInvalidationPolicy(data.invalidationPolicy)
+  }
+  return DEFAULT_INVALIDATION_POLICY
 }

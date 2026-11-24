@@ -1666,3 +1666,36 @@ describe('ResolveSchema — override hook normalization', () => {
     expect((hook as { type: 'run'; command: string }).command).toBe('pnpm test')
   })
 })
+
+describe('ResolveSchema approval anchor validation', () => {
+  const disabledReady = minimalData({
+    workflow: [
+      {
+        step: 'ready',
+        optional: false,
+        disabled: true,
+        requires: [],
+        requiresTaskCompletion: [],
+        hooks: { pre: [], post: [] },
+      },
+    ],
+  })
+
+  it('rejects a disabled ready step when the spec gate is on', async () => {
+    const registry = makeRegistry({ test: rawResult(disabledReady) })
+    const sut = new ResolveSchema(registry, 'test', [], undefined, undefined, {
+      spec: true,
+      signoff: false,
+    })
+    await expect(sut.execute()).rejects.toThrow(SchemaValidationError)
+  })
+
+  it('accepts a disabled ready step when the spec gate is off', async () => {
+    const registry = makeRegistry({ test: rawResult(disabledReady) })
+    const sut = new ResolveSchema(registry, 'test', [], undefined, undefined, {
+      spec: false,
+      signoff: false,
+    })
+    await expect(sut.execute()).resolves.toBeDefined()
+  })
+})

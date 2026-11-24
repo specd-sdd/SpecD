@@ -1,7 +1,39 @@
 import { describe, expect, it } from 'vitest'
 import { createSkillRepository } from '../../src/index.js'
 
+function decisionRow(content: string, mode: '`change`' | '`delegated`'): string[] {
+  const row = content.split('\n').find((line) => line.startsWith(`| ${mode} |`))
+  if (!row) throw new Error(`Missing rendered decision row for ${mode}`)
+  return row
+    .split('|')
+    .slice(2, -1)
+    .map((cell) => cell.trim())
+}
+
 describe('createSkillRepository', () => {
+  it('given workflow templates, when rendered, then verification commands survive bundling', async () => {
+    const repository = createSkillRepository()
+    const verify = await repository.getBundle('specd-verify')
+    const compliance = await repository.getBundle('specd-compliance')
+    const verifyBody = verify.files.find((file) => file.filename === 'SKILL.md')?.content ?? ''
+    const complianceBody =
+      compliance.files.find((file) => file.filename === 'SKILL.md')?.content ?? ''
+    const sharedBody = verify.files.find((file) => file.filename === 'shared.md')?.content ?? ''
+
+    expect(verifyBody).toContain('specd changes verification start <name>')
+    expect(verifyBody).toContain('specd changes verification complete <name>')
+    expect(verifyBody).toContain('--delegated --attempt <attemptId>')
+    expect(complianceBody).toContain('mode = delegated')
+    expect(complianceBody).toContain('do not claim successful verification')
+    const standalone = decisionRow(complianceBody, '`change`')
+    const delegated = decisionRow(complianceBody, '`delegated`')
+    expect(delegated.slice(0, 7)).toEqual(standalone.slice(0, 7))
+    expect(standalone.slice(7)).toEqual(['yes', 'yes'])
+    expect(delegated.slice(7)).toEqual(['no', 'no'])
+    expect(sharedBody).toContain('Do not calculate fingerprints')
+    expect(sharedBody).toContain('Verification staleness alone never moves lifecycle state')
+  })
+
   it('given canonical templates, when list is called, then returns metadata-only skills and agents', async () => {
     const repository = createSkillRepository()
     const all = await repository.list()

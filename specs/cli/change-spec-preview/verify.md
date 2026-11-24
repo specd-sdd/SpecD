@@ -165,3 +165,17 @@
 - **WHEN** `specd change spec-preview my-change my-spec --artifact verify` is run
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message about missing artifact in change
+
+### Requirement: Artifact names from the change's schema
+
+#### Scenario: --artifact resolves against the change schema
+
+- **GIVEN** a change whose `schemaName` is `custom-workflow` and an artifact name declared only by that schema
+- **WHEN** `specd changes spec-preview <name> <specId> --artifact <artifact>` runs
+- **THEN** the artifact is resolved and printed
+
+#### Scenario: Identity mismatch is reported as an error
+
+- **GIVEN** a schema provider returning a wrong-name schema for the change
+- **WHEN** `specd changes spec-preview` runs
+- **THEN** it exits non-zero and reports the identity mismatch

@@ -2,10 +2,12 @@ import { mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { SpecdConfig } from '@specd/core'
 import {
+  addSharedOwner,
   createSkillRepository,
   injectSpecdBlock,
   renderBaseAgentInstruction,
   ResolveBundle,
+  splitTopLevelCommas,
 } from '@specd/skills'
 import type {
   AgentInstallOptions,
@@ -14,7 +16,7 @@ import type {
 } from '@specd/plugin-manager'
 import type { Frontmatter } from '../../domain/types/frontmatter.js'
 import { skillFrontmatter, agentFrontmatter } from '../../domain/frontmatter/index.js'
-import { resolveSharedFolder } from './shared-folder.js'
+import { resolveSharedFolder } from '@specd/skills'
 
 /**
  * Installs selected skills into Copilot's project-local skills directory.
@@ -44,7 +46,6 @@ export class InstallSkills {
     const requestedNames = [...requestedSkills, ...requestedAgents]
 
     const skillsTargetDir = path.join(config.projectRoot, '.github', 'skills')
-    const agentsTargetDir = path.join(config.projectRoot, '.github', 'agents')
     const resolvedSharedFolder = resolveSharedFolder(
       config.projectRoot,
       config.configPath,
@@ -53,15 +54,20 @@ export class InstallSkills {
         : undefined,
     )
     const sharedDir = resolvedSharedFolder.absolutePath
+    const capabilities = options?.capabilities ?? ['frontmatter', 'agents']
+    const supportsAgents = capabilities.includes('agents')
+    const agentsTargetDir = supportsAgents
+      ? path.join(config.projectRoot, '.github', 'agents')
+      : sharedDir
 
     await mkdir(skillsTargetDir, { recursive: true })
-    await mkdir(agentsTargetDir, { recursive: true })
+    if (supportsAgents) {
+      await mkdir(agentsTargetDir, { recursive: true })
+    }
 
     const installed: Array<{ skill: string; path: string }> = []
     const skipped: Array<{ skill: string; reason: string }> = []
-
-    // Copilot capabilities
-    const capabilities = ['frontmatter', 'agents']
+    let ownerRegistered = false
 
     for (const name of requestedNames) {
       const item = await repository.get(name)
@@ -79,7 +85,7 @@ export class InstallSkills {
           const rawTools = metadata['allowed-tools']
           tools = Array.isArray(rawTools)
             ? rawTools.map((t: string) => t.trim())
-            : rawTools.split(',').map((t: string) => t.trim())
+            : splitTopLevelCommas(rawTools)
         }
         agentFrontmatterVars = {
           name: metadata.name ?? name,
@@ -143,6 +149,11 @@ export class InstallSkills {
         }
 
         const outputPath = path.join(baseDir, finalFilename)
+        if ((file.shared === true || baseDir === sharedDir) && !ownerRegistered) {
+          // Register ownership before the first shared write so a partial failure still leaves the marker.
+          await addSharedOwner(sharedDir, 'copilot')
+          ownerRegistered = true
+        }
         await mkdir(path.dirname(outputPath), { recursive: true })
         await writeFile(outputPath, content, 'utf8')
       }
@@ -214,3 +225,5 @@ function normalizeTemplateVariable(value: unknown): TemplateVariable | undefined
   }
   return undefined
 }
+
+export { splitTopLevelCommas }

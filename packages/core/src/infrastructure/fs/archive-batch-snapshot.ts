@@ -44,26 +44,71 @@ export class FsArchiveBatchSnapshot implements ArchiveBatchSnapshotPort {
   async detectOrphans(specIds: readonly string[], changeName: string): Promise<void> {
     for (const specId of specIds) {
       const backupDir = this._backupDir(specId)
-      if (backupDir === null) continue
+      if (backupDir === null) {
+        Logger.debug('ArchiveBatchSnapshot orphan check', {
+          change: changeName,
+          specId,
+          outcome: 'skipped-unknown-workspace',
+        })
+        continue
+      }
       const manifestPath = path.join(backupDir, MANIFEST_FILENAME)
       let raw: string
       try {
         raw = await fs.readFile(manifestPath, 'utf8')
-      } catch {
-        continue
-      }
-
-      let manifest: ArchiveBatchManifest
-      try {
-        manifest = JSON.parse(raw) as ArchiveBatchManifest
-      } catch {
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException | undefined)?.code
+        if (code === 'ENOENT') {
+          Logger.debug('ArchiveBatchSnapshot orphan check', {
+            change: changeName,
+            specId,
+            outcome: 'none-found',
+          })
+          continue
+        }
+        Logger.debug('ArchiveBatchSnapshot orphan check', {
+          change: changeName,
+          specId,
+          outcome: 'unreadable',
+          ...(code !== undefined ? { errorCode: code } : {}),
+        })
         throw new ArchiveOrphanBackupError(
           specId,
           changeName,
-          true,
-          `Cannot archive — corrupt orphan backup at ${specId}. Remove ${ARCHIVE_BACKUP_DIR} manually and retry.`,
+          false,
+          `Cannot archive — the orphan backup manifest at ${specId} cannot be read${code !== undefined ? ` (${code})` : ''}. Fix the permissions of ${ARCHIVE_BACKUP_DIR} or remove it manually and retry.`,
         )
       }
+
+      const corrupt = (): ArchiveOrphanBackupError => {
+        Logger.debug('ArchiveBatchSnapshot orphan check', {
+          change: changeName,
+          specId,
+          outcome: 'corrupt-abort',
+        })
+        return new ArchiveOrphanBackupError(
+          specId,
+          changeName,
+          false,
+          `Cannot archive — corrupt orphan backup manifest at ${specId}. Remove ${ARCHIVE_BACKUP_DIR} manually and retry.`,
+        )
+      }
+
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(raw)
+      } catch {
+        throw corrupt()
+      }
+      if (
+        typeof parsed !== 'object' ||
+        parsed === null ||
+        Array.isArray(parsed) ||
+        typeof (parsed as { changeName?: unknown }).changeName !== 'string'
+      ) {
+        throw corrupt()
+      }
+      const manifest = parsed as ArchiveBatchManifest
 
       Logger.debug('ArchiveBatchSnapshot orphan check', {
         change: changeName,
@@ -165,6 +210,7 @@ export class FsArchiveBatchSnapshot implements ArchiveBatchSnapshotPort {
     }
 
     Logger.debug('ArchiveBatchSnapshot recorded created file', {
+      change: manifest.changeName,
       specId,
       relativePath,
     })
@@ -174,9 +220,11 @@ export class FsArchiveBatchSnapshot implements ArchiveBatchSnapshotPort {
   async restoreBatch(
     specIds: readonly string[],
     publishOrder: readonly string[],
+    changeName: string,
   ): Promise<ArchiveBatchRestoreResult> {
     const order = [...publishOrder].reverse()
     Logger.debug('ArchiveBatchSnapshot restore started', {
+      change: changeName,
       specIds: order,
       publishOrder,
     })
@@ -198,6 +246,7 @@ export class FsArchiveBatchSnapshot implements ArchiveBatchSnapshotPort {
       } catch (error) {
         failedSpecIds.push(specId)
         Logger.debug('ArchiveBatchSnapshot restore failed for spec', {
+          change: changeName,
           specId,
           message: error instanceof Error ? error.message : String(error),
         })
@@ -205,6 +254,7 @@ export class FsArchiveBatchSnapshot implements ArchiveBatchSnapshotPort {
     }
 
     Logger.debug('ArchiveBatchSnapshot restore completed', {
+      change: changeName,
       restoredSpecIds,
       failedSpecIds,
     })
@@ -213,7 +263,7 @@ export class FsArchiveBatchSnapshot implements ArchiveBatchSnapshotPort {
   }
 
   /** @inheritdoc */
-  async cleanup(specIds: readonly string[]): Promise<void> {
+  async cleanup(specIds: readonly string[], changeName: string): Promise<void> {
     for (const specId of specIds) {
       const backupDir = this._backupDir(specId)
       if (backupDir === null) continue
@@ -226,7 +276,7 @@ export class FsArchiveBatchSnapshot implements ArchiveBatchSnapshotPort {
     for (const specId of specIds) {
       this._manifests.delete(specId)
     }
-    Logger.debug('ArchiveBatchSnapshot cleanup completed', { specIds })
+    Logger.debug('ArchiveBatchSnapshot cleanup completed', { change: changeName, specIds })
   }
 
   /**

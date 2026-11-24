@@ -1,0 +1,24 @@
+- op: removed
+  description: Replace renamed requirement section
+  selector:
+    type: section
+    matches: 'Requirement:\ Schema\ name\ guard'
+- op: added
+  description: Verify sovereign schema resolution when workspace default differs
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement:\ Change\ lookup'
+  content: |
+    ### Requirement: Sovereign schema resolution
+
+    #### Scenario: Resolves sovereign schema when workspace default differs
+
+    - **GIVEN** a change created with schema `custom-schema`
+    - **AND** workspace default schema is `spec-driven`
+    - **WHEN** `execute` is called
+    - **THEN** it resolves `custom-schema` via `SchemaProvider.get('custom-schema')`
+    - **AND** `SchemaMismatchError` is not thrown

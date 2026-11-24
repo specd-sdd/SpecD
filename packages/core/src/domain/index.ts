@@ -1,6 +1,7 @@
 export * from './entities/index.js'
 export * from './value-objects/index.js'
 export * from './errors/index.js'
+export { PLUGIN_NAME_REGEX, isPluginName } from './plugin-name.js'
 export * from './services/index.js'
 export {
   type ReadOnlyChangeView,

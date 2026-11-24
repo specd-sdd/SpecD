@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Changes must progress through a governed lifecycle so that validations, approval gates, requires enforcement, and hooks fire at the right time. `specd change transition <name> <step>` advances a change to the next lifecycle state, transparently routing through approval gates when enabled, enforcing workflow `requires`, and executing `run:` hooks at step boundaries by default.
+Changes must progress through a governed lifecycle so that validations, in-place approval checks, requires enforcement, and hooks fire at the right time. `specd change transition <name> <step>` advances a change to a requested lifecycle state (or `--next` for Core-resolved happy-path next). Failed spec/signoff checks leave the change in `ready` / `done`. The CLI enforces workflow `requires` via Core and executes `run:` hooks at step boundaries by default.
 
 Because transitions may trigger long-running hooks, the command must also keep hook execution observable while those hooks are in flight.
 
@@ -10,36 +10,42 @@ Because transitions may trigger long-running hooks, the command must also keep h
 
 ### Requirement: Command signature
 
-```
-specd change transition <name> <step> [--skip-hooks <phases>] [--format text|json|toon]
-specd change transition <name> --next [--skip-hooks <phases>] [--format text|json|toon]
-```
+The command SHALL be invoked as `specd change transition <name> [step] [--next]`.
+`<name>` is required. Exactly one of `<step>` or `--next` MUST be provided: passing both SHALL fail with `<step> and --next are mutually exclusive`, and passing neither SHALL fail with `either <step> or --next is required`, both as CLI usage errors (exit code 1) without calling `TransitionChange`.
 
-- `<name>` — required positional; the name of the change to transition
-- `<step>` — required positional when `--next` is not used; the target lifecycle state (e.g. `designing`, `ready`, `implementing`, `verifying`, `done`, `archivable`, `pending-spec-approval`, `spec-approved`, `pending-signoff`, `signed-off`)
-- `--next` — optional flag; resolves the next logical lifecycle target from the change's current state and is mutually exclusive with `<step>`
-- `--skip-hooks <phases>` — optional; comma-separated list of hook phases to skip. Valid values: `source.pre`, `source.post`, `target.pre`, `target.post`, `all`. When `all` is specified, all hook phases are skipped. When omitted, all applicable hooks execute.
-- `--format text|json|toon` — optional; output format, defaults to `text`
+The command MUST accept a `--skip-checks <ids>` option accepting a comma-separated list of check IDs.
+The command MUST maintain backward compatibility with legacy flags by translating them into `skipChecks`:
+
+- `--allow-out-of-scope` appends `impl.linksInScope` to `skipChecks`.
+- `--allow-overlap` appends `spec.overlap` to `skipChecks`.
+
+The CLI adapter MUST pass the compiled `skipChecks` array directly to `TransitionChangeInput.skipChecks`.
+
+The `--help` JSON output schema MUST list the fields of the structured failure record, including `error`, `hint`, `state`, `validity`, `verification`, blocker `bypassFlag`, and `nextAction.intent`, `nextAction.action`, and `nextAction.guidance` alongside `command`. Blocker entries MUST list `code`, `message`, `label`, `checkId`, `details`, `action`, and `bypassFlag`, and the `nextAction` shape MUST list `command`, `intent`, `action`, `guidance`, `actionType`, and `reason`, with no raw `isSkippable`.
 
 ### Requirement: Next-transition resolution
 
-When `--next` is used, the CLI MUST load the current change state and resolve the same logical forward target a human would normally choose for the next workflow step:
+When the command is invoked with `--next`, it SHALL pass `to: 'next'` to `TransitionChange.execute`. The CLI MUST NOT resolve the target itself through a local from→to table.
 
-- `drafting` → `designing`
-- `designing` → `ready`
-- `ready` → `implementing`
-- `spec-approved` → `implementing`
-- `implementing` → `verifying`
-- `verifying` → `done`
-- `done` → `archivable`
+Core resolves `'next'` to the closest subsequent enabled step via `nextWorkflowStep`. Disabled steps are absent from the active pipeline and are therefore skipped. An enabled optional step remains the `'next'` target; `--next` SHALL NOT evaluate optional-step shortcut policy or bypass that step merely because its `step-skip` checks pass.
 
-After resolving the target, the command MUST execute the normal `TransitionChange` flow for that resolved state. Approval-gate routing, requires enforcement, hook execution, and error handling remain unchanged.
+Optional-step shortcut recommendation belongs to `GetStatus.nextAction`: callers that want the recommended shortcut use the explicit target projected there. `--next` remains a deterministic one-hop operation over the enabled topology.
 
-`--next` is unavailable when the current state does not have a transition-driven next action through `change transition`. In those cases, the command MUST exit with code 1 and print an explanatory `error:` message to stderr instead of inventing a synthetic transition target. This includes at least:
+When Core rejects `to: 'next'` (no happy-path hop: `archivable`, `archiving`), the command MUST exit with code 1 and print an explanatory `error:` message to stderr. From a legacy parking state, `next` resolves to its delivery edge (`implementing` or `archivable`) and the bound approval check decides whether it proceeds.
 
-- `pending-spec-approval` — waiting for human spec approval
-- `pending-signoff` — waiting for human signoff
-- `archivable` — the next action is archive execution, not another lifecycle transition
+### Requirement: CLI-rendered transition error hints
+
+When `HappyPathNextUnavailableError` (`HAPPY_PATH_NEXT_UNAVAILABLE`) or a skippable `impl.linksInScope` failure is surfaced by `change transition`, the command SHALL use the centralized CLI hint-resolution helper (`change.transition` context) to render `--next` context and the generic bypass hint `Retry with --skip-checks <id> if an exception is granted` (with `<id>` replaced by the failing check id, for example `impl.linksInScope`), rather than relying on CLI flags embedded in `@specd/core` messages. The hint MUST be identical in form for every skippable check; it MUST NOT add check-specific variants. The `deps.consistent` hint (re-run dependency extraction or update the change dependencies) applies only when the blocker is not skippable; a skippable `deps.consistent` blocker receives the generic bypass hint instead. The hint MUST NOT add check-specific variants beyond that and MUST NOT mention the `--allow-out-of-scope` alias (which keeps working as input).
+
+### Requirement: Validity-aware transition guidance
+
+Before resolving `next`, and when a requested transition fails after fresh reconciliation, the command SHALL consume the canonical `GetStatus` or `TransitionChange` result rather than reconstructing gate or verification rules. When rendering the repair guide in text mode, the CLI SHALL project `--skip-checks <checkId>` bypass hints from `blocker.isSkippable` and `blocker.checkId`, and SHALL project `nextAction.command` from Core's `nextAction.intent` (and optional `action`) via the centralized CLI guidance presenter.
+
+If reconciliation committed an automatic return, output SHALL show the new state, invalidated evidence, reason, and current next action. Required stale spec approval in a state after `ready` routes through `designing` and `ready`, while in `ready` the change stays and consent is renewed there; stale sign-off alone routes to `done`; stale verification at required boundaries recommends the verification skill in place. Earlier-phase stale verification remains context and MUST NOT cause the CLI to suggest verification prematurely.
+
+The CLI MUST NOT retry the original transition automatically after recovery, choose an alternate transition, expose verification-attempt restart flags, or accept `verifying → verifying`. Entry to `verifying` reports readiness checks without claiming baseline capture. Exit to `done` reports `verification.current` through the generic check output. A failure does not claim verification completion or transition success; it reports the actual reconciled state and in-place verification guidance. Transitions never start or complete an attempt.
+
+When `TransitionChange` fails with `ReconciledOperationBlockedError` (reconciliation committed an automatic return before the requested edge could run), the command MUST render it as a repair guide, never as an invalid-edge error line. The text output SHALL show the committed state, the committed blockers projected through the CLI blocker projection (label, `checkId`, action, `bypassFlag`; never raw `isSkippable`), and the projected next action (the `command:` or `guidance:` line plus the reason). In json and toon modes the failure record SHALL carry `state`, `automaticReturn`, the projected blockers and the projected `nextAction` (`intent`, `action`, `command`, `guidance`).
 
 ### Requirement: Delegates refresh policy to TransitionChange
 
@@ -53,14 +59,9 @@ When rendering a repair guide after a failed transition, the command MUST call `
 
 ### Requirement: Approval-gate routing
 
-The CLI MUST NOT pass approval gate flags to `TransitionChange.execute`. Approval routing uses gate state baked into the kernel's `TransitionChange` instance from `config.approvals` at kernel construction.
+The CLI MUST NOT pass approval gate flags to `TransitionChange.execute`. Gate state is baked into the kernel's `TransitionChange` instance from `config.approvals` at kernel construction.
 
-The use case, via `LifecycleEngine`, applies smart routing:
-
-- When the change is in `ready` and `config.approvals.spec` is `true`, `implementing` is silently routed to `pending-spec-approval`
-- When the change is in `done` and `config.approvals.signoff` is `true`, `archivable` is silently routed to `pending-signoff`
-
-The user always specifies the logical target state; routing is transparent, and the CLI must not duplicate routing logic beyond choosing the requested target or `--next` target.
+The CLI MUST NOT rewrite `implementing` to `pending-spec-approval` or `archivable` to `pending-signoff`. The user specifies the delivery target; failed `approval.spec` / `approval.signoff` stay in `ready` / `done`.
 
 ### Requirement: Hook execution
 
@@ -70,21 +71,11 @@ The CLI maps the `--skip-hooks` option to a `skipHookPhases` set on `TransitionC
 
 ### Requirement: Progress output
 
-The CLI passes an `onProgress` callback to the use case that renders step-by-step feedback in `text` format and preserves structured progress for machine-oriented formats.
+The CLI passes an `onProgress` callback to the use case that renders generic **check** progress in `text` format and preserves structured progress for machine-oriented formats.
 
-For hook execution during a transition, progress output MUST allow the caller to observe:
+Predicate and effect checks share one bus: `check-start`, optional `check-progress`, `check-done`. Hooks MUST appear on that bus (`Running pre hooks` / `Running post hooks`). The CLI MUST NOT emit `stream: "hook-progress"` from `change transition`. `run-hooks` MAY keep `_hook-progress-presenter` until a later change remaps it.
 
-- hook start
-- the active hook ID and command
-- recent hook output while the hook is still running
-- liveness signals when the hook remains active without new output
-- hook completion
-
-In `text` mode, the active hook MAY use a lightweight running label, but that label is only a visual aid and MUST NOT be the only signal that work is still progressing.
-
-Progress output for previously completed hooks MUST remain understandable instead of being fully overwritten by the currently running hook.
-
-In `json` and `toon`, progress MUST be emitted on stdout as newline-delimited structured stream records. Hook lifecycle events use `stream: "hook-progress"`. Transition lifecycle events such as `requires-check` and `transitioned` use `stream: "change-transition"`.
+In `json` and `toon`, progress MUST be emitted on stdout as newline-delimited structured stream records with `stream: "change-transition"` for check and transition lifecycle events.
 
 ### Requirement: Transition hook observability
 
@@ -94,14 +85,7 @@ This applies even when the transition ultimately fails before the lifecycle stat
 
 ### Requirement: Shared hook progress presentation
 
-The command MUST use the same hook progress presentation model as `specd change run-hooks` for equivalent hook events.
-
-The CLI implementation MUST centralize that presentation logic in a shared helper so the two commands do not drift in:
-
-- running-status labels
-- recent-output tail rendering
-- liveness signalling
-- failed-hook full-output rendering
+`change transition` MUST use the generic check-progress presenter. `change run-hooks` MAY keep the hook-progress presenter until it is remapped onto the check bus. The two commands MUST NOT advertise the same public JSON `stream` name.
 
 ### Requirement: Output on success
 
@@ -125,40 +109,52 @@ If hook progress was rendered before the failure, the failure output MUST still 
 
 ### Requirement: Invalid transition error
 
-If the transition is not valid from the current state, the command exits with code 1 and prints an `error:` message to stderr.
+The command MUST catch `CheckPredicateFailedError` for every failed check (built-in, plugin, or schema-embedded) and map it onto the CLI Text Repair Guide. There are no check-specific error classes to handle.
+When this error is caught:
 
-When the transition fails (e.g. `InvalidStateTransitionError`, `HookFailedError`), the command MUST render a **Repair Guide** in text mode:
-
-```
-error: cannot transition to <step>
-! <CODE>: <message>
-
-repair guide:
-  target:  <targetStep>
-  command: <command>
-  reason:  <reason>
-```
-
-The repair guide uses the `nextAction` data from the `GetStatusResult`. The `! <CODE>` line uses the blocker codes identified in the `GetStatus` spec (e.g., `MISSING_ARTIFACT`, `ARTIFACT_DRIFT`).
-
-When `format` is `json` or `toon`, the command MUST keep failure reporting on stdout as part of the structured stream by emitting a terminal `stream: "change-transition"` record with `event.type: "complete"` and `event.result` containing `result: "failure"`, `name`, `from`, `to`, `blockers`, and `nextAction`.
-
-When the underlying `InvalidStateTransitionError` carries a structured reason explaining that the change is blocked on human approval or signoff, the command MUST surface that explanation in the stderr message rather than collapsing it to a generic invalid-transition message.
-
-When `--next` is invoked from a state where no transition-driven next action exists, the stderr message MUST explain why the command cannot advance automatically from that state.
+- The CLI SHALL render the failure message, the failed check's own diagnostic code taken from the caught error (even when the fresh status no longer carries that blocker), the check's gerund label, and the attempted transition (`from` / `to`) as context.
+- The CLI SHALL render check-specific context by `checkId` and `code` from `details` through the CLI presenter (for example the blocking artifact and its blocking parent for `workflow.requires`, the task counts for `workflow.taskCompletion`, every mismatch for `deps.consistent`, the affected specs for `workspace.readOnly`).
+- If the failed check result declared an `action`, the Repair Guide MUST present the command projected from it by the guidance presenter under the `command:` field. When the action has no command mapping (an unknown kind, or only `guidance`), the Repair Guide MUST print the action's host-neutral guidance on a separate `guidance:` line and MUST NOT place guidance prose under `command:`. In that case, if the fresh status `nextAction` projects a command, the Repair Guide MUST print BOTH the check action's `guidance:` line AND the next-action command under `command:`; the next-action command MUST NOT replace or suppress the check's guidance line.
+- If the failed check allows bypass (`skippable: true`), the Repair Guide MUST suggest the exact bypass syntax: `Retry with --skip-checks <id> if an exception is granted`. In text mode, every skippable blocker listed in the repair guide MUST get its own `bypass:` line (one per skippable blocker), matching the per-blocker `bypassFlag` carried in json and toon output.
+- If the check is mandatory (`skippable: false`), no bypass option SHALL be offered.
+- When the command fails with `CheckNotSkippableError`, the repair guide MUST render the CLI hint resolved for that code and the offending `checkId` (for a `hook.*` check, the `--skip-hooks` hint) in text mode and in the `hint` field of json and toon output.
+- In json and toon modes the failure record MUST carry an `error` object with `code`, `message` and, when known, `checkId`, so machine consumers can tell why the transition failed even when the fresh status no longer carries the blocker; a skippable `CheckPredicateFailedError` MUST also produce the bypass `hint`.
+- In json and toon modes, the structured failure blockers MUST be projected through the CLI blocker projection (`label`, `checkId`, `details`, `action`, `bypassFlag`), never spread raw from Core, so raw `isSkippable` is never emitted.
+- When reading the fresh status fails while rendering a repair guide, the command MUST NOT mask the original transition error: it prints only that original error through the standard error path (text, json and toon) and renders no repair guide and no structured repair record (no projected blockers, `nextAction` or validity fields); the exit code stays 1.
 
 ### Requirement: Incomplete tasks error
 
-If transitioning `implementing → verifying` and any artifact has incomplete task items (matching `taskCompletionCheck.incompletePattern`), the command exits with code 1 and prints an `error:` message to stderr naming the blocking artifact.
+If transitioning toward a step whose `workflow.taskCompletion` predicate fails (typically `implementing → verifying`) and any gated artifact has incomplete task items, the command exits with code 1 and prints an `error:` message to stderr naming the blocking artifact and the task counts from the check `details`. Status for that same change MUST already have omitted `verifying` from `availableTransitions`.
+
+### Requirement: Check progress rendering
+
+When `TransitionChange` emits generic check progress events, the CLI MUST render them in text mode as:
+
+```text
+<label> (<id>)
+  …optional check-progress lines…
+✓ <label>
+# or
+✗ <label>: <reason>
+# or
+⊘ <label> (skipped: <reason>)
+```
+
+Labels are gerund phrases from each check. The CLI MUST NOT print an `Executing:` prefix. Hooks MUST appear on this same bus (`Running pre hooks` / `Running post hooks`), not as a separate public progress contract.
+
+A `check-done` with `outcome: 'skip'` MUST be rendered with the skipped marker and its reason (for example `--skip-hooks`, `--skip-checks`, or "not applicable"), never with the passed marker `✓`. In particular, when `--skip-hooks` disables a hook phase, that phase MUST render as skipped.
+
+When Core re-evaluates predicates after hooks, the CLI SHALL render that second pass only if at least one hook phase actually ran, and SHALL label it as a re-check (for example a `Re-checking after hooks` heading). When no hook ran, the re-evaluation MUST NOT be printed as a duplicate check list.
 
 ### Requirement: Unsatisfied requires error
 
-If the target workflow step has `requires` and any required artifact is not `complete` or `skipped`, the command exits with code 1 and prints an `error:` message to stderr.
+If the target workflow step has `requires` and any required artifact is not `complete` or `skipped`, the `workflow.requires` check fails, the command exits with code 1, and prints an `error:` message to stderr naming the blocking artifact (and its blocking parent when `details.blockedBy` is present).
 
 ## Constraints
 
 - The user specifies the logical target state; the CLI never exposes the routing logic in its help text
-- Repair-guide blockers and next-action data are projected from core lifecycle diagnostics (`TransitionChange` failure plus `GetStatus`), not recomputed in the CLI layer
+- Repair-guide blockers and next-action data are projected from core lifecycle diagnostics (`TransitionChange` failure plus `GetStatus` check evaluation), not recomputed in the CLI layer
+- `HookFailedError` is not a repair-guide error
 - In `text`, progress is rendered to stderr and the final human-readable confirmation remains on stdout
 - In `json` and `toon`, machine-readable progress and the terminal `complete` record are emitted on stdout; stderr is reserved for non-structured diagnostics
 
@@ -179,3 +175,5 @@ specd change transition add-login --skip-hooks all
 - [`core:transition-change`](../../core/transition-change/spec.md) — transition execution and default refresh orchestration
 - [`core:hook-execution-model`](../../core/hook-execution-model/spec.md) — hook ordering and failure semantics
 - [`core:get-status`](../../core/get-status/spec.md) — pre-transition and repair-guide status reads
+- [`core:transition-checks`](../../core/transition-checks/spec.md) — check progress bus; no pending rewrite
+- [`core:lifecycle-engine`](../../core/lifecycle-engine/spec.md) — lifecycle evaluation and available transition routing

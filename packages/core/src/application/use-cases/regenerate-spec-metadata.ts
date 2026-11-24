@@ -1,3 +1,4 @@
+import { SpecdError } from '../../domain/errors/specd-error.js'
 import {
   type MaterializeSpecMetadata,
   type MaterializeSpecMetadataResult,
@@ -22,6 +23,7 @@ export interface RegenerateSpecMetadataSpecResult {
   readonly ok: boolean
   readonly result?: MaterializeSpecMetadataResult
   readonly error?: string
+  readonly code?: string
 }
 
 /** Result returned by {@link RegenerateSpecMetadata}. */
@@ -103,6 +105,7 @@ export class RegenerateSpecMetadata {
         specId,
         ok: false,
         error: error instanceof Error ? error.message : String(error),
+        ...(error instanceof SpecdError ? { code: error.code } : {}),
       }
     }
   }

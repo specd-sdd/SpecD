@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { makeMockConfig } from './helpers.js'
+import { makeMockConfig, makeMockHost } from './helpers.js'
 
 vi.mock('@specd/sdk', async () => {
   const actual = await vi.importActual<typeof import('@specd/sdk')>('@specd/sdk')
@@ -61,6 +61,7 @@ describe('graph CLI context', () => {
       vcsRoot: '/repository',
       configFilePath: null,
       kernel: null,
+      host: null,
     })
   })
 
@@ -76,11 +77,8 @@ describe('graph CLI context', () => {
   it('resolves an explicit config outside VCS without bootstrap validation', async () => {
     const config = makeMockConfig({ projectRoot: '/non-vcs/project' })
     const kernel = {} as never
-    vi.mocked(resolveCliContext).mockResolvedValue({
-      config,
-      configFilePath: '/non-vcs/project/specd.yaml',
-      kernel,
-    })
+    const host = makeMockHost({ config, configFilePath: '/non-vcs/project/specd.yaml', kernel })
+    vi.mocked(resolveCliContext).mockResolvedValue(host)
     vi.mocked(createVcsAdapter).mockRejectedValue(new Error('not a repository'))
 
     await expect(
@@ -90,6 +88,7 @@ describe('graph CLI context', () => {
       config,
       configFilePath: '/non-vcs/project/specd.yaml',
       kernel,
+      host,
       projectRoot: '/non-vcs/project',
       vcsRoot: null,
     })
@@ -101,11 +100,12 @@ describe('graph CLI context', () => {
     const config = makeMockConfig({ projectRoot: '/non-vcs/discovered-project' })
     const kernel = {} as never
     vi.mocked(resolveConfigPath).mockResolvedValue('/non-vcs/discovered-project/specd.yaml')
-    vi.mocked(resolveCliContext).mockResolvedValue({
+    const host = makeMockHost({
       config,
       configFilePath: '/non-vcs/discovered-project/specd.yaml',
       kernel,
     })
+    vi.mocked(resolveCliContext).mockResolvedValue(host)
     vi.mocked(createVcsAdapter).mockRejectedValue(new Error('not a repository'))
 
     await expect(resolveGraphCliContext()).resolves.toEqual({
@@ -113,6 +113,7 @@ describe('graph CLI context', () => {
       config,
       configFilePath: '/non-vcs/discovered-project/specd.yaml',
       kernel,
+      host,
       projectRoot: '/non-vcs/discovered-project',
       vcsRoot: null,
     })

@@ -13,5 +13,41 @@
     {
       "file": "core:src/composition/use-cases/restore-change.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "RestoreChange recovers drafted change via restored event + mutateDraft(); relocates drafts/ → changes/; isDrafted false.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:351bafa0de071047a5a0864938f8d4ed40b170623a0f1d39f614387ba4420989",
+          "lastModified": "2026-08-25T15:37:19.334Z"
+        },
+        "verify.md": {
+          "hash": "sha256:3a74ee908447ce05509cb7ec7103e71d57f211e25b890a6c45cc3dce5db147be",
+          "lastModified": "2026-08-25T15:37:19.334Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# RestoreChange\n\n## Rules\n- Input: `name` (required).\n- MUST load via `ChangeRepository.getDraft(name)`; null → `ChangeNotFoundError`. MUST NOT use `ChangeRepository.get(name)`.\n- Actor via `ActorResolver` on `restored` event.\n- `change.restore(actor)`. Event: `type: 'restored'`, `at`, `by`.\n- Persist via `ChangeRepository.mutateDraft(name, fn)`: callback gets fresh drafted Change; call `restore` and return. Repo persists manifest + moves `drafts/` → `changes/`.\n- Returns updated active `Change` (`isDrafted === false`) from serialized mutation.\n- Deps: ChangeRepository, ActorResolver. Config factory via `resolveRestoreChangeDeps` only.\n\n## Constraints\n- No lifecycle state transitions — restoring orthogonal to lifecycle\n- Directory relocation entirely repository-owned\n- `isDrafted` derived from most recent drafted or restored history event",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:351bafa0de071047a5a0864938f8d4ed40b170623a0f1d39f614387ba4420989",
+          "lastModified": "2026-08-25T15:37:19.334Z"
+        },
+        "verify.md": {
+          "hash": "sha256:3a74ee908447ce05509cb7ec7103e71d57f211e25b890a6c45cc3dce5db147be",
+          "lastModified": "2026-08-25T15:37:19.334Z"
+        }
+      }
+    }
+  }
 }

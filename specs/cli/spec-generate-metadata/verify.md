@@ -69,23 +69,23 @@
 
 ### Requirement: Error — dependsOn overwrite
 
-#### Scenario: dependsOn change exits 1
+#### Scenario: dependsOn change exits 1 with --force hint
 
 - **GIVEN** existing metadata has `dependsOn: [core:config, core:schema-format]`
 - **AND** the regenerated metadata has `dependsOn: [core:change]`
 - **WHEN** `specd spec generate-metadata auth/login` is invoked without `--force`
-- **THEN** the command writes `error: dependsOn would change` to stderr
+- **THEN** stderr includes `error: dependsOn would change` and a hint mentioning `--force`
 - **AND** exits with code 1
 - **AND** stdout is empty
 
-#### Scenario: JSON output on dependsOn error
+#### Scenario: JSON output on dependsOn error includes hint
 
 - **GIVEN** existing metadata has `dependsOn: [core:config]`
 - **AND** the regenerated metadata has `dependsOn: [core:change]`
 - **WHEN** `specd spec generate-metadata auth/login --format json` is invoked without `--force`
 - **THEN** the command exits with code 1
 - **AND** stderr contains `error: dependsOn would change`
-- **AND** stdout is empty
+- **AND** the structured error payload includes a `hint` mentioning `--force`
 
 #### Scenario: --force bypasses dependsOn check
 

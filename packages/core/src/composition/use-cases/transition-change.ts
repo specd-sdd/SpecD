@@ -1,20 +1,20 @@
 import { type ActorResolver } from '../../application/ports/actor-resolver.js'
 import { type ChangeRepository } from '../../application/ports/change-repository.js'
 import { type SchemaProvider } from '../../application/ports/schema-provider.js'
+import { type ResolveChangeSchema } from '../../application/services/resolve-change-schema.js'
 import { TransitionChange } from '../../application/use-cases/transition-change.js'
-import { CountTasks } from '../../application/use-cases/count-tasks.js'
-import { createCountTasks, resolveCountTasksDeps } from './count-tasks.js'
 import { type RefreshImplementationTracking } from '../../application/use-cases/refresh-implementation-tracking.js'
-import { type RunStepHooks } from '../../application/use-cases/run-step-hooks.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import { type ApprovalGates } from '../../application/use-cases/transition-change.js'
-import { type LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
+import { type CheckBinding } from '../../domain/services/transition-checks.js'
+import { type CheckRegistry } from '../../domain/services/check-registry.js'
 import {
   createCompositionResolver,
   type CompositionResolver,
   type CompositionResolutionOptions,
 } from '../composition-resolver.js'
 import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
+import { resolveWorkflowCheckRegistry } from './workflow-check-registry.js'
 
 /**
  * Explicit dependencies for {@link createTransitionChange}.
@@ -26,16 +26,18 @@ export interface TransitionChangeDeps {
   readonly actor: ActorResolver
   /** Schema provider used by the use case. */
   readonly schemaProvider: SchemaProvider
-  /** Step hook runner used by the use case. */
-  readonly runStepHooks: RunStepHooks
+  /** Shared change schema resolver. */
+  readonly resolveChangeSchema?: ResolveChangeSchema
   /** Refresh implementation tracking use case used by the use case. */
   readonly refreshImplementationTracking: RefreshImplementationTracking
   /** Approval gate configuration used by the use case. */
   readonly approvals: ApprovalGates
-  /** Lifecycle engine used by the use case. */
-  readonly lifecycle: LifecycleEngine
-  /** Shared task-completion query used by the use case. */
-  readonly countTasks: CountTasks
+  /** Composed transition check bindings. */
+  readonly transitionBindings: readonly CheckBinding[]
+  /** Canonical reconciler. Config resolution always supplies the shared instance. */
+  readonly reconcile: import('../../application/use-cases/reconcile-change-validity.js').ReconcileChangeValidity
+  /** Check registry for open check resolution and governance. */
+  readonly checkRegistry?: CheckRegistry
 }
 
 /**
@@ -45,15 +47,17 @@ export interface TransitionChangeDeps {
  * @returns The resolved dependencies for `TransitionChange`
  */
 export function resolveTransitionChangeDeps(resolver: CompositionResolver): TransitionChangeDeps {
+  const registry = resolveWorkflowCheckRegistry(resolver)
   return {
     changes: resolver.getChangeRepository(),
     actor: resolver.getActorResolver(),
     schemaProvider: resolver.getSchemaProvider(),
-    runStepHooks: resolver.getRunStepHooks(),
+    resolveChangeSchema: resolver.getResolveChangeSchema(),
     refreshImplementationTracking: resolver.getRefreshImplementationTracking(),
     approvals: resolver.config.approvals,
-    lifecycle: resolver.getLifecycleEngine(),
-    countTasks: createCountTasks(resolveCountTasksDeps(resolver)),
+    transitionBindings: registry.transitionBindings,
+    reconcile: resolver.getReconcileChangeValidity(),
+    ...(registry.checkRegistry !== undefined ? { checkRegistry: registry.checkRegistry } : {}),
   }
 }
 
@@ -109,21 +113,22 @@ function createTransitionChangeFromNormalized(
       changes,
       actor,
       schemaProvider,
-      runStepHooks,
       refreshImplementationTracking,
       approvals,
-      lifecycle,
-      countTasks,
+      transitionBindings,
+      reconcile,
+      checkRegistry,
     } = input.deps
     return new TransitionChange(
       changes,
       actor,
       schemaProvider,
-      runStepHooks,
       refreshImplementationTracking,
       approvals,
-      lifecycle,
-      countTasks,
+      transitionBindings,
+      reconcile,
+      checkRegistry,
+      input.deps.resolveChangeSchema,
     )
   }
 
@@ -144,10 +149,9 @@ function isTransitionChangeDeps(
     'changes' in value &&
     'actor' in value &&
     'schemaProvider' in value &&
-    'runStepHooks' in value &&
     'refreshImplementationTracking' in value &&
     'approvals' in value &&
-    'lifecycle' in value &&
-    'countTasks' in value
+    'transitionBindings' in value &&
+    'reconcile' in value
   )
 }

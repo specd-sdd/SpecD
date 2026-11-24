@@ -40,7 +40,7 @@ describe('CreateChange', () => {
           specIds: [],
           schemaName: 'specd-std',
           schemaVersion: 1,
-          invalidationPolicy: 'sugical',
+          invalidation: { artifacts: 'sugical' as never, workflow: 'preserve' },
         })
         .catch((e: unknown) => e)
 
@@ -50,7 +50,31 @@ describe('CreateChange', () => {
       expect(createSpy).not.toHaveBeenCalled()
     })
 
-    it.each(['none', 'surgical', 'downstream', 'global'])('accepts %s', async (policy) => {
+    it('rejects an unknown workflow policy with InvalidInputError and creates nothing', async () => {
+      const repo = makeChangeRepository()
+      const createSpy = vi.spyOn(repo, 'create')
+      const uc = makeCreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+      )
+
+      const error = await uc
+        .execute({
+          name: 'add-oauth',
+          specIds: [],
+          schemaName: 'specd-std',
+          schemaVersion: 1,
+          invalidation: { artifacts: 'surgical', workflow: 'bogus' as never },
+        })
+        .catch((e: unknown) => e)
+
+      expect(error).toBeInstanceOf(InvalidInputError)
+      expect((error as Error).message).toContain('bogus')
+      expect((error as Error).message).toContain('preserve, redesign')
+      expect(createSpy).not.toHaveBeenCalled()
+    })
+
+    it.each(['none', 'surgical', 'downstream', 'global'] as const)('accepts %s', async (policy) => {
       const uc = makeCreateChange(
         makeChangeRepository(),
         makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
@@ -61,10 +85,10 @@ describe('CreateChange', () => {
         specIds: [],
         schemaName: 'specd-std',
         schemaVersion: 1,
-        invalidationPolicy: policy,
+        invalidation: { artifacts: policy, workflow: 'preserve' },
       })
 
-      expect(result.change.invalidationPolicy).toBe(policy)
+      expect(result.change.invalidationPolicy.artifacts).toBe(policy)
     })
   })
 
@@ -186,10 +210,13 @@ describe('CreateChange', () => {
         specIds: ['auth/login'],
         schemaName: 'specd-std',
         schemaVersion: 1,
-        invalidationPolicy: 'surgical',
+        invalidation: { artifacts: 'surgical', workflow: 'preserve' },
       })
 
-      expect(result.change.invalidationPolicy).toBe('surgical')
+      expect(result.change.invalidationPolicy).toEqual({
+        artifacts: 'surgical',
+        workflow: 'preserve',
+      })
     })
 
     it('defaults invalidation policy to downstream', async () => {
@@ -206,7 +233,50 @@ describe('CreateChange', () => {
         schemaVersion: 1,
       })
 
-      expect(result.change.invalidationPolicy).toBe('downstream')
+      expect(result.change.invalidationPolicy).toEqual({
+        artifacts: 'downstream',
+        workflow: 'preserve',
+      })
+    })
+
+    it('uses the injected project invalidation policy when input omits an override', async () => {
+      const repo = makeChangeRepository()
+      const uc = makeCreateChange(repo, makeListWorkspaces(new Map()), {
+        defaultInvalidation: { artifacts: 'surgical', workflow: 'redesign' },
+      })
+
+      const result = await uc.execute({
+        name: 'configured-policy',
+        specIds: [],
+        schemaName: 'specd-std',
+        schemaVersion: 1,
+      })
+
+      expect(result.change.invalidationPolicy).toEqual({
+        artifacts: 'surgical',
+        workflow: 'redesign',
+      })
+    })
+
+    it('prefers an explicit invalidation policy over the injected project default', async () => {
+      const repo = makeChangeRepository()
+      const uc = makeCreateChange(repo, makeListWorkspaces(new Map()), {
+        defaultInvalidation: { artifacts: 'global', workflow: 'redesign' },
+      })
+
+      const result = await uc.execute({
+        name: 'explicit-policy',
+        specIds: [],
+        schemaName: 'specd-std',
+        schemaVersion: 1,
+        invalidation: { artifacts: 'none', workflow: 'preserve' },
+      })
+
+      expect(result.change.invalidationPolicy).toEqual({
+        artifacts: 'none',
+        workflow: 'preserve',
+      })
+      expect(result.change.history).toHaveLength(1)
     })
 
     it('loads and seeds persisted dependencies for existing specs', async () => {
@@ -233,7 +303,7 @@ describe('CreateChange', () => {
       expect(result.change.specDependsOn.get('default:auth/login')).toEqual(['default:shared/auth'])
     })
 
-    it('falls back to persisted state for dependencies when sidecar is absent', async () => {
+    it("seeds dependencies from persisted spec-lock state when it is the spec's only file", async () => {
       const repo = makeChangeRepository()
       const specRepo = makeSpecRepository({
         specs: [
@@ -259,7 +329,7 @@ describe('CreateChange', () => {
       expect(result.change.specDependsOn.get('default:auth/login')).toEqual(['default:shared/auth'])
     })
 
-    it('still falls back to persisted state for dependencies when metadata cache is stale', async () => {
+    it('seeds dependencies from persisted spec-lock state, not from a stale metadata cache', async () => {
       const repo = makeChangeRepository()
       const specRepo = makeSpecRepository({
         specs: [
@@ -294,7 +364,7 @@ describe('CreateChange', () => {
       expect(result.change.specDependsOn.get('default:auth/login')).toEqual(['default:shared/auth'])
     })
 
-    it('prefers persisted dependencies over metadata fallback when both exist', async () => {
+    it('uses persisted dependencies and ignores metadata.json dependsOn when both exist', async () => {
       const repo = makeChangeRepository()
       const specRepo = makeSpecRepository({
         specs: [makeSpec({ workspace: 'default', name: 'auth/login', filenames: [] })],
@@ -321,6 +391,29 @@ describe('CreateChange', () => {
       expect(result.change.specDependsOn.get('default:auth/login')).toEqual([
         'default:shared/persisted',
       ])
+    })
+
+    it('seeds no entry for an existing spec without persisted state, ignoring metadata.json', async () => {
+      const repo = makeChangeRepository()
+      const specRepo = makeSpecRepository({
+        specs: [makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })],
+        artifacts: {
+          'auth/login/spec.md': '# Login flow',
+          'auth/login/metadata.json': JSON.stringify({
+            dependsOn: ['default:shared/metadata'],
+          }),
+        },
+      })
+      const uc = makeCreateChange(repo, makeListWorkspaces(new Map([['default', specRepo]])))
+
+      const result = await uc.execute({
+        name: 'add-oauth',
+        specIds: ['default:auth/login'],
+        schemaName: 'specd-std',
+        schemaVersion: 1,
+      })
+
+      expect(result.change.specDependsOn.has('default:auth/login')).toBe(false)
     })
 
     it('does not seed dependsOn for non-existent specs (newly created)', async () => {

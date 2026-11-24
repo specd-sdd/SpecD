@@ -1,0 +1,10 @@
+- op: added
+  description: Preserve typed approval repair guidance for historic parked changes.
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Historic parked approval repair precedence
+
+    For an in-flight change already in `pending-spec-approval` or `pending-signoff`, `TransitionChange` MUST allow only its documented drain target. Before evaluating `protocol.edge` or any other transition predicate, a request for any non-drain target MUST fail with `InvalidStateTransitionError` whose reason has `type: 'approval-required'` and the matching `gate` (`'spec'` or `'signoff'`). It MUST NOT report `invalid-transition` for that request.

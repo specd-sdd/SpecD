@@ -1,0 +1,14 @@
+- op: added
+  description: Verify the artifact model comes from the change's sovereign schema
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Artifact listing from the change's schema
+
+    #### Scenario: Listing follows the change schema
+
+    - **GIVEN** a change whose `schemaName` is `custom-workflow` with a workspace default exposing different artifacts
+    - **WHEN** `specd changes artifacts <name>` runs
+    - **THEN** it lists exactly the `custom-workflow` artifacts in that schema's declared order

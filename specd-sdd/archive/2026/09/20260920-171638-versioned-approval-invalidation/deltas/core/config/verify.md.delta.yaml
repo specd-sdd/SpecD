@@ -1,0 +1,35 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Invalidation policy configuration$'
+  content: |
+    Scenarios:
+
+    #### Scenario: New defaults preserve lifecycle position
+
+    - **WHEN** configuration omits both invalidation shapes
+    - **THEN** a new change resolves `{ artifacts: downstream, workflow: preserve }`
+
+    #### Scenario: Legacy and structured shapes cannot be combined
+
+    - **GIVEN** effective configuration contains `invalidationPolicy` and `invalidation`
+    - **WHEN** configuration is loaded
+    - **THEN** validation fails as ambiguous
+    - **AND** the legacy key alone maps its artifact value with `workflow: redesign`
+
+- op: added
+  description: 'Guard against prematurely treating omitted workflow rows as phase-skipping edges'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Approvals$'
+    after:
+      type: section
+      matches: '^Scenario: Spec gate on does not require pending-spec-approval in the graph$'
+  content: |
+    #### Scenario: Omitted implementing row does not create ready to verifying
+
+    - **GIVEN** the spec approval gate is enabled and the schema omits an `implementing` workflow row
+    - **WHEN** a caller requests `ready → verifying`
+    - **THEN** the fixed protocol still rejects that edge
+    - **AND** the spec gate remains bound to every legal forward leave of `ready`

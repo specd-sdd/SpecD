@@ -6,6 +6,7 @@ import {
   mockProcessExit,
   captureStdout,
   captureStderr,
+  makeMockHost,
 } from './helpers.js'
 
 vi.mock('../../src/helpers/cli-context.js', () => ({
@@ -50,7 +51,9 @@ function setup(workspaces?: Array<{ name: string }>) {
     },
   ]
   kernel.project.listWorkspaces.execute.mockResolvedValue(wsList)
-  vi.mocked(resolveCliContext).mockResolvedValue({ config, configFilePath: null, kernel })
+  vi.mocked(resolveCliContext).mockResolvedValue(
+    makeMockHost({ config, configFilePath: null, kernel }),
+  )
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()

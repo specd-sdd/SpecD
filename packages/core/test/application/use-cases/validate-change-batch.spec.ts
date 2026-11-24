@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { ValidateChangeBatch } from '../../../src/application/use-cases/validate-change-batch.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
-import { SchemaMismatchError } from '../../../src/application/errors/schema-mismatch-error.js'
+import { SchemaProviderIdentityMismatchError } from '../../../src/application/errors/schema-provider-identity-mismatch-error.js'
 import { type ValidateArtifacts } from '../../../src/application/use-cases/validate-artifacts.js'
 import {
   makeChange,
@@ -31,7 +31,7 @@ describe('ValidateChangeBatch', () => {
     expect(validateArtifacts.execute).not.toHaveBeenCalled()
   })
 
-  it('throws SchemaMismatchError when change schema does not match active schema', async () => {
+  it('throws SchemaProviderIdentityMismatchError when provider returns a different schema than the change schema', async () => {
     const change = makeChange('test-change', { specIds: ['default:auth/login'] }, 'schema-a')
     const repo = new StubChangeRepository([change])
     const schema = makeSchema([], [], { name: 'schema-b' })
@@ -39,7 +39,9 @@ describe('ValidateChangeBatch', () => {
     const validateArtifacts = { execute: vi.fn() } as unknown as ValidateArtifacts
 
     const useCase = new ValidateChangeBatch(repo, schemaProvider, validateArtifacts)
-    await expect(useCase.execute({ name: 'test-change' })).rejects.toThrow(SchemaMismatchError)
+    await expect(useCase.execute({ name: 'test-change' })).rejects.toThrow(
+      SchemaProviderIdentityMismatchError,
+    )
     expect(validateArtifacts.execute).not.toHaveBeenCalled()
   })
 

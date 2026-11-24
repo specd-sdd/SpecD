@@ -12,41 +12,44 @@
   "implementation": [
     {
       "file": "code-graph:src/application/use-cases/get-graph-health.ts",
-      "symbols": ["CoverageCompleteness", "CoverageWarning", "GetGraphHealthResult"]
+      "symbols": ["GetGraphHealth"]
+    },
+    {
+      "file": "code-graph:test/application/use-cases/get-graph-health.spec.ts"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "GetGraphHealth aggregates statistics, freshness, coverage, VCS staleness, and fingerprint diagnostics on an open provider.",
+      "value": "GetGraphHealth reports provider statistics, VCS and content freshness, fingerprint compatibility, and aggregate/workspace graph health.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:369558041e60529b41b46d08eed78dce2ba20b716bb64512511f0e732df4013d",
-          "lastModified": "2026-11-02T19:27:44.459Z"
+          "hash": "sha256:08bde58552e9eb27c03b3604ef6fea16e15de415e0709b10d7632eb7228be34f",
+          "lastModified": "2026-08-30T09:18:36.412Z"
         },
         "verify.md": {
-          "hash": "sha256:0eae6d0d05fc99a8c8a2e25b6e77ea397b0993c0d10f049db87994c1722e7a2f",
-          "lastModified": "2026-11-02T19:27:44.462Z"
+          "hash": "sha256:3ea3a96cb1fb86d467a65d45eaa117752c5e8de1292f8208602d6d7258cf367f",
+          "lastModified": "2026-08-30T09:18:36.413Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Get Graph Health\n\n## Rules\n\n- `GetGraphHealth.execute(input)` returns all `GraphStatistics` + `stale`, `currentRef`, `fingerprintMismatch`, content/coverage, `state`, `knownStaleSinceLastIndex`, reason codes, ordered workspace health.\n- Availability via `provider.getStatistics()`; propagate busy/stale unchanged. No lock helpers or caller escape hatch. Input: `config`, open provider, `codeGraphVersion`, optional workspaces; never open/close. `createGetGraphHealth()` stateless, no config capture.\n- VCS: `createVcsAdapter(config.projectRoot)` + `isGraphStale(lastIndexedRef, currentRef)`; `lastIndexedRef === null` → `stale: null`.\n- Fingerprint: if workspaces and `stats.graphFingerprint` exist, effective config + `detectFingerprintMismatch(codeGraphVersion, projectRoot, workspaces, graphConfig)`; else not comparable → `null`.\n- Freshness/coverage: expose working-tree/content state, schema/generation compatibility, partial, summaries/reasons for excluded/unsupported/parse-failed/partial. `excluded`/`unsupported` terminal visible, do NOT incomplete aggregate coverage; `parse-failed`/`partial` do. Discovery/stat/read/hash failure → unknown, never false mismatch/stale latch. No indexing; only refresh equal-content observations + monotonic workspace/global latches.\n- `coverageCompleteness`: `complete` | `complete-with-warnings` | `incomplete` | `unknown`; `coverageWarnings` ordered `{ code, count }`. Only defined warning code `file-too-large` (count of `unsupported`/`file-too-large` records). Derive: incomplete when aggregate incomplete; unknown when unassessable; `complete-with-warnings` when complete + non-empty warnings; else `complete`. Warnings empty when incomplete/unknown. Boolean `coverageComplete` stays `true` for `complete-with-warnings`. Other unsupported/excluded MUST NOT raise warnings. Treat `complete-with-warnings` as absence unproven for size-skipped files.\n- Integrity: indexed coverage MUST correspond to expected File/Document in same generation. Missing node, impossible counts, or completed generation over empty/partial graph → `contentFresh`/`coverageComplete` false, state not current, `GRAPH_CONTENT_INCONSISTENT`. Excluded/unsupported need no node. No repair; diagnostic for reindex/recovery.\n- Aggregate: `state` current/stale/unknown; precedence stale > unknown > current. True aggregate latch → stale without rescan. Transient failure → unknown without latch change. Global failures MAY affect aggregate without false workspace cause. Structured keeps all workspaces; text = aggregate + non-current only; no absolute roots.\n- Efficiency: VCS workspaces by repo root share normalized modified paths filtered by visibility. Excluded-only changes leave latches unchanged. Non-VCS: compare visible membership/observations; hash only when mtime/size differs; refresh equal; stop on first proven mismatch. Inspect failure → unknown unless independent stale evidence. NEVER every symbol or directed assessment of whole graph. Size-skipped (`unsupported`/`file-too-large`) terminal, not indexed members — index+skip run stays current until files/limits change; previously indexed file growing past limit → membership change.\n\n## Constraints\n\n- No indexing, destructive recreation, or arbitrary graph mutation.\n- MAY mutate only semantic freshness cache: equal-content observations + monotonic latches.\n- MUST NOT load change entities or compile project context.\n- Already-open provider: never open/close.\n",
+      "value": "# Get Graph Health\n\n## Rules\n- `GetGraphHealth.execute(input)` returns `GetGraphHealthResult`: all `GraphStatistics`, `stale: boolean | null`, `currentRef: string | null`, `fingerprintMismatch: boolean | null`; aggregate `state: current | stale | unknown`, `knownStaleSinceLastIndex`, stable reason codes, ordered workspace health (`name`, state, latch, `vcs|filesystem|hybrid`, reasons).\n- Use `provider.getStatistics()` for availability; propagate provider busy/stale errors unchanged. No external lock helpers or caller lock-bypass. Input `config: SpecdConfig`, already-open `provider: CodeGraphProvider`, `codeGraphVersion`, optional workspaces; never open/close provider.\n- Get current VCS ref `createVcsAdapter(config.projectRoot)`; `isGraphStale(lastIndexedRef, currentRef)`. `lastIndexedRef === null` → `stale: null`.\n- If workspaces given + `stats.graphFingerprint != null`, parse stored fingerprint, effective graph config, call `detectFingerprintMismatch(codeGraphVersion, projectRoot, workspaces, graphConfig)`; otherwise `null`. `createGetGraphHealth()` returns stateless instance, all input per `execute()`.\n- Report content freshness, backend schema/generation compatibility, partial-index state, coverage/reasons excluded, unsupported, parse-failed, partially indexed. `excluded`/`unsupported` terminal and visible but not incomplete; `parse-failed`/`partial` incomplete + non-current. Reasons aggregate only incomplete coverage.\n- Assessment/stat/content-read/hash failure = unknown affected scope, never false mismatch/stale latch. No indexing; only refresh equal-content observations and atomically set monotonic workspace/global stale latches. Target absence result must show whether trustworthy stale evidence.\n- Successfully indexed coverage record requires expected persisted file/document node same logical generation. Missing nodes, impossible counts, completed generation over empty/partial graph → `contentFresh` and `coverageComplete` false, non-current, `GRAPH_CONTENT_INCONSISTENT`. Excluded/unsupported records require no physical code node. Read-only graph content; diagnostics support reindex/recovery.\n- Aggregate precedence `stale > unknown > current`; true aggregate latch returns stale without rescan. Transient failure unknown without latch mutation; project-wide derivation/input failure may be non-current without false workspace failure. Structured output keeps all workspaces; text only aggregate + non-current; no absolute workspace/VCS roots.\n- VCS workspaces grouped by repository root: one normalized modified-path evaluation filtered effective visibility; excluded-only changes leave latches unchanged. Non-VCS compare visible membership/stored observations, hash only mtime/size differs, refresh equal content, stop first proven mismatch; inspection failure stays unknown unless independent stale proof. Never inspect all symbols or targeted resources graph-wide.\n\n## Constraints\n- Never trigger indexing, destructive recreation, arbitrary graph mutation, load changes, or compile project context.\n- May mutate only semantic freshness cache: equal-content observations; monotonic workspace/global stale latches.\n- Use already-open provider only.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:369558041e60529b41b46d08eed78dce2ba20b716bb64512511f0e732df4013d",
-          "lastModified": "2026-11-02T19:27:44.459Z"
+          "hash": "sha256:08bde58552e9eb27c03b3604ef6fea16e15de415e0709b10d7632eb7228be34f",
+          "lastModified": "2026-08-30T09:18:36.412Z"
         },
         "verify.md": {
-          "hash": "sha256:0eae6d0d05fc99a8c8a2e25b6e77ea397b0993c0d10f049db87994c1722e7a2f",
-          "lastModified": "2026-11-02T19:27:44.462Z"
+          "hash": "sha256:3ea3a96cb1fb86d467a65d45eaa117752c5e8de1292f8208602d6d7258cf367f",
+          "lastModified": "2026-08-30T09:18:36.413Z"
         }
       }
     }

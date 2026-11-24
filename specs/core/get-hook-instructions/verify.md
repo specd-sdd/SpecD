@@ -2,15 +2,27 @@
 
 ## Requirements
 
-### Requirement: Schema name guard
+### Requirement: Sovereign schema resolution
 
-#### Scenario: Schema mismatch throws SchemaMismatchError
+#### Scenario: Resolves sovereign schema when workspace default differs
 
-- **GIVEN** a change created with schema `spec-driven`
-- **AND** `SchemaProvider.get()` returns a schema named `custom-schema`
+- **GIVEN** a change created with schema `custom-schema`
+- **AND** workspace default schema is `spec-driven`
 - **WHEN** `execute` is called
-- **THEN** `SchemaMismatchError` is thrown
-- **AND** no hooks are executed
+- **THEN** it resolves `custom-schema` via `SchemaProvider.get('custom-schema')`
+- **AND** returns instructions defined in `custom-schema` without throwing `SchemaMismatchError`
+
+#### Scenario: Disabled step returns no hook instructions
+
+- **GIVEN** a change schema that declares hooks on `verifying` and marks `verifying` as `disabled: true`
+- **WHEN** hook instructions are requested for `verifying` in either phase
+- **THEN** no instructions are returned
+
+#### Scenario: Identity mismatch propagates
+
+- **GIVEN** a schema provider returning a wrong-name schema for `change.schemaName`
+- **WHEN** hook instructions are requested
+- **THEN** `SchemaProviderIdentityMismatchError` propagates
 
 ### Requirement: Step resolution
 

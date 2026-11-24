@@ -1,4 +1,10 @@
 import path from 'node:path'
+import {
+  ChangeNotFoundError,
+  SchemaProviderIdentityMismatchError,
+  type ResolvedChangeSchema,
+} from '@specd/sdk'
+import { formatSchemaAdvisories, resolveChangeSchemaForCli } from '../../helpers/change-schema.js'
 import { type Command } from 'commander'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
@@ -211,6 +217,33 @@ function isPreviewFileEntry(value: unknown): value is PreviewFileEntry {
 }
 
 /**
+ * Resolves the change's own schema, exiting with code 3 when resolution fails.
+ * A provider identity mismatch keeps its own code.
+ *
+ * @param kernel - The wired kernel instance
+ * @param name - Change name
+ * @param format - Raw `--format` flag for structured errors
+ * @returns The change's resolved schema and resolver advisories
+ */
+async function resolveValidateSchema(
+  kernel: import('@specd/sdk').Kernel,
+  name: string,
+  format: string,
+): Promise<ResolvedChangeSchema> {
+  try {
+    return await resolveChangeSchemaForCli(kernel, name)
+  } catch (err) {
+    if (err instanceof ChangeNotFoundError) throw err
+    const message = err instanceof Error ? err.message : String(err)
+    const code =
+      err instanceof SchemaProviderIdentityMismatchError
+        ? 'SCHEMA_PROVIDER_IDENTITY_MISMATCH'
+        : 'SCHEMA_RESOLUTION_FAILED'
+    return cliError(message, format, 3, code)
+  }
+}
+
+/**
  * Loads inline diff output for a successful single-artifact spec validation.
  *
  * @param kernel - The wired kernel instance
@@ -225,12 +258,8 @@ async function loadInlineDiffReview(
   specPath: string,
   artifactId: string,
 ): Promise<InlineDiffReview | null> {
-  const schemaResult = await kernel.specs.getActiveSchema.execute()
-  if (schemaResult.raw) {
-    return null
-  }
-
-  const artifactType = schemaResult.schema.artifact(artifactId)
+  const { schema: changeSchema } = await resolveChangeSchemaForCli(kernel, name)
+  const artifactType = changeSchema.artifact(artifactId)
   if (artifactType === null || artifactType.scope !== 'spec') {
     return null
   }
@@ -312,11 +341,8 @@ JSON/TOON output schema:
 
           let requestedArtifactScope: ArtifactScope | undefined
           if (opts.artifact !== undefined) {
-            const schemaResult = await kernel.specs.getActiveSchema.execute()
-            if (schemaResult.raw) {
-              cliError('Cannot validate: schema resolved in raw mode', opts.format)
-            }
-            const artifactType = schemaResult.schema.artifacts().find((a) => a.id === opts.artifact)
+            const { schema: changeSchema } = await resolveValidateSchema(kernel, name, opts.format)
+            const artifactType = changeSchema.artifacts().find((a) => a.id === opts.artifact)
             if (artifactType !== undefined) {
               requestedArtifactScope = artifactType.scope
             }
@@ -372,6 +398,9 @@ async function executeSingle(
   requestedArtifactScope?: ArtifactScope,
 ): Promise<void> {
   const isChangeScopedArtifact = opts.artifact !== undefined && requestedArtifactScope === 'change'
+
+  const { warnings: schemaWarnings } = await resolveValidateSchema(kernel, name, opts.format)
+  const advisoryBlock = formatSchemaAdvisories(schemaWarnings)
 
   const result = toValidateResult(
     await kernel.changes.validate.execute({
@@ -444,6 +473,7 @@ async function executeSingle(
       output(`validation failed ${displayTarget}:\n${allLines.join('\n')}`, 'text')
       process.exitCode = 1
     }
+    if (advisoryBlock !== null) output(advisoryBlock, 'text')
   } else {
     output(
       {
@@ -451,6 +481,7 @@ async function executeSingle(
         failures: result.failures,
         notes: result.notes,
         files: result.files,
+        ...(schemaWarnings.length > 0 ? { schemaWarnings } : {}),
       },
       fmt,
     )
@@ -498,6 +529,7 @@ async function executeBatch(
   }
 
   const fmt = parseFormat(opts.format)
+  const schemaWarnings = batchResult.warnings ?? []
 
   if (fmt === 'text') {
     const isChangeScopedArtifact =
@@ -540,8 +572,16 @@ async function executeBatch(
     }
     const passedSteps = batchResult.results.filter((r) => r.passed).length
     output(`validated ${passedSteps}/${batchResult.total} steps`, 'text')
+    const advisoryBlock = formatSchemaAdvisories(schemaWarnings)
+    if (advisoryBlock !== null) output(advisoryBlock, 'text')
   } else {
-    output(batchResult, fmt)
+    output(
+      {
+        ...batchResult,
+        ...(schemaWarnings.length > 0 ? { schemaWarnings } : {}),
+      },
+      fmt,
+    )
   }
 
   if (!batchResult.passed) {

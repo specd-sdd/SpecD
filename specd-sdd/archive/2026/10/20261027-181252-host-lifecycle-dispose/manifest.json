@@ -1,0 +1,1712 @@
+{
+  "manifestVersion": 2,
+  "name": "host-lifecycle-dispose",
+  "createdAt": "2026-10-27T18:12:52.028Z",
+  "updatedAt": "2026-10-28T11:02:20.119Z",
+  "description": "Adds an idempotent dispose() and AsyncDisposable support (await using) to the Kernel and SdkHostContext, with named disposers, ordered and isolated teardown and a 5 s per-disposer timeout. The CLI now releases every host it opens through a cleanup registry on all exit paths and on SIGINT/SIGTERM (exit codes 130/143), with a 1 s/5 s exit grace period for leaked handles, and declares Node >=22 as the supported floor. This is the base lifecycle for upcoming runtime plugins.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:kernel",
+    "sdk:host-context",
+    "cli:host-context",
+    "core:kernel-builder",
+    "cli:entrypoint",
+    "default:_global/conventions"
+  ],
+  "specDependsOn": {
+    "core:kernel": [
+      "default:_global/architecture",
+      "core:composition",
+      "core:create-change",
+      "core:get-status",
+      "core:transition-change",
+      "core:draft-change",
+      "core:restore-change",
+      "core:discard-change",
+      "core:archive-change",
+      "core:validate-artifacts",
+      "core:compile-context",
+      "core:list-changes",
+      "core:list-drafts",
+      "core:list-discarded",
+      "core:edit-change",
+      "core:skip-artifact",
+      "core:update-spec-deps",
+      "core:list-archived",
+      "core:get-archived-change",
+      "core:run-step-hooks",
+      "core:get-hook-instructions",
+      "core:get-artifact-instruction",
+      "core:approve-spec",
+      "core:approve-signoff",
+      "core:list-specs",
+      "core:get-spec",
+      "core:get-active-schema",
+      "core:validate-specs",
+      "core:generate-metadata",
+      "core:materialize-spec-metadata",
+      "core:get-spec-metadata",
+      "core:regenerate-spec-metadata",
+      "core:initialize-persisted-spec-state",
+      "core:get-persisted-spec-schema",
+      "core:update-persisted-spec-schema",
+      "core:get-persisted-spec-deps",
+      "core:update-persisted-spec-deps",
+      "core:get-persisted-spec-implementation",
+      "core:update-persisted-spec-implementation",
+      "core:get-persisted-spec-optimizations",
+      "core:update-persisted-spec-optimizations",
+      "core:get-spec-context",
+      "core:config-writer-port",
+      "core:list-workspaces",
+      "core:get-project-context",
+      "core:get-config",
+      "core:project-metadata",
+      "core:update-project-metadata",
+      "core:resolve-schema",
+      "core:spec-overlap",
+      "core:get-specs-health",
+      "core:count-tasks",
+      "core:check-registry",
+      "core:archive-repository-port",
+      "core:get-draft",
+      "core:get-discarded",
+      "core:invalidate-change",
+      "core:update-implementation-tracking",
+      "core:refresh-implementation-tracking",
+      "core:get-implementation-review",
+      "core:preview-spec",
+      "core:get-spec-outline",
+      "core:validate-schema",
+      "core:resolve-context-specs",
+      "core:get-project-summary",
+      "core:actor-resolver"
+    ],
+    "sdk:host-context": [
+      "sdk:composition",
+      "core:kernel",
+      "core:kernel-builder",
+      "core:composition",
+      "code-graph:composition"
+    ],
+    "cli:host-context": ["cli:entrypoint", "sdk:host-context", "sdk:composition", "core:kernel"],
+    "core:kernel-builder": [
+      "core:kernel",
+      "core:composition",
+      "core:composition-resolver",
+      "core:materialize-spec-metadata",
+      "default:_global/architecture"
+    ],
+    "cli:entrypoint": ["core:config", "default:_global/error-handling-conventions"],
+    "default:_global/conventions": ["default:_global/error-handling-conventions"]
+  },
+  "invalidation": {
+    "artifacts": "downstream",
+    "workflow": "preserve"
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:f0966ffbff36ce1bfe3f416485c6f1ec6329b4203697e2e7258fd2ff896adba5"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:kernel",
+          "filename": "deltas/core/kernel/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2409482a02a6cf2e90ef9a8f7af6e770873ce810afcd6da7a2687095ec764353"
+        },
+        {
+          "key": "sdk:host-context",
+          "filename": "deltas/sdk/host-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:cd7beae26d8a909821c30a1f53b843ced30b25cdf951e3eaf9ad48b9c104e1a1"
+        },
+        {
+          "key": "cli:host-context",
+          "filename": "deltas/cli/host-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:fb1630ca9c91500bca347788dd872001defc9482994a7341b518ae7cd5275789"
+        },
+        {
+          "key": "core:kernel-builder",
+          "filename": "deltas/core/kernel-builder/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9298f890ecf8aab975f6018e9b8a6317f5322010324faf30c5fc053484cf9df8"
+        },
+        {
+          "key": "cli:entrypoint",
+          "filename": "deltas/cli/entrypoint/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ec51dcf5a1729a0feaa8ac3a343a475c2ae65b1bbd4d52085c2b5ddbe8847578"
+        },
+        {
+          "key": "default:_global/conventions",
+          "filename": "deltas/default/_global/conventions/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:23cb7622bc10e243acffe94a584875c5090b0b5d3dee9171246a5f95e25dcacf"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:kernel",
+          "filename": "deltas/core/kernel/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:363f84d3afdb4c892a9d2a1c2edaaf27bdf85ead6d07e4d30c3a76fa014165f0"
+        },
+        {
+          "key": "sdk:host-context",
+          "filename": "deltas/sdk/host-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f6c634011ed6490fce45674ebbfc2dd37ca88e528a073ecac26915b64330dbb3"
+        },
+        {
+          "key": "cli:host-context",
+          "filename": "deltas/cli/host-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e2859505b2662ae29a590664f1b2a37b7347f44c8d8476b1fe56cf6ac7ff7740"
+        },
+        {
+          "key": "core:kernel-builder",
+          "filename": "deltas/core/kernel-builder/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8419ae56b37a6433e863e71a0f5eea9569f6c1f35623bd70da9f51d6e865a2d3"
+        },
+        {
+          "key": "cli:entrypoint",
+          "filename": "deltas/cli/entrypoint/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:60faabddd66f4f0d72ef4cae759ca8737a5becf7efc7733610d86f032971de97"
+        },
+        {
+          "key": "default:_global/conventions",
+          "filename": "deltas/default/_global/conventions/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:73239aefc11782dc6002fba3cdedb2845a644d0c9f67e15e6895c83ddf257995"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:1c2f221db7b0d97ecd48475f52ffacf616fe7287f79a016056e9739162fedaef"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:eef778f60f559e61dad924dc86d03195df5dc00965c161006234647332898dfb"
+        }
+      ]
+    }
+  ],
+  "trackedImplementationFiles": [
+    {
+      "file": "packages/core/src/composition/kernel.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/kernel-disposal.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/errors/disposer-failed-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/errors/invalid-disposer-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/kernel-builder.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/composition/host-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/helpers/cli-host.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/helpers/cli-cleanup.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/helpers/cli-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/helpers/cli-context-types.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/graph-index-task.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/with-provider.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/run.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/helpers/cli-signals.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/helpers/cli-exit-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/handle-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "dev/scripts/check-engines.js",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20261027-host-lifecycle-dispose-specd.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20261027-host-lifecycle-dispose.md",
+      "state": "resolved"
+    },
+    {
+      "file": "README.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/adr/0003-esm-only.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/adr/0031-host-lifecycle-and-node-floor.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/errors.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/overview.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/sdk/index.md",
+      "state": "resolved"
+    },
+    {
+      "file": "package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/archive.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/create.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/implementation.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/run-hooks.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/transition.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/hotspots.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/impact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/index-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/resolve-graph-cli-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/search.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/stats.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/plugins/install.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/plugins/uninstall.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/plugins/update.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/project/dashboard.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/project/init.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/project/status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/project/update.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/schema/validate.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/optimizations.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/helpers/sdk-host.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/cli/test/commands/archive-list.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/archive-show.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-artifact-instruction.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-artifacts.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-check-overlap.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-create.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-deps.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-discard.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-draft.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-edit.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-implementation.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-list.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-run-hooks.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-skip-artifact.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-validate.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change/approve.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change/archive.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change/change-artifacts.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change/change-invalidate.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change/spec-preview.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change/status.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change/transition.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change/verification.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/config-schema-project.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/discarded-list.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/discarded-show.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/drafts-list.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/drafts-restore.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/drafts-show.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-cli-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-hotspots.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-impact.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-index.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-search.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-stats.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/helpers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/list-commands.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/plugins-update.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/plugins.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/project-context-specs.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/project-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/project-dashboard.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/project-init.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/project-update.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/project/status.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/schema-extend.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/schema-fork.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/schema-show.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/schema-validate.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-deps.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-generate-metadata.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-implementation.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-init.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-list.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-metadata.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-optimizations.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-outline.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-resolve-path.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-schema.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-search.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-show.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-validate.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/storage-reindex.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/entrypoint.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/graph-index-task.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/handle-error.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/helpers/cli-cleanup.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/helpers/cli-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/helpers/cli-host.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/helpers/cli-signals.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/run.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/errors/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/extensions.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/public.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/kernel-builder.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/kernel-disposal.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/kernel.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/infrastructure/generated/guides.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/mcp/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-claude/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-codex/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-standard/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/schema-std/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/composition/host-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/composition/with-open-graph-provider.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/specd/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "tsconfig.base.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/dev/check-engines.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/fixtures/signal-child.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/helpers/cli-signals-process.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-status/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/package-deps.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/run-host-release.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/fixtures/run-child.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/run-process.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:kernel",
+      "file": "packages/core/src/composition/kernel.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createKernel", "Kernel", "KernelOptions"]
+    },
+    {
+      "specId": "core:kernel",
+      "file": "packages/core/src/composition/kernel-disposal.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "runDisposers",
+        "createDispose",
+        "validateDisposers",
+        "releaseAfterFailedConstruction",
+        "KernelDisposer"
+      ]
+    },
+    {
+      "specId": "core:kernel",
+      "file": "packages/core/src/application/errors/disposer-failed-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["DisposerFailedError"]
+    },
+    {
+      "specId": "core:kernel",
+      "file": "packages/core/src/application/errors/invalid-disposer-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InvalidDisposerError"]
+    },
+    {
+      "specId": "core:kernel-builder",
+      "file": "packages/core/src/composition/kernel-builder.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createKernelBuilder", "KernelBuilder"]
+    },
+    {
+      "specId": "sdk:host-context",
+      "file": "packages/sdk/src/composition/host-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createSdkContext", "SdkHostContext", "openSpecdHost"]
+    },
+    {
+      "specId": "cli:host-context",
+      "file": "packages/cli/src/helpers/cli-host.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["openCliHost"]
+    },
+    {
+      "specId": "cli:host-context",
+      "file": "packages/cli/src/helpers/cli-cleanup.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerCliCleanup", "runCliCleanup"]
+    },
+    {
+      "specId": "cli:host-context",
+      "file": "packages/cli/src/helpers/cli-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["resolveCliContext"]
+    },
+    {
+      "specId": "cli:host-context",
+      "file": "packages/cli/src/helpers/cli-context-types.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CliContext"]
+    },
+    {
+      "specId": "cli:host-context",
+      "file": "packages/cli/src/graph-index-task.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["runGraphIndexTask"]
+    },
+    {
+      "specId": "cli:host-context",
+      "file": "packages/cli/src/commands/graph/with-provider.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["withProvider"]
+    },
+    {
+      "specId": "cli:entrypoint",
+      "file": "packages/cli/src/run.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["run"]
+    },
+    {
+      "specId": "cli:entrypoint",
+      "file": "packages/cli/src/helpers/cli-signals.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["installCliSignalHandlers"]
+    },
+    {
+      "specId": "cli:entrypoint",
+      "file": "packages/cli/src/helpers/cli-exit-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CliExitError"]
+    },
+    {
+      "specId": "cli:entrypoint",
+      "file": "packages/cli/src/handle-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["cliError", "handleError"]
+    },
+    {
+      "specId": "cli:entrypoint",
+      "file": "packages/cli/src/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/conventions",
+      "file": "dev/scripts/check-engines.js",
+      "fileLinkExplicit": true
+    }
+  ],
+  "implementationTrackingStartedAt": "2026-10-27T20:42:23.040Z",
+  "verification": {
+    "completed": {
+      "id": "verification-4",
+      "attemptId": "verification-attempt-4",
+      "status": "valid",
+      "completedAt": "2026-10-28T10:45:32.361Z",
+      "completedBy": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "fingerprint": {
+        "version": 1,
+        "artifacts": {
+          "version": 1,
+          "algorithm": "artifact-pre-hash-v1",
+          "files": {
+            "design:design": "sha256:1c2f221db7b0d97ecd48475f52ffacf616fe7287f79a016056e9739162fedaef",
+            "proposal:proposal": "sha256:f0966ffbff36ce1bfe3f416485c6f1ec6329b4203697e2e7258fd2ff896adba5",
+            "specs:cli:entrypoint": "sha256:ec51dcf5a1729a0feaa8ac3a343a475c2ae65b1bbd4d52085c2b5ddbe8847578",
+            "specs:cli:host-context": "sha256:fb1630ca9c91500bca347788dd872001defc9482994a7341b518ae7cd5275789",
+            "specs:core:kernel": "sha256:2409482a02a6cf2e90ef9a8f7af6e770873ce810afcd6da7a2687095ec764353",
+            "specs:core:kernel-builder": "sha256:9298f890ecf8aab975f6018e9b8a6317f5322010324faf30c5fc053484cf9df8",
+            "specs:default:_global/conventions": "sha256:23cb7622bc10e243acffe94a584875c5090b0b5d3dee9171246a5f95e25dcacf",
+            "specs:sdk:host-context": "sha256:cd7beae26d8a909821c30a1f53b843ced30b25cdf951e3eaf9ad48b9c104e1a1",
+            "verify:cli:entrypoint": "sha256:60faabddd66f4f0d72ef4cae759ca8737a5becf7efc7733610d86f032971de97",
+            "verify:cli:host-context": "sha256:e2859505b2662ae29a590664f1b2a37b7347f44c8d8476b1fe56cf6ac7ff7740",
+            "verify:core:kernel": "sha256:363f84d3afdb4c892a9d2a1c2edaaf27bdf85ead6d07e4d30c3a76fa014165f0",
+            "verify:core:kernel-builder": "sha256:8419ae56b37a6433e863e71a0f5eea9569f6c1f35623bd70da9f51d6e865a2d3",
+            "verify:default:_global/conventions": "sha256:73239aefc11782dc6002fba3cdedb2845a644d0c9f67e15e6895c83ddf257995",
+            "verify:sdk:host-context": "sha256:f6c634011ed6490fce45674ebbfc2dd37ca88e528a073ecac26915b64330dbb3"
+          }
+        },
+        "implementation": {
+          "version": 1,
+          "hashAlgorithm": "sha256",
+          "textNormalization": "text-v1",
+          "binaryNormalization": "bytes-v1",
+          "files": {
+            "dev/scripts/check-engines.js": {
+              "hash": "sha256:e6b61c9f64ca24bfef2281bceec222ed2346826e2cec602e249597c4e89ec239",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/commands/graph/with-provider.ts": {
+              "hash": "sha256:910fe26e5ec0958837420e92de96f92ae30e1322b5c796e13236415f5241687d",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/graph-index-task.ts": {
+              "hash": "sha256:9f7ab2812af0e6b061b4867ebfbb5e24a512d571ae312b4ea3ef6b276d83945c",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/handle-error.ts": {
+              "hash": "sha256:979aefb93b86bec25048a1bee76fa3ef680e2a3abfeb7d6b0fdc0afb70327813",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/helpers/cli-cleanup.ts": {
+              "hash": "sha256:9f5f213518cb49302b20a00e27d734899a22a1764fb642958ddd676a4806dcb4",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/helpers/cli-context-types.ts": {
+              "hash": "sha256:7e0926cabaf8646b6deabbd195bd24b6f6ef36034a881a9a4cd314b36fb5bead",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/helpers/cli-context.ts": {
+              "hash": "sha256:e0c939d34d791332bdbae9c0efe8f277672f961ece9bc3b29dfd6514358ee86b",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/helpers/cli-exit-error.ts": {
+              "hash": "sha256:fc1e8123dfcf76bab0729b2fb9b9eb49816106a7c3ea6de95706b461fa545585",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/helpers/cli-host.ts": {
+              "hash": "sha256:120650be2d262fe4c26ac9f580da076aabd1a3cf10711bcc9b1ddea74e1dfafd",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/helpers/cli-signals.ts": {
+              "hash": "sha256:c7c1db67f8aab6b7d9d891864afd5c82e146e309d89b5521a073fbcca754e5f0",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/index.ts": {
+              "hash": "sha256:ffef660d27720b611201886a05ea3e30e0a73548bb6dc5a900976798807a7a34",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/run.ts": {
+              "hash": "sha256:5c3934d3eda1293fb476fe9ab7bf6e66f6be5a6b3579374e5fb29223d4999707",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/application/errors/disposer-failed-error.ts": {
+              "hash": "sha256:1c1f3ceb1fdb3b0cb5240a7bbf808cd40825fbab1d09f42df11c648bc7a83fe4",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/application/errors/invalid-disposer-error.ts": {
+              "hash": "sha256:27e21b5c7a2433c31a15485d3cf0bc8a1f49f8f5a61cc8fe5f5b9d887760b8ec",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/composition/kernel-builder.ts": {
+              "hash": "sha256:cf803e6c2128e47621a9a3e933803ef3f1dbfb85c33b747438a9e08fccbaef45",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/composition/kernel-disposal.ts": {
+              "hash": "sha256:1ef8253e7b404cc9a01a1bed0bb9a3216390e735c621d22d6a1459122b130890",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/composition/kernel.ts": {
+              "hash": "sha256:b73f3ddcc3ec2c8832d62b36894bc46380489e7107ea1ed1ed5ba5578531e3bf",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/sdk/src/composition/host-context.ts": {
+              "hash": "sha256:d8a951fd4bf408aa80196a640f06fe8a740507d563f6ed4b4473fcf1a9b2a6c9",
+              "content": "text",
+              "normalization": "text-v1"
+            }
+          }
+        }
+      }
+    }
+  },
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-10-27T18:12:52.028Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["core:core/kernel", "sdk:sdk/host-context", "cli:cli/host-context"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-27T18:12:52.047Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:core/kernel"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:sdk/host-context"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/host-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/kernel"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:sdk/host-context"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/host-context"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T19:00:11.556Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-27T19:00:52.652Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:kernel"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:host-context"
+        },
+        {
+          "type": "specs",
+          "key": "cli:host-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:kernel"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:host-context"
+        },
+        {
+          "type": "verify",
+          "key": "cli:host-context"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-27T19:00:58.543Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "core:core/kernel"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:sdk/host-context"
+        },
+        {
+          "type": "specs",
+          "key": "cli:cli/host-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:core/kernel"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:sdk/host-context"
+        },
+        {
+          "type": "verify",
+          "key": "cli:cli/host-context"
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-27T19:44:13.898Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:kernel-builder"
+        },
+        {
+          "type": "verify",
+          "key": "core:kernel-builder"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-27T20:14:18.803Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:entrypoint"
+        },
+        {
+          "type": "specs",
+          "key": "default:_global/conventions"
+        },
+        {
+          "type": "verify",
+          "key": "cli:entrypoint"
+        },
+        {
+          "type": "verify",
+          "key": "default:_global/conventions"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-27T20:28:41.353Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:kernel",
+            "sdk:host-context",
+            "cli:host-context",
+            "core:kernel-builder",
+            "cli:entrypoint",
+            "default:_global/conventions"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:kernel",
+            "sdk:host-context",
+            "cli:host-context",
+            "core:kernel-builder",
+            "cli:entrypoint",
+            "default:_global/conventions"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-27T20:33:34.198Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T20:41:21.787Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T20:42:23.040Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-27T22:43:43.752Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-10-27T22:44:09.776Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-1",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-28T06:31:43.685Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-28T06:32:06.425Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:host-context", "cli:entrypoint"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:host-context", "cli:entrypoint"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-28T06:34:56.424Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-28T06:36:14.675Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-28T08:02:48.508Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-10-28T08:03:13.269Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-2",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-28T08:19:26.268Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-28T08:22:56.232Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:kernel", "cli:host-context", "core:kernel-builder", "cli:entrypoint"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:kernel",
+            "sdk:host-context",
+            "cli:host-context",
+            "core:kernel-builder",
+            "cli:entrypoint",
+            "default:_global/conventions"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-28T08:25:18.091Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-28T08:30:04.373Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-28T08:40:30.567Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-10-28T08:44:10.700Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-3",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-28T08:51:21.892Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-28T10:39:40.044Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-10-28T10:39:46.706Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-4",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "verification-completed",
+      "at": "2026-10-28T10:45:32.361Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-4",
+      "verificationId": "verification-4"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-28T10:45:58.707Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-28T10:46:24.229Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-10-28T10:53:15.480Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Adds an idempotent dispose() and AsyncDisposable support (await using) to the Kernel and SdkHostContext, with named disposers, ordered and isolated teardown and a 5 s per-disposer timeout. The CLI now releases every host it opens through a cleanup registry on all exit paths and on SIGINT/SIGTERM (exit codes 130/143), with a 1 s/5 s exit grace period for leaked handles, and declares Node >=22 as the supported floor. This is the base lifecycle for upcoming runtime plugins."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-28T11:02:20.112Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-10-28T11:02:20.637Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

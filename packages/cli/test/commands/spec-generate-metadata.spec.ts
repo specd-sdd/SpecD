@@ -6,6 +6,7 @@ import {
   mockProcessExit,
   captureStdout,
   captureStderr,
+  makeMockHost,
 } from './helpers.js'
 
 vi.mock('../../src/helpers/cli-context.js', () => ({
@@ -19,11 +20,13 @@ import { registerSpecGenerateMetadata } from '../../src/commands/spec/generate-m
 function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
-  vi.mocked(resolveCliContext).mockResolvedValue({
-    config: config,
-    configFilePath: null,
-    kernel: kernel,
-  })
+  vi.mocked(resolveCliContext).mockResolvedValue(
+    makeMockHost({
+      config: config,
+      configFilePath: null,
+      kernel: kernel,
+    }),
+  )
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
@@ -187,5 +190,57 @@ describe('spec generate-metadata', () => {
     expect(parsed.total).toBe(2)
     expect(parsed.succeeded).toBe(2)
     expect(parsed.failed).toBe(0)
+  })
+
+  it('exits 1 with --force hint on stderr when single-spec fails with DEPENDS_ON_OVERWRITE', async () => {
+    const { kernel, stdout, stderr } = setup()
+    vi.mocked(kernel.specs.regenerateMetadata.execute).mockResolvedValue({
+      kind: 'spec',
+      result: {
+        specId: 'default:auth/login',
+        ok: false,
+        code: 'DEPENDS_ON_OVERWRITE',
+        error:
+          'dependsOn would change (added: core:auth); overwriting curated dependencies requires explicit confirmation.',
+      },
+    })
+
+    const program = makeProgram()
+    registerSpecGenerateMetadata(program.command('spec'))
+    await program
+      .parseAsync(['node', 'specd', 'spec', 'generate-metadata', 'auth/login'])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stdout()).toBe('')
+    expect(stderr()).toContain('dependsOn would change')
+    expect(stderr()).toContain('--force')
+  })
+
+  it('includes --force hint in JSON output when single-spec fails with DEPENDS_ON_OVERWRITE', async () => {
+    const { kernel, stdout, stderr } = setup()
+    vi.mocked(kernel.specs.regenerateMetadata.execute).mockResolvedValue({
+      kind: 'spec',
+      result: {
+        specId: 'default:auth/login',
+        ok: false,
+        code: 'DEPENDS_ON_OVERWRITE',
+        error:
+          'dependsOn would change (added: core:auth); overwriting curated dependencies requires explicit confirmation.',
+      },
+    })
+
+    const program = makeProgram()
+    registerSpecGenerateMetadata(program.command('spec'))
+    await program
+      .parseAsync(['node', 'specd', 'spec', 'generate-metadata', 'auth/login', '--format', 'json'])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toContain('dependsOn would change')
+    const parsed = JSON.parse(stdout())
+    expect(parsed.result).toBe('error')
+    expect(parsed.code).toBe('DEPENDS_ON_OVERWRITE')
+    expect(parsed.hint).toContain('--force')
   })
 })

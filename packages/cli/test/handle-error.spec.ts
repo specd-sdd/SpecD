@@ -24,11 +24,14 @@ import {
   HookFailedError,
   SchemaValidationError,
   ConfigValidationError,
-  ArchiveDependencyMismatchError,
+  CheckPredicateFailedError,
+  PluginDestroyError,
+  PluginValidationError,
   InvalidSpecLockError,
   type LoggerPort,
 } from '@specd/sdk'
-import { handleError } from '../src/handle-error.js'
+import { handleError, cliError } from '../src/handle-error.js'
+import { CliExitError } from '../src/helpers/cli-exit-error.js'
 import { CliValidationError, InvalidFormatError } from '../src/errors/index.js'
 import { mockProcessExit, ExitSentinel } from './commands/helpers.js'
 
@@ -40,11 +43,20 @@ function capturedStderr(): string {
 function callHandleError(
   err: unknown,
   format?: string,
-  options?: { readonly lockRepairHint?: boolean },
+  options?: {
+    readonly command?: import('../src/error-hints.js').CliCommandId
+    readonly lockRepairHint?: boolean
+  },
 ): void {
   try {
     handleError(err, format, options)
   } catch (e) {
+    try {
+      if (e instanceof CliExitError) process.exit(e.exitCode)
+    } catch (sentinel) {
+      if (sentinel instanceof ExitSentinel) return
+      throw sentinel
+    }
     if (e instanceof ExitSentinel) return
     throw e
   }
@@ -87,6 +99,8 @@ describe('handleError — exit code 1 (domain errors)', () => {
     ['UnsupportedPatternError', new UnsupportedPatternError('output', 'nested variables')],
     ['PathTraversalError', new PathTraversalError('/etc/passwd')],
     ['DeltaApplicationError', new DeltaApplicationError('section not found')],
+    ['PluginDestroyError', new PluginDestroyError([new Error('boom')], ['@acme/x'])],
+    ['PluginValidationError', new PluginValidationError('@acme/x', ['create'])],
     ['MetadataValidationError', new MetadataValidationError('title: Required')],
     ['DependsOnOverwriteError', new DependsOnOverwriteError(['core:config'], ['core:change'])],
   ]
@@ -306,21 +320,35 @@ describe('handleError — structured error output', () => {
 
   it('structured output preserves contextual metadata from SpecdError getters', () => {
     callHandleError(
-      new ArchiveDependencyMismatchError(
-        'core:archive-change',
-        ['core:change', 'core:storage'],
-        ['core:change', 'default:_global/error-handling-conventions'],
+      new CheckPredicateFailedError(
+        'deps.consistent',
+        'Checking dependency consistency',
+        'DEPS_INCONSISTENT',
+        'Extracted dependsOn disagrees with persisted values',
+        undefined,
+        {
+          mismatches: [
+            {
+              specId: 'core:archive-change',
+              extracted: ['core:change', 'default:_global/error-handling-conventions'],
+              persisted: ['core:change', 'core:storage'],
+            },
+          ],
+        },
+        false,
+        { from: 'archivable', to: 'archiving' },
       ),
       'json',
     )
 
     const parsed = JSON.parse(capturedStdout()) as Record<string, unknown>
-    expect(parsed.code).toBe('ARCHIVE_DEPENDENCY_MISMATCH')
-    expect(parsed.message).toContain('Archive failed')
-    expect(parsed.metadata).toEqual({
-      specId: 'core:archive-change',
-      expectedDeps: ['core:change', 'core:storage'],
-      actualDeps: ['core:change', 'default:_global/error-handling-conventions'],
+    expect(parsed.code).toBe('DEPS_INCONSISTENT')
+    expect(parsed.message).toContain("Check 'deps.consistent' failed")
+    expect(parsed.metadata).toMatchObject({
+      checkId: 'deps.consistent',
+      checkCode: 'DEPS_INCONSISTENT',
+      from: 'archivable',
+      to: 'archiving',
     })
   })
 
@@ -367,5 +395,135 @@ describe('handleError — structured error output', () => {
     callHandleError('raw string', 'json')
     expect(capturedStdout()).toBe('')
     expect(capturedStderr()).toMatch(/^fatal:/)
+  })
+})
+
+describe('exit signalling without process.exit', () => {
+  beforeEach(() => {
+    mockProcessExit()
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('cliError writes its output and throws a CliExitError without calling process.exit', () => {
+    let thrown: unknown
+    try {
+      cliError('something failed', undefined, 1)
+    } catch (e) {
+      thrown = e
+    }
+
+    expect(thrown).toBeInstanceOf(CliExitError)
+    expect((thrown as CliExitError).exitCode).toBe(1)
+    expect(process.exit).not.toHaveBeenCalled()
+    expect(capturedStderr()).toContain('error: something failed')
+  })
+
+  it('handleError throws a CliExitError carrying the exit code for a domain error', () => {
+    let thrown: unknown
+    try {
+      handleError(new ChangeNotFoundError('my-change'))
+    } catch (e) {
+      thrown = e
+    }
+
+    expect(thrown).toBeInstanceOf(CliExitError)
+    expect((thrown as CliExitError).exitCode).toBe(1)
+    expect(process.exit).not.toHaveBeenCalled()
+  })
+
+  it('handleError rethrows a CliExitError unchanged and prints nothing', () => {
+    const original = new CliExitError(2)
+    let thrown: unknown
+    try {
+      handleError(original)
+    } catch (e) {
+      thrown = e
+    }
+
+    expect(thrown).toBe(original)
+    expect(capturedStderr()).toBe('')
+  })
+
+  it('handleError turns an unexpected error into CliExitError(3)', () => {
+    let thrown: unknown
+    try {
+      handleError(new Error('unexpected'))
+    } catch (e) {
+      thrown = e
+    }
+
+    expect(thrown).toBeInstanceOf(CliExitError)
+    expect((thrown as CliExitError).exitCode).toBe(3)
+    expect(capturedStderr()).toContain('fatal: unexpected')
+  })
+})
+
+describe('handleError — command-aware hint rendering', () => {
+  beforeEach(() => {
+    mockProcessExit()
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('renders command-specific DEPENDS_ON_OVERWRITE hints on stderr and json output', () => {
+    const err = new DependsOnOverwriteError(['a'], ['b'])
+    callHandleError(err, 'text', { command: 'specs.generate-metadata' })
+    expect(capturedStderr()).toContain('Re-run with --force to overwrite curated dependsOn entries')
+
+    vi.mocked(process.stderr.write).mockClear()
+    vi.mocked(process.stdout.write).mockClear()
+
+    callHandleError(err, 'json', { command: 'specs.validate' })
+    const payload = JSON.parse(capturedStdout()) as { code: string; hint?: string }
+    expect(payload.code).toBe('DEPENDS_ON_OVERWRITE')
+    expect(payload.hint).toContain('specd specs deps')
+    expect(payload.hint).not.toContain('specs validate --force')
+  })
+
+  it('renders spec.show-canonical hint for SpecNotInChangeError with metadata.specId', () => {
+    const err = new SpecNotInChangeError('core:auth', 'my-change')
+    callHandleError(err, 'json', { command: 'change.transition' })
+    const payload = JSON.parse(capturedStdout()) as {
+      code: string
+      message: string
+      hint?: string
+    }
+    expect(payload.code).toBe('SPEC_NOT_IN_CHANGE')
+    expect(payload.message).not.toContain('specd specs show')
+    expect(payload.hint).toBe('Run: specd specs show core:auth to view the canonical spec')
+  })
+
+  it('includes hint in toon output for command-aware errors', () => {
+    const err = new DependsOnOverwriteError(['a'], ['b'])
+    callHandleError(err, 'toon', { command: 'specs.generate-metadata' })
+    const toonOut = capturedStdout()
+    expect(toonOut).toContain('code: DEPENDS_ON_OVERWRITE')
+    expect(toonOut).toContain('hint: Re-run with --force to overwrite curated dependsOn entries')
+  })
+
+  it('resolves impl.linksInScope hint from checkId and skippable metadata in structured mode', () => {
+    const err = {
+      specd: true,
+      name: 'CheckPredicateFailedError',
+      code: 'IMPLEMENTATION_STATE',
+      message: 'Out of scope links',
+      checkId: 'impl.linksInScope',
+      skippable: true,
+    }
+    callHandleError(err, 'json', { command: 'change.archive' })
+    const payload = JSON.parse(capturedStdout()) as { code: string; hint?: string }
+    expect(payload.code).toBe('IMPLEMENTATION_STATE')
+    expect(payload.hint).toBe(
+      'Retry with --skip-checks impl.linksInScope if an exception is granted',
+    )
+    expect(payload.hint).not.toContain('--allow-out-of-scope')
   })
 })

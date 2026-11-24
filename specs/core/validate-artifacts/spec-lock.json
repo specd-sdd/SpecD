@@ -14,50 +14,48 @@
     "default:_global/architecture",
     "core:spec-id-format",
     "core:schema-format",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:transition-checks",
+    "core:resolve-change-schema"
   ],
   "implementation": [
     {
-      "file": "core:src/domain/services/pre-hash-cleanup.ts",
-      "symbols": ["applyPreHashCleanup"]
-    },
-    {
-      "file": "core:src/application/use-cases/_shared/compute-artifact-hash.ts",
-      "symbols": ["computeArtifactHash"]
+      "file": "core:src/application/use-cases/validate-artifacts.ts",
+      "symbols": ["ValidateArtifacts"]
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Single chokepoint validating change artifacts against schema, detecting conflicts/drift, and alone marking artifacts complete.",
+      "value": "Validate artifacts against change schema, dependencies, deltas, metadata, hashes, and canonical validity reconciliation.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:13c1589422e057b61292ea1f8c8e770267d46225136ce8d144261ca967d8a9a7",
-          "lastModified": "2026-08-29T20:55:21.006Z"
+          "hash": "sha256:dc85ae51f62f067a6248f72a5a36ec9ad630c7bc57f1371b6d371c3e74a59c54",
+          "lastModified": "2026-10-20T14:34:09.761Z"
         },
         "verify.md": {
-          "hash": "sha256:7093108cee73f362aa8edc40cc256421861a9a214467c8a6055fc3972f8ee3c7",
-          "lastModified": "2026-08-29T20:55:21.007Z"
+          "hash": "sha256:32bfa965321a5cfa358ef33bddcd826627fcff855c1852376e7c0aa6ecc5b80b",
+          "lastModified": "2026-10-20T14:34:09.762Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# ValidateArtifacts\n\n## Rules\n\n- Constructor deps: `ChangeRepository`, `ReadonlyMap<string, SpecRepository>`, `SchemaProvider`, `ArtifactParserRegistry`, `ExtractorTransformRegistry`, `ActorResolver`, `ContentHasher`, `LifecycleEngine`, `readonly SpecWorkspaceRoute[]`. All injected at kernel composition, not per invocation. `SchemaProvider` lazy caching replaces `SchemaRegistry`+`schemaRef`+`workspaceSchemasPaths`. `LifecycleEngine` only for schema-aware dependency interpretation; structural validation/delta preview/metadata extraction/completion owned by `ValidateArtifacts`.\n- Input: `specPath` optional for `scope: change` (artifact ID alone); required for `scope: spec`. Omitted `specPath` for change-scope → validate requested `artifactId` files only, no `change.specIds` membership. Provided `specPath` for change-scope ignored.\n- After `SchemaProvider`: compare `schema.name()` with `change.schemaName`; differ → `SchemaMismatchError` before any validation.\n- Required artifacts: all non-optional IDs present (status not `missing`). Optional `skipped` (`validatedHash === \"__skipped__\"`) resolved. Missing non-optional → failure result listing IDs (not throw). Skipped when `artifactId` provided.\n- Before validate artifact: all `requires` IDs `complete` or `skipped` via `LifecycleEngine`. Else skip dependent → dependency-blocked failure with dependency ID + effective status. `pending-parent-artifact-review` MUST include upstream parent blocker context. `missing`/`in-progress` MUST include status, not generic \"incomplete\". `pending-review`/`drifted-pending-review` = review blockers with status explicit. Multi-artifact `execute` MUST recompute lifecycle after each persisted completion; MUST NOT freeze snapshot only at start. `skipped` not validated.\n- Multi-artifact without `artifactId` filter: iterate `schema.artifactDag().topologicalOrder()`. Batch `--all --artifact` outer driver still respects topo; within type follow `specIds` order.\n- Canonical `complete`/`skipped` files: MUST NOT re-read, re-validate, delta-preview, or re-`markComplete`. Review/drift/non-terminal (except absent-file `missing`) still validated when selected. Approval/signoff drift detection still runs for actually validated files.\n- Active `change.activeSpecApproval` or `activeSignoff`: if any file hash (after `preHashCleanup`) differs from recorded `artifactHashes` (`type:key` format), collect full drifted set. Per `execute`: scan all drifted keys by artifact type → mark `drifted-pending-review` → recompute parent states → single structured invalidation → roll to `designing`, preserve drifted, downgrade rest to `pending-review`.\n- Policy-aware drift: any mismatch (changed content or absence) = drift evidence. Collect focused mismatch set by type; preserve canonical `missing` for absent files; call `Change.invalidate()` once with cause `artifact-drift` + focused payload; entity applies policy + `hasDrift=true`. Policy `none`: still detect/report; reopen not materialized beyond canonical rules.\n- Missing required expected file → canonical `missing`. Establish presence/canonical state before interpreting `validatedHash`. Absence MAY imply `hasDrift=true` but MUST NOT surface as `complete-with-drift`.\n- Expected paths: existing spec + delta-capable → `deltas/<workspace>/<capability-path>/<artifact-filename>.delta.yaml` (MUST NOT accept direct `specs/...` fallback). New spec → `specs/<workspace>/<capability-path>/<artifact-filename>` (MUST NOT require delta). Change-scope → artifact basename at change root. Missing non-optional → failure with expected path; MUST NOT mark complete.\n- Delta eligibility at concrete artifact-file level: other existing artifact file MUST NOT make different file delta-eligible unless that specific base exists. Absent concrete base → delta invalid even if other artifact files exist for same spec.\n- New spec: reject mixed `specs/...` + delta-backed unless concrete base exists per delta-backed artifact. Direct files valid; deltas valid only when concrete target base exists.\n- Delta validation when `deltaValidations[]` + delta file: parse YAML AST; evaluate rules (selector fields or JSONPath `path`; zero nodes → fail if `required` else warn; `count`/unique cardinality; per node `contentMatches` via `parser.renderSubtree` + recursive `children`). Required fail → stop before apply preview. **No-op-only delta**: skip `deltaValidations`, apply preview, structural validation; hash raw delta → `markComplete`.\n- Delta apply preview (`delta: true` + existing base): load base + delta; `parser.parse` + `parser.apply`; `DeltaApplicationError` → failure, no `validations[]`/`markComplete`. No-op-only skips steps 1–6. Merged AST for `validations[]`; base NOT modified. New files: validate direct `specs/...` against `validations[]`.\n- Structural validation: parse → evaluate all `validations[]` (same rule algorithm); collect all failures/warnings (no first-fail stop). No-op-only skips. Locally valid parsed output prerequisite for cross-artifact rules.\n- Cross-artifact: after local success, evaluate applicable `crossArtifactValidations` (matching scope; participants same target spec+scope; with `artifactId` only rules referencing it). Participant ready when expected file exists, local structural passed, parsed output available (spec = merged/materialized preview; change = direct file). Rehydrate complete participants from expected content reconstructing same parsed shape. Evaluate: resolve `selector` (+ optional relative `keySelector`); extract keys via `key.from` + `capture`/`strip`; apply `relation.kind`/`between`/`options`. Relations: `all-equal`; directional `subset`/`superset`; `ordering: ignore|strict` (strict subset/superset = relative-order preservation). All ready → evaluate + record mismatches as failures. Not ready → defer with non-failing notice.\n- MetadataExtraction after merged preview: `schema.metadataExtraction()` → `extractMetadata(...)` → validate `strictSpecMetadataSchema`. Unknown/failing transform (absent/invalid context) → validation failure. Only for artifact being validated.\n- On all pass: cleaned hash = `preHashCleanup` substitutions in order on raw file (not merged) → collapse `\\s+` to space + trim → SHA-256; `change.getArtifact(type).markComplete(key, cleanedHash)` (key = type id for change-scope, spec ID for spec-scope). Any fail → no `markComplete`.\n- Result object (not throw for validation failures): `passed`, `failures`, `warnings`, `files` (`artifactId`, `key`, `filename`=expected path used, validated/skipped/missing). Missing-file failures MUST include expected `filename`.\n- Persist via `ChangeRepository.mutate(name, fn)` on fresh instance: completions, invalidation history, `setSpecDependsOn`. Persist partial progress when some fail.\n- Successful `scope: spec` + valid extracted `dependsOn` → persist into `change.specDependsOn`. Transform failure → validation fail, no snapshot update. MUST NOT fail solely because in-change differs from canonical `spec-lock.json` (hard checks reserved for `ArchiveChange`).\n- `createValidateArtifacts(config, options?)` MUST derive deps via `resolveValidateArtifactsDeps(resolver)` then canonical factory. Resolve: `changes`, `listWorkspaces`, `schemaProvider`, `parsers`, `actor`, `hasher`, `extractorTransforms`, `workspaceRoutes`, `lifecycle`. No inline fs-shaped wiring.\n\n## Constraints\n\n- Only path that may call `Artifact.markComplete(hash)` — by convention + tests.\n- Merged spec never written to `SpecRepository` during validate — only `ArchiveChange`.\n- `change.invalidate('artifact-drift', ...)` at most once per `execute`; payload focused to mismatching artifacts/files.\n- `deltaValidations` on delta YAML AST; `validations` on merged/direct artifact AST; same rule algorithm.\n- `preHashCleanup` only for hash computation, never mutates disk content.\n- Missing `deltaValidations[]` or `validations[]` → skip step (not error).\n- Missing expected delta for existing spec + `delta: true` → validation failure; direct `specs/...` valid only for new specs or non-delta artifacts.\n",
+      "value": "# ValidateArtifacts\n## Rules\n- Resolve change/schema; validate artifacts topologically. Required non-missing; optional `skipped` valid.\n- Apply/validate deltas, rules, cross-artifact checks; hash cleaned raw content then `markComplete`.\n- Reconcile fresh artifact/implementation validity atomically; persist progress/audit via `ChangeRepository.mutate`.\n## Constraints\n- Only `ValidateArtifacts` calls `Artifact.markComplete(hash)`.\n- Never write merged specs to `SpecRepository`.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:13c1589422e057b61292ea1f8c8e770267d46225136ce8d144261ca967d8a9a7",
-          "lastModified": "2026-08-29T20:55:21.006Z"
+          "hash": "sha256:dc85ae51f62f067a6248f72a5a36ec9ad630c7bc57f1371b6d371c3e74a59c54",
+          "lastModified": "2026-10-20T14:34:09.761Z"
         },
         "verify.md": {
-          "hash": "sha256:7093108cee73f362aa8edc40cc256421861a9a214467c8a6055fc3972f8ee3c7",
-          "lastModified": "2026-08-29T20:55:21.007Z"
+          "hash": "sha256:32bfa965321a5cfa358ef33bddcd826627fcff855c1852376e7c0aa6ecc5b80b",
+          "lastModified": "2026-10-20T14:34:09.762Z"
         }
       }
     }

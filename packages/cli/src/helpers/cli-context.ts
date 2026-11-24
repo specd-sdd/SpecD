@@ -1,13 +1,8 @@
 import { fileURLToPath } from 'node:url'
 import * as path from 'node:path'
-import {
-  openSpecdHost,
-  type KernelOptions,
-  type LogDestination,
-  type LogEntry,
-  type LogLevel,
-} from '@specd/sdk'
+import { type KernelOptions, type LogDestination, type LogEntry, type LogLevel } from '@specd/sdk'
 import type { CliContext } from './cli-context-types.js'
+import { openCliHost } from './cli-host.js'
 
 export type { CliContext } from './cli-context-types.js'
 
@@ -84,16 +79,20 @@ export function buildCliKernelOptions(options?: {
  * @param options - Optional overrides
  * @param options.configPath - Path to specd.yaml config file
  * @param options.onLog - Optional callback to handle log entries
+ * @param options.plugins - When `false`, configured plugins are not initialized
  * @returns The resolved CLI context
  */
 export async function resolveCliContext(options?: {
   configPath?: string | undefined
   onLog?: ((entry: LogEntry) => void) | undefined
+  /** When `false`, configured plugins are not initialized. */
+  plugins?: boolean | undefined
 }): Promise<CliContext> {
-  const host = await openSpecdHost({
+  const host = await openCliHost({
     ...(options?.configPath !== undefined ? { configPath: options.configPath } : {}),
     options: {
       kernel: buildCliKernelOptions({ onLog: options?.onLog }),
+      ...(options?.plugins !== undefined ? { plugins: options.plugins } : {}),
     },
   })
   // SDK returns warnings on config; CLI owns formatting and emission.
@@ -102,9 +101,5 @@ export async function resolveCliContext(options?: {
       console.warn(`warning: ${warning}`)
     }
   }
-  return {
-    config: host.config,
-    configFilePath: host.configFilePath,
-    kernel: host.kernel,
-  }
+  return host
 }

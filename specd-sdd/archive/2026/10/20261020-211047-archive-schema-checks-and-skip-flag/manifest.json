@@ -1,0 +1,1878 @@
+{
+  "manifestVersion": 2,
+  "name": "archive-schema-checks-and-skip-flag",
+  "createdAt": "2026-10-20T21:10:47.783Z",
+  "updatedAt": "2026-10-22T14:02:39.401Z",
+  "description": "Make changes archive resolve checks via the shared cascade (schema-declared archive checks under allow* locks), add generic --skip-checks with resolved-binding skippability, keep --allow-overlap/--allow-out-of-scope as aliases, align status hints and CLI messages",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:archive-change",
+    "core:check-registry",
+    "core:schema-format",
+    "core:transition-checks",
+    "cli:change-archive",
+    "cli:change-status",
+    "core:workflow-model",
+    "core:change",
+    "core:kernel",
+    "core:get-status",
+    "core:lifecycle-engine",
+    "skills:skill-templates-source"
+  ],
+  "specDependsOn": {
+    "core:archive-change": [
+      "core:change",
+      "core:schema-format",
+      "core:delta-format",
+      "core:validate-artifacts",
+      "core:storage",
+      "core:run-step-hooks",
+      "core:hook-execution-model",
+      "core:template-variables",
+      "core:spec-metadata",
+      "core:content-extraction",
+      "default:_global/architecture",
+      "core:workspace",
+      "core:spec-id-format",
+      "core:spec-overlap",
+      "default:_global/logging",
+      "core:spec-lock",
+      "default:_global/error-handling-conventions",
+      "core:materialize-spec-metadata",
+      "core:spec-optimization",
+      "core:initialize-persisted-spec-state",
+      "core:composition-resolver",
+      "core:transition-checks",
+      "core:resolve-change-schema",
+      "core:check-registry"
+    ],
+    "core:check-registry": [
+      "core:transition-checks",
+      "default:_global/architecture",
+      "core:schema-format"
+    ],
+    "core:schema-format": [
+      "core:delta-format",
+      "core:selector-model",
+      "core:content-extraction",
+      "core:schema-merge"
+    ],
+    "core:transition-checks": [
+      "core:change",
+      "core:workflow-model",
+      "core:workflow-topology",
+      "core:schema-format",
+      "default:_global/architecture",
+      "core:check-registry",
+      "core:archive-change",
+      "core:get-status"
+    ],
+    "cli:change-archive": [
+      "cli:entrypoint",
+      "core:change",
+      "core:archive-change",
+      "core:hook-execution-model",
+      "cli:command-resource-naming",
+      "core:transition-checks"
+    ],
+    "cli:change-status": [
+      "cli:entrypoint",
+      "core:change",
+      "core:get-status",
+      "sdk:build-implementation-review",
+      "core:transition-checks",
+      "core:lifecycle-engine",
+      "core:resolve-change-schema"
+    ],
+    "core:workflow-model": [
+      "core:change",
+      "core:schema-format",
+      "core:build-schema",
+      "core:compile-context",
+      "core:get-status",
+      "core:transition-change",
+      "core:archive-change",
+      "core:hook-execution-model",
+      "core:workflow-topology",
+      "core:check-registry"
+    ],
+    "core:change": [
+      "core:change-manifest",
+      "core:workflow-model",
+      "core:spec-metadata",
+      "core:spec-id-format",
+      "default:_global/architecture",
+      "core:lifecycle-engine",
+      "default:_global/logging",
+      "core:implementation-detector-port",
+      "core:transition-checks",
+      "core:workflow-topology"
+    ],
+    "core:kernel": [
+      "default:_global/architecture",
+      "core:composition",
+      "core:create-change",
+      "core:get-status",
+      "core:transition-change",
+      "core:draft-change",
+      "core:restore-change",
+      "core:discard-change",
+      "core:archive-change",
+      "core:validate-artifacts",
+      "core:compile-context",
+      "core:list-changes",
+      "core:list-drafts",
+      "core:list-discarded",
+      "core:edit-change",
+      "core:skip-artifact",
+      "core:update-spec-deps",
+      "core:list-archived",
+      "core:get-archived-change",
+      "core:run-step-hooks",
+      "core:get-hook-instructions",
+      "core:get-artifact-instruction",
+      "core:approve-spec",
+      "core:approve-signoff",
+      "core:list-specs",
+      "core:get-spec",
+      "core:get-active-schema",
+      "core:validate-specs",
+      "core:generate-metadata",
+      "core:materialize-spec-metadata",
+      "core:get-spec-metadata",
+      "core:regenerate-spec-metadata",
+      "core:initialize-persisted-spec-state",
+      "core:get-persisted-spec-schema",
+      "core:update-persisted-spec-schema",
+      "core:get-persisted-spec-deps",
+      "core:update-persisted-spec-deps",
+      "core:get-persisted-spec-implementation",
+      "core:update-persisted-spec-implementation",
+      "core:get-persisted-spec-optimizations",
+      "core:update-persisted-spec-optimizations",
+      "core:get-spec-context",
+      "core:config-writer-port",
+      "core:list-workspaces",
+      "core:get-project-context",
+      "core:get-config",
+      "core:project-metadata",
+      "core:update-project-metadata",
+      "core:resolve-schema",
+      "core:spec-overlap",
+      "core:get-specs-health",
+      "core:count-tasks",
+      "core:check-registry",
+      "core:archive-repository-port",
+      "core:get-draft",
+      "core:get-discarded",
+      "core:invalidate-change",
+      "core:update-implementation-tracking",
+      "core:refresh-implementation-tracking",
+      "core:get-implementation-review",
+      "core:preview-spec",
+      "core:get-spec-outline",
+      "core:validate-schema",
+      "core:resolve-context-specs",
+      "core:get-project-summary",
+      "core:actor-resolver"
+    ],
+    "core:get-status": [
+      "core:change",
+      "core:kernel",
+      "core:transition-change",
+      "core:schema-format",
+      "core:config",
+      "core:lifecycle-engine",
+      "core:refresh-implementation-tracking",
+      "core:composition-resolver",
+      "core:count-tasks",
+      "core:transition-checks",
+      "core:resolve-change-schema"
+    ],
+    "core:lifecycle-engine": [
+      "core:change",
+      "core:workflow-model",
+      "core:schema-format",
+      "default:_global/architecture",
+      "default:_global/logging",
+      "core:transition-checks",
+      "core:workflow-topology",
+      "core:resolve-change-schema"
+    ],
+    "skills:skill-templates-source": [
+      "skills:skill",
+      "cli:spec-optimizations",
+      "skills:workflow-automation",
+      "core:transition-checks"
+    ]
+  },
+  "invalidation": {
+    "artifacts": "downstream",
+    "workflow": "preserve"
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:e6e92a16c5947cab7ae6438194c0b66e3e1ec5de49b50915e0e47f5152ab142c"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:archive-change",
+          "filename": "deltas/core/archive-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ef3c7dbe035f8c20af8d571fac864e76b1070345a12894ee56c1bd098463e095"
+        },
+        {
+          "key": "core:check-registry",
+          "filename": "deltas/core/check-registry/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2db521da790655faf63c29378a302a1e1ada979af25e5c007e8fcffaf24564c7"
+        },
+        {
+          "key": "core:schema-format",
+          "filename": "deltas/core/schema-format/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c4cce1db844cf1eeb17e532c1b2dc820dddb1a59bb7f80ddc76c05982d59d179"
+        },
+        {
+          "key": "core:transition-checks",
+          "filename": "deltas/core/transition-checks/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:fb1ac217624d7ee8587387bedb9f26d541554488214e94ff6080a67eb59f999b"
+        },
+        {
+          "key": "cli:change-archive",
+          "filename": "deltas/cli/change-archive/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7a1ccedd4f92613cca1095cbdf3b411c2e02121f5104dfb19cc2c976517b658e"
+        },
+        {
+          "key": "cli:change-status",
+          "filename": "deltas/cli/change-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ff7e1073cce79daad47fb8a6bb9595ee17c0983297739ccdb6d2dd33d8f1e118"
+        },
+        {
+          "key": "core:workflow-model",
+          "filename": "deltas/core/workflow-model/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3f7328bbabf43129f70703124c7f2632baec3678b146c472a79e5edfc579c895"
+        },
+        {
+          "key": "core:change",
+          "filename": "deltas/core/change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d7c2da610053fba2eefe685981504c9c3a4ff98b28406654e3a2051543f7e33c"
+        },
+        {
+          "key": "core:kernel",
+          "filename": "deltas/core/kernel/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:85202d725570c814d62a5f372e450027b95347ca5b30aedcd9e57b25a5377703"
+        },
+        {
+          "key": "core:get-status",
+          "filename": "deltas/core/get-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:153e645d0a6112141c63a99f2155607a6e71890cd6697fcc17b3b541d3b15584"
+        },
+        {
+          "key": "core:lifecycle-engine",
+          "filename": "deltas/core/lifecycle-engine/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8f205ceb9b8674617383cb4590ae063e30eb3a281fb84140c2333d71b78e34fe"
+        },
+        {
+          "key": "skills:skill-templates-source",
+          "filename": "deltas/skills/skill-templates-source/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:deda2a6c666e13f18508cfe8c7babbd82b81f0c8be1c6f2a4c2b8df188e93441"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:archive-change",
+          "filename": "deltas/core/archive-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e8491ca96f059fb90965ea61b691d411f79037f3d121c7a5adf26f71be27e458"
+        },
+        {
+          "key": "core:check-registry",
+          "filename": "deltas/core/check-registry/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3a034b0d57c13e0c343229fbf1354c7c4898311d179fd790c50783e97995c31c"
+        },
+        {
+          "key": "core:schema-format",
+          "filename": "deltas/core/schema-format/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b8dc390d01b978a9407218cc1b51c6a23ea3fcf10f28e4e68cf366b2d5ab72d7"
+        },
+        {
+          "key": "core:transition-checks",
+          "filename": "deltas/core/transition-checks/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b50e75d230dbe9fe391cab8276644e4d8ebcd77c18c7eb6376a8dd8e08ed9853"
+        },
+        {
+          "key": "cli:change-archive",
+          "filename": "deltas/cli/change-archive/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b7949633ae5b9c676f8ba8203e43f7b76350d2bce80adb4f990f74c067252c66"
+        },
+        {
+          "key": "cli:change-status",
+          "filename": "deltas/cli/change-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ccfedfc3a91de8d5ba461b7fcbb52d1a24d58a3c0d7395a86b00b1496591784c"
+        },
+        {
+          "key": "core:workflow-model",
+          "filename": "deltas/core/workflow-model/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6bc6439c1d2f09e661758f07e3d5f487cc0e907cbc7f7f7ec7d215584169a942"
+        },
+        {
+          "key": "core:change",
+          "filename": "deltas/core/change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d2776da93d4d4b529dc5a7488d986019aeab402eab3c5b9de6a8ec7b8364dd81"
+        },
+        {
+          "key": "core:kernel",
+          "filename": "deltas/core/kernel/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:15b07efd1a2cca9f019f17ccc9baecd5d3159ed7c8e87669bab5d4ee551adb81"
+        },
+        {
+          "key": "core:get-status",
+          "filename": "deltas/core/get-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:729a2ad15c8ddabbf16dd01b61d464e8fcd51eadfcb74e7fc581ed4a80b62665"
+        },
+        {
+          "key": "core:lifecycle-engine",
+          "filename": "deltas/core/lifecycle-engine/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:aee2d16d6a726aa4604164a4a0b4b5a594d619dce889571445d1c032647e9370"
+        },
+        {
+          "key": "skills:skill-templates-source",
+          "filename": "deltas/skills/skill-templates-source/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f93fd146fe13bf2ea6e5e2f10c98bec666e671173a471a17b01d94c98f0667b1"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:d6e06da41e4f8d49d3d24b1c8595532759c405c1f1acd56634b1957252690280"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:a8160c3c721f486d53ac5e78ac3a4e904c62ce1e7cef393a4aa2c25454318465"
+        }
+      ]
+    }
+  ],
+  "trackedImplementationFiles": [
+    {
+      "file": ".changeset/20261022-archive-schema-checks-and-skip-flag-specd.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20261022-archive-schema-checks-and-skip-flag.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/adr/0030-open-check-registry-and-hook-failure-policies.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/custom-checks.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/cli.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/custom-schemas.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/workflow.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/schemas/schema-format.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/archive.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change/archive.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change/status.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/services/execute-matching-predicates.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/services/validate-skip-checks.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/archive-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/transition-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/archive-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/spec-overlap-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/services/build-schema.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/services/check-bindings.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/services/check-registry.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/services/merge-schema-layers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/services/transition-checks.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/value-objects/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/value-objects/workflow-step.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/schema-yaml-parser.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/services/validate-skip-checks.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/archive-change-input.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/archive-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-status.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/helpers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/composition-registries.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/archive-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/workflow-check-registry.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/errors/spec-overlap-error.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/services/build-schema-archive-checks.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/services/check-bindings.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/services/check-registry.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/services/lifecycle-verdict.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/services/merge-schema-layers.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/services/schema-std-load.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/services/transition-checks.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/schema-yaml-parser.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/infrastructure/generated/guides.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-archive/SKILL.md.tpl",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-design/SKILL.md.tpl",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-implement/SKILL.md.tpl",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-new/SKILL.md.tpl",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-verify/SKILL.md.tpl",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/test/template-workflow.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/services/lifecycle-verdict.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/change-status/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/archive-change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/check-registry/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-status/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/lifecycle-engine/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/transition-checks/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/workflow-model/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/skill-templates-source/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/actor-resolver/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/approve-signoff/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/approve-spec/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/change-manifest/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/compile-context/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/count-tasks/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/create-change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/edit-change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/generate-metadata/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-artifact-instruction/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-discarded/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-draft/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-hook-instructions/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-project-summary/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-spec-outline/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/invalidate-change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/materialize-spec-metadata/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/preview-spec/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/resolve-change-schema/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/run-step-hooks/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/transition-change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/validate-artifacts/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/validate-schema/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/workflow-topology/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/workflow-automation/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/change-transition/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/actor-provider/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/actor-resolver-privacy/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/fs-spec-repository/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/parse-schema-yaml/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/persist-spec-metadata/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/validation-result-cache-port/spec-lock.json",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:archive-change",
+      "file": "packages/core/src/application/use-cases/archive-change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ArchiveChange", "ArchiveChangeInput"]
+    },
+    {
+      "specId": "core:archive-change",
+      "file": "packages/core/src/application/services/validate-skip-checks.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["validateSkipChecks"]
+    },
+    {
+      "specId": "core:archive-change",
+      "file": "packages/core/src/composition/use-cases/archive-change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["resolveArchiveChangeDeps", "ArchiveChangeDeps"]
+    },
+    {
+      "specId": "core:archive-change",
+      "file": "packages/core/src/domain/errors/spec-overlap-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SpecOverlapError"]
+    },
+    {
+      "specId": "core:check-registry",
+      "file": "packages/core/src/domain/services/check-bindings.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ARCHIVE_BINDING_SPECS"]
+    },
+    {
+      "specId": "core:check-registry",
+      "file": "packages/core/src/domain/services/check-registry.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CheckRegistry"]
+    },
+    {
+      "specId": "core:schema-format",
+      "file": "packages/core/src/domain/value-objects/workflow-step.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["WorkflowStepArchiveCheckDeclaration", "WorkflowStep"]
+    },
+    {
+      "specId": "core:schema-format",
+      "file": "packages/core/src/infrastructure/schema-yaml-parser.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["parseSchemaYaml"]
+    },
+    {
+      "specId": "core:schema-format",
+      "file": "packages/core/src/domain/services/merge-schema-layers.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["mergeSchemaLayers"]
+    },
+    {
+      "specId": "core:workflow-model",
+      "file": "packages/core/src/domain/services/build-schema.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["buildSchema"]
+    },
+    {
+      "specId": "core:transition-checks",
+      "file": "packages/core/src/domain/services/transition-checks.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["resolveEffectiveBindings", "ResolveEffectiveBindingsInput"]
+    },
+    {
+      "specId": "core:get-status",
+      "file": "packages/core/src/application/use-cases/get-status.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GetStatus"]
+    },
+    {
+      "specId": "cli:change-archive",
+      "file": "packages/cli/src/commands/change/archive.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerChangeArchive"]
+    },
+    {
+      "specId": "cli:change-status",
+      "file": "packages/cli/src/commands/change/status.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerChangeStatus"]
+    },
+    {
+      "specId": "skills:skill-templates-source",
+      "file": "packages/skills/templates/skills/specd-archive/SKILL.md.tpl",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "skills:skill-templates-source",
+      "file": "packages/skills/templates/skills/specd-design/SKILL.md.tpl",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "skills:skill-templates-source",
+      "file": "packages/skills/templates/skills/specd-implement/SKILL.md.tpl",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "skills:skill-templates-source",
+      "file": "packages/skills/templates/skills/specd-new/SKILL.md.tpl",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "skills:skill-templates-source",
+      "file": "packages/skills/templates/skills/specd-verify/SKILL.md.tpl",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:lifecycle-engine",
+      "file": "packages/core/src/domain/services/lifecycle-verdict.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["evaluateLifecycleVerdict", "LifecycleVerdictInput"]
+    }
+  ],
+  "implementationTrackingStartedAt": "2026-10-22T06:29:05.066Z",
+  "verification": {
+    "completed": {
+      "id": "verification-8",
+      "attemptId": "verification-attempt-8",
+      "status": "valid",
+      "completedAt": "2026-10-22T13:55:39.910Z",
+      "completedBy": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "fingerprint": {
+        "version": 1,
+        "artifacts": {
+          "version": 1,
+          "algorithm": "artifact-pre-hash-v1",
+          "files": {
+            "design:design": "sha256:d6e06da41e4f8d49d3d24b1c8595532759c405c1f1acd56634b1957252690280",
+            "proposal:proposal": "sha256:e6e92a16c5947cab7ae6438194c0b66e3e1ec5de49b50915e0e47f5152ab142c",
+            "specs:cli:change-archive": "sha256:7a1ccedd4f92613cca1095cbdf3b411c2e02121f5104dfb19cc2c976517b658e",
+            "specs:cli:change-status": "sha256:ff7e1073cce79daad47fb8a6bb9595ee17c0983297739ccdb6d2dd33d8f1e118",
+            "specs:core:archive-change": "sha256:ef3c7dbe035f8c20af8d571fac864e76b1070345a12894ee56c1bd098463e095",
+            "specs:core:change": "sha256:d7c2da610053fba2eefe685981504c9c3a4ff98b28406654e3a2051543f7e33c",
+            "specs:core:check-registry": "sha256:2db521da790655faf63c29378a302a1e1ada979af25e5c007e8fcffaf24564c7",
+            "specs:core:get-status": "sha256:153e645d0a6112141c63a99f2155607a6e71890cd6697fcc17b3b541d3b15584",
+            "specs:core:kernel": "sha256:85202d725570c814d62a5f372e450027b95347ca5b30aedcd9e57b25a5377703",
+            "specs:core:lifecycle-engine": "sha256:8f205ceb9b8674617383cb4590ae063e30eb3a281fb84140c2333d71b78e34fe",
+            "specs:core:schema-format": "sha256:c4cce1db844cf1eeb17e532c1b2dc820dddb1a59bb7f80ddc76c05982d59d179",
+            "specs:core:transition-checks": "sha256:fb1ac217624d7ee8587387bedb9f26d541554488214e94ff6080a67eb59f999b",
+            "specs:core:workflow-model": "sha256:3f7328bbabf43129f70703124c7f2632baec3678b146c472a79e5edfc579c895",
+            "specs:skills:skill-templates-source": "sha256:deda2a6c666e13f18508cfe8c7babbd82b81f0c8be1c6f2a4c2b8df188e93441",
+            "verify:cli:change-archive": "sha256:b7949633ae5b9c676f8ba8203e43f7b76350d2bce80adb4f990f74c067252c66",
+            "verify:cli:change-status": "sha256:ccfedfc3a91de8d5ba461b7fcbb52d1a24d58a3c0d7395a86b00b1496591784c",
+            "verify:core:archive-change": "sha256:e8491ca96f059fb90965ea61b691d411f79037f3d121c7a5adf26f71be27e458",
+            "verify:core:change": "sha256:d2776da93d4d4b529dc5a7488d986019aeab402eab3c5b9de6a8ec7b8364dd81",
+            "verify:core:check-registry": "sha256:3a034b0d57c13e0c343229fbf1354c7c4898311d179fd790c50783e97995c31c",
+            "verify:core:get-status": "sha256:729a2ad15c8ddabbf16dd01b61d464e8fcd51eadfcb74e7fc581ed4a80b62665",
+            "verify:core:kernel": "sha256:15b07efd1a2cca9f019f17ccc9baecd5d3159ed7c8e87669bab5d4ee551adb81",
+            "verify:core:lifecycle-engine": "sha256:aee2d16d6a726aa4604164a4a0b4b5a594d619dce889571445d1c032647e9370",
+            "verify:core:schema-format": "sha256:b8dc390d01b978a9407218cc1b51c6a23ea3fcf10f28e4e68cf366b2d5ab72d7",
+            "verify:core:transition-checks": "sha256:b50e75d230dbe9fe391cab8276644e4d8ebcd77c18c7eb6376a8dd8e08ed9853",
+            "verify:core:workflow-model": "sha256:6bc6439c1d2f09e661758f07e3d5f487cc0e907cbc7f7f7ec7d215584169a942",
+            "verify:skills:skill-templates-source": "sha256:f93fd146fe13bf2ea6e5e2f10c98bec666e671173a471a17b01d94c98f0667b1"
+          }
+        },
+        "implementation": {
+          "version": 1,
+          "hashAlgorithm": "sha256",
+          "textNormalization": "text-v1",
+          "binaryNormalization": "bytes-v1",
+          "files": {
+            "packages/cli/src/commands/change/archive.ts": {
+              "hash": "sha256:92b5d1256aacd9bd3a4769f71904acc09ab19f7e45fa83ce97fd423dfcd2a548",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/commands/change/status.ts": {
+              "hash": "sha256:5a20547a3d02f4c000dc326a9970289fa887e4cb651ef4a5492366eac2adfbca",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/application/services/validate-skip-checks.ts": {
+              "hash": "sha256:a7a2c716cfb4d34e2a48bc705815db4510c549f579c869f0a897df163e009b79",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/application/use-cases/archive-change.ts": {
+              "hash": "sha256:51501c587d1637e0eb4c6a9ca75b44a284a8b3650eb589d2a73577937532c767",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/application/use-cases/get-status.ts": {
+              "hash": "sha256:be017e7e3fe5aa13dec813d0d9eea01c9aaff5eca248c8826900dc6cc18f2255",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/composition/use-cases/archive-change.ts": {
+              "hash": "sha256:58fe9865c9a5054dbb7caa2e8f976e1bbd46a70a6f5b789f14b336ea5e05ee1f",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/domain/errors/spec-overlap-error.ts": {
+              "hash": "sha256:9c4c34aa0c5cd58f09e5ed557ed2fcdb783f4ca42c3e9c9c43af957b3c97d2c8",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/domain/services/build-schema.ts": {
+              "hash": "sha256:30125b76c4266d6e5dfcc47d03a0da5ddbf30bd5a62ae5a127380407845726b1",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/domain/services/check-bindings.ts": {
+              "hash": "sha256:fd0935b8a896d15bde5df361c7efa9238a9c8d8f9979fc1bd6786365ac81cbc0",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/domain/services/check-registry.ts": {
+              "hash": "sha256:dfd3bfb672d7c8a9977e5dc21d768c71b707495904a172b949737db0438a486e",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/domain/services/lifecycle-verdict.ts": {
+              "hash": "sha256:d40052a3a9761840f3f64c87be882758cb4f214f31f4768a53682a7d78e186d1",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/domain/services/merge-schema-layers.ts": {
+              "hash": "sha256:e1949d19eeb93109e535b4bed78af5bf01736bbb87f1a20902c1d25b9012939f",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/domain/services/transition-checks.ts": {
+              "hash": "sha256:2641d3396c3b4aa37bb779d888ac9af63bc9fa447889c9ea6d251c1cd21b0e6a",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/domain/value-objects/workflow-step.ts": {
+              "hash": "sha256:0e96902b43d313cf3e48b5092a8722bca4f50918ec85fd5e18e054a8ff1c0819",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/infrastructure/schema-yaml-parser.ts": {
+              "hash": "sha256:59b723726eca8a0a1bcd4164a36c7252e49be1946f8bbf30d476fb685ba99136",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/skills/templates/skills/specd-archive/SKILL.md.tpl": {
+              "hash": "sha256:c049cd76f6cc996cd78d9ff86d73ebdf5f7d72a77150d2ad2f6914c584b4fce5",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/skills/templates/skills/specd-design/SKILL.md.tpl": {
+              "hash": "sha256:188b1866a8a0ce6a359e3f8ca526d64f786d469bb8ed8c18927a50dda930a851",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/skills/templates/skills/specd-implement/SKILL.md.tpl": {
+              "hash": "sha256:c844abb938a999383dcfcd795508c24f438fa5b7169849af9dcab59d2f2dd1ef",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/skills/templates/skills/specd-new/SKILL.md.tpl": {
+              "hash": "sha256:5e9aa5f3ab4a3388a6fa3d3e66d49f4002831f92b16e9201f8f8c435159f11a2",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/skills/templates/skills/specd-verify/SKILL.md.tpl": {
+              "hash": "sha256:723aa653c49330c4e79c148a33c3453332aec82c578f4a567dd1f03eeb5f3d5e",
+              "content": "text",
+              "normalization": "text-v1"
+            }
+          }
+        }
+      }
+    }
+  },
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-10-20T21:10:47.783Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "core:archive-change",
+        "core:check-registry",
+        "core:schema-format",
+        "core:transition-checks",
+        "cli:change-archive",
+        "cli:change-status"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-20T21:10:47.826Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:archive-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:check-registry"
+        },
+        {
+          "type": "specs",
+          "key": "core:schema-format"
+        },
+        {
+          "type": "specs",
+          "key": "core:transition-checks"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-archive"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-status"
+        },
+        {
+          "type": "verify",
+          "key": "core:archive-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:check-registry"
+        },
+        {
+          "type": "verify",
+          "key": "core:schema-format"
+        },
+        {
+          "type": "verify",
+          "key": "core:transition-checks"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-archive"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-status"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-21T05:48:25.302Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-21T11:35:59.751Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:workflow-model"
+        },
+        {
+          "type": "verify",
+          "key": "core:workflow-model"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-21T11:55:50.485Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:change"
+        },
+        {
+          "type": "verify",
+          "key": "core:change"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-21T11:55:51.206Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:kernel"
+        },
+        {
+          "type": "verify",
+          "key": "core:kernel"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-21T11:55:51.939Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:get-status"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-status"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-21T11:55:52.582Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:lifecycle-engine"
+        },
+        {
+          "type": "verify",
+          "key": "core:lifecycle-engine"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-21T11:55:53.225Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "skills:skill-templates-source"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skill-templates-source"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-21T15:10:16.557Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:archive-change", "cli:change-archive"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:archive-change", "cli:change-archive"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-22T06:19:37.460Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-22T06:29:05.066Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-22T07:31:02.604Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-10-22T07:32:45.895Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-1",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-10-22T07:32:58.999Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-2",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-10-22T07:43:33.470Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-3",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-22T07:44:59.911Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-22T08:23:34.946Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:archive-change", "core:check-registry", "core:transition-checks"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:archive-change", "core:transition-checks"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-22T08:26:50.353Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-22T08:43:52.630Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-22T08:54:38.848Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-10-22T08:55:34.301Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-4",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-22T09:11:54.337Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:get-status"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:archive-change",
+            "core:check-registry",
+            "core:schema-format",
+            "core:transition-checks",
+            "cli:change-archive",
+            "cli:change-status",
+            "core:workflow-model",
+            "core:change",
+            "core:kernel",
+            "core:get-status",
+            "core:lifecycle-engine",
+            "skills:skill-templates-source"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-22T09:13:27.037Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:archive-change",
+            "core:check-registry",
+            "core:schema-format",
+            "core:transition-checks",
+            "cli:change-archive",
+            "cli:change-status",
+            "core:workflow-model",
+            "core:change",
+            "core:kernel",
+            "core:get-status",
+            "core:lifecycle-engine",
+            "skills:skill-templates-source"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-22T09:14:31.508Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:archive-change"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:archive-change",
+            "core:check-registry",
+            "core:schema-format",
+            "core:transition-checks",
+            "cli:change-archive",
+            "cli:change-status",
+            "core:workflow-model",
+            "core:change",
+            "core:kernel",
+            "core:get-status",
+            "core:lifecycle-engine",
+            "skills:skill-templates-source"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-22T09:16:34.911Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:transition-checks"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:archive-change",
+            "core:check-registry",
+            "core:schema-format",
+            "core:transition-checks",
+            "cli:change-archive",
+            "cli:change-status",
+            "core:workflow-model",
+            "core:change",
+            "core:kernel",
+            "core:get-status",
+            "core:lifecycle-engine",
+            "skills:skill-templates-source"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-22T09:17:24.220Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:workflow-model"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:archive-change",
+            "core:check-registry",
+            "core:schema-format",
+            "core:transition-checks",
+            "cli:change-archive",
+            "cli:change-status",
+            "core:workflow-model",
+            "core:change",
+            "core:kernel",
+            "core:get-status",
+            "core:lifecycle-engine",
+            "skills:skill-templates-source"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-22T09:21:56.894Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:check-registry", "core:lifecycle-engine"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:archive-change",
+            "core:check-registry",
+            "core:schema-format",
+            "core:transition-checks",
+            "cli:change-archive",
+            "cli:change-status",
+            "core:workflow-model",
+            "core:change",
+            "core:kernel",
+            "core:get-status",
+            "core:lifecycle-engine",
+            "skills:skill-templates-source"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-22T09:31:31.687Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-22T11:01:49.796Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-22T12:04:20.478Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-10-22T12:12:31.030Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-5",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-10-22T12:39:55.715Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-6",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-10-22T13:28:46.152Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-7",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-10-22T13:53:12.398Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-8",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "verification-completed",
+      "at": "2026-10-22T13:55:39.910Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-8",
+      "verificationId": "verification-8"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-22T13:56:09.131Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-22T13:56:33.082Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-22T14:02:39.396Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-10-22T14:02:39.876Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

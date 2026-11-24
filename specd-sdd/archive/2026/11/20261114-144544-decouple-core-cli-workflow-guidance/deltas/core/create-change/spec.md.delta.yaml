@@ -1,0 +1,14 @@
+- op: modified
+  description: 'Audit round 10 wording'
+  selector:
+    type: section
+    matches: 'Requirement: Initial specDependsOn seeding'
+  content: |
+    When `CreateChange.execute` is called with spec IDs that already exist in a configured spec repository, the newly constructed `Change` MUST seed `change.specDependsOn` for each such spec before persistence.
+
+    Seeding rules:
+
+    - If the spec's repository returns persisted state through `readPersistedState(spec)` (the `spec-lock.json` state), its `dependsOn` MUST be used. No fallback to `metadata.json.dependsOn` exists.
+    - If the workspace is unknown, the spec does not exist in its repository, or the repository has no persisted state for it, no `specDependsOn` entry is seeded at creation time.
+
+    This ensures a change created against existing specs starts from the current persisted dependency snapshot without depending on raw sidecar filenames or generic artifact reads.

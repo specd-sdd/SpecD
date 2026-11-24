@@ -1,0 +1,59 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:transition-checks", "default:_global/architecture", "core:schema-format"],
+  "implementation": [
+    {
+      "file": "core:src/domain/services/check-registry.ts",
+      "symbols": ["CheckRegistry"]
+    },
+    {
+      "file": "core:test/composition/composition-registries.spec.ts"
+    },
+    {
+      "file": "core:test/composition/kernel.spec.ts"
+    },
+    {
+      "file": "core:test/domain/services/check-registry.spec.ts",
+      "symbols": ["CheckRegistry"]
+    }
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Extensible pure registry resolves immutable built-ins and namespaced plugin checks with locked binding governance.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:ce1413fb256ca2807766656b1b8ce640a8dd09a4d22f6a27bb2811d4ad262367",
+          "lastModified": "2026-10-22T14:47:46.134Z"
+        },
+        "verify.md": {
+          "hash": "sha256:bcc3dee5287cf0363fc5d6a3f8a4e3131eb36ebcd418c9dd51484b14b0fb2b39",
+          "lastModified": "2026-10-22T14:47:46.135Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Check Registry\n\n## Rules\n- `CheckRegistry` catalogs `Check` definitions and default `CheckBinding`; exposes `get`, `has`, `list`, `bindings`.\n- Built-ins immutable. `register(pluginName, check, ...)` uses canonical `@${pluginName}.${check.id}` and rejects invalid names/duplicates/kinds.\n- Bindings identify transition, archive, or step-skip coordinates; exact duplicate fails.\n- Governance separates placement, binding policy, config, disablement. Code locks are monotonic; schema-owned bindings remain editable within check locks.\n- Categories A/B restrict embedding/override/disable; policy checks permit governed overrides. Resolver merges check -> binding -> schema config.\n\n## Constraints\n- Pure domain: no filesystem, subprocess, console.\n- Existing built-in resolution remains compatible.\n- Checks and bindings immutable after construction.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:ce1413fb256ca2807766656b1b8ce640a8dd09a4d22f6a27bb2811d4ad262367",
+          "lastModified": "2026-10-22T14:47:46.134Z"
+        },
+        "verify.md": {
+          "hash": "sha256:bcc3dee5287cf0363fc5d6a3f8a4e3131eb36ebcd418c9dd51484b14b0fb2b39",
+          "lastModified": "2026-10-22T14:47:46.135Z"
+        }
+      }
+    }
+  }
+}

@@ -4,5 +4,33 @@
     "version": 1
   },
   "dependsOn": ["default:_global/architecture"],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "plugin-manager:test/domain/errors.spec.ts"
+    },
+    {
+      "file": "plugin-manager:src/domain/errors/plugin-init-error.ts",
+      "symbols": ["PluginInitError"]
+    },
+    {
+      "file": "plugin-manager:src/domain/errors/plugin-validation.ts",
+      "symbols": ["PluginValidationError"]
+    },
+    {
+      "file": "plugin-manager:src/domain/errors/duplicate-handler-kind-error.ts",
+      "symbols": ["DuplicateHandlerKindError"]
+    },
+    {
+      "file": "plugin-manager:src/domain/errors/invalid-contribution-address-error.ts",
+      "symbols": ["InvalidContributionAddressError"]
+    },
+    {
+      "file": "plugin-manager:src/domain/errors/plugin-destroy-error.ts",
+      "symbols": ["PluginDestroyError"]
+    },
+    {
+      "file": "plugin-manager:src/application/use-cases/load-plugin-safely.ts",
+      "symbols": ["loadPluginSafely"]
+    }
+  ]
 }

@@ -36,6 +36,17 @@ Every log entry MUST be assigned a level that reflects its purpose and severity:
 
 Direct usage of the global `console` object for logging in production code SHALL be avoided in favor of the project's logging abstraction.
 
+### Requirement: Ambient Logger
+
+Packages MAY expose an ambient `Logger` (static facade over the logging interface defined by this spec).
+
+- The composition root assigns the active implementation during startup.
+- Before wiring, `Logger` MUST behave as a no-op so imports are safe during module load.
+- Any layer MAY import `Logger` for observability (`debug`, `trace`, diagnostic `info`). It MUST NOT be used for control flow, persistence, or side effects beyond logging.
+- Each package chooses how and where to use it; this spec does not prescribe constructor injection vs ambient access beyond forbidding direct `console.*` in production code (see Requirement: Policy on Console Usage).
+
+This is the intentional exception documented in [`default:_global/architecture`](../architecture/spec.md).
+
 ## Spec Dependencies
 
-_none — this is a global constraint spec_
+- [`default:_global/architecture`](../architecture/spec.md) — documents the ambient Logger import exception.

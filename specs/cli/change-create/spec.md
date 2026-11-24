@@ -8,16 +8,23 @@ Users need a way to start tracking a new unit of spec work before any artifacts 
 
 ### Requirement: Command signature
 
-```
-specd change create <name> [--spec <id>...] [--description <text>] [--invalidation-policy <policy>] [--format text|json|toon] [--config <path>]
+```text
+specd changes create <name>
+  [--description <text>]
+  [--spec <id> ...]
+  [--artifact-policy none|surgical|downstream|global]
+  [--workflow-policy preserve|redesign]
+  [--format text|json|toon]
+  [--config <path>]
 ```
 
-- `<name>` — required positional; the unique slug name for the new change (e.g. `add-auth-flow`)
-- `--spec <id>` — optional repeatable flag; one or more spec IDs being created or modified. Each `<id>` follows the `[<workspace>:]<capability-path>` format of `core:spec-id-format`; when the workspace is omitted the core resolves it to `default` (e.g. `--spec auth/login` means `default:auth/login`, and an explicit workspace is `--spec billing-ws:billing/invoices`). Each value is passed to `CreateChange` unchanged, is one whole spec ID, and is never split on commas. When omitted, the change is created with an empty specIds list — specs can be added later via `change edit`.
-- `--description <text>` — optional; a short free-text description of the change's purpose, stored in the manifest
-- `--invalidation-policy <policy>` — optional; initial invalidation policy of the change (`none`, `surgical`, `downstream`, or `global`); when absent the project configuration's `invalidationPolicy` applies
-- `--format text|json|toon` — optional; output format, defaults to `text`
-- `--config <path>` — optional; path to `specd.yaml`
+The name is required; spec and policy flags are optional and repeatability follows their value shape. Each `--spec <id>` value follows `[<workspace>:]<capability-path>` (`core:spec-id-format`), is passed to `CreateChange` unchanged, is one whole spec ID, and is never split on commas. The command validates policy values before delegating creation (and `CreateChange` also enforces them). It does not expose the deprecated scalar policy as a new-write option.
+
+### Requirement: Structured invalidation policy input
+
+The command SHALL expose independent optional inputs for artifact policy (`none | surgical | downstream | global`) and workflow policy (`preserve | redesign`). It SHALL resolve omitted values from validated project configuration and pass one structured policy to `CreateChange`.
+
+With no explicit or configured value, the created change uses `{ artifacts: downstream, workflow: preserve }`. Legacy `invalidationPolicy` compatibility and rejection of simultaneous old/new config shapes belong to core configuration loading; the CLI MUST NOT duplicate them. New manifests persist only the v2 structured shape.
 
 ### Requirement: Workspace resolution
 
@@ -102,7 +109,8 @@ specd change create add-shared-api --spec shared-ws:api/contracts
 
 ## Spec Dependencies
 
-- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:change`](../../core/change/spec.md) — Change entity, identity requirements
-- [`core:spec-id-format`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format, bare path shorthand
-- [`core:create-change`](../../core/create-change/spec.md) — validation, `readOnly` rejection and invalidation policy rules live in the use case
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, and output conventions
+- [`core:change`](../../core/change/spec.md) — change identity and structured policy projection
+- [`core:create-change`](../../core/create-change/spec.md) — canonical creation input, v2 persistence, validation, and `readOnly` rejection
+- [`core:config`](../../core/config/spec.md) — structured defaults and legacy alias adaptation
+- [`core:spec-id-format`](../../core/spec-id-format/spec.md) — canonical spec ID format and bare-path shorthand

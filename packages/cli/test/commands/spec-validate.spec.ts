@@ -6,6 +6,7 @@ import {
   mockProcessExit,
   captureStdout,
   captureStderr,
+  makeMockHost,
 } from './helpers.js'
 
 vi.mock('../../src/helpers/cli-context.js', () => ({
@@ -19,11 +20,13 @@ import { registerSpecValidate } from '../../src/commands/spec/validate.js'
 function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
-  vi.mocked(resolveCliContext).mockResolvedValue({
-    config: config,
-    configFilePath: null,
-    kernel: kernel,
-  })
+  vi.mocked(resolveCliContext).mockResolvedValue(
+    makeMockHost({
+      config: config,
+      configFilePath: null,
+      kernel: kernel,
+    }),
+  )
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
@@ -200,5 +203,31 @@ describe('spec validate', () => {
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain('error:')
+  })
+
+  it('renders specs.validate repair hint without suggesting --force on DependsOnOverwriteError', async () => {
+    const { kernel, stderr } = setup()
+    kernel.specs.validate.execute.mockRejectedValue(
+      Object.assign(
+        new Error(
+          'dependsOn would change (added: core:new; removed: core:old). overwriting curated dependencies requires explicit confirmation.',
+        ),
+        {
+          specd: true,
+          code: 'DEPENDS_ON_OVERWRITE',
+          existingDeps: ['core:old'],
+          incomingDeps: ['core:new'],
+        },
+      ),
+    )
+
+    const program = makeProgram()
+    registerSpecValidate(program.command('spec'))
+    await program.parseAsync(['node', 'specd', 'spec', 'validate', 'auth/login']).catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toContain('dependsOn would change')
+    expect(stderr()).toContain('specd specs deps add')
+    expect(stderr()).toContain('specd specs generate-metadata --force')
   })
 })

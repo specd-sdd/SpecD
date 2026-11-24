@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Getting a specd project off the ground requires creating a config file, storage directories, and optionally installing agent skills — doing this manually is tedious and error-prone. The `specd project init` command bootstraps a new specd project, presenting a guided wizard in interactive mode or proceeding silently with flags in non-interactive mode. All file creation is delegated to `createConfigWriter().initProject(...)` in `@specd/core`.
+Getting a specd project off the ground requires creating a config file, storage directories, and optionally installing agent plugins — doing this manually is tedious and error-prone. The `specd project init` command bootstraps a new specd project, presenting a guided wizard in interactive mode or proceeding silently with flags in non-interactive mode. All file creation is delegated to `createConfigWriter().initProject(...)` in `@specd/core`.
 
 ## Requirements
 
@@ -36,16 +36,18 @@ The command enters interactive mode when **all** of the following are true:
 
 - stdout is a TTY
 - `--format` is not `json` or `toon`
-- No configuration flags (`--schema`, `--workspace`, `--workspace-path`, `--plugin`) are provided
+- No configuration flag (`--schema`, `--workspace`, `--workspace-path`, `--plugin`) was _provided_ on the command line. Provision is determined by the option's source (whether the user supplied it), not by comparing the value with its default: explicitly passing a default value (e.g. `--workspace default`) counts as provided and keeps the command non-interactive.
 
 In interactive mode the command presents a guided wizard:
 
-1. **Welcome header** — an ASCII banner and a short description of specd, shown once at startup.
+1. **Welcome header** — an ASCII banner and a short description of specd, shown once at startup. The banner is printed ONLY in the interactive wizard; non-interactive text output MUST NOT print it.
 2. **Project settings prompts** — prompts for each setting with its default value pre-filled:
    - Schema reference (default: `@specd/schema-std`)
    - Default workspace ID (default: `default`)
    - Specs path (default: `specs/`)
 3. **Plugin selection** — a multi-select listing available agent plugins. The user selects which plugins to install. Selecting none is valid (plugins can be installed later with `specd plugins install`).
+
+Cancelling any prompt, or declining the overwrite confirmation, aborts the command without writing anything and exits with code 0: cancelling is a user choice, not an error. The command help MUST state this. When `specd.yaml` already exists the overwrite confirmation MUST name the config path and state that overwriting replaces the existing configuration, including its declared plugins and workspaces.
 
 ### Requirement: Known plugin options
 
@@ -59,7 +61,7 @@ The interactive plugin-selection wizard MUST expose this known agent plugin opti
 
 ### Requirement: Non-interactive mode
 
-When not in interactive mode, the command uses the flag values (or defaults) directly, calls `createConfigWriter().initProject(...)`, optionally installs plugins specified via `--plugin`, and prints output according to `--format`.
+When not in interactive mode, the command uses the flag values (or defaults) directly, validates every `--plugin` name, calls `createConfigWriter().initProject(...)`, installs the plugins specified via `--plugin`, and prints output according to `--format`. No banner is printed.
 
 - `text`: prints `initialized specd in <absolute-project-root-path>` followed by `metadata cache: <metadataCachePath> (ignored in .gitignore)`, then per-plugin install status lines when any `--plugin` flags were given.
 - `json` or `toon`: outputs `{"result":"ok","configPath":"...","schema":"...","workspaces":[...],"metadataCachePath":"...","plugins":[...]}` where `metadataCachePath` is the project-relative path to the created, Git-ignored metadata cache directory (default `.specd/metadata/`), and `plugins` is an array of install result entries (`name`, `status`, `detail`).
@@ -83,9 +85,13 @@ This keeps all tmp artifacts (including `fs-cache/`) out of version control whil
 
 `initProject` also idempotently creates the default metadata cache directory and appends its rooted ignore entry (default `/.specd/metadata/`) to the project-root `.gitignore`, so a fresh clone or deleted cache is immediately usable without a separate maintenance command. The CLI surfaces the resulting `metadataCachePath` from the `InitProject` result rather than re-deriving it.
 
-### Requirement: Skills installation after init
+### Requirement: Plugin installation after init
 
-After `InitProject` succeeds, if any plugins were selected (interactively or via `--plugin`), the CLI installs each selected plugin using `specd plugins install`. Each plugin's `install()` method handles writing its skill files.
+Plugin names (from `--plugin` or the wizard) MUST be validated against the plugin name rule of `plugin-manager:specd-plugin-type` BEFORE `initProject` writes anything; an invalid name fails the command with exit code 1 and leaves the filesystem untouched.
+
+After `initProject` succeeds, if any plugins were selected (interactively or via `--plugin`), the CLI installs each selected plugin with the same install logic as `specd plugins install`. The install step opens its host with `resolveCliContext({ configPath, plugins: false })` against the freshly written config. The installed plugins are recorded in the flat `plugins` list of the generated `specd.yaml`, which `initProject` creates with `configVersion: 2`.
+
+If a plugin install fails after a successful init, the init output (config, directories, metadata cache) is kept, the failure is reported in the per-plugin results, and the command exits with code 1.
 
 ### Requirement: Already initialised
 
@@ -96,7 +102,7 @@ If `specd.yaml` already exists and `--force` is not provided:
 
 ## Constraints
 
-- `specd project init` does not require an existing `specd.yaml` to run; standard config discovery is not invoked
+- `specd project init` does not require an existing `specd.yaml` to run; standard config discovery is not invoked for the init step (the optional plugin-install step loads the freshly written config through an explicit `configPath`)
 - The CLI never reads or writes YAML — all config format knowledge lives in `@specd/core`
 - `--schema` accepts any string; validation is deferred to first use
 - Interactive mode is never entered when `--format json` or `--format toon` is set, even if stdout is a TTY — these formats imply scripted use
@@ -124,6 +130,8 @@ specd init --format json
 
 - [`cli:entrypoint`](../entrypoint/spec.md) — exit codes, output conventions
 - [`cli:plugins-install`](../plugins-install/spec.md) — plugin installation after init
+- [`cli:host-context`](../host-context/spec.md) — post-init host bootstrap with `plugins: false`
+- [`plugin-manager:specd-plugin-type`](../../plugin-manager/specd-plugin-type/spec.md) — plugin name rule
 - [`core:composition`](../../core/composition/spec.md) — `createConfigWriter()` factory
 - [`core:config-writer-port`](../../core/config-writer-port/spec.md) — `initProject` operation
 - [`core:spec-id-format`](../../core/spec-id-format/spec.md) — workspace name rule (`isValidWorkspaceName`) used to validate the workspace id

@@ -62,6 +62,7 @@ async function makeConfig(): Promise<SpecdConfig> {
       archiveAdapter: { adapter: 'fs', config: { path: archivePath } },
     },
     approvals: { spec: false, signoff: false },
+    invalidation: { artifacts: 'downstream', workflow: 'preserve' },
   }
 }
 
@@ -83,7 +84,11 @@ describe('shared-repository-wiring', () => {
     expect((changeRepo as any)._resolveArtifactTypes).toBeDefined()
 
     // Let's call the resolved resolver hook
-    const artifactTypes = await (changeRepo as any)._resolveArtifactTypes()
+    const artifactTypes = await (changeRepo as any)._resolveArtifactTypes({
+      changeName: 'c',
+      schemaName: 'schema-std',
+      schemaVersion: 1,
+    })
     expect(artifactTypes).toBeDefined()
 
     const tasksType = artifactTypes.find((t: any) => t.id === 'tasks')

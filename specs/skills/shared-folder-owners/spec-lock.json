@@ -1,0 +1,28 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["skills:skill-bundle", "skills:skill-repository"],
+  "implementation": [
+    {
+      "file": "skills:src/application/shared-folder-owners.ts",
+      "symbols": [
+        "addSharedOwner",
+        "removeSharedOwner",
+        "removeSharedFolderIfEmpty",
+        "SharedOwnerRelease"
+      ]
+    },
+    {
+      "file": "skills:src/index.ts",
+      "symbols": ["addSharedOwner", "removeSharedOwner", "removeSharedFolderIfEmpty"]
+    },
+    {
+      "file": "skills:test/application/shared-folder-owners.spec.ts"
+    },
+    {
+      "file": "skills:test/application/shared-folder-owners-eacces.spec.ts"
+    }
+  ]
+}

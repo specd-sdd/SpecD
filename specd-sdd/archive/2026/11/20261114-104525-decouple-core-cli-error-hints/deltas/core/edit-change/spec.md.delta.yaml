@@ -1,0 +1,13 @@
+- op: added
+  description: 'Ensure SpecNotInChangeError thrown by EditChange is host-neutral without CLI command syntax'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Removal of absent spec throws'
+  content: |
+    ### Requirement: Host-neutral SpecNotInChangeError
+
+    When `EditChange` throws `SpecNotInChangeError` (`SPEC_NOT_IN_CHANGE`), the error `message` MUST state that the spec is not in the change's `specIds` in host-neutral terms without embedding CLI commands such as `specd specs show`. The error MUST expose `specId` and `changeName` as structured metadata properties.

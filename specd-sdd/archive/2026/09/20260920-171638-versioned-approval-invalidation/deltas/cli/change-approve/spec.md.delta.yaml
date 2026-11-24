@@ -1,0 +1,19 @@
+- op: modified
+  description: 'Delegate fingerprint and gate validity to core'
+  selector:
+    type: section
+    matches: '^Requirement: Artifact hash computation$'
+  content: |
+    The command MUST NOT compute fingerprints itself. It SHALL delegate spec approval to `ApproveSpec` and sign-off to `ApproveSignoff`, which reconcile fresh inputs and create the canonical artifact and implementation fingerprints.
+
+    Spec approval is available only in reconciled `ready` after required artifact validation with no non-task drift or pending review. Sign-off is available only in reconciled `done` with valid verification evidence.
+
+- op: modified
+  description: 'Render materialized approval evidence'
+  selector:
+    type: section
+    matches: '^Requirement: Output on success$'
+  content: |
+    Success output SHALL identify the approved gate, resulting materialized status `valid`, approver, decision time, and summarized fingerprint scope. Sign-off output SHALL distinguish an observed empty implementation map from legacy missing evidence and show the normalization algorithm without printing file contents.
+
+    If pre-approval reconciliation commits recovery or reveals a blocker, the command SHALL render the returned state, reasons, and next action and MUST NOT report approval success.

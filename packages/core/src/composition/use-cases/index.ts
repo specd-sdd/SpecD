@@ -17,6 +17,7 @@ export { createGetConfig, type GetConfigDeps } from './get-config.js'
 export { createCreateChange, type CreateChangeDeps } from './create-change.js'
 export { createGetStatus, type GetStatusDeps } from './get-status.js'
 export { createCountTasks, type CountTasksDeps } from './count-tasks.js'
+export { createResolveChangeSchema, type ResolveChangeSchemaDeps } from './resolve-change-schema.js'
 export { createTransitionChange, type TransitionChangeDeps } from './transition-change.js'
 export { createDraftChange, type DraftChangeDeps } from './draft-change.js'
 export { createRestoreChange, type RestoreChangeDeps } from './restore-change.js'
@@ -40,6 +41,20 @@ export { createResolveSchema, type ResolveSchemaDeps } from './resolve-schema.js
 export { createGetChangeSpecDeps, type GetChangeSpecDepsDeps } from './get-change-spec-deps.js'
 export { createUpdateSpecDeps, type UpdateSpecDepsDeps } from './update-spec-deps.js'
 export { createInvalidateChange, type InvalidateChangeDeps } from './invalidate-change.js'
+export {
+  createReconcileChangeValidity,
+  createStartVerification,
+  createCompleteVerification,
+  createInvalidateVerification,
+  resolveReconcileChangeValidityDeps,
+  resolveStartVerificationDeps,
+  resolveCompleteVerificationDeps,
+  resolveInvalidateVerificationDeps,
+  type ReconcileChangeValidityDeps,
+  type StartVerificationDeps,
+  type CompleteVerificationDeps,
+  type InvalidateVerificationDeps,
+} from './verification-factories.js'
 export { createRunStepHooks, type RunStepHooksDeps } from './run-step-hooks.js'
 export { createGetHookInstructions, type GetHookInstructionsDeps } from './get-hook-instructions.js'
 export {

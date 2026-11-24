@@ -1,0 +1,78 @@
+- op: modified
+  description: Include workflow.tasksEmpty in immutability of built-in checks
+  selector:
+    type: section
+    matches: 'Requirement: Immutability of built-in checks'
+  content: |
+    All built-in system checks (`protocol.edge`, `workflow.requires`, `workflow.taskCompletion`, `workflow.tasksEmpty`, `deps.consistent`, `workspace.readOnly`, `impl.filesResolved`, `impl.linksInScope`, `approval.spec`, `approval.signoff`, `schema.nameMatch`, `archive.archivable`, `spec.overlap`, `verification.current`, `hook.pre`, `hook.post`) MUST be injected into the `CheckRegistry` upon constructor initialization.
+    The public `CheckRegistry` interface MUST NOT expose any method to register, replace, mutate, or unregister built-in checks.
+    External plugin checks are always registered under the `@<plugin>.<id>` namespace, so an external registration can never produce an unprefixed identifier and can never collide with or shadow a built-in check ID, even when `<plugin>` or `<id>` resemble built-in segments (for example `@protocol.edge` is distinct from `protocol.edge`). The registry SHALL throw `InvalidPluginNameError` only when the plugin name violates the documented plugin-name grammar `^[a-zA-Z0-9_-]+$` (for example empty, whitespace, symbols, dots, or path traversal).
+
+- op: modified
+  description: Add scope step-skip to check binding coordinate identity
+  selector:
+    type: section
+    matches: 'Requirement: Binding coordinate identity and duplicate prevention'
+  content: |
+    Each check binding MUST be uniquely identified by its lifecycle coordinate:
+
+    - For transition bindings: `{ checkId, scope: 'transition', to, along }` where `to` is the target `ChangeState` and `along` is the classified transition direction.
+    - For archive bindings: `{ checkId, scope: 'archive' }`.
+    - For step-skip bindings: `{ checkId, scope: 'step-skip', step }` where `step` is the intermediate `ChangeState` being bypassed.
+
+    The registry MUST reject registration attempts containing duplicate bindings for the exact same coordinate with a `DuplicateCheckBindingError`.
+
+- op: modified
+  description: Split placement (allowSchemaEmbedding) from code-defined policy locks; schema-owned bindings; real instances
+  selector:
+    type: section
+    matches: 'Requirement: Two-tier governance and confinement locks'
+  content: |
+    The registry MUST support a governance model that separates **where** a schema may place a check from **what** a schema may change on bindings defined by code. A binding is **code-defined** when it comes from the built-in binding tables or from a plugin's `defaultBindings`. A binding is **schema-owned** when a schema declaration creates it at a coordinate that no code-defined binding serves.
+
+    1. **Placement Lock (`allowSchemaEmbedding`, check level)**:
+       - `PluginCheckRegistration.allowSchemaEmbedding` and the built-in check governance declare whether a schema MAY place the check at a coordinate that no code-defined binding of that check serves. When `false`, such a declaration MUST throw `CheckEmbeddingForbiddenError`.
+       - For plugin checks, if `defaultBindings` are provided and `allowSchemaEmbedding` is not specified, it SHALL default to `false`. If `defaultBindings` are omitted, the check is an unbound catalog capability and `allowSchemaEmbedding` SHALL default to `true`.
+       - Declaring a check (built-in or plugin) at a coordinate already served by one of its code-defined bindings is NOT embedding. It MUST be accepted regardless of `allowSchemaEmbedding`, and it is governed only by that coordinate's policy, configuration, and disablement locks.
+       - `allowSchemaEmbedding` SHALL NOT lock `onFailure`, `skippable`, configuration, or disablement at any coordinate.
+    2. **Code-Defined Policy Lock (`allowBindingOverride`)**:
+       - `CheckBindingSpec.allowBindingOverride`: if `false` on a code-defined binding coordinate, `schema.yaml` CANNOT alter the `onFailure` policy or the `skippable` permission for that exact coordinate (`CheckBindingOverrideForbiddenError`).
+       - `PluginCheckRegistration.allowBindingOverride` is the default inherited by the plugin's default bindings that omit the field. If `defaultBindings` are provided and it is not specified, it SHALL default to `false`.
+       - `allowBindingOverride` SHALL NOT restrict placement; placement is governed only by `allowSchemaEmbedding`.
+       - `allowBindingOverride` SHALL NOT apply to schema-owned bindings.
+    3. **Configuration Override Locks (`allowConfigOverride`)**:
+       - If set to `false` at the check level, schemas CANNOT provide or override configuration for this check anywhere, including schema-owned bindings.
+       - If set to `false` on a code-defined binding, schemas CANNOT override configuration for that specific coordinate.
+       - A code-defined binding that omits `allowConfigOverride` SHALL inherit the check-level value; it SHALL NOT default to a more permissive value than its check.
+    4. **Disablement Governance Locks (`allowDisable`)**:
+       - `PluginCheckRegistration.allowDisable`: If set to `false`, the check CANNOT be disabled in `schema.yaml` via `disabled: true`, at any coordinate. Core protocol invariants MUST have `allowDisable: false`.
+       - `CheckBindingSpec.allowDisable`: If set to `false` on a code-defined binding coordinate, `schema.yaml` CANNOT disable the check for that specific coordinate.
+       - **Immutability of `allowDisable` (No Relaxation)**: An existing binding or check definition with `allowDisable: false` CANNOT be relaxed or overridden by `schema.yaml`. Any attempt in `schema.yaml` to declare `disabled: true` on a check or coordinate where `allowDisable: false` is active MUST throw a `CheckDisableForbiddenError`.
+    5. **Monotonic Governance Rule (Principle of Monotonic Governance Locks)**:
+       - Every lock set by code (check registration or code-defined binding) operates under monotonic restriction: once `false`, it CANNOT be erased, relaxed, or overwritten by subsequent schema layers, redeclarations of the same binding, or AST mergers (`merge-schema-layers`).
+       - Schema layer mergers (`merge-schema-layers`) MUST preserve both `step.checks` and `step.skipChecks` collections using collision-safe array mutation, preventing accidental clobbering or erasure of governance locks across extended layers.
+       - Any attempt to downgrade or erase a code-set lock (`false` -> `true` or omitted) across layers or redeclarations MUST be strictly rejected, guaranteeing the principle of least privilege.
+       - **Schema-owned bindings belong to the schema.** Because a schema-owned binding carries no code-defined binding locks, a later schema layer (`extends`, schema plugin, `schemaOverrides`) MAY change its `onFailure`, `skippable`, configuration, or `disabled` flag, or remove it, subject only to the check-level `allowConfigOverride` and `allowDisable` locks. Governance is validated against the merged declaration.
+    6. **Built-in Checks Governance Categorization**:
+       - The registry MUST initialize built-in checks according to their architectural category:
+         - **Category A (Protocol & State Invariants)** (`protocol.edge`, `verification.current`, `archive.archivable`, `schema.nameMatch`, `hook.pre`, `hook.post`): MUST have `allowSchemaEmbedding: false`, `allowBindingOverride: false`, and `allowDisable: false`.
+         - **Category B (Native Step Attributes)** (`workflow.requires`, `workflow.taskCompletion`, `workflow.tasksEmpty`, `approval.spec`, `approval.signoff`): Governed natively via dedicated step and workspace schema configurations (`requires: []`, `requiresTaskCompletion`, `approvals`). MUST have `allowSchemaEmbedding: false`, `allowBindingOverride: false`, and `allowDisable: false` to prevent redundant or conflicting embedding in `step.checks: []`.
+         - **Category C (Policy & Consistency Checks)** (`impl.linksInScope`, `spec.overlap`, `deps.consistent`, `impl.filesResolved`, `workspace.readOnly`): MUST have `allowSchemaEmbedding: true`, `allowBindingOverride: true`, and `allowDisable: true`, permitting project schemas to declare them on workflow steps, configure them, or disable them.
+       - Every built-in binding spec MUST declare `allowBindingOverride` and `allowDisable` explicitly with its category's values.
+    7. **Registration fidelity through composition**:
+       - Kernel composition SHALL forward every governance field of a `PluginCheckRegistration` (`allowSchemaEmbedding`, `allowBindingOverride`, `allowConfigOverride`, `allowDisable`, `defaultConfig`) to the `CheckRegistry` unchanged.
+       - Kernel composition SHALL forward every declared default binding of a plugin check, in all scopes (`transition`, `archive`, and `step-skip`), into the bindings the use cases evaluate. A plugin `step-skip` default binding SHALL be evaluated when its step is bypassed exactly like a built-in step-skip binding.
+    8. **Executable check instances**:
+       - The `CheckRegistry` that composition hands to use cases MUST catalog the executable application check instances (the `create*` factories that read real facts through ports) for every built-in check.
+       - Domain matcher instances that evaluate fixed facts SHALL be used only for matcher tests and domain fixtures. A binding synthesized for a schema-embedded check MUST evaluate the same real implementation as that check's code-defined bindings, never a stub that cannot fail.
+
+- op: modified
+  description: Cascade computed once by the binding resolver
+  selector:
+    type: section
+    matches: 'Requirement: Cascading configuration hierarchy'
+  content: |
+    The registry MUST record check-level `defaultConfig` and binding-level `config`.
+    The effective configuration for a check at a coordinate MUST be computed exactly once, by the binding resolver (`resolveEffectiveBindings` in [`core:transition-checks`](../transition-checks/spec.md)), via a deep merge in order of precedence: check `defaultConfig`, then binding `config`, then the schema step declaration `config`. Objects merge by key, arrays concatenate in that order, and scalars from a later level replace earlier ones.
+    The predicate runner MUST pass the resolved configuration unchanged; it SHALL NOT merge configuration again.
+    The resolved configuration MUST be passed into `CheckExecutionContext.config` as an isolated, read-only record.

@@ -1,0 +1,114 @@
+{
+  "manifestVersion": 2,
+  "name": "check-plugins-example",
+  "createdAt": "2026-10-27T19:51:34.564Z",
+  "updatedAt": "2026-10-27T19:51:34.576Z",
+  "description": "Runnable examples/ project showing a host with check plugins configured in specd.yaml (a simple config-only check and one using CheckServices), with an automated test and docs pointer",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [],
+  "invalidation": {
+    "artifacts": "downstream",
+    "workflow": "preserve"
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "missing",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "missing",
+      "files": []
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "missing",
+      "files": []
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-10-27T19:51:34.564Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-27T19:51:34.576Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    }
+  ]
+}

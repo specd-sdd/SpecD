@@ -1,0 +1,5756 @@
+{
+  "manifestVersion": 2,
+  "name": "plugin-architecture",
+  "createdAt": "2026-10-29T14:37:02.729Z",
+  "updatedAt": "2026-11-13T17:33:55.352Z",
+  "description": "Plugin system base: plugin as a feature with N contributions declared in the manifest, flat plugins list in specd.yaml, open registry of contribution-kind handlers, scoped names and @scope/name.id addressing, runtime and install lifecycles, registerPlugins in the SDK, migration of agent plugins and cli plugins commands",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:config",
+    "core:config-loader",
+    "core:config-writer-port",
+    "plugin-manager:specd-plugin-type",
+    "plugin-manager:plugin-loader",
+    "plugin-manager:register-plugins-use-case",
+    "plugin-manager:install-plugin-use-case",
+    "plugin-manager:uninstall-plugin-use-case",
+    "plugin-manager:update-plugin-use-case",
+    "plugin-manager:list-plugins-use-case",
+    "cli:plugins-install",
+    "cli:plugins-uninstall",
+    "cli:plugins-update",
+    "cli:plugins-list",
+    "cli:plugins-show",
+    "sdk:composition",
+    "sdk:host-context",
+    "plugin-manager:agent-plugin-type",
+    "cli:project-init",
+    "cli:project-update",
+    "cli:config-show",
+    "core:check-registry",
+    "plugin-manager:load-plugin-use-case",
+    "plugin-manager:plugin-errors",
+    "plugin-manager:plugin-repository-port",
+    "plugin-agent-claude:plugin-agent",
+    "plugin-agent-copilot:plugin-agent",
+    "plugin-agent-codex:plugin-agent",
+    "plugin-agent-opencode:plugin-agent",
+    "plugin-agent-standard:plugin-agent",
+    "cli:host-context",
+    "skills:shared-folder-owners"
+  ],
+  "specDependsOn": {
+    "core:config": [
+      "core:vcs-adapter-port",
+      "default:_global/architecture",
+      "core:transition-checks"
+    ],
+    "core:config-loader": [
+      "core:config",
+      "core:composition",
+      "core:schema-merge",
+      "core:vcs-adapter-port",
+      "core:vcs-adapter",
+      "default:_global/architecture"
+    ],
+    "core:config-writer-port": ["default:_global/architecture", "core:config"],
+    "plugin-manager:specd-plugin-type": ["core:config", "default:_global/architecture"],
+    "plugin-manager:plugin-loader": [
+      "core:config",
+      "plugin-manager:specd-plugin-type",
+      "plugin-manager:plugin-errors"
+    ],
+    "plugin-manager:register-plugins-use-case": [
+      "plugin-manager:specd-plugin-type",
+      "plugin-manager:plugin-loader",
+      "plugin-manager:plugin-errors",
+      "core:kernel-builder",
+      "core:config"
+    ],
+    "plugin-manager:install-plugin-use-case": [
+      "core:config",
+      "plugin-manager:plugin-loader",
+      "plugin-manager:plugin-errors",
+      "plugin-manager:agent-plugin-type"
+    ],
+    "plugin-manager:uninstall-plugin-use-case": [
+      "core:config",
+      "plugin-manager:plugin-loader",
+      "plugin-manager:plugin-errors",
+      "plugin-manager:agent-plugin-type"
+    ],
+    "plugin-manager:update-plugin-use-case": [
+      "core:config",
+      "plugin-manager:plugin-loader",
+      "plugin-manager:install-plugin-use-case",
+      "plugin-manager:plugin-errors",
+      "plugin-manager:agent-plugin-type"
+    ],
+    "plugin-manager:list-plugins-use-case": ["plugin-manager:plugin-loader"],
+    "cli:plugins-install": [
+      "plugin-manager:install-plugin-use-case",
+      "plugin-manager:specd-plugin-type",
+      "core:composition",
+      "core:config-writer-port",
+      "core:get-config",
+      "cli:host-context"
+    ],
+    "cli:plugins-uninstall": [
+      "plugin-manager:uninstall-plugin-use-case",
+      "core:composition",
+      "core:config-writer-port",
+      "cli:host-context"
+    ],
+    "cli:plugins-update": [
+      "plugin-manager:update-plugin-use-case",
+      "core:get-config",
+      "cli:host-context"
+    ],
+    "cli:plugins-list": [
+      "plugin-manager:load-plugin-use-case",
+      "core:get-config",
+      "cli:host-context"
+    ],
+    "cli:plugins-show": ["plugin-manager:load-plugin-use-case", "cli:host-context"],
+    "sdk:composition": [
+      "default:_global/architecture",
+      "core:composition",
+      "code-graph:composition",
+      "cli:host-context",
+      "sdk:context-markdown",
+      "sdk:build-implementation-review",
+      "code-graph:isolated-index-worker",
+      "plugin-manager:register-plugins-use-case",
+      "plugin-manager:plugin-errors"
+    ],
+    "sdk:host-context": [
+      "sdk:composition",
+      "core:kernel",
+      "core:kernel-builder",
+      "core:composition",
+      "code-graph:composition",
+      "plugin-manager:register-plugins-use-case",
+      "plugin-manager:plugin-errors"
+    ],
+    "plugin-manager:agent-plugin-type": ["core:config", "plugin-manager:specd-plugin-type"],
+    "cli:project-init": [
+      "cli:entrypoint",
+      "cli:plugins-install",
+      "cli:host-context",
+      "plugin-manager:specd-plugin-type",
+      "core:composition",
+      "core:config-writer-port"
+    ],
+    "cli:project-update": [
+      "cli:entrypoint",
+      "cli:plugins-update",
+      "cli:host-context",
+      "core:config"
+    ],
+    "cli:config-show": ["cli:entrypoint", "core:config"],
+    "core:check-registry": [
+      "core:transition-checks",
+      "default:_global/architecture",
+      "core:schema-format"
+    ],
+    "plugin-manager:load-plugin-use-case": ["plugin-manager:plugin-loader"],
+    "plugin-manager:plugin-errors": ["default:_global/architecture"],
+    "plugin-manager:plugin-repository-port": [
+      "plugin-manager:specd-plugin-type",
+      "core:config-writer-port"
+    ],
+    "plugin-agent-claude:plugin-agent": [
+      "core:config",
+      "plugin-manager:agent-plugin-type",
+      "skills:skill-bundle",
+      "skills:skill-repository",
+      "skills:resolve-bundle",
+      "skills:agents",
+      "skills:agent-instruction-template",
+      "skills:shared-folder-owners"
+    ],
+    "plugin-agent-copilot:plugin-agent": [
+      "core:config",
+      "plugin-manager:agent-plugin-type",
+      "skills:skill-bundle",
+      "skills:skill-templates-source",
+      "skills:resolve-bundle",
+      "skills:agents",
+      "skills:agent-instruction-template",
+      "skills:shared-folder-owners"
+    ],
+    "plugin-agent-codex:plugin-agent": [
+      "core:config",
+      "plugin-manager:agent-plugin-type",
+      "skills:skill-bundle",
+      "skills:skill-templates-source",
+      "skills:resolve-bundle",
+      "skills:agents",
+      "skills:agent-instruction-template",
+      "skills:shared-folder-owners"
+    ],
+    "plugin-agent-opencode:plugin-agent": [
+      "core:config",
+      "plugin-manager:agent-plugin-type",
+      "skills:skill-bundle",
+      "skills:skill-repository",
+      "skills:resolve-bundle",
+      "skills:agents",
+      "skills:agent-instruction-template",
+      "skills:shared-folder-owners"
+    ],
+    "plugin-agent-standard:plugin-agent": [
+      "core:config",
+      "plugin-manager:agent-plugin-type",
+      "skills:skill-bundle",
+      "skills:skill-repository",
+      "skills:resolve-bundle",
+      "skills:agents",
+      "skills:agent-instruction-template",
+      "skills:shared-folder-owners"
+    ],
+    "cli:host-context": ["cli:entrypoint", "sdk:host-context", "sdk:composition", "core:kernel"],
+    "skills:shared-folder-owners": ["skills:skill-bundle", "skills:skill-repository"]
+  },
+  "invalidation": {
+    "artifacts": "downstream",
+    "workflow": "preserve"
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:ccbb80581facd29d30cbd8b9d7f19e2f343f3b60ca0df83019c2e9e767d01140"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:config",
+          "filename": "deltas/core/config/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:cd36183a986d5107c4b4efce72123927f2405c252dd44351cf2218dfc1ba97cf"
+        },
+        {
+          "key": "core:config-loader",
+          "filename": "deltas/core/config-loader/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:86d4ca3614e8f245a48020b04ff539036ae2987628720b81ff24aa98f02b8c4c"
+        },
+        {
+          "key": "core:config-writer-port",
+          "filename": "deltas/core/config-writer-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:75f2b1d0ad751cd256733b1f91ac3870c19b0b92ee494a53b56e180ba9313213"
+        },
+        {
+          "key": "plugin-manager:specd-plugin-type",
+          "filename": "deltas/plugin-manager/specd-plugin-type/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:26b5517bebc2ffe40b828238b3fa6f4b73215b1407136a24d2737c4754a350c1"
+        },
+        {
+          "key": "plugin-manager:plugin-loader",
+          "filename": "deltas/plugin-manager/plugin-loader/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a5f7bf6e1fb565a38a74f5491ad8533a1d9787edc996a052850af68670140698"
+        },
+        {
+          "key": "plugin-manager:register-plugins-use-case",
+          "filename": "specs/plugin-manager/register-plugins-use-case/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:1ead68cf0cc48f1199e46e10ab69c6f9035d161ca71f55bdae2fd1d195615515"
+        },
+        {
+          "key": "plugin-manager:install-plugin-use-case",
+          "filename": "deltas/plugin-manager/install-plugin-use-case/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3247278ddd8524aa163e4297a34a5924db820fa18c5575cd8f5f0236876801ca"
+        },
+        {
+          "key": "plugin-manager:uninstall-plugin-use-case",
+          "filename": "deltas/plugin-manager/uninstall-plugin-use-case/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1b02e941afb7ecf95535302a82b0e6cdf70d4d098f8f9c3ac2190058f7b1c43f"
+        },
+        {
+          "key": "plugin-manager:update-plugin-use-case",
+          "filename": "deltas/plugin-manager/update-plugin-use-case/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3f5d2b81e57e9b0fda707ec8d659d13fe64ee346f947c83bca6025279a5c1912"
+        },
+        {
+          "key": "plugin-manager:list-plugins-use-case",
+          "filename": "deltas/plugin-manager/list-plugins-use-case/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3b60cb498484cf301fb7f630a489e2faf74f9c94c7a0a161f1b25ffad01d9589"
+        },
+        {
+          "key": "cli:plugins-install",
+          "filename": "deltas/cli/plugins-install/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7a233457e5b74c5814b217370aa830b8176738d451767ba92508a118dd695a49"
+        },
+        {
+          "key": "cli:plugins-uninstall",
+          "filename": "deltas/cli/plugins-uninstall/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:114f7d082ba41c7133dd7b2e62615c032050cceff826eebe1e63ec4b2e7f6856"
+        },
+        {
+          "key": "cli:plugins-update",
+          "filename": "deltas/cli/plugins-update/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8d10a4f55dda04180dfbf5a59f72f4ef4463a7cf40a78fedcc858cbe2d78bcc5"
+        },
+        {
+          "key": "cli:plugins-list",
+          "filename": "deltas/cli/plugins-list/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e84695ef8fd67b4e085886deca2281473efddc0c08054191db1ee06e2257be25"
+        },
+        {
+          "key": "cli:plugins-show",
+          "filename": "deltas/cli/plugins-show/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e1ead3d6b9095a7edde6260007110dd6f26f10d85cd4060d081ec59d156c52ec"
+        },
+        {
+          "key": "sdk:composition",
+          "filename": "deltas/sdk/composition/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d44b15da8e7e98a0086c62bd10ec189ba577e04f37b5ee02f1b310cbf6108255"
+        },
+        {
+          "key": "sdk:host-context",
+          "filename": "deltas/sdk/host-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:bb4559a4103a510c634f7b50a2795e7c8fe748f6ed8c48af349c950295e3fbac"
+        },
+        {
+          "key": "plugin-manager:agent-plugin-type",
+          "filename": "deltas/plugin-manager/agent-plugin-type/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3fdfad3bb6cf0b2cea4d530ccdc18634343ba2c95647487acb588cfede2eb49f"
+        },
+        {
+          "key": "cli:project-init",
+          "filename": "deltas/cli/project-init/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2ddf4cc795c796544d25cadf39a67bbfe1be9fe83f9d5d25a476af1a38ec97f9"
+        },
+        {
+          "key": "cli:project-update",
+          "filename": "deltas/cli/project-update/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b7478fce1af0c5c1bb2220151096cc206935e6fcd3703daa4e58011285d4e089"
+        },
+        {
+          "key": "cli:config-show",
+          "filename": "deltas/cli/config-show/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b43646469ce2c2c5988ee289dd612ac88c7b2b1e2781abf58b4932807874ba05"
+        },
+        {
+          "key": "core:check-registry",
+          "filename": "deltas/core/check-registry/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:aae0b2c9355e0092ce58908446d05d952c3f24196b1f5a08a4938be5996ddd85"
+        },
+        {
+          "key": "plugin-manager:load-plugin-use-case",
+          "filename": "deltas/plugin-manager/load-plugin-use-case/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:af45e65bfeb6883dd99ec0d9c267a963c189e792ef87452a61f51f6328ff09ad"
+        },
+        {
+          "key": "plugin-manager:plugin-errors",
+          "filename": "deltas/plugin-manager/plugin-errors/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:921d6636d2430a8c8dfe487f9bc655c059a838df4325643ffb8e4eca1e51c170"
+        },
+        {
+          "key": "plugin-manager:plugin-repository-port",
+          "filename": "deltas/plugin-manager/plugin-repository-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7e868a655ec48e2a0583ca4c5d1871d3c2c525c79f697394f221542c8a65907d"
+        },
+        {
+          "key": "plugin-agent-claude:plugin-agent",
+          "filename": "deltas/plugin-agent-claude/plugin-agent/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a2a2bf846958a12b801a2c3a038e6f24d0f1cdea9a2fe7cade054c7783f0d9bc"
+        },
+        {
+          "key": "plugin-agent-copilot:plugin-agent",
+          "filename": "deltas/plugin-agent-copilot/plugin-agent/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:61ec323a5a29e0ad583d4a45b7aa171145f916bcfa8584f1beb09400a23936a9"
+        },
+        {
+          "key": "plugin-agent-codex:plugin-agent",
+          "filename": "deltas/plugin-agent-codex/plugin-agent/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:19ca16ef169ef68be2f6e2121072bf026d13502e5f0922acce6fe7ba851c2e3b"
+        },
+        {
+          "key": "plugin-agent-opencode:plugin-agent",
+          "filename": "deltas/plugin-agent-opencode/plugin-agent/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:78f8b5b7682c445fc54a33135d603c3cfd9a409aa15da7945ae88d7c232f2143"
+        },
+        {
+          "key": "plugin-agent-standard:plugin-agent",
+          "filename": "deltas/plugin-agent-standard/plugin-agent/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a7e4c7ed956d0538fbd03a0ddd90623104a51ed949915086f4bd33adbe4659c7"
+        },
+        {
+          "key": "cli:host-context",
+          "filename": "deltas/cli/host-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:bcb7bbb7e3a3846aa0968a76818aa581390b44ef74a4f3ddc4123f97482b8bfe"
+        },
+        {
+          "key": "skills:shared-folder-owners",
+          "filename": "specs/skills/shared-folder-owners/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:e91225c211af5f839dc47e65bb01acc87c93965a154557c2c3d24068691b3bf9"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:config",
+          "filename": "deltas/core/config/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b395714e2167e3789ec2088e08b39aac603e95a980d7e1047089d08106a18d55"
+        },
+        {
+          "key": "core:config-loader",
+          "filename": "deltas/core/config-loader/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5421e8a3d6dc1f837abb7b8024bb4aca4020a0db2959a4c1ff7d5d88fb07c6df"
+        },
+        {
+          "key": "core:config-writer-port",
+          "filename": "deltas/core/config-writer-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7d059dbee45dc8ee1816d395183d7580e7991eb9cdddb4bb741b92e9ee5a766e"
+        },
+        {
+          "key": "plugin-manager:specd-plugin-type",
+          "filename": "deltas/plugin-manager/specd-plugin-type/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:97b1668d872349514371695209cd18d820e14524b478da97fd2b5e78e277eabe"
+        },
+        {
+          "key": "plugin-manager:plugin-loader",
+          "filename": "deltas/plugin-manager/plugin-loader/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6b97f953b362f465b10e5c8221718784f241105f7870a5e6b142cb4b2ff77ce3"
+        },
+        {
+          "key": "plugin-manager:register-plugins-use-case",
+          "filename": "specs/plugin-manager/register-plugins-use-case/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:878329707b6c0eaee9ad712797b884f2ada6b42b02a09d74fce132fd2f02bc2f"
+        },
+        {
+          "key": "plugin-manager:install-plugin-use-case",
+          "filename": "deltas/plugin-manager/install-plugin-use-case/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ac7a24d55cc89a80d46b6d23f630352611a3afd9c7f01157d922d2f1178368e9"
+        },
+        {
+          "key": "plugin-manager:uninstall-plugin-use-case",
+          "filename": "deltas/plugin-manager/uninstall-plugin-use-case/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9db5513735ab3c4d5fb1d7358d4e89eb33a70c789ef9539921cd017ba08a1779"
+        },
+        {
+          "key": "plugin-manager:update-plugin-use-case",
+          "filename": "deltas/plugin-manager/update-plugin-use-case/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9b5d1fe49d57fe3ede5e1e168438b1bd62d1154e0b7f2f564a03e5ffa396bc63"
+        },
+        {
+          "key": "plugin-manager:list-plugins-use-case",
+          "filename": "deltas/plugin-manager/list-plugins-use-case/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7507241e1acf31c4d25627bd2be4f8f4566ca7114446f1e121609ab52bef072f"
+        },
+        {
+          "key": "cli:plugins-install",
+          "filename": "deltas/cli/plugins-install/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5bcc8e356e9dcdcd109cf9547c6cc4b3d06fb6f4c8eb6347d7669d9028054822"
+        },
+        {
+          "key": "cli:plugins-uninstall",
+          "filename": "deltas/cli/plugins-uninstall/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1f2ebe96d35ab7bfa5093ce290f37f863f977e86f1ce1eece5488e279130d61e"
+        },
+        {
+          "key": "cli:plugins-update",
+          "filename": "deltas/cli/plugins-update/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ceb100e64ecded249cd23660a75577456d87d32961f1578eebcde77c42989f12"
+        },
+        {
+          "key": "cli:plugins-list",
+          "filename": "deltas/cli/plugins-list/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0172876cb067a95e576515297363c9d61a801ef80275bf258ed7c74b20e2a44e"
+        },
+        {
+          "key": "cli:plugins-show",
+          "filename": "deltas/cli/plugins-show/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d9ecf02214aff8fa294b31e4039ce3bfc3d643a52468bb9e48381f141ead7c8d"
+        },
+        {
+          "key": "sdk:composition",
+          "filename": "deltas/sdk/composition/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:22321793ef2aa1c4a038df7c1b5832672189dc9dda71fefad44e81fa69b27494"
+        },
+        {
+          "key": "sdk:host-context",
+          "filename": "deltas/sdk/host-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:77c0955ba9654280f4a347ab040747a829c0c465b56135527a15a5344b306f8d"
+        },
+        {
+          "key": "plugin-manager:agent-plugin-type",
+          "filename": "deltas/plugin-manager/agent-plugin-type/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ff1188ddfdf941cc1e8870fbbbc3ff9710b739b46fd6e23bbaf02f6548c80e8b"
+        },
+        {
+          "key": "cli:project-init",
+          "filename": "deltas/cli/project-init/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3816444f204bd8fcb2145ab29846349133924f0150df10f45e999626ea376c53"
+        },
+        {
+          "key": "cli:project-update",
+          "filename": "deltas/cli/project-update/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:22cd1bbc7d4a189f5d4dacbc0141f536db5e550e355b64dcc80010949fa32a22"
+        },
+        {
+          "key": "cli:config-show",
+          "filename": "deltas/cli/config-show/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d364493c1f650b9b115ac9e91541c8fffe5d92f476eed4f95c8a92ea019b041d"
+        },
+        {
+          "key": "core:check-registry",
+          "filename": "deltas/core/check-registry/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1c032380a1618125dc3f9380ed9796f1f59c94df32c7b8883d60292e6f4436c4"
+        },
+        {
+          "key": "plugin-manager:load-plugin-use-case",
+          "filename": "deltas/plugin-manager/load-plugin-use-case/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a2475b49e9128b0e46cccc9f6626a2d903375462b9042eaa4b02e19c185ad1a1"
+        },
+        {
+          "key": "plugin-manager:plugin-errors",
+          "filename": "deltas/plugin-manager/plugin-errors/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9f39b0a7f84a0664bb4a9e4215450ff5de684bfc2976b694bd850435964284be"
+        },
+        {
+          "key": "plugin-manager:plugin-repository-port",
+          "filename": "deltas/plugin-manager/plugin-repository-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b597211ffbb2cedc4bdd03371ec2adc49cec2aac1bd827c7d93a0cb44aaaad34"
+        },
+        {
+          "key": "plugin-agent-claude:plugin-agent",
+          "filename": "deltas/plugin-agent-claude/plugin-agent/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:698adf0c1a60ec465cbf79a7c29ea20b9cc4795ed811c1d96988205001d1b6c5"
+        },
+        {
+          "key": "plugin-agent-copilot:plugin-agent",
+          "filename": "deltas/plugin-agent-copilot/plugin-agent/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:367282afc198c19ea0561ce2cc8934614f6be0cf2a03b32da00bb7f50a859186"
+        },
+        {
+          "key": "plugin-agent-codex:plugin-agent",
+          "filename": "deltas/plugin-agent-codex/plugin-agent/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ba06bedcfed2ba520525edbb30b1d4cd6e0ae3f25ebb4fec3069be51eaf273f9"
+        },
+        {
+          "key": "plugin-agent-opencode:plugin-agent",
+          "filename": "deltas/plugin-agent-opencode/plugin-agent/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:fd455491b46e2d29dc4462ee3fe8bd5301ab3ef0ab70efc18f219f87e0f67022"
+        },
+        {
+          "key": "plugin-agent-standard:plugin-agent",
+          "filename": "deltas/plugin-agent-standard/plugin-agent/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:28e68a2ad09463e00df5f8ba70fada5160586b70a91c7878f844f85b9c78c3f8"
+        },
+        {
+          "key": "cli:host-context",
+          "filename": "deltas/cli/host-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:96b7ed430d68d8c8f1f4a2f18abc212698e07c85bcadf16e8ec5ba00b82a0b5b"
+        },
+        {
+          "key": "skills:shared-folder-owners",
+          "filename": "specs/skills/shared-folder-owners/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:f3d07acbb68cc8c3cf7561513b25b11a1f568a1cbabe21fd575b9cbc9eb29989"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:511e5a1dcd24d31537664e152cb5318cb298c05851c7fdb0034fe78aee522738"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:a2b864ebedeffb3548413175d84b69b521cb2c5b546fabfe926618535d23e414"
+        }
+      ]
+    }
+  ],
+  "trackedImplementationFiles": [
+    {
+      "file": "specs/_global/conventions/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/entrypoint/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/indexer/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/kernel-builder/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/kernel/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/vcs-adapter/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/agent-instruction-template/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/skill-templates-source/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/ports/config-schema.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/ports/config-writer.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/specd-config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/legacy-config-format-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/unsupported-config-version-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/plugin-name.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/services/check-registry.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/config-cascade.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/config-loader.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/config-writer.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/public.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/services/execute-matching-predicates.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/archive-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-status.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/transition-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/kernel-get-config.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/workflow-check-registry.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/services/build-schema-archive-checks.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/services/build-schema.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/services/check-registry.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/services/transition-checks.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/config-loader.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/config-writer.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-claude/specd-plugin.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-claude/src/domain/types/claude-plugin.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-claude/test/domain/types/claude-plugin.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-claude/test/install-skills.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-codex/specd-plugin.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-codex/src/domain/types/codex-plugin.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-codex/test/domain/types/codex-plugin.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-codex/test/install-skills.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/specd-plugin.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/src/domain/types/copilot-plugin.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/test/domain/types/copilot-plugin.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/test/install-skills.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/specd-plugin.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/src/domain/types/opencode-plugin.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/test/domain/types/opencode-plugin.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/test/install-skills.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-standard/specd-plugin.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-standard/src/domain/types/agent-standard-plugin.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-standard/test/domain/types/agent-standard-plugin.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-standard/test/install-skills.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/application/ports/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/application/ports/plugin-loader.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/application/ports/plugin-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/application/use-cases/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/application/use-cases/install-plugin.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/application/use-cases/list-plugins.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/application/use-cases/load-plugin.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/application/use-cases/register-plugins.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/application/use-cases/uninstall-plugin.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/application/use-cases/update-plugin.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/domain/errors/duplicate-contribution-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/domain/errors/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/domain/errors/invalid-plugin-config-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/domain/errors/plugin-init-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/domain/errors/unknown-contribution-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/domain/errors/unknown-contribution-kind-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/domain/errors/unsupported-schema-keyword-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/domain/handlers/agents-handler.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/domain/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/domain/services/plugin-config-schema.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/domain/services/resolve-contributions.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/domain/types/agent-plugin.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/domain/types/contribution-kind-handler.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/domain/types/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/domain/types/plugin-manifest.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/domain/types/specd-plugin.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/infrastructure/loader/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/infrastructure/loader/plugin-loader.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/infrastructure/loader/register-plugins.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/test/application/install-plugin.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/test/application/uninstall-plugin.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/test/application/update-plugin.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/test/domain/types/is-agent-plugin.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/test/domain/types/is-specd-plugin.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/test/infrastructure/plugin-loader.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/test/mock-config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specd.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/composition/host-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/core-reexports.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/helpers/cli-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/graph-index-task.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/plugins/install.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/plugins/uninstall.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/plugins/update.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/plugins/list.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/plugins/show.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/project/init.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/project/update.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/config/show.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/plugins/get-declared-plugins.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/plugins-install.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/plugins-list.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/plugins-update.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/project-init.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/project-update.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/config.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/configuration-examples.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/configuration.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/index.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/installation.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/plugins.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/config-show.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/plugins-update.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/plugins.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/plugins/get-declared-plugins.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/graph-index-task.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/infrastructure/generated/guides.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-claude/README.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-codex/README.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/README.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/README.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-standard/README.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/README.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/composition/host-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/test/resolve-bundle.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "AGENTS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/project-init.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/project-update.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/configuration-coverage.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/helpers/cli-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/composition-registries.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/kernel.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/test/application/list-plugin.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/test/application/load-plugin.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/test/application/register-plugins.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/test/domain/agents-handler.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/test/domain/errors.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/test/domain/plugin-config-schema.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/test/domain/resolve-contributions.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/test/domain/specd-plugin.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/barrel.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/composition/composition.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/composition/package-boundary.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/domain/errors/plugin-validation.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/domain/errors/duplicate-handler-kind-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/domain/errors/invalid-contribution-address-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-codex/src/application/use-cases/install-skills.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/src/application/use-cases/uninstall-skills.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-standard/src/application/use-cases/uninstall-skills.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-standard/src/domain/frontmatter/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/src/application/shared-folder-owners.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-claude/src/application/use-cases/install-skills.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-claude/src/application/use-cases/uninstall-skills.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/src/application/use-cases/install-skills.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-codex/src/application/use-cases/uninstall-skills.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/src/application/use-cases/install-skills.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/src/application/use-cases/uninstall-skills.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-standard/src/application/use-cases/install-skills.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/test/application/shared-folder-owners.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/test/application/shared-folder-owners-eacces.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/ports.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-claude/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-codex/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-standard/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/domain/services/merge-handlers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/test/application/plugin-repository-port.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/composition/host-context-e2e.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/config-writer.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-create.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-claude/src/application/use-cases/shared-folder.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/plugin-agent-codex/src/application/use-cases/shared-folder.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/src/application/use-cases/shared-folder.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/src/application/use-cases/shared-folder.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/plugin-agent-standard/src/application/use-cases/shared-folder.ts",
+      "state": "removed"
+    },
+    {
+      "file": "specs/cli/change-status/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-manager/src/domain/errors/plugin-destroy-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/config-show-real-loader.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/project-update-allowlist.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/handle-error.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/config-cascade-plugins.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/domain/errors/plugin-not-found.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/test/application/plugin-hooks-no-agents.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/test/application/register-plugins-contract.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/test/infrastructure/plugin-loader-contract.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "EXPLORATION-checks-gates-getstatus.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/sdk/index.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/config/config-shape.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/config.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/load-config.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/package-deps.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/composition-registries.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/kernel-builder.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/check-registry-errors.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-claude/test/agent-lifecycle.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-claude/test/domain/frontmatter-contract.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-codex/test/agent-lifecycle.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-codex/test/domain/frontmatter-contract.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/test/agent-lifecycle.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/test/domain/frontmatter-contract.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/test/agent-lifecycle.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/test/domain/frontmatter-contract.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/test/meta-package.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-standard/test/agent-lifecycle.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-standard/test/domain/frontmatter-contract.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-standard/test/meta-package.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/composition/handler-contracts.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/ports/config-writer.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/artifact-parser/delta-validation-real.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/application/use-cases/load-plugin-safely.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/test/application/loader-failures.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/helpers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/plugins-install-real-loader.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-claude/test/create.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-claude/test/real-pipeline.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-claude/test/shared-folder-ownership.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-codex/test/create.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-codex/test/real-pipeline.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-codex/test/shared-folder-ownership.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-codex/test/toml-escaping.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/test/create.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/test/real-pipeline.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/test/shared-folder-ownership.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/test/create.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/test/permission.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/test/real-pipeline.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/test/shared-folder-ownership.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-standard/test/create.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-standard/test/real-pipeline.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-standard/test/shared-folder-ownership.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/domain/errors/describe-thrown.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/composition/host-context-rollback.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/src/application/split-top-level-commas.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/test/application/split-top-level-commas.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/plugins-real-init-never-runs.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/project-update-real-discovery.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-claude/test/skill-frontmatter-keys.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-claude/test/uninstall-safety.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-codex/test/uninstall-safety.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/test/agent-tools-split.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/test/uninstall-safety.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/test/uninstall-safety.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-standard/test/uninstall-safety.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/application/use-cases/has-agent-hooks.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/domain/errors/is-specd-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/test/application/hostile-hooks.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/src/application/select-managed-names.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/test/application/select-managed-names.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/plugins-uninstall.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/proj/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/plugins/plugins-uninstall-real-loader.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/test/application/hardening.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/src/domain/shared-folder.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/test/domain/shared-folder.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/helpers/cli-cleanup.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/plugins-real-loader-fixtures.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/plugins-show-real-loader.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/plugins-uninstall-real-loader.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/helpers/cli-cleanup.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/helpers/cli-context-real-host.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/helpers/cli-host.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/helpers/real-project.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/kernel-builder.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-claude/test/frontmatter-values.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "CLAUDE.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_ARCHIVE_LINK_REMEDIATION.md",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:config",
+      "file": "packages/core/src/domain/plugin-name.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["PLUGIN_NAME_REGEX", "isPluginName"]
+    },
+    {
+      "specId": "core:config",
+      "file": "packages/core/src/domain/errors/legacy-config-format-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["LegacyConfigFormatError"]
+    },
+    {
+      "specId": "core:config",
+      "file": "packages/core/src/domain/errors/unsupported-config-version-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["UnsupportedConfigVersionError", "CURRENT_CONFIG_VERSION"]
+    },
+    {
+      "specId": "core:config-loader",
+      "file": "packages/core/src/infrastructure/fs/config-loader.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["assertCurrentConfigFormat"]
+    },
+    {
+      "specId": "core:config-writer-port",
+      "file": "packages/core/src/application/ports/config-writer.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ConfigWriter", "AddPluginOptions"]
+    },
+    {
+      "specId": "core:check-registry",
+      "file": "packages/core/src/domain/services/check-registry.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CheckRegistry"]
+    },
+    {
+      "specId": "plugin-manager:specd-plugin-type",
+      "file": "packages/plugin-manager/src/domain/types/specd-plugin.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "SpecdPlugin",
+        "isSpecdPlugin",
+        "buildContributionAddress",
+        "parseContributionAddress",
+        "baseContractFields",
+        "PluginInstallContext"
+      ]
+    },
+    {
+      "specId": "plugin-manager:plugin-loader",
+      "file": "packages/plugin-manager/src/infrastructure/loader/plugin-loader.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createPluginLoader", "RuntimePluginLoader"]
+    },
+    {
+      "specId": "plugin-manager:register-plugins-use-case",
+      "file": "packages/plugin-manager/src/application/use-cases/register-plugins.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerPlugins"]
+    },
+    {
+      "specId": "plugin-manager:install-plugin-use-case",
+      "file": "packages/plugin-manager/src/application/use-cases/install-plugin.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InstallPlugin"]
+    },
+    {
+      "specId": "plugin-manager:agent-plugin-type",
+      "file": "packages/plugin-manager/src/domain/handlers/agents-handler.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["agentsContributionHandler"]
+    },
+    {
+      "specId": "plugin-agent-claude:plugin-agent",
+      "file": "packages/plugin-agent-claude/src/domain/types/claude-plugin.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ClaudeAgentPlugin"]
+    },
+    {
+      "specId": "sdk:host-context",
+      "file": "packages/sdk/src/composition/host-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createSdkContext", "SdkContextOptions"]
+    },
+    {
+      "specId": "sdk:composition",
+      "file": "packages/sdk/src/index.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["SdkContextOptions"]
+    },
+    {
+      "specId": "sdk:composition",
+      "file": "packages/sdk/src/core-reexports.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["isPluginName", "PLUGIN_NAME_REGEX"]
+    },
+    {
+      "specId": "cli:host-context",
+      "file": "packages/cli/src/helpers/cli-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["resolveCliContext"]
+    },
+    {
+      "specId": "cli:host-context",
+      "file": "packages/cli/src/graph-index-task.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["runGraphIndexTask"]
+    },
+    {
+      "specId": "cli:plugins-install",
+      "file": "packages/cli/src/commands/plugins/install.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["installPluginsWithKernel"]
+    },
+    {
+      "specId": "cli:plugins-uninstall",
+      "file": "packages/cli/src/commands/plugins/uninstall.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerPluginsUninstall"]
+    },
+    {
+      "specId": "cli:plugins-update",
+      "file": "packages/cli/src/commands/plugins/update.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["updatePluginsWithKernel", "PluginUpdateEntry"]
+    },
+    {
+      "specId": "cli:plugins-list",
+      "file": "packages/cli/src/commands/plugins/list.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerPluginsList"]
+    },
+    {
+      "specId": "cli:plugins-show",
+      "file": "packages/cli/src/commands/plugins/show.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerPluginsShow"]
+    },
+    {
+      "specId": "cli:project-init",
+      "file": "packages/cli/src/commands/project/init.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["registerProjectInit"]
+    },
+    {
+      "specId": "cli:project-update",
+      "file": "packages/cli/src/commands/project/update.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerProjectUpdate"]
+    },
+    {
+      "specId": "cli:config-show",
+      "file": "packages/cli/src/commands/config/show.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["registerConfigShow"]
+    },
+    {
+      "specId": "cli:plugins-install",
+      "file": "packages/cli/src/commands/plugins/get-declared-plugins.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["getDeclaredPlugins", "findDeclaredPlugin"]
+    },
+    {
+      "specId": "cli:project-init",
+      "file": "packages/cli/test/commands/project-init.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:project-update",
+      "file": "packages/cli/test/commands/project-update.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:host-context",
+      "file": "packages/cli/test/helpers/cli-context.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:check-registry",
+      "file": "packages/core/test/composition/composition-registries.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:check-registry",
+      "file": "packages/core/test/composition/kernel.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "plugin-manager:list-plugins-use-case",
+      "file": "packages/plugin-manager/test/application/list-plugin.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "plugin-manager:load-plugin-use-case",
+      "file": "packages/plugin-manager/test/application/load-plugin.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "plugin-manager:register-plugins-use-case",
+      "file": "packages/plugin-manager/test/application/register-plugins.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "plugin-manager:agent-plugin-type",
+      "file": "packages/plugin-manager/test/domain/agents-handler.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "plugin-manager:plugin-errors",
+      "file": "packages/plugin-manager/test/domain/errors.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "plugin-manager:plugin-loader",
+      "file": "packages/plugin-manager/test/domain/plugin-config-schema.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "plugin-manager:register-plugins-use-case",
+      "file": "packages/plugin-manager/test/domain/resolve-contributions.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "plugin-manager:specd-plugin-type",
+      "file": "packages/plugin-manager/test/domain/specd-plugin.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:composition",
+      "file": "packages/sdk/test/barrel.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:composition",
+      "file": "packages/sdk/test/composition/composition.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:composition",
+      "file": "packages/sdk/test/composition/package-boundary.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "plugin-manager:plugin-errors",
+      "file": "packages/plugin-manager/src/domain/errors/plugin-init-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["PluginInitError"]
+    },
+    {
+      "specId": "plugin-manager:plugin-errors",
+      "file": "packages/plugin-manager/src/domain/errors/plugin-validation.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["PluginValidationError"]
+    },
+    {
+      "specId": "plugin-manager:plugin-errors",
+      "file": "packages/plugin-manager/src/domain/errors/duplicate-handler-kind-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["DuplicateHandlerKindError"]
+    },
+    {
+      "specId": "plugin-manager:plugin-errors",
+      "file": "packages/plugin-manager/src/domain/errors/invalid-contribution-address-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InvalidContributionAddressError"]
+    },
+    {
+      "specId": "plugin-manager:uninstall-plugin-use-case",
+      "file": "packages/plugin-manager/src/application/use-cases/uninstall-plugin.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["UninstallPlugin"]
+    },
+    {
+      "specId": "plugin-manager:update-plugin-use-case",
+      "file": "packages/plugin-manager/src/application/use-cases/update-plugin.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["UpdatePlugin"]
+    },
+    {
+      "specId": "plugin-manager:agent-plugin-type",
+      "file": "packages/plugin-manager/src/domain/services/resolve-contributions.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["installContextContributions"]
+    },
+    {
+      "specId": "core:config-writer-port",
+      "file": "packages/core/src/infrastructure/fs/config-writer.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FsConfigWriter"]
+    },
+    {
+      "specId": "plugin-agent-codex:plugin-agent",
+      "file": "packages/plugin-agent-codex/src/application/use-cases/install-skills.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InstallSkills"]
+    },
+    {
+      "specId": "plugin-agent-copilot:plugin-agent",
+      "file": "packages/plugin-agent-copilot/src/application/use-cases/uninstall-skills.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["UninstallSkills"]
+    },
+    {
+      "specId": "plugin-agent-standard:plugin-agent",
+      "file": "packages/plugin-agent-standard/src/application/use-cases/uninstall-skills.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["UninstallSkills"]
+    },
+    {
+      "specId": "plugin-agent-standard:plugin-agent",
+      "file": "packages/plugin-agent-standard/src/domain/frontmatter/index.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["skillFrontmatter"]
+    },
+    {
+      "specId": "skills:shared-folder-owners",
+      "file": "packages/skills/src/application/shared-folder-owners.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "addSharedOwner",
+        "removeSharedOwner",
+        "removeSharedFolderIfEmpty",
+        "SharedOwnerRelease"
+      ]
+    },
+    {
+      "specId": "plugin-agent-claude:plugin-agent",
+      "file": "packages/plugin-agent-claude/src/application/use-cases/install-skills.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InstallSkills"]
+    },
+    {
+      "specId": "plugin-agent-claude:plugin-agent",
+      "file": "packages/plugin-agent-claude/src/application/use-cases/uninstall-skills.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["UninstallSkills"]
+    },
+    {
+      "specId": "plugin-agent-copilot:plugin-agent",
+      "file": "packages/plugin-agent-copilot/src/application/use-cases/install-skills.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InstallSkills"]
+    },
+    {
+      "specId": "plugin-agent-codex:plugin-agent",
+      "file": "packages/plugin-agent-codex/src/application/use-cases/uninstall-skills.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["UninstallSkills"]
+    },
+    {
+      "specId": "plugin-agent-opencode:plugin-agent",
+      "file": "packages/plugin-agent-opencode/src/application/use-cases/install-skills.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InstallSkills"]
+    },
+    {
+      "specId": "plugin-agent-opencode:plugin-agent",
+      "file": "packages/plugin-agent-opencode/src/application/use-cases/uninstall-skills.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["UninstallSkills"]
+    },
+    {
+      "specId": "plugin-agent-standard:plugin-agent",
+      "file": "packages/plugin-agent-standard/src/application/use-cases/install-skills.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InstallSkills"]
+    },
+    {
+      "specId": "skills:shared-folder-owners",
+      "file": "packages/skills/src/index.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["addSharedOwner", "removeSharedOwner", "removeSharedFolderIfEmpty"]
+    },
+    {
+      "specId": "skills:shared-folder-owners",
+      "file": "packages/skills/test/application/shared-folder-owners.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "skills:shared-folder-owners",
+      "file": "packages/skills/test/application/shared-folder-owners-eacces.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "plugin-manager:plugin-loader",
+      "file": "packages/plugin-manager/src/domain/services/merge-handlers.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["mergeHandlers"]
+    },
+    {
+      "specId": "plugin-manager:register-plugins-use-case",
+      "file": "packages/plugin-manager/src/domain/services/merge-handlers.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["mergeHandlers"]
+    },
+    {
+      "specId": "plugin-manager:register-plugins-use-case",
+      "file": "packages/plugin-manager/src/infrastructure/loader/register-plugins.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerPlugins", "RegisterPluginsInput"]
+    },
+    {
+      "specId": "plugin-manager:plugin-repository-port",
+      "file": "packages/plugin-manager/src/application/ports/plugin-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["PluginRepositoryPort", "DeclaredPlugin"]
+    },
+    {
+      "specId": "plugin-manager:plugin-repository-port",
+      "file": "packages/plugin-manager/test/application/plugin-repository-port.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:config-writer-port",
+      "file": "packages/core/src/ports.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "plugin-agent-claude:plugin-agent",
+      "file": "packages/plugin-agent-claude/src/index.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["create"]
+    },
+    {
+      "specId": "plugin-agent-codex:plugin-agent",
+      "file": "packages/plugin-agent-codex/src/index.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["create"]
+    },
+    {
+      "specId": "plugin-agent-copilot:plugin-agent",
+      "file": "packages/plugin-agent-copilot/src/index.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["create"]
+    },
+    {
+      "specId": "plugin-agent-opencode:plugin-agent",
+      "file": "packages/plugin-agent-opencode/src/index.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["create"]
+    },
+    {
+      "specId": "plugin-agent-standard:plugin-agent",
+      "file": "packages/plugin-agent-standard/src/index.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["create"]
+    },
+    {
+      "specId": "plugin-manager:uninstall-plugin-use-case",
+      "file": "packages/plugin-manager/test/application/uninstall-plugin.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "plugin-manager:update-plugin-use-case",
+      "file": "packages/plugin-manager/test/application/update-plugin.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "plugin-manager:install-plugin-use-case",
+      "file": "packages/plugin-manager/test/application/install-plugin.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "plugin-manager:plugin-loader",
+      "file": "packages/plugin-manager/test/infrastructure/plugin-loader.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:host-context",
+      "file": "packages/sdk/test/composition/host-context-e2e.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:config-writer-port",
+      "file": "packages/core/test/infrastructure/fs/config-writer.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:config-loader",
+      "file": "packages/core/test/infrastructure/fs/config-loader.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:check-registry",
+      "file": "packages/core/test/domain/services/check-registry.spec.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CheckRegistry"]
+    },
+    {
+      "specId": "core:config-writer-port",
+      "file": "packages/core/test/composition/config-writer.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:plugins-install",
+      "file": "packages/cli/test/commands/plugins.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:plugins-uninstall",
+      "file": "packages/cli/test/commands/plugins.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:plugins-list",
+      "file": "packages/cli/test/commands/plugins.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:plugins-show",
+      "file": "packages/cli/test/commands/plugins.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:plugins-update",
+      "file": "packages/cli/test/commands/plugins-update.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:config-show",
+      "file": "packages/cli/test/commands/config-show.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "plugin-manager:plugin-errors",
+      "file": "packages/plugin-manager/src/domain/errors/plugin-destroy-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["PluginDestroyError"]
+    },
+    {
+      "specId": "cli:config-show",
+      "file": "packages/cli/src/commands/config/config-shape.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["renderConfigShapeHelp"]
+    },
+    {
+      "specId": "plugin-manager:plugin-errors",
+      "file": "packages/plugin-manager/src/application/use-cases/load-plugin-safely.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["loadPluginSafely"]
+    }
+  ],
+  "implementationTrackingStartedAt": "2026-11-01T20:45:26.667Z",
+  "verification": {
+    "completed": {
+      "id": "verification-13",
+      "attemptId": "verification-attempt-13",
+      "status": "valid",
+      "completedAt": "2026-11-13T17:33:31.307Z",
+      "completedBy": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "fingerprint": {
+        "version": 1,
+        "artifacts": {
+          "version": 1,
+          "algorithm": "artifact-pre-hash-v1",
+          "files": {
+            "design:design": "sha256:511e5a1dcd24d31537664e152cb5318cb298c05851c7fdb0034fe78aee522738",
+            "proposal:proposal": "sha256:ccbb80581facd29d30cbd8b9d7f19e2f343f3b60ca0df83019c2e9e767d01140",
+            "specs:cli:config-show": "sha256:b43646469ce2c2c5988ee289dd612ac88c7b2b1e2781abf58b4932807874ba05",
+            "specs:cli:host-context": "sha256:bcb7bbb7e3a3846aa0968a76818aa581390b44ef74a4f3ddc4123f97482b8bfe",
+            "specs:cli:plugins-install": "sha256:7a233457e5b74c5814b217370aa830b8176738d451767ba92508a118dd695a49",
+            "specs:cli:plugins-list": "sha256:e84695ef8fd67b4e085886deca2281473efddc0c08054191db1ee06e2257be25",
+            "specs:cli:plugins-show": "sha256:e1ead3d6b9095a7edde6260007110dd6f26f10d85cd4060d081ec59d156c52ec",
+            "specs:cli:plugins-uninstall": "sha256:114f7d082ba41c7133dd7b2e62615c032050cceff826eebe1e63ec4b2e7f6856",
+            "specs:cli:plugins-update": "sha256:8d10a4f55dda04180dfbf5a59f72f4ef4463a7cf40a78fedcc858cbe2d78bcc5",
+            "specs:cli:project-init": "sha256:2ddf4cc795c796544d25cadf39a67bbfe1be9fe83f9d5d25a476af1a38ec97f9",
+            "specs:cli:project-update": "sha256:b7478fce1af0c5c1bb2220151096cc206935e6fcd3703daa4e58011285d4e089",
+            "specs:core:check-registry": "sha256:aae0b2c9355e0092ce58908446d05d952c3f24196b1f5a08a4938be5996ddd85",
+            "specs:core:config": "sha256:cd36183a986d5107c4b4efce72123927f2405c252dd44351cf2218dfc1ba97cf",
+            "specs:core:config-loader": "sha256:86d4ca3614e8f245a48020b04ff539036ae2987628720b81ff24aa98f02b8c4c",
+            "specs:core:config-writer-port": "sha256:75f2b1d0ad751cd256733b1f91ac3870c19b0b92ee494a53b56e180ba9313213",
+            "specs:plugin-agent-claude:plugin-agent": "sha256:a2a2bf846958a12b801a2c3a038e6f24d0f1cdea9a2fe7cade054c7783f0d9bc",
+            "specs:plugin-agent-codex:plugin-agent": "sha256:19ca16ef169ef68be2f6e2121072bf026d13502e5f0922acce6fe7ba851c2e3b",
+            "specs:plugin-agent-copilot:plugin-agent": "sha256:61ec323a5a29e0ad583d4a45b7aa171145f916bcfa8584f1beb09400a23936a9",
+            "specs:plugin-agent-opencode:plugin-agent": "sha256:78f8b5b7682c445fc54a33135d603c3cfd9a409aa15da7945ae88d7c232f2143",
+            "specs:plugin-agent-standard:plugin-agent": "sha256:a7e4c7ed956d0538fbd03a0ddd90623104a51ed949915086f4bd33adbe4659c7",
+            "specs:plugin-manager:agent-plugin-type": "sha256:3fdfad3bb6cf0b2cea4d530ccdc18634343ba2c95647487acb588cfede2eb49f",
+            "specs:plugin-manager:install-plugin-use-case": "sha256:3247278ddd8524aa163e4297a34a5924db820fa18c5575cd8f5f0236876801ca",
+            "specs:plugin-manager:list-plugins-use-case": "sha256:3b60cb498484cf301fb7f630a489e2faf74f9c94c7a0a161f1b25ffad01d9589",
+            "specs:plugin-manager:load-plugin-use-case": "sha256:af45e65bfeb6883dd99ec0d9c267a963c189e792ef87452a61f51f6328ff09ad",
+            "specs:plugin-manager:plugin-errors": "sha256:921d6636d2430a8c8dfe487f9bc655c059a838df4325643ffb8e4eca1e51c170",
+            "specs:plugin-manager:plugin-loader": "sha256:a5f7bf6e1fb565a38a74f5491ad8533a1d9787edc996a052850af68670140698",
+            "specs:plugin-manager:plugin-repository-port": "sha256:7e868a655ec48e2a0583ca4c5d1871d3c2c525c79f697394f221542c8a65907d",
+            "specs:plugin-manager:register-plugins-use-case": "sha256:1ead68cf0cc48f1199e46e10ab69c6f9035d161ca71f55bdae2fd1d195615515",
+            "specs:plugin-manager:specd-plugin-type": "sha256:26b5517bebc2ffe40b828238b3fa6f4b73215b1407136a24d2737c4754a350c1",
+            "specs:plugin-manager:uninstall-plugin-use-case": "sha256:1b02e941afb7ecf95535302a82b0e6cdf70d4d098f8f9c3ac2190058f7b1c43f",
+            "specs:plugin-manager:update-plugin-use-case": "sha256:3f5d2b81e57e9b0fda707ec8d659d13fe64ee346f947c83bca6025279a5c1912",
+            "specs:sdk:composition": "sha256:d44b15da8e7e98a0086c62bd10ec189ba577e04f37b5ee02f1b310cbf6108255",
+            "specs:sdk:host-context": "sha256:bb4559a4103a510c634f7b50a2795e7c8fe748f6ed8c48af349c950295e3fbac",
+            "specs:skills:shared-folder-owners": "sha256:e91225c211af5f839dc47e65bb01acc87c93965a154557c2c3d24068691b3bf9",
+            "verify:cli:config-show": "sha256:d364493c1f650b9b115ac9e91541c8fffe5d92f476eed4f95c8a92ea019b041d",
+            "verify:cli:host-context": "sha256:96b7ed430d68d8c8f1f4a2f18abc212698e07c85bcadf16e8ec5ba00b82a0b5b",
+            "verify:cli:plugins-install": "sha256:5bcc8e356e9dcdcd109cf9547c6cc4b3d06fb6f4c8eb6347d7669d9028054822",
+            "verify:cli:plugins-list": "sha256:0172876cb067a95e576515297363c9d61a801ef80275bf258ed7c74b20e2a44e",
+            "verify:cli:plugins-show": "sha256:d9ecf02214aff8fa294b31e4039ce3bfc3d643a52468bb9e48381f141ead7c8d",
+            "verify:cli:plugins-uninstall": "sha256:1f2ebe96d35ab7bfa5093ce290f37f863f977e86f1ce1eece5488e279130d61e",
+            "verify:cli:plugins-update": "sha256:ceb100e64ecded249cd23660a75577456d87d32961f1578eebcde77c42989f12",
+            "verify:cli:project-init": "sha256:3816444f204bd8fcb2145ab29846349133924f0150df10f45e999626ea376c53",
+            "verify:cli:project-update": "sha256:22cd1bbc7d4a189f5d4dacbc0141f536db5e550e355b64dcc80010949fa32a22",
+            "verify:core:check-registry": "sha256:1c032380a1618125dc3f9380ed9796f1f59c94df32c7b8883d60292e6f4436c4",
+            "verify:core:config": "sha256:b395714e2167e3789ec2088e08b39aac603e95a980d7e1047089d08106a18d55",
+            "verify:core:config-loader": "sha256:5421e8a3d6dc1f837abb7b8024bb4aca4020a0db2959a4c1ff7d5d88fb07c6df",
+            "verify:core:config-writer-port": "sha256:7d059dbee45dc8ee1816d395183d7580e7991eb9cdddb4bb741b92e9ee5a766e",
+            "verify:plugin-agent-claude:plugin-agent": "sha256:698adf0c1a60ec465cbf79a7c29ea20b9cc4795ed811c1d96988205001d1b6c5",
+            "verify:plugin-agent-codex:plugin-agent": "sha256:ba06bedcfed2ba520525edbb30b1d4cd6e0ae3f25ebb4fec3069be51eaf273f9",
+            "verify:plugin-agent-copilot:plugin-agent": "sha256:367282afc198c19ea0561ce2cc8934614f6be0cf2a03b32da00bb7f50a859186",
+            "verify:plugin-agent-opencode:plugin-agent": "sha256:fd455491b46e2d29dc4462ee3fe8bd5301ab3ef0ab70efc18f219f87e0f67022",
+            "verify:plugin-agent-standard:plugin-agent": "sha256:28e68a2ad09463e00df5f8ba70fada5160586b70a91c7878f844f85b9c78c3f8",
+            "verify:plugin-manager:agent-plugin-type": "sha256:ff1188ddfdf941cc1e8870fbbbc3ff9710b739b46fd6e23bbaf02f6548c80e8b",
+            "verify:plugin-manager:install-plugin-use-case": "sha256:ac7a24d55cc89a80d46b6d23f630352611a3afd9c7f01157d922d2f1178368e9",
+            "verify:plugin-manager:list-plugins-use-case": "sha256:7507241e1acf31c4d25627bd2be4f8f4566ca7114446f1e121609ab52bef072f",
+            "verify:plugin-manager:load-plugin-use-case": "sha256:a2475b49e9128b0e46cccc9f6626a2d903375462b9042eaa4b02e19c185ad1a1",
+            "verify:plugin-manager:plugin-errors": "sha256:9f39b0a7f84a0664bb4a9e4215450ff5de684bfc2976b694bd850435964284be",
+            "verify:plugin-manager:plugin-loader": "sha256:6b97f953b362f465b10e5c8221718784f241105f7870a5e6b142cb4b2ff77ce3",
+            "verify:plugin-manager:plugin-repository-port": "sha256:b597211ffbb2cedc4bdd03371ec2adc49cec2aac1bd827c7d93a0cb44aaaad34",
+            "verify:plugin-manager:register-plugins-use-case": "sha256:878329707b6c0eaee9ad712797b884f2ada6b42b02a09d74fce132fd2f02bc2f",
+            "verify:plugin-manager:specd-plugin-type": "sha256:97b1668d872349514371695209cd18d820e14524b478da97fd2b5e78e277eabe",
+            "verify:plugin-manager:uninstall-plugin-use-case": "sha256:9db5513735ab3c4d5fb1d7358d4e89eb33a70c789ef9539921cd017ba08a1779",
+            "verify:plugin-manager:update-plugin-use-case": "sha256:9b5d1fe49d57fe3ede5e1e168438b1bd62d1154e0b7f2f564a03e5ffa396bc63",
+            "verify:sdk:composition": "sha256:22321793ef2aa1c4a038df7c1b5832672189dc9dda71fefad44e81fa69b27494",
+            "verify:sdk:host-context": "sha256:77c0955ba9654280f4a347ab040747a829c0c465b56135527a15a5344b306f8d",
+            "verify:skills:shared-folder-owners": "sha256:f3d07acbb68cc8c3cf7561513b25b11a1f568a1cbabe21fd575b9cbc9eb29989"
+          }
+        },
+        "implementation": {
+          "version": 1,
+          "hashAlgorithm": "sha256",
+          "textNormalization": "text-v1",
+          "binaryNormalization": "bytes-v1",
+          "files": {
+            "packages/cli/src/commands/config/config-shape.ts": {
+              "hash": "sha256:041ca530461aa10f93b128a24a0f72ac8ddd51f82ba08ba8c40f6978363395dd",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/commands/config/show.ts": {
+              "hash": "sha256:68f685065d9c6a12c93187d8039c4e1bfad9d640a7cfb928aed54c1ac85af098",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/commands/plugins/get-declared-plugins.ts": {
+              "hash": "sha256:f9aadd37a3423db3b73ce2544be283c92fc4c8ca272a87d2c1b711b9af119fb2",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/commands/plugins/install.ts": {
+              "hash": "sha256:11a56e7ed4430d05265cae1bb68deef3274a887d73fe14058aa8d1f453cfd8cc",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/commands/plugins/list.ts": {
+              "hash": "sha256:4713846fe7124c9fa6cce0ed934e2a175903f22bd50ee420997097aeac652964",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/commands/plugins/show.ts": {
+              "hash": "sha256:25ca10099f9e28a6195433b762eb03191a31b783854e65b8fd2ed51d2caeefe5",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/commands/plugins/uninstall.ts": {
+              "hash": "sha256:adce4fcf9f776a020f577878996d472fa6f2b28d544d688c0c6a201241734cec",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/commands/plugins/update.ts": {
+              "hash": "sha256:cf787d5c520349a25fabd0d52429435076f451feb5362826e6e5a701983a1108",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/commands/project/init.ts": {
+              "hash": "sha256:28a4f7163db37ff4a6e1b7ad39172a82845014dcf549539722005d0c26d5cd13",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/commands/project/update.ts": {
+              "hash": "sha256:21bdf358437a0440e8db4ddd944d8f233ce9eff72924ebef62835445b715d0ce",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/graph-index-task.ts": {
+              "hash": "sha256:4d429ccd7a751b141f422ac5c4a1c33a2504e310884e0024416e26668590c1e7",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/helpers/cli-context.ts": {
+              "hash": "sha256:cf6cf9c2dab1deed8fb87d4bfd0a8b597939d91b956245122b2a26bbc6090b7d",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/test/commands/config-show.spec.ts": {
+              "hash": "sha256:6c8963ad19ea49fb9a69da608995b0408fd47302a50d3d592b6375f5bb5b73f0",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/test/commands/plugins-update.spec.ts": {
+              "hash": "sha256:3ce08f5202995cbae08d03264ab7497140688a24cbc1268dbc67f37e53c4bca9",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/test/commands/plugins.spec.ts": {
+              "hash": "sha256:0259a754ec1b460aad23bc623246da6859a99367289245abcf91b8c6cc4e2973",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/test/commands/project-init.spec.ts": {
+              "hash": "sha256:0aaab5f05396dfe820d743dffdad731893bbe83132f71ffd20a2a9394bd4e93d",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/test/commands/project-update.spec.ts": {
+              "hash": "sha256:91624f05ad8fcc58c51980d7a691d54b14a7d9125836f854850cb4c6a72c65d9",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/test/helpers/cli-context.spec.ts": {
+              "hash": "sha256:c4d85561eedd27c1738bfd6dd087d151ee3bb84581a06dc37574d91329a73f2b",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/application/ports/config-writer.ts": {
+              "hash": "sha256:97951fb6fa059f11def81db4c348021b004161107229a521b4ef0888e12daf0c",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/domain/errors/legacy-config-format-error.ts": {
+              "hash": "sha256:03bac7833322bc04a3a937641697ebcb72a4b0f616598fad58f0ddbc314209a3",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/domain/errors/unsupported-config-version-error.ts": {
+              "hash": "sha256:f0557ce55968d149f81fc2aa62b2ffb6c70b1e6c705282c11034368ae6492379",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/domain/plugin-name.ts": {
+              "hash": "sha256:689beeb67cd35be08c68e1a9b515ce71dc428fa52d75eb473981cb04c87ff9cd",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/domain/services/check-registry.ts": {
+              "hash": "sha256:f544b8b9a9af610a4b80d7ce71771f3300428b419070afc19a19a552b07da269",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/infrastructure/fs/config-loader.ts": {
+              "hash": "sha256:5832bc8e82f369f53f72c8c297aa324faa605de67851ba5d31386a04ce9118b0",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/infrastructure/fs/config-writer.ts": {
+              "hash": "sha256:2bd9f1cbaddc4d803ca9a686c052e4b5dcad8c647f2c1dccc09f86638b89bd9c",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/ports.ts": {
+              "hash": "sha256:c2f7a0cba643411b8b69c7ab7d8c08a1b2babd7b3dd5f20d2816a07d03d670ab",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/test/composition/composition-registries.spec.ts": {
+              "hash": "sha256:0ed0cedf312797c557aef1b22c5efb67d1edacd2d952cc99b22f4e821c8c9ba0",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/test/composition/config-writer.spec.ts": {
+              "hash": "sha256:c4213ccafe5357ab5e6e4fadce932509e24e0317e5b9b7399ed9513d08d8f5ec",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/test/composition/kernel.spec.ts": {
+              "hash": "sha256:8d09440cf0b2cae0a2ad6b6f3a7356bf69ee9e03b6ef2f0c53d9aba82314fec5",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/test/domain/services/check-registry.spec.ts": {
+              "hash": "sha256:622ddfbfc5328ddf1fb2b4a80b74614ccec1a6df27d264c65cd6cc3ed64213f0",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/test/infrastructure/fs/config-loader.spec.ts": {
+              "hash": "sha256:1e29b610c32944838742bdbaf410d7936434f39cf0113afab1866fcaf94ff631",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/test/infrastructure/fs/config-writer.spec.ts": {
+              "hash": "sha256:cb4d0c92ded63383f9f114f4c44e74b65de4cad59aabcc39f9ebaaadf0c016bf",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-agent-claude/src/application/use-cases/install-skills.ts": {
+              "hash": "sha256:244306f04339cdffd745fa9fb3b8ce310975dc8e1736e64f8e32fa8936c029dc",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-agent-claude/src/application/use-cases/uninstall-skills.ts": {
+              "hash": "sha256:f8aecb7478198844f3369369938c1d2eda6c561697455c366ae985be745afe2a",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-agent-claude/src/domain/types/claude-plugin.ts": {
+              "hash": "sha256:a709a8dccf9a7cbb7d376cd2d072b68da15f2f9f8340507589f33cd908989ab1",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-agent-claude/src/index.ts": {
+              "hash": "sha256:e37987137e995e3381acbf3a7682c639d727a49c2451f9050397aee917be95ec",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-agent-codex/src/application/use-cases/install-skills.ts": {
+              "hash": "sha256:1b30ebb65370652013bc7e94e2824a6374c90c09cfe5847c508e9174cb78bd21",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-agent-codex/src/application/use-cases/uninstall-skills.ts": {
+              "hash": "sha256:a20a1fb41fdf3cc6eed1891787d7a880c4fbac4695294ef9ac9eb2c1e077258f",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-agent-codex/src/index.ts": {
+              "hash": "sha256:ebf311d3a7b4f95543465b2606030a43f38d0a9cff510b69a569e3b58f4311cb",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-agent-copilot/src/application/use-cases/install-skills.ts": {
+              "hash": "sha256:fe6fb4765b8ee55c1af8427a6392cb2e82940495940b6adea4a614fd73474cc5",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-agent-copilot/src/application/use-cases/uninstall-skills.ts": {
+              "hash": "sha256:ab722e8054000eae7f5dfea3d499960b173a7d8d9379bea60babeba8b21fb230",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-agent-copilot/src/index.ts": {
+              "hash": "sha256:e39b13f112489075f82e078093798bd2f7353c9ba7c3e2a30afa03d8fc8e8a0b",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-agent-opencode/src/application/use-cases/install-skills.ts": {
+              "hash": "sha256:fb58e40c66c2f21893d4c2f764397bfd5680afe73a46ea001448ed6de05cb51b",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-agent-opencode/src/application/use-cases/uninstall-skills.ts": {
+              "hash": "sha256:2e4b87392d1ead9bdc3cf5e9f5b78a7b86a1a747d3d22da31748749588903f67",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-agent-opencode/src/index.ts": {
+              "hash": "sha256:736c430714bd6fbe3354bad05510986b4cab7cd6f383885c69152dabd80931eb",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-agent-standard/src/application/use-cases/install-skills.ts": {
+              "hash": "sha256:dd328d78efdec368936e1ff00aa2a740230c9068f4deb0bc9a399974fab094e1",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-agent-standard/src/application/use-cases/uninstall-skills.ts": {
+              "hash": "sha256:96aaa194e94fa3385dc7948c3754d7578bd48aed476dab6bbd89bc3adfb77cbb",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-agent-standard/src/domain/frontmatter/index.ts": {
+              "hash": "sha256:21b99d9060d6a23fd1deb205bb5e28a3ccd87ac1de4b28f595d3200ccad56736",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-agent-standard/src/index.ts": {
+              "hash": "sha256:18fa6f590a6d74da635a0ecf5f4c16208f98eb52ddfaeb437feb2b194e07cad0",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/src/application/ports/plugin-repository.ts": {
+              "hash": "sha256:15cabcdd3ff5f3946e92c8422a3be86ea2b573bf315db78ce99107cd49a3afbb",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/src/application/use-cases/install-plugin.ts": {
+              "hash": "sha256:3ee28160b99834be32cc3685263d33417b6e663a42952a812897f4a793dadca8",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/src/application/use-cases/load-plugin-safely.ts": {
+              "hash": "sha256:cbde49bdbb432673fff732192eeff6eb21092281573f4bfb297f18931f11c54f",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/src/application/use-cases/register-plugins.ts": {
+              "hash": "sha256:4df5a90ec7ea9894771e99907fe1ebbc5c1aa9ef35ca39e9b56ea109b9ef7f89",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/src/application/use-cases/uninstall-plugin.ts": {
+              "hash": "sha256:f20354c2e5a9bd614a4f46a6b12ba02be41b3657f0403c0ba671cbdb480222aa",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/src/application/use-cases/update-plugin.ts": {
+              "hash": "sha256:863bf54bdc11e7580b5b1dfa453319ed4bdfda7bcfedcb285bfa77977913b601",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/src/domain/errors/duplicate-handler-kind-error.ts": {
+              "hash": "sha256:d04d587a8ac2bcfda24c5cd19d1e1fc30185b876b41c698a1a656cb0dff20eab",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/src/domain/errors/invalid-contribution-address-error.ts": {
+              "hash": "sha256:b75eaefa0faf06d061f8afb5181196786f81cc5f4b266ff85b6be27384a562e4",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/src/domain/errors/plugin-destroy-error.ts": {
+              "hash": "sha256:f14d29971c0d48071843cd607c0c1e3285224cbd745910536664bf0b538d6bc8",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/src/domain/errors/plugin-init-error.ts": {
+              "hash": "sha256:9481561bb5779fe23cdd743fed67f40b48dbfb7cdc5781a55485b3ea29c05803",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/src/domain/errors/plugin-validation.ts": {
+              "hash": "sha256:75b13c215b360faa2588c0cdd2e8c9e148833ef813cc9ab558bcaa548242384a",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/src/domain/handlers/agents-handler.ts": {
+              "hash": "sha256:46e002dd844065dfc2e3464b634bc2f29344d0ce82553d353b84c324078ffe00",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/src/domain/services/merge-handlers.ts": {
+              "hash": "sha256:33efbd1ee393e2341edcee81e8e49ab09e57491e78b6bb1500cc3cd536821e62",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/src/domain/services/resolve-contributions.ts": {
+              "hash": "sha256:fe78d793f03aba4f0751576567bd25ed905bca1b5be325944e488ba8a76ca3f1",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/src/domain/types/specd-plugin.ts": {
+              "hash": "sha256:f8e65d85ff8ee9d04caa13ccda065e15734f09536ed5342e1e258b16a5a73e86",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/src/infrastructure/loader/plugin-loader.ts": {
+              "hash": "sha256:b8287c61fba1ff76d4fc3ae86d3f968e563cf13f871af5a96f6d7c2d07b3cf3b",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/src/infrastructure/loader/register-plugins.ts": {
+              "hash": "sha256:96f0781b5fb80158b2a77eac8b6a22b3dac15c5fc25c16c9b16d56a08410d5c1",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/test/application/install-plugin.spec.ts": {
+              "hash": "sha256:42d27c390ef457c48281e9a72d4d6f9ecb9847dfffefb405febd341aed103785",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/test/application/list-plugin.spec.ts": {
+              "hash": "sha256:a45a5c968e2ce007a07bf2884e71a003ae43d93b8c83279513e7c7e5af4aa6df",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/test/application/load-plugin.spec.ts": {
+              "hash": "sha256:0fd4b791aa182665912073bc4121888fed8b97274f056047eaf2681605c0c9c3",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/test/application/plugin-repository-port.spec.ts": {
+              "hash": "sha256:6fdc5b7350cc6d2242840c798f7dbcbc4ed460aaf361bbeec41ebd16eb344f6b",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/test/application/register-plugins.spec.ts": {
+              "hash": "sha256:0e85298bcfccae885666455cd9363fe63f3eee554d93ac78e1c548ab7f5284e4",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/test/application/uninstall-plugin.spec.ts": {
+              "hash": "sha256:723a19aac0babd1d6e9dc5adf83ee304aa16e24a27cc1b2c64017a1da6d0f756",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/test/application/update-plugin.spec.ts": {
+              "hash": "sha256:894ab21b3c412c39430b6d4ce518811784832a0a74c4325f244a6d28a81fb402",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/test/domain/agents-handler.spec.ts": {
+              "hash": "sha256:c6b37fb789785ab647dc692e7b4e64587500bed8506cf71bd5a88697a2b4d067",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/test/domain/errors.spec.ts": {
+              "hash": "sha256:5fdd3d2aee164f5f17ac8b6308db7b92f8a17a2bea30c8da436b5f76aa2633f0",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/test/domain/plugin-config-schema.spec.ts": {
+              "hash": "sha256:5e3123c7de05677404e73a3d205792e2809bc29e6997a8952f3b044b7b8c7454",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/test/domain/resolve-contributions.spec.ts": {
+              "hash": "sha256:a269f495faa59428461b5d9ed7d5955678ce0673058b6919087ee6c0b581d50a",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/test/domain/specd-plugin.spec.ts": {
+              "hash": "sha256:376ebbea67af4f1e8e4406b56c54c5184631091850f2650fc534bd053ad65afe",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/plugin-manager/test/infrastructure/plugin-loader.spec.ts": {
+              "hash": "sha256:c9786ff7dc3198e1269cac7b3ddb4bc9381092449162eb0c9eee66bfff9a5f07",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/sdk/src/composition/host-context.ts": {
+              "hash": "sha256:1adce22106638e2d80783d4bc7509944170663ff08d76321884fe4e7e63773bb",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/sdk/src/core-reexports.ts": {
+              "hash": "sha256:66424820c1f1b17ab4fcbe31854d179b4ae32028944ee375d4108a11fdf4f7ca",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/sdk/src/index.ts": {
+              "hash": "sha256:a803fa32053ff062db35512f4b3f5928c365b2768a542fe06d46e324d4eb6306",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/sdk/test/barrel.spec.ts": {
+              "hash": "sha256:3da3af1480a7728c15c13ddc9bff6ddd8b0ad9ebd4eeb4d4860e8a5be1347e2d",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/sdk/test/composition/composition.spec.ts": {
+              "hash": "sha256:8d5aba38cd6def38f0e99b7e0c2d6876c3a528f52ec6a40addb7b98ae489fbae",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/sdk/test/composition/host-context-e2e.spec.ts": {
+              "hash": "sha256:e8c584e192f76d3926d191cd39ffe5ae72e49cfbdacce7eb3339e9850a0b27b0",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/sdk/test/composition/package-boundary.spec.ts": {
+              "hash": "sha256:ca740dfc5e010000fd55238f227ea9d147a59439a747e4a3b4830c456c67daa7",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/skills/src/application/shared-folder-owners.ts": {
+              "hash": "sha256:1203283d4061f84d13aacc1fa649daeb208fa6bed6c347db58209fb41ed3433e",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/skills/src/index.ts": {
+              "hash": "sha256:5f8fd5c1bc4a649f89202f4cbc9e2ebb6d94a84cca947b9afde84ec5a6dd7121",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/skills/test/application/shared-folder-owners-eacces.spec.ts": {
+              "hash": "sha256:0520c6a75be542ef52203cd3c640cc6211d4804c9d1f4523716fdfc18329cf01",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/skills/test/application/shared-folder-owners.spec.ts": {
+              "hash": "sha256:8961bc353e0ddf33211013636bd0da9d9c25d2470e7fad5347ea16f552ed01c9",
+              "content": "text",
+              "normalization": "text-v1"
+            }
+          }
+        }
+      }
+    }
+  },
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-10-29T14:37:02.729Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T14:37:02.743Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:35.755Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:config"
+        },
+        {
+          "type": "verify",
+          "key": "core:config"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:36.700Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:config-loader"
+        },
+        {
+          "type": "verify",
+          "key": "core:config-loader"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:37.876Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:config-writer-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:config-writer-port"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:39.125Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:specd-plugin-type"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:specd-plugin-type"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:40.289Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-loader"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-loader"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:41.090Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:register-plugins-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:register-plugins-use-case"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:41.553Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:install-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:install-plugin-use-case"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:42.108Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:uninstall-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:uninstall-plugin-use-case"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:42.699Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:update-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:update-plugin-use-case"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:43.302Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:list-plugins-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:list-plugins-use-case"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:44.144Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:plugins-install"
+        },
+        {
+          "type": "verify",
+          "key": "cli:plugins-install"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:45.060Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:plugins-uninstall"
+        },
+        {
+          "type": "verify",
+          "key": "cli:plugins-uninstall"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:45.987Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:plugins-update"
+        },
+        {
+          "type": "verify",
+          "key": "cli:plugins-update"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:46.907Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:plugins-list"
+        },
+        {
+          "type": "verify",
+          "key": "cli:plugins-list"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:47.789Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:plugins-show"
+        },
+        {
+          "type": "verify",
+          "key": "cli:plugins-show"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:48.730Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "sdk:composition"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:composition"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-29T16:18:49.791Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "sdk:host-context"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:host-context"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-30T10:47:54.393Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-01T19:36:09.851Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:agent-plugin-type"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:agent-plugin-type"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-01T19:45:13.825Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:project-init"
+        },
+        {
+          "type": "verify",
+          "key": "cli:project-init"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-01T19:45:14.559Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:project-update"
+        },
+        {
+          "type": "verify",
+          "key": "cli:project-update"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-01T19:45:15.197Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:config-show"
+        },
+        {
+          "type": "verify",
+          "key": "cli:config-show"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-01T19:45:15.786Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:check-registry"
+        },
+        {
+          "type": "verify",
+          "key": "core:check-registry"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-01T19:45:16.342Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:load-plugin-use-case"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:load-plugin-use-case"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-01T19:45:16.903Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-errors"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-errors"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-01T19:45:17.489Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:plugin-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:plugin-repository-port"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-01T19:45:18.103Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-agent-claude:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-claude:plugin-agent"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-01T19:45:18.722Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-agent-copilot:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-copilot:plugin-agent"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-01T19:45:19.321Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-agent-codex:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-codex:plugin-agent"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-01T19:45:20.023Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-agent-opencode:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-opencode:plugin-agent"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-01T19:45:20.721Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-agent-standard:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-standard:plugin-agent"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-01T20:12:16.693Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:host-context"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-index"
+        },
+        {
+          "type": "verify",
+          "key": "cli:host-context"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-index"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-01T20:12:37.561Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "cli:graph-index"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-index"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-01T20:31:02.272Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["plugin-manager:register-plugins-use-case"]
+        },
+        {
+          "type": "verify",
+          "files": ["plugin-manager:register-plugins-use-case"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-01T20:44:23.106Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-01T20:45:26.667Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-02T09:03:49.141Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-11-02T09:04:17.360Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-1",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-02T09:16:57.265Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-02T09:26:44.653Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "core:config-writer-port",
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:plugin-loader",
+            "plugin-manager:install-plugin-use-case",
+            "plugin-manager:uninstall-plugin-use-case",
+            "plugin-manager:update-plugin-use-case",
+            "cli:project-update",
+            "plugin-manager:load-plugin-use-case",
+            "plugin-manager:plugin-repository-port",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:host-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "plugin-manager:install-plugin-use-case",
+            "plugin-manager:uninstall-plugin-use-case",
+            "plugin-manager:update-plugin-use-case",
+            "cli:project-update",
+            "plugin-manager:load-plugin-use-case",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-02T09:28:49.070Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "core:config-writer-port",
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:plugin-loader",
+            "plugin-manager:register-plugins-use-case",
+            "plugin-manager:install-plugin-use-case",
+            "plugin-manager:uninstall-plugin-use-case",
+            "plugin-manager:update-plugin-use-case",
+            "cli:project-update",
+            "plugin-manager:load-plugin-use-case",
+            "plugin-manager:plugin-repository-port",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:host-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "plugin-manager:register-plugins-use-case",
+            "plugin-manager:install-plugin-use-case",
+            "plugin-manager:uninstall-plugin-use-case",
+            "plugin-manager:update-plugin-use-case",
+            "cli:project-update",
+            "plugin-manager:load-plugin-use-case",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-02T09:30:52.005Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:config",
+            "core:config-loader",
+            "core:config-writer-port",
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:plugin-loader",
+            "plugin-manager:register-plugins-use-case",
+            "plugin-manager:install-plugin-use-case",
+            "plugin-manager:uninstall-plugin-use-case",
+            "plugin-manager:update-plugin-use-case",
+            "plugin-manager:list-plugins-use-case",
+            "cli:plugins-install",
+            "cli:plugins-uninstall",
+            "cli:plugins-update",
+            "cli:plugins-list",
+            "cli:plugins-show",
+            "sdk:composition",
+            "sdk:host-context",
+            "plugin-manager:agent-plugin-type",
+            "cli:project-init",
+            "cli:project-update",
+            "cli:config-show",
+            "core:check-registry",
+            "plugin-manager:load-plugin-use-case",
+            "plugin-manager:plugin-errors",
+            "plugin-manager:plugin-repository-port",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:host-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-02T15:24:28.220Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-02T15:25:25.772Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-02T18:30:32.787Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-11-02T18:41:07.350Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-2",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-02T19:15:33.987Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-02T19:31:10.351Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "skills:shared-folder-owners"
+        },
+        {
+          "type": "verify",
+          "key": "skills:shared-folder-owners"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-02T19:38:38.155Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "core:config",
+            "core:config-loader",
+            "core:config-writer-port",
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:plugin-loader",
+            "plugin-manager:register-plugins-use-case",
+            "plugin-manager:install-plugin-use-case",
+            "plugin-manager:uninstall-plugin-use-case",
+            "plugin-manager:update-plugin-use-case",
+            "plugin-manager:list-plugins-use-case",
+            "cli:plugins-install",
+            "cli:plugins-uninstall",
+            "cli:plugins-update",
+            "cli:plugins-list",
+            "cli:plugins-show",
+            "sdk:composition",
+            "sdk:host-context",
+            "plugin-manager:agent-plugin-type",
+            "cli:project-init",
+            "cli:project-update",
+            "cli:config-show",
+            "core:check-registry",
+            "plugin-manager:load-plugin-use-case",
+            "plugin-manager:plugin-errors",
+            "plugin-manager:plugin-repository-port",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:host-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:config",
+            "core:config-loader",
+            "core:config-writer-port",
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:plugin-loader",
+            "plugin-manager:register-plugins-use-case",
+            "plugin-manager:install-plugin-use-case",
+            "plugin-manager:uninstall-plugin-use-case",
+            "plugin-manager:update-plugin-use-case",
+            "plugin-manager:list-plugins-use-case",
+            "cli:plugins-install",
+            "cli:plugins-uninstall",
+            "cli:plugins-update",
+            "cli:plugins-list",
+            "cli:plugins-show",
+            "sdk:composition",
+            "sdk:host-context",
+            "plugin-manager:agent-plugin-type",
+            "cli:project-init",
+            "cli:project-update",
+            "cli:config-show",
+            "core:check-registry",
+            "plugin-manager:plugin-errors",
+            "plugin-manager:plugin-repository-port",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:host-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-02T19:40:52.956Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:config",
+            "core:config-loader",
+            "core:config-writer-port",
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:plugin-loader",
+            "plugin-manager:register-plugins-use-case",
+            "plugin-manager:install-plugin-use-case",
+            "plugin-manager:uninstall-plugin-use-case",
+            "plugin-manager:update-plugin-use-case",
+            "plugin-manager:list-plugins-use-case",
+            "cli:plugins-install",
+            "cli:plugins-uninstall",
+            "cli:plugins-update",
+            "cli:plugins-list",
+            "cli:plugins-show",
+            "sdk:composition",
+            "sdk:host-context",
+            "plugin-manager:agent-plugin-type",
+            "cli:project-init",
+            "cli:project-update",
+            "cli:config-show",
+            "core:check-registry",
+            "plugin-manager:load-plugin-use-case",
+            "plugin-manager:plugin-errors",
+            "plugin-manager:plugin-repository-port",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:host-context",
+            "skills:shared-folder-owners"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:config",
+            "core:config-loader",
+            "core:config-writer-port",
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:plugin-loader",
+            "plugin-manager:register-plugins-use-case",
+            "plugin-manager:install-plugin-use-case",
+            "plugin-manager:uninstall-plugin-use-case",
+            "plugin-manager:update-plugin-use-case",
+            "plugin-manager:list-plugins-use-case",
+            "cli:plugins-install",
+            "cli:plugins-uninstall",
+            "cli:plugins-update",
+            "cli:plugins-list",
+            "cli:plugins-show",
+            "sdk:composition",
+            "sdk:host-context",
+            "plugin-manager:agent-plugin-type",
+            "cli:project-init",
+            "cli:project-update",
+            "cli:config-show",
+            "core:check-registry",
+            "plugin-manager:load-plugin-use-case",
+            "plugin-manager:plugin-errors",
+            "plugin-manager:plugin-repository-port",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:host-context",
+            "skills:shared-folder-owners"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-02T22:24:43.118Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-02T22:27:45.847Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-04T06:59:20.126Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-11-04T07:00:10.870Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-3",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-04T07:09:21.879Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-04T07:11:50.656Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "core:config-writer-port",
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:plugin-loader",
+            "plugin-manager:register-plugins-use-case",
+            "sdk:composition",
+            "plugin-agent-copilot:plugin-agent"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:config-writer-port",
+            "plugin-manager:plugin-loader",
+            "plugin-manager:register-plugins-use-case"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-04T07:37:44.599Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-04T07:38:31.934Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-04T09:49:11.118Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-11-04T09:49:20.350Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-4",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-04T18:01:21.710Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-05T06:48:10.160Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:register-plugins-use-case",
+            "sdk:composition",
+            "skills:shared-folder-owners"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:register-plugins-use-case",
+            "sdk:composition",
+            "skills:shared-folder-owners"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-05T08:11:43.208Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-05T08:22:59.239Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-05T08:25:51.345Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "core:config",
+            "core:config-writer-port",
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:plugin-loader",
+            "plugin-manager:register-plugins-use-case",
+            "plugin-manager:install-plugin-use-case",
+            "plugin-manager:uninstall-plugin-use-case",
+            "plugin-manager:list-plugins-use-case",
+            "plugin-manager:agent-plugin-type",
+            "cli:config-show",
+            "plugin-manager:plugin-errors",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "skills:shared-folder-owners"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": ["plugin-manager:plugin-loader"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-05T08:28:20.380Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-05T08:30:53.108Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-05T08:31:10.387Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "plugin-manager:plugin-loader",
+            "plugin-manager:register-plugins-use-case",
+            "sdk:composition",
+            "plugin-manager:plugin-errors"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "plugin-manager:plugin-loader",
+            "plugin-manager:register-plugins-use-case",
+            "sdk:composition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-05T08:31:49.671Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-05T08:38:48.172Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-05T09:38:56.378Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-05T09:39:26.567Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:plugins-install", "cli:project-init"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:plugins-install", "cli:project-init"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-05T09:40:04.179Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-05T09:40:08.561Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-05T14:24:49.730Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-11-05T14:24:52.044Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-5",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-05T14:54:47.554Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-05T14:57:19.349Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "core:config",
+            "core:config-writer-port",
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:plugin-loader",
+            "plugin-manager:register-plugins-use-case",
+            "cli:plugins-uninstall",
+            "cli:plugins-update",
+            "sdk:host-context",
+            "cli:config-show",
+            "core:check-registry",
+            "plugin-manager:plugin-errors",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:config",
+            "core:config-writer-port",
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:plugin-loader",
+            "plugin-manager:register-plugins-use-case",
+            "sdk:host-context",
+            "cli:config-show",
+            "core:check-registry",
+            "plugin-manager:plugin-errors",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-05T15:03:05.588Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-05T15:03:45.197Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-05T16:29:34.192Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-05T16:29:47.501Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "core:config",
+            "core:config-writer-port",
+            "plugin-manager:plugin-loader",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:config",
+            "core:config-loader",
+            "core:config-writer-port",
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:plugin-loader",
+            "plugin-manager:register-plugins-use-case",
+            "plugin-manager:install-plugin-use-case",
+            "plugin-manager:uninstall-plugin-use-case",
+            "plugin-manager:update-plugin-use-case",
+            "plugin-manager:list-plugins-use-case",
+            "cli:plugins-install",
+            "cli:plugins-uninstall",
+            "cli:plugins-update",
+            "cli:plugins-list",
+            "cli:plugins-show",
+            "sdk:composition",
+            "sdk:host-context",
+            "plugin-manager:agent-plugin-type",
+            "cli:project-init",
+            "cli:project-update",
+            "cli:config-show",
+            "core:check-registry",
+            "plugin-manager:load-plugin-use-case",
+            "plugin-manager:plugin-errors",
+            "plugin-manager:plugin-repository-port",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:host-context",
+            "skills:shared-folder-owners"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-05T16:35:13.222Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-05T16:35:22.997Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-05T16:48:21.190Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-05T16:48:36.658Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:plugins-install"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:plugins-install"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-05T16:48:59.391Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-05T16:49:01.093Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-06T08:50:08.245Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-11-06T08:50:09.476Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-6",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-06T09:10:14.681Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-06T09:12:04.610Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "core:config",
+            "core:config-writer-port",
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:plugin-loader",
+            "plugin-manager:register-plugins-use-case",
+            "sdk:host-context",
+            "core:check-registry",
+            "plugin-manager:plugin-errors",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "skills:shared-folder-owners"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:config",
+            "core:config-writer-port",
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:register-plugins-use-case",
+            "cli:plugins-install",
+            "core:check-registry",
+            "plugin-manager:plugin-errors"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-06T09:13:52.469Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:plugins-list"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:config",
+            "core:config-loader",
+            "core:config-writer-port",
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:plugin-loader",
+            "plugin-manager:register-plugins-use-case",
+            "plugin-manager:install-plugin-use-case",
+            "plugin-manager:uninstall-plugin-use-case",
+            "plugin-manager:update-plugin-use-case",
+            "plugin-manager:list-plugins-use-case",
+            "cli:plugins-install",
+            "cli:plugins-uninstall",
+            "cli:plugins-update",
+            "cli:plugins-list",
+            "cli:plugins-show",
+            "sdk:composition",
+            "sdk:host-context",
+            "plugin-manager:agent-plugin-type",
+            "cli:project-init",
+            "cli:project-update",
+            "cli:config-show",
+            "core:check-registry",
+            "plugin-manager:load-plugin-use-case",
+            "plugin-manager:plugin-errors",
+            "plugin-manager:plugin-repository-port",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:host-context",
+            "skills:shared-folder-owners"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-06T09:15:21.690Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-06T09:15:23.502Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-06T09:35:24.750Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-06T09:36:01.189Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:plugin-loader",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "skills:shared-folder-owners"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:config",
+            "core:config-loader",
+            "core:config-writer-port",
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:plugin-loader",
+            "plugin-manager:register-plugins-use-case",
+            "plugin-manager:install-plugin-use-case",
+            "plugin-manager:uninstall-plugin-use-case",
+            "plugin-manager:update-plugin-use-case",
+            "plugin-manager:list-plugins-use-case",
+            "cli:plugins-install",
+            "cli:plugins-uninstall",
+            "cli:plugins-update",
+            "cli:plugins-list",
+            "cli:plugins-show",
+            "sdk:composition",
+            "sdk:host-context",
+            "plugin-manager:agent-plugin-type",
+            "cli:project-init",
+            "cli:project-update",
+            "cli:config-show",
+            "core:check-registry",
+            "plugin-manager:load-plugin-use-case",
+            "plugin-manager:plugin-errors",
+            "plugin-manager:plugin-repository-port",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:host-context",
+            "skills:shared-folder-owners"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-06T09:43:23.336Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": [
+            "plugin-manager:plugin-loader",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "skills:shared-folder-owners"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-06T09:46:05.774Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-06T09:46:11.970Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-06T09:58:28.190Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-11-06T09:58:29.247Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-7",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-06T16:20:43.085Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-06T16:22:33.358Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "core:config",
+            "core:config-loader",
+            "plugin-manager:plugin-loader",
+            "plugin-manager:list-plugins-use-case",
+            "cli:plugins-uninstall",
+            "cli:plugins-list",
+            "plugin-manager:plugin-repository-port",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "plugin-manager:install-plugin-use-case",
+            "cli:plugins-uninstall",
+            "plugin-agent-claude:plugin-agent"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-06T16:29:27.254Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-06T16:29:45.130Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-06T17:00:22.172Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-06T17:00:36.346Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "plugin-manager:list-plugins-use-case",
+            "cli:plugins-list",
+            "plugin-manager:plugin-errors",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:project-init"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-06T17:04:05.791Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-06T17:04:12.586Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-06T17:27:34.557Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-11-06T17:27:35.651Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-8",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-07T00:45:55.562Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-07T00:46:30.073Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "plugin-manager:specd-plugin-type",
+            "cli:plugins-uninstall",
+            "cli:plugins-update",
+            "cli:plugins-list",
+            "skills:shared-folder-owners"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:plugins-uninstall"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-07T01:10:31.579Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-07T01:10:42.586Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-07T08:43:12.298Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-11-07T08:43:13.332Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-9",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-07T20:00:49.200Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-07T20:00:50.410Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:register-plugins-use-case",
+            "plugin-manager:plugin-errors"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:register-plugins-use-case",
+            "plugin-manager:plugin-errors",
+            "skills:shared-folder-owners"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-07T20:01:28.532Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-07T20:01:30.158Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-07T20:27:08.715Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-07T20:27:21.100Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "core:config-writer-port",
+            "cli:plugins-list",
+            "cli:plugins-show",
+            "sdk:composition",
+            "sdk:host-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:config",
+            "core:config-loader",
+            "core:config-writer-port",
+            "plugin-manager:specd-plugin-type",
+            "plugin-manager:plugin-loader",
+            "plugin-manager:register-plugins-use-case",
+            "plugin-manager:install-plugin-use-case",
+            "plugin-manager:uninstall-plugin-use-case",
+            "plugin-manager:update-plugin-use-case",
+            "plugin-manager:list-plugins-use-case",
+            "cli:plugins-install",
+            "cli:plugins-uninstall",
+            "cli:plugins-update",
+            "cli:plugins-list",
+            "cli:plugins-show",
+            "sdk:composition",
+            "sdk:host-context",
+            "plugin-manager:agent-plugin-type",
+            "cli:project-init",
+            "cli:project-update",
+            "cli:config-show",
+            "core:check-registry",
+            "plugin-manager:load-plugin-use-case",
+            "plugin-manager:plugin-errors",
+            "plugin-manager:plugin-repository-port",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:host-context",
+            "skills:shared-folder-owners"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-07T20:29:25.042Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-07T20:29:29.107Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-07T20:46:30.617Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-11-07T22:47:29.563Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-10",
+      "state": "implementing",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-08T08:51:34.271Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition", "sdk:host-context"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:host-context"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-11-08T11:56:40.122Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-11",
+      "state": "implementing",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "verification-completed",
+      "at": "2026-11-08T12:36:10.805Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-11",
+      "verificationId": "verification-11"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-10T07:30:35.642Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-10T07:30:49.473Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-10T07:31:06.974Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-11-13T16:59:37.007Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"core:config\" points outside workspace \"core\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "verification-invalidated",
+      "at": "2026-11-13T16:59:57.729Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "verificationId": "verification-11",
+      "reason": "Implementation files changed"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-11-13T17:10:53.156Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-12",
+      "state": "archivable",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "verification-completed",
+      "at": "2026-11-13T17:17:05.967Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-12",
+      "verificationId": "verification-12"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-11-13T17:24:15.029Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"core:config\" points outside workspace \"core\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "verification-invalidated",
+      "at": "2026-11-13T17:24:44.832Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "verificationId": "verification-12",
+      "reason": "Implementation files changed"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-11-13T17:33:30.678Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-13",
+      "state": "archivable",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "verification-completed",
+      "at": "2026-11-13T17:33:31.307Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-13",
+      "verificationId": "verification-13"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-13T17:33:55.333Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-11-13T17:33:57.229Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

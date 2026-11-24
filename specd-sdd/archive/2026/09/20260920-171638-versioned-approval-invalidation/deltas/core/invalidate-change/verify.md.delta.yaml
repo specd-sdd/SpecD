@@ -1,0 +1,80 @@
+- op: modified
+  selector: { type: section, matches: '^Requirement: Input contract$' }
+  content: |
+    Scenarios:
+
+    #### Scenario: Override dimensions remain independent
+
+    - **WHEN** a request overrides only workflow policy
+    - **THEN** persisted artifact policy supplies the other dimension and target rules remain artifact-policy-driven
+
+    #### Scenario: Invalid policy value is rejected before mutation
+
+    - **WHEN** either override dimension contains an unsupported value
+    - **THEN** input validation fails and the change remains untouched
+
+- op: modified
+  selector: { type: section, matches: '^Requirement: Effective policy resolution$' }
+  content: |
+    Scenarios:
+
+    #### Scenario: Execution override is not persisted
+
+    - **WHEN** invalidation applies a valid structured override
+    - **THEN** that execution uses the overlaid policy and the change default remains unchanged
+
+    #### Scenario: Workflow override does not alter target normalization
+
+    - **WHEN** workflow policy changes but artifact policy does not
+    - **THEN** target requirements and expansion remain those of the artifact policy
+
+- op: modified
+  selector: { type: section, matches: '^Requirement: Change-level invalidation is unconditional$' }
+  rename: 'Requirement: Canonical gate-safe invalidation and recovery'
+  content: |
+    Scenarios:
+
+    #### Scenario: Gate priority wins over preserve
+
+    - **GIVEN** forced invalidation affects valid spec approval and signoff under workflow `preserve`
+    - **WHEN** reconciliation applies it
+    - **THEN** both projections retain audit evidence and spec recovery returns to `designing`
+    - **AND** repeating the request does not duplicate effects
+
+    #### Scenario: Ungated preserve retains lifecycle state
+
+    - **GIVEN** invalidation affects no required consent under workflow `preserve`
+    - **WHEN** it is applied
+    - **THEN** lifecycle state remains and artifact reopening follows only artifact policy
+
+- op: modified
+  selector: { type: section, matches: '^Requirement: Approval guard$' }
+  content: |
+    Scenarios:
+
+    #### Scenario: Force is required only for current consent
+
+    - **GIVEN** a request affects valid approval
+    - **WHEN** force is absent
+    - **THEN** no mutation occurs and affected gates and recovery targets are reported
+    - **AND** already-stale historical evidence does not trigger that guard
+
+    #### Scenario: Forced revocation commits evidence and recovery together
+
+    - **WHEN** force authorizes revoking valid consent
+    - **THEN** projection, audit event, artifact effects, and recovery are atomic
+
+- op: modified
+  selector: { type: section, matches: '^Requirement: Output contract$' }
+  content: |
+    Scenarios:
+
+    #### Scenario: Result reports committed canonical effects
+
+    - **WHEN** invalidation succeeds
+    - **THEN** its result includes reason, effective policy, normalized targets, projection changes, blockers, next action, and any committed return
+
+    #### Scenario: Output reflects idempotent repetition
+
+    - **WHEN** unchanged invalidity is applied again
+    - **THEN** result reports no new projection or recovery effects

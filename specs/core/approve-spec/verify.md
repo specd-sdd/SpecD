@@ -21,50 +21,90 @@
 
 ### Requirement: Artifact hash computation
 
-#### Scenario: Artifacts are hashed with schema cleanup rules
+Scenarios:
 
-- **GIVEN** the change has two artifacts of type `spec` and `verify`
-- **AND** the schema defines a pre-hash cleanup rule for `spec` but not `verify`
-- **WHEN** the use case computes artifact hashes
-- **THEN** the `spec` artifact content has the cleanup rule applied before hashing
-- **AND** the `verify` artifact content is hashed without cleanup
+#### Scenario: Task artifacts are excluded from consent fingerprint
 
-#### Scenario: Artifact cannot be loaded
+- **GIVEN** all required artifacts are valid and one declares `hasTasks: true`
+- **WHEN** spec approval computes its fingerprint
+- **THEN** non-task artifacts use configured cleanup and the task artifact is excluded
 
-- **GIVEN** the change has an artifact entry but `ChangeRepository.artifact()` returns `null` for it
-- **WHEN** the use case computes artifact hashes
-- **THEN** that artifact is skipped and does not appear in the hash map
+#### Scenario: Missing required artifact blocks approval
 
-#### Scenario: Schema resolution failure propagates
+- **WHEN** a required non-task artifact is missing or pending review
+- **THEN** fingerprint approval fails without recording consent
 
-- **GIVEN** `SchemaProvider.get()` throws for the configured schema
-- **WHEN** the use case executes
-- **THEN** the error propagates from the gate guard before hash computation is reached
+#### Scenario: Approval snapshots canonical scope
+
+- **GIVEN** repeated and differently ordered spec IDs resolve to one canonical set
+- **WHEN** spec approval computes its fingerprint
+- **THEN** the sorted deduplicated spec IDs and artifact fingerprint are captured together
 
 ### Requirement: Approval recording and state transition
 
-#### Scenario: Change is in pending-spec-approval state
+Scenarios:
 
-- **GIVEN** the change is in `pending-spec-approval` state
-- **WHEN** `execute()` completes successfully
-- **THEN** the change history contains a `spec-approved` event with the provided reason, computed artifact hashes, and the resolved actor
-- **AND** the change state is `spec-approved`
+#### Scenario: Approval is renewed only in ready
 
-#### Scenario: Change is not in pending-spec-approval state
+- **GIVEN** stale required consent while the change is implementing
+- **WHEN** approval is requested
+- **THEN** reconciliation routes through designing and ready before approval can succeed
+- **AND** no pending state or deleted history is produced
 
-- **GIVEN** the change is in `drafting` state
-- **WHEN** `execute()` is called
-- **THEN** an `InvalidStateTransitionError` is thrown
+#### Scenario: Successful renewal retains prior audit history
+
+- **WHEN** consent is renewed in reconciled `ready`
+- **THEN** the current projection and new event contain the same complete scope-aware fingerprint
+- **AND** prior approval events retain their earlier scopes unchanged
+
+#### Scenario: Approval actor decorator remains authoritative
+
+- **WHEN** approval resolves actor name and email
+- **THEN** it uses the existing decorated actor resolver with the same privacy and fallback behavior
+- **AND** it resolves exactly one decorated identity for the logical operation
+- **AND** reconciliation, the projection, and all appended events receive that same value
+
+#### Scenario: Eligible states come from the check bindings
+
+- **GIVEN** `approval.spec` is bound as a transition source from `ready`, `pending-spec-approval`, and `spec-approved`
+- **WHEN** `ApproveSpec` decides whether the current state accepts consent
+- **THEN** the decision uses the binding `from` states of `approval.spec`
+- **AND** a change in any other state fails with `InvalidStateTransitionError`
+
+#### Scenario: Consent in a parking state never transitions
+
+- **GIVEN** a historic change in `spec-approved` with no recorded approval and an eligible artifact fingerprint
+- **WHEN** approval is recorded
+- **THEN** the approval is recorded
+- **AND** no `transitioned` event is appended and the state is still `spec-approved`
+
+#### Scenario: Stale consent in a parking state is recovered before it is renewed
+
+- **GIVEN** a historic change in `spec-approved` with a stale approval
+- **WHEN** `ApproveSpec` runs
+- **THEN** the reconciler first commits the return to `designing`
+- **AND** the request fails with `InvalidStateTransitionError` until the change is back in `ready`
+
+### Requirement: Canonical pre-approval reconciliation
+
+#### Scenario: Newly detected drift prevents approval
+
+- **WHEN** reconciliation detects non-task drift before approval
+- **THEN** it persists canonical review and recovery and approval is not recorded
 
 ### Requirement: Persistence and return value
 
-#### Scenario: Change is saved and returned through serialized mutation
+Scenarios:
 
-- **GIVEN** a successful approval
-- **WHEN** `execute()` returns
-- **THEN** `ChangeRepository.mutate(input.name, fn)` has been called
-- **AND** the callback records the approval and transitions the fresh persisted change to `spec-approved`
-- **AND** the returned `Change` has state `spec-approved`
+#### Scenario: Approval and reconciliation share one snapshot
+
+- **WHEN** eligible approval succeeds
+- **THEN** the valid projection and event refer to the same fresh fingerprint committed in one mutation
+
+#### Scenario: Ineligible approval commits only reconciliation
+
+- **WHEN** canonical reconciliation makes approval inapplicable
+- **THEN** its recovery persists without adding an approval event
 
 ### Requirement: Input contract
 
@@ -86,26 +126,27 @@
 - **GIVEN** `ApproveSpec` is constructed with `approvals.spec: true`
 - **GIVEN** the change is in `pending-spec-approval` state
 - **WHEN** `execute({ name, reason })` is called
-- **THEN** the change transitions to `spec-approved`
+- **THEN** a valid spec approval is recorded
+- **AND** the change remains in `pending-spec-approval`
 
-#### Scenario: Schema mismatch fails in gate guard
+#### Scenario: Sovereign schema resolution in gate guard
 
 - **GIVEN** `ApproveSpec` is constructed with `approvals.spec: true`
 - **GIVEN** the active schema name differs from the change `schemaName`
 - **WHEN** `execute({ name, reason })` is called
-- **THEN** a `SchemaMismatchError` is thrown before `mutate` is invoked
+- **THEN** it resolves the schema via `SchemaProvider.get(change.schemaName)` without throwing `SchemaMismatchError`
 
 ### Requirement: Config-based factory delegates through resolveApproveSpecDeps
 
-#### Scenario: createApproveSpec config form derives ApproveSpecDeps through resolveApproveSpecDeps
+Scenarios:
 
-- **WHEN** `createApproveSpec(config, options?)` is invoked
-- **THEN** it creates a composition resolver for that composition session
-- **AND** it derives `ApproveSpecDeps` through `resolveApproveSpecDeps(resolver)`
-- **AND** `resolveApproveSpecDeps(resolver)` resolves:
-- `changes: ChangeRepository`
-- `actor: ActorResolver`
-- `schemaProvider: SchemaProvider`
-- `hasher: ContentHasher`
-- `approvals: ApprovalGates`
-- **AND** the factory delegates to canonical `createApproveSpec(deps)`
+#### Scenario: Both factories are behaviorally equivalent
+
+- **WHEN** approval is constructed through deps and through config/options
+- **THEN** both delegate to the same canonical dependencies and result
+- **AND** options with deps raise the established invalid-arguments error
+
+#### Scenario: Factory does not bootstrap a kernel
+
+- **WHEN** dependencies are resolved
+- **THEN** only approval-specific ports are constructed and shared composition is reused

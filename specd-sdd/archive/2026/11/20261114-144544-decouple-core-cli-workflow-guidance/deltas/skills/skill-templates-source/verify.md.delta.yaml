@@ -1,0 +1,38 @@
+- op: modified
+  description: 'Routing rows for parked states follow nextAction'
+  selector:
+    type: section
+    matches: 'Scenario: New-skill routing table treats pending as drain only'
+  content: |
+    - **WHEN** `packages/skills/templates/skills/specd-new/SKILL.md.tpl` `targetStep` table is inspected
+    - **THEN** `pending-spec-approval` and `pending-signoff` rows are drain-only
+    - **AND** they are not presented as the default wait for new work
+    - **AND** they suggest the matching `approve` command while consent is missing and follow `nextAction` once it is recorded
+
+- op: added
+  description: 'specd-implement accepts parked spec states after consent'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: In-place approval gates in workflow templates'
+  content: |
+    #### Scenario: Implement skill accepts pending-spec-approval after consent
+
+    - **WHEN** `packages/skills/templates/skills/specd-implement/SKILL.md.tpl` state gate is inspected
+    - **THEN** `pending-spec-approval` is accepted next to `spec-approved` as a drain entry state
+    - **AND** with spec consent recorded it transitions to `implementing`
+    - **AND** without consent it stops and redirects to human `approve spec` without transitioning
+
+- op: added
+  description: 'Shared template documents unmapped next actions'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: In-place approval gates in workflow templates'
+  content: |
+    #### Scenario: Shared template documents command null with guidance
+
+    - **WHEN** `packages/skills/templates/shared/shared.md.tpl` `nextAction` documentation is inspected
+    - **THEN** the "Next Action engine" section lists `targetStep`, `actionType`, `reason`, `intent`, `action`, `command`, and `guidance`
+    - **AND** it states that an action without a command mapping yields `command: null` plus `guidance`, and that agents follow the guidance and never invent a command
+    - **AND** a template contract test asserts these terms in the rendered shared template content

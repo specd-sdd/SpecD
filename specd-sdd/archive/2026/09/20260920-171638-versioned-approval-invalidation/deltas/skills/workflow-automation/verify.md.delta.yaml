@@ -1,0 +1,44 @@
+- op: added
+  position:
+    {
+      parent: { type: section, matches: '^Requirements$' },
+      after: { type: section, matches: '^Requirement: Structural Validation and Content Review$' },
+    }
+  content: |
+    ### Requirement: Cross-skill artifact review and recovery
+
+    #### Scenario: Independent verify owns its attempt
+
+    - **WHEN** simple verify runs from any active state
+    - **THEN** it starts before scenario checks and completes only after successful findings and hooks
+
+    #### Scenario: Full verify shares one attempt with compliance
+
+    - **GIVEN** verify explicitly invokes change-scoped compliance in delegated mode
+    - **WHEN** scenarios and audit succeed
+    - **THEN** verify alone starts and completes the shared attempt
+    - **AND** compliance neither replaces its baseline nor completes it early
+
+    #### Scenario: Delegated compliance remains change scoped downstream
+
+    - **GIVEN** verify invokes compliance with `--delegated --attempt <attemptId>`
+    - **WHEN** compliance selects context, scope, dependencies, spec reads, report directory, and filename
+    - **THEN** each branch follows the same change-scoped path as standalone `--change`
+    - **AND** only start and complete ownership differ
+
+    #### Scenario: Delegated mode requires an explicit attempt
+
+    - **WHEN** compliance receives `--delegated` without `--attempt`
+    - **THEN** it fails before audit work or report creation
+
+    #### Scenario: Standalone compliance owns a separate attempt
+
+    - **WHEN** change-scoped compliance is invoked independently, even with an existing active attempt
+    - **THEN** it explicitly starts, audits and reports, then completes on success
+
+    #### Scenario: Changed inputs require repeated work
+
+    - **GIVEN** fingerprinted inputs change during verification
+    - **WHEN** the owning skill starts a replacement attempt
+    - **THEN** it repeats all applicable verification work before completion
+    - **AND** earlier results cannot complete the new attempt

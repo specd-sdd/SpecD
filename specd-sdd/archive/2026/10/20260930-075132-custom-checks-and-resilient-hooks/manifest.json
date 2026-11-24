@@ -1,0 +1,1850 @@
+{
+  "manifestVersion": 2,
+  "name": "custom-checks-and-resilient-hooks",
+  "createdAt": "2026-09-30T07:51:32.371Z",
+  "updatedAt": "2026-10-01T14:53:49.721Z",
+  "description": "Open transition check registry with schema bindings and resilient hook failure policies",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:transition-checks",
+    "core:transition-change",
+    "core:workflow-model",
+    "core:hook-execution-model",
+    "core:build-schema",
+    "cli:change-transition",
+    "core:kernel",
+    "core:check-registry",
+    "core:config-loader"
+  ],
+  "specDependsOn": {
+    "core:transition-checks": [
+      "core:change",
+      "core:workflow-model",
+      "core:schema-format",
+      "default:_global/architecture",
+      "core:check-registry"
+    ],
+    "core:transition-change": [
+      "core:change",
+      "core:run-step-hooks",
+      "core:hook-execution-model",
+      "core:workflow-model",
+      "default:_global/architecture",
+      "core:lifecycle-engine",
+      "core:refresh-implementation-tracking",
+      "core:composition-resolver",
+      "core:count-tasks",
+      "core:transition-checks"
+    ],
+    "core:workflow-model": [
+      "core:change",
+      "core:schema-format",
+      "core:build-schema",
+      "core:compile-context",
+      "core:get-status",
+      "core:transition-change",
+      "core:archive-change",
+      "core:hook-execution-model"
+    ],
+    "core:hook-execution-model": [
+      "core:workflow-model",
+      "core:schema-format",
+      "core:hook-runner-port",
+      "core:transition-change",
+      "core:archive-change",
+      "core:run-step-hooks",
+      "core:get-hook-instructions",
+      "core:config",
+      "cli:change-transition",
+      "cli:change-archive",
+      "core:transition-checks"
+    ],
+    "core:build-schema": [
+      "default:_global/architecture",
+      "core:schema-format",
+      "core:content-extraction",
+      "core:selector-model",
+      "core:schema-merge"
+    ],
+    "cli:change-transition": [
+      "cli:entrypoint",
+      "core:change",
+      "core:transition-change",
+      "core:hook-execution-model",
+      "core:get-status",
+      "core:transition-checks"
+    ],
+    "core:kernel": [
+      "default:_global/architecture",
+      "core:composition",
+      "core:create-change",
+      "core:get-status",
+      "core:transition-change",
+      "core:draft-change",
+      "core:restore-change",
+      "core:discard-change",
+      "core:archive-change",
+      "core:validate-artifacts",
+      "core:compile-context",
+      "core:list-changes",
+      "core:list-drafts",
+      "core:list-discarded",
+      "core:edit-change",
+      "core:skip-artifact",
+      "core:update-spec-deps",
+      "core:list-archived",
+      "core:get-archived-change",
+      "core:run-step-hooks",
+      "core:get-hook-instructions",
+      "core:get-artifact-instruction",
+      "core:approve-spec",
+      "core:approve-signoff",
+      "core:list-specs",
+      "core:get-spec",
+      "core:get-active-schema",
+      "core:validate-specs",
+      "core:generate-metadata",
+      "core:materialize-spec-metadata",
+      "core:get-spec-metadata",
+      "core:regenerate-spec-metadata",
+      "core:initialize-persisted-spec-state",
+      "core:get-persisted-spec-schema",
+      "core:update-persisted-spec-schema",
+      "core:get-persisted-spec-deps",
+      "core:update-persisted-spec-deps",
+      "core:get-persisted-spec-implementation",
+      "core:update-persisted-spec-implementation",
+      "core:get-persisted-spec-optimizations",
+      "core:update-persisted-spec-optimizations",
+      "core:get-spec-context",
+      "core:config-writer-port",
+      "core:list-workspaces",
+      "core:get-project-context",
+      "core:get-config",
+      "core:project-metadata",
+      "core:update-project-metadata",
+      "core:resolve-schema",
+      "core:spec-overlap",
+      "core:get-specs-health",
+      "core:count-tasks",
+      "core:check-registry"
+    ],
+    "core:check-registry": ["core:transition-checks", "default:_global/architecture"],
+    "core:config-loader": [
+      "core:config",
+      "core:composition",
+      "core:schema-merge",
+      "core:vcs-adapter-port",
+      "core:vcs-adapter",
+      "default:_global/architecture"
+    ]
+  },
+  "invalidation": {
+    "artifacts": "downstream",
+    "workflow": "redesign"
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:86de584f120db2e6e6a3d5a3353681700f9957a7bff9426439ab353414e7860c"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:transition-checks",
+          "filename": "deltas/core/transition-checks/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a47b9250cf8f0f29452ae714a4d6225ff04639ba7cecee83f112f4d9b998094f"
+        },
+        {
+          "key": "core:transition-change",
+          "filename": "deltas/core/transition-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1f0b5cbc773ad3bbe07dd9b887edd9236dfe74d3d29ffa54f02d863ed8fcb9a8"
+        },
+        {
+          "key": "core:workflow-model",
+          "filename": "deltas/core/workflow-model/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:cc85d98d91bfd5757539cd58d805d7a6e5c3770d7c6f8cc081bddd53b4fcb6cc"
+        },
+        {
+          "key": "core:hook-execution-model",
+          "filename": "deltas/core/hook-execution-model/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:07093843b41d70b0fb7fa00dde81f2e40f24a11bc2d22b69e7ca18822508d1be"
+        },
+        {
+          "key": "core:build-schema",
+          "filename": "deltas/core/build-schema/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:96a6e7d1f49926b54d94dda261988c248886d08f56ba7c6156165e632f3bd120"
+        },
+        {
+          "key": "cli:change-transition",
+          "filename": "deltas/cli/change-transition/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:831b202a6138a5f2e1db9a69989e002fd3712873f0481d719eaf85778357c135"
+        },
+        {
+          "key": "core:kernel",
+          "filename": "deltas/core/kernel/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1786f3519902e3e2065670b23be561ac930b944a950e2bad592ca2e413cc2cb1"
+        },
+        {
+          "key": "core:check-registry",
+          "filename": "specs/core/check-registry/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:b7cc8bc4c39f266770cbdeae0499c7d46dda8713cd847f3efc07f1841732c0bd"
+        },
+        {
+          "key": "core:config-loader",
+          "filename": "deltas/core/config-loader/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d5b0e408022edf398ea7f5648934b5fdb954c96c77a1d71bcc33ea6175a2a693"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:transition-checks",
+          "filename": "deltas/core/transition-checks/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e228e381f375f60be3dd894151f20e2ed0654fd02325605076e642978a36999e"
+        },
+        {
+          "key": "core:transition-change",
+          "filename": "deltas/core/transition-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6ab7afe648585a461cf7384d8c5dd4ffc0aa8c04acd7dfe917c188d12d48aadf"
+        },
+        {
+          "key": "core:workflow-model",
+          "filename": "deltas/core/workflow-model/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9c24d263cde84cf9bd82d389c6c632341507bfc244f93c0647620252a4da798e"
+        },
+        {
+          "key": "core:hook-execution-model",
+          "filename": "deltas/core/hook-execution-model/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:cec184cc655ff2801447bdcf7904434cf72d0e076da2c3521b1a88ca6b9e14b9"
+        },
+        {
+          "key": "core:build-schema",
+          "filename": "deltas/core/build-schema/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:38af57d7e93f4728908188807a913659dc4ecdcdb52f548e0131cc33fefc99b5"
+        },
+        {
+          "key": "cli:change-transition",
+          "filename": "deltas/cli/change-transition/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a4212fd696d20d0c03ac4cf83d6bb8503637d7ca2e1ed8354c0ab78c68811d55"
+        },
+        {
+          "key": "core:kernel",
+          "filename": "deltas/core/kernel/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:081c9df3043161b37bf94537ddec86b83cbbfdd3b306923a491762c808f97a7d"
+        },
+        {
+          "key": "core:check-registry",
+          "filename": "specs/core/check-registry/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:932e9493e69220db956da68c8512e94c0214ef35a171daf52b2506fd4bd104a8"
+        },
+        {
+          "key": "core:config-loader",
+          "filename": "deltas/core/config-loader/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5cd0687e28347bb07f445438012b42b1dc8c50524d801ba671d91131022c36f8"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:a740aee4e62eec0f4fc1485736f103ccb69a9164da085c508ae91fe035657365"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:810fb99459cbe7735b8589d1e7fd6355a29bb0257960803f43e18ab0ebe1c1fa"
+        }
+      ]
+    }
+  ],
+  "trackedImplementationFiles": [
+    {
+      "file": "fix-deps.cjs",
+      "state": "ignored"
+    },
+    {
+      "file": "generate-verifies.js",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/check-registry.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/check-registry-errors.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/services/transition-checks.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/services/check-bindings.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/checks/impl-links-in-scope.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/checks/spec-overlap.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/checks/impl-links-in-scope.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/checks/spec-overlap.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/services/deep-merge-config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/ports/config-schema.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/value-objects/workflow-step.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/services/build-schema.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/check-predicate-failed-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/services/execute-matching-predicates.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/transition-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/run-step-hooks.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/composition-registries.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/kernel-builder.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/transition.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/run-hooks.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/adr/0030-open-check-registry-and-hook-failure-policies.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/custom-checks.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/cli.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/configuration.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/schemas.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/workflow.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change/transition.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/archive-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/resolve-schema.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/composition-resolver.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/transition-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/services/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/services/lifecycle-verdict.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/value-objects/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/public.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-status.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/run-step-hooks.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/transition-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/services/build-schema.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/services/check-bindings.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/services/check-registry.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/services/deep-merge-config.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/services/lifecycle-verdict.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/src/infrastructure/generated/guides.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/core-reexports.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/_hook-progress-presenter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/checks/approval-signoff.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/checks/approval-spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/checks/hook-effect-shared.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/checks/workflow-check.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/checks/workflow-requires.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/checks/approval-signoff.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/checks/approval-spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/checks/workflow-requires.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/services/execute-check-with-progress.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/services/execute-matching-predicates.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/archive-change-batch-restore.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/archive-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/helpers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/workflow-check-registry.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/services/transition-checks.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/workflow-check-registry.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/kernel.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/_hook-progress-presenter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/services/merge-schema-layers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/services/merge-schema-layers.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:check-registry",
+      "file": "packages/core/src/domain/services/check-registry.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CheckRegistry", "CheckGovernance", "PluginCheckRegistrationOptions"]
+    },
+    {
+      "specId": "core:check-registry",
+      "file": "packages/core/src/domain/errors/check-registry-errors.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "InvalidPluginNameError",
+        "DuplicateCheckError",
+        "DuplicateCheckBindingError",
+        "InvalidCheckKindError",
+        "CheckEmbeddingForbiddenError",
+        "CheckBindingOverrideForbiddenError",
+        "CheckConfigOverrideForbiddenError",
+        "CheckNotSkippableError",
+        "UnknownCheckError"
+      ]
+    },
+    {
+      "specId": "core:transition-checks",
+      "file": "packages/core/src/domain/services/transition-checks.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "Check",
+        "CheckResult",
+        "CheckExecutionContext",
+        "CustomCheckDefinition",
+        "CheckBindingSpec",
+        "CheckBinding",
+        "applyBindingSpecs",
+        "pass",
+        "skip",
+        "fail"
+      ]
+    },
+    {
+      "specId": "core:transition-checks",
+      "file": "packages/core/src/domain/services/check-bindings.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["TRANSITION_BINDING_SPECS", "ARCHIVE_BINDING_SPECS", "DOMAIN_CHECKS"]
+    },
+    {
+      "specId": "core:transition-checks",
+      "file": "packages/core/src/domain/checks/impl-links-in-scope.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["runImplLinksInScope", "implLinksInScope"]
+    },
+    {
+      "specId": "core:transition-checks",
+      "file": "packages/core/src/domain/checks/spec-overlap.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["runSpecOverlap", "specOverlap"]
+    },
+    {
+      "specId": "core:transition-checks",
+      "file": "packages/core/src/application/checks/impl-links-in-scope.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createImplLinksInScope"]
+    },
+    {
+      "specId": "core:transition-checks",
+      "file": "packages/core/src/application/checks/spec-overlap.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createSpecOverlap"]
+    },
+    {
+      "specId": "core:config-loader",
+      "file": "packages/core/src/domain/services/deep-merge-config.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["deepMergeConfig", "isRecord"]
+    },
+    {
+      "specId": "core:config-loader",
+      "file": "packages/core/src/application/ports/config-schema.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["deepMergeRawConfig"]
+    },
+    {
+      "specId": "core:workflow-model",
+      "file": "packages/core/src/domain/value-objects/workflow-step.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["WorkflowStep", "WorkflowStepCheckDeclaration", "HookFailurePolicy", "HookEntry"]
+    },
+    {
+      "specId": "core:hook-execution-model",
+      "file": "packages/core/src/domain/value-objects/workflow-step.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["HookFailurePolicy", "HookEntry"]
+    },
+    {
+      "specId": "core:build-schema",
+      "file": "packages/core/src/domain/services/build-schema.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["buildSchema"]
+    },
+    {
+      "specId": "core:transition-checks",
+      "file": "packages/core/src/domain/errors/check-predicate-failed-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CheckPredicateFailedError"]
+    },
+    {
+      "specId": "core:transition-checks",
+      "file": "packages/core/src/application/services/execute-matching-predicates.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["executeMatchingPredicates"]
+    },
+    {
+      "specId": "core:transition-checks",
+      "file": "packages/core/src/application/use-cases/transition-change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["TransitionChange"]
+    },
+    {
+      "specId": "core:transition-checks",
+      "file": "packages/core/src/application/use-cases/get-status.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GetStatus"]
+    },
+    {
+      "specId": "core:hook-execution-model",
+      "file": "packages/core/src/application/use-cases/run-step-hooks.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["RunStepHooks"]
+    },
+    {
+      "specId": "core:check-registry",
+      "file": "packages/core/src/composition/composition-registries.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["PluginCheckRegistration"]
+    },
+    {
+      "specId": "core:check-registry",
+      "file": "packages/core/src/composition/kernel-builder.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["KernelBuilder"]
+    },
+    {
+      "specId": "core:check-registry",
+      "file": "packages/core/src/composition/use-cases/workflow-check-registry.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["resolveWorkflowCheckRegistry"]
+    },
+    {
+      "specId": "core:build-schema",
+      "file": "packages/core/src/domain/services/merge-schema-layers.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["mergeSchemaLayers"]
+    },
+    {
+      "specId": "cli:change-transition",
+      "file": "packages/cli/src/commands/change/transition.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerChangeTransition"]
+    }
+  ],
+  "implementationTrackingStartedAt": "2026-09-30T15:04:48.185Z",
+  "verification": {
+    "completed": {
+      "id": "verification-4",
+      "attemptId": "verification-attempt-4",
+      "status": "valid",
+      "completedAt": "2026-10-01T14:53:27.690Z",
+      "completedBy": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "fingerprint": {
+        "version": 1,
+        "artifacts": {
+          "version": 1,
+          "algorithm": "artifact-pre-hash-v1",
+          "files": {
+            "design:design": "sha256:a740aee4e62eec0f4fc1485736f103ccb69a9164da085c508ae91fe035657365",
+            "proposal:proposal": "sha256:86de584f120db2e6e6a3d5a3353681700f9957a7bff9426439ab353414e7860c",
+            "specs:cli:change-transition": "sha256:831b202a6138a5f2e1db9a69989e002fd3712873f0481d719eaf85778357c135",
+            "specs:core:build-schema": "sha256:96a6e7d1f49926b54d94dda261988c248886d08f56ba7c6156165e632f3bd120",
+            "specs:core:check-registry": "sha256:b7cc8bc4c39f266770cbdeae0499c7d46dda8713cd847f3efc07f1841732c0bd",
+            "specs:core:config-loader": "sha256:d5b0e408022edf398ea7f5648934b5fdb954c96c77a1d71bcc33ea6175a2a693",
+            "specs:core:hook-execution-model": "sha256:07093843b41d70b0fb7fa00dde81f2e40f24a11bc2d22b69e7ca18822508d1be",
+            "specs:core:kernel": "sha256:1786f3519902e3e2065670b23be561ac930b944a950e2bad592ca2e413cc2cb1",
+            "specs:core:transition-change": "sha256:1f0b5cbc773ad3bbe07dd9b887edd9236dfe74d3d29ffa54f02d863ed8fcb9a8",
+            "specs:core:transition-checks": "sha256:a47b9250cf8f0f29452ae714a4d6225ff04639ba7cecee83f112f4d9b998094f",
+            "specs:core:workflow-model": "sha256:cc85d98d91bfd5757539cd58d805d7a6e5c3770d7c6f8cc081bddd53b4fcb6cc",
+            "verify:cli:change-transition": "sha256:a4212fd696d20d0c03ac4cf83d6bb8503637d7ca2e1ed8354c0ab78c68811d55",
+            "verify:core:build-schema": "sha256:38af57d7e93f4728908188807a913659dc4ecdcdb52f548e0131cc33fefc99b5",
+            "verify:core:check-registry": "sha256:932e9493e69220db956da68c8512e94c0214ef35a171daf52b2506fd4bd104a8",
+            "verify:core:config-loader": "sha256:5cd0687e28347bb07f445438012b42b1dc8c50524d801ba671d91131022c36f8",
+            "verify:core:hook-execution-model": "sha256:cec184cc655ff2801447bdcf7904434cf72d0e076da2c3521b1a88ca6b9e14b9",
+            "verify:core:kernel": "sha256:081c9df3043161b37bf94537ddec86b83cbbfdd3b306923a491762c808f97a7d",
+            "verify:core:transition-change": "sha256:6ab7afe648585a461cf7384d8c5dd4ffc0aa8c04acd7dfe917c188d12d48aadf",
+            "verify:core:transition-checks": "sha256:e228e381f375f60be3dd894151f20e2ed0654fd02325605076e642978a36999e",
+            "verify:core:workflow-model": "sha256:9c24d263cde84cf9bd82d389c6c632341507bfc244f93c0647620252a4da798e"
+          }
+        },
+        "implementation": {
+          "version": 1,
+          "hashAlgorithm": "sha256",
+          "textNormalization": "text-v1",
+          "binaryNormalization": "bytes-v1",
+          "files": {
+            "packages/cli/src/commands/change/transition.ts": {
+              "hash": "sha256:1385a2eb9223052c0b0aaf0680dae9ffb3a3c414a33b0aa25e12e8ede6b601b9",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/application/checks/impl-links-in-scope.ts": {
+              "hash": "sha256:743f7b1664d9b4ca5d4badb82dc0fc04e694e9060d9b6691b749308fa60e595e",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/application/checks/spec-overlap.ts": {
+              "hash": "sha256:b57ddd1b52fccb5c814ebd60fb70b913965ddeb87e432bfa2dd2e0b88587ddcf",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/application/ports/config-schema.ts": {
+              "hash": "sha256:b10f438f5423579fdb3542c5a2f1de1ad8dee0cc84a9e230aa3677907b4d21f2",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/application/services/execute-matching-predicates.ts": {
+              "hash": "sha256:081f167a70d40caecfc465df710580cab5a71d54dd8105f834181c322a2394d1",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/application/use-cases/get-status.ts": {
+              "hash": "sha256:eaff061e65625e93cd91a9aca02a2a4466b7a5dc5e10d96276f9319f9c954c37",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/application/use-cases/run-step-hooks.ts": {
+              "hash": "sha256:b80c580fed8100f22214b65a868c3f23dfcae1b0228562b2e8a4d45965617ef6",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/application/use-cases/transition-change.ts": {
+              "hash": "sha256:5c0037d733ffc5a19426c2299f06794cf0bd17608e4e6f0cdbc446b166cc2739",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/composition/composition-registries.ts": {
+              "hash": "sha256:33f1394f6b33fd21d451e9fffce13bb46887f9765cc0c6b252f59b8ae6bec0fd",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/composition/kernel-builder.ts": {
+              "hash": "sha256:cfb93a32474d6e06bb03a3ef08cd10fd1a17d0e1b3b7f22cd4f7181205ffc55d",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/composition/use-cases/workflow-check-registry.ts": {
+              "hash": "sha256:200b04effc7baf24c630e43261f1a9f95511baf7fbb0d2c5653f0f513cfb6b33",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/domain/checks/impl-links-in-scope.ts": {
+              "hash": "sha256:a034e878bb17ea82792bebe01ada91ebe59d010faf3d50e5e2ba69728f9fb617",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/domain/checks/spec-overlap.ts": {
+              "hash": "sha256:e1ec1226ea3698853123c7620288cfa18b8a9465bda2517f52d1f5cc6aaedf65",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/domain/errors/check-predicate-failed-error.ts": {
+              "hash": "sha256:e83c4400e670b6c5cbe5382fbfa97fb504aec90e7fceee35006e5f325bb12864",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/domain/errors/check-registry-errors.ts": {
+              "hash": "sha256:4f06ed4a861a9a3d90a6ce632c2571036072d274a6b7d57aba7d2838cb301498",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/domain/services/build-schema.ts": {
+              "hash": "sha256:72cfce99beca6f3026c0c25188990e03616ddbcf509c431b0207886fdbd98bf1",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/domain/services/check-bindings.ts": {
+              "hash": "sha256:cdb61feb78003c62536f421948f9c7c9c2393a19746af8dd9e396f02ea300131",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/domain/services/check-registry.ts": {
+              "hash": "sha256:baeec2b51e2387bbcaa8f0c2207cd1a4b89e7c05fda1478401692b369265df49",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/domain/services/deep-merge-config.ts": {
+              "hash": "sha256:ffa8af728518b08707e659c1a5bf9d42b818db248d040cc92229338c5535abc9",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/domain/services/merge-schema-layers.ts": {
+              "hash": "sha256:9c5cc81beca0a7687521fe1fa5e1dcd568c0aec30229858166f3d69c1eb83ea5",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/domain/services/transition-checks.ts": {
+              "hash": "sha256:a22b477e33ba27069699ca575a32b3522f3578febd139ec3ca44076356b940fb",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/domain/value-objects/workflow-step.ts": {
+              "hash": "sha256:a408d5a1f992db89d5fa8bc4785d5452a3cf3dfab9c2e1a26da3be84be2509af",
+              "content": "text",
+              "normalization": "text-v1"
+            }
+          }
+        }
+      }
+    }
+  },
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-09-30T07:51:32.371Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "core:transition-checks",
+        "core:transition-change",
+        "core:workflow-model",
+        "core:hook-execution-model",
+        "core:build-schema",
+        "cli:change-transition"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-09-30T07:51:32.397Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:transition-checks"
+        },
+        {
+          "type": "specs",
+          "key": "core:transition-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:workflow-model"
+        },
+        {
+          "type": "specs",
+          "key": "core:hook-execution-model"
+        },
+        {
+          "type": "specs",
+          "key": "core:build-schema"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-transition"
+        },
+        {
+          "type": "verify",
+          "key": "core:transition-checks"
+        },
+        {
+          "type": "verify",
+          "key": "core:transition-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:workflow-model"
+        },
+        {
+          "type": "verify",
+          "key": "core:hook-execution-model"
+        },
+        {
+          "type": "verify",
+          "key": "core:build-schema"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-transition"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-30T07:51:56.171Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-09-30T08:00:25.211Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:kernel"
+        },
+        {
+          "type": "verify",
+          "key": "core:kernel"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-09-30T09:27:27.946Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:check-registry"
+        },
+        {
+          "type": "verify",
+          "key": "core:check-registry"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-09-30T11:20:42.314Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "schema-std:standard-schema"
+        },
+        {
+          "type": "verify",
+          "key": "schema-std:standard-schema"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-09-30T11:23:55.546Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "schema-std:standard-schema"
+        },
+        {
+          "type": "verify",
+          "key": "schema-std:standard-schema"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-30T11:45:28.699Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "core:transition-checks",
+            "core:transition-change",
+            "core:workflow-model",
+            "core:hook-execution-model",
+            "core:build-schema",
+            "cli:change-transition",
+            "core:kernel",
+            "core:check-registry"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:transition-checks",
+            "core:transition-change",
+            "core:workflow-model",
+            "core:hook-execution-model",
+            "core:build-schema",
+            "cli:change-transition",
+            "core:kernel",
+            "core:check-registry"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-30T14:25:50.311Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-30T14:28:53.633Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-30T14:30:28.678Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:transition-checks"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:transition-checks",
+            "core:transition-change",
+            "core:workflow-model",
+            "core:hook-execution-model",
+            "core:build-schema",
+            "cli:change-transition",
+            "core:kernel",
+            "core:check-registry"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-30T14:34:35.437Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-30T14:39:07.838Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-30T14:39:41.461Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-30T14:40:53.665Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-30T14:42:20.576Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-09-30T14:42:26.992Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:config-loader"
+        },
+        {
+          "type": "verify",
+          "key": "core:config-loader"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-30T14:44:01.351Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:transition-checks",
+            "core:transition-change",
+            "core:workflow-model",
+            "core:hook-execution-model",
+            "core:build-schema",
+            "cli:change-transition",
+            "core:kernel",
+            "core:check-registry",
+            "core:config-loader"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:transition-checks",
+            "core:transition-change",
+            "core:workflow-model",
+            "core:hook-execution-model",
+            "core:build-schema",
+            "cli:change-transition",
+            "core:kernel",
+            "core:check-registry",
+            "core:config-loader"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-30T14:46:58.929Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-30T15:04:48.185Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-09-30T21:25:24.972Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [cli:change-transition, core:build-schema, core:check-registry, core:config-loader, core:hook-execution-model, core:kernel, core:transition-change, core:transition-checks, core:workflow-model]; verify [cli:change-transition, core:build-schema, core:check-registry, core:config-loader, core:hook-execution-model, core:kernel, core:transition-change, core:transition-checks, core:workflow-model]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-transition",
+            "core:build-schema",
+            "core:check-registry",
+            "core:config-loader",
+            "core:hook-execution-model",
+            "core:kernel",
+            "core:transition-change",
+            "core:transition-checks",
+            "core:workflow-model"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-transition",
+            "core:build-schema",
+            "core:check-registry",
+            "core:config-loader",
+            "core:hook-execution-model",
+            "core:kernel",
+            "core:transition-change",
+            "core:transition-checks",
+            "core:workflow-model"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-09-30T21:25:24.972Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-09-30T21:31:44.889Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-1",
+      "state": "designing",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "verification-completed",
+      "at": "2026-09-30T21:36:51.659Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-1",
+      "verificationId": "verification-1"
+    },
+    {
+      "type": "verification-invalidated",
+      "at": "2026-10-01T07:45:43.900Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "verificationId": "verification-1",
+      "reason": "Artifact files require review"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-01T07:45:43.900Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:transition-checks", "core:build-schema", "core:check-registry"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:build-schema", "core:check-registry"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-01T08:03:28.225Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:build-schema", "core:check-registry"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:build-schema", "core:check-registry"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-01T08:48:33.850Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:transition-change", "core:workflow-model", "core:kernel"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:transition-checks",
+            "core:transition-change",
+            "core:workflow-model",
+            "core:kernel"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-01T09:13:01.708Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:transition-checks", "core:build-schema", "core:check-registry"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:build-schema", "core:check-registry"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-01T11:02:08.336Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-01T11:10:44.725Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-01T11:50:46.943Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-10-01T13:16:47.045Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-2",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "verification-completed",
+      "at": "2026-10-01T13:19:45.068Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-2",
+      "verificationId": "verification-2"
+    },
+    {
+      "type": "verification-invalidated",
+      "at": "2026-10-01T13:48:09.549Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "verificationId": "verification-2",
+      "reason": "Artifact files require review"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-10-01T13:48:09.549Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:build-schema", "core:check-registry"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:check-registry"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-01T13:48:09.549Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-01T13:48:49.936Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-01T13:49:19.677Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-01T13:50:57.846Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-10-01T13:51:03.989Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-3",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "verification-completed",
+      "at": "2026-10-01T13:51:27.790Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-3",
+      "verificationId": "verification-3"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-01T13:51:46.287Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-01T13:52:22.866Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-10-01T14:03:02.915Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"core:check-registry\" points outside workspace \"core\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "verification-invalidated",
+      "at": "2026-10-01T14:52:56.107Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "verificationId": "verification-3",
+      "reason": "Implementation files changed"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-10-01T14:53:20.918Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-4",
+      "state": "archivable",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "verification-completed",
+      "at": "2026-10-01T14:53:27.690Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-4",
+      "verificationId": "verification-4"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-01T14:53:49.716Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-10-01T14:53:50.270Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

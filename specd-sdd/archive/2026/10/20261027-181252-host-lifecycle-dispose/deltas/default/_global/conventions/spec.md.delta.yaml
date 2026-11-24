@@ -1,0 +1,15 @@
+- op: added
+  description: 'One common Node.js engine floor for every published package.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Immutability preference'
+  content: |
+    ### Requirement: Node.js engine floor
+
+    Every published package (every workspace package whose `package.json` has `"private": false`) SHALL declare `engines.node` with the same value, `>=22`. The value MUST match the Node.js version installed by the CI workflow, so that the supported floor is the tested one. Private packages (for example documentation sites) MAY omit it.
+
+    Raising or lowering the floor is a breaking-change decision and MUST be applied to every published package in the same change.

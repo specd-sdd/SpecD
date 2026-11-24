@@ -6,14 +6,18 @@ Plugin infrastructure for [specd](https://github.com/specd-sdd/SpecD). For more 
 
 ### Domain types
 
-- **`SpecdPlugin`** — base plugin interface (`name`, `type`, `version`, `configSchema`, `init`, `destroy`).
-- **`AgentPlugin`** — extends `SpecdPlugin` with `install` and `uninstall` for AI-agent integrations.
+- **`SpecdPlugin`** — base plugin interface (`name`, `version`, `init`, `destroy`, optional `install` / `uninstall` / `contribution`).
+- **`AgentPlugin`** — agent contribution contract. `install` and `uninstall` take a context with `config`, `contributions`, and optional `options`.
 - **`InstallOptions`** / **`InstallResult`** — input and output types for skill install operations.
 - **`isSpecdPlugin()`** / **`isAgentPlugin()`** — type guards for runtime validation.
 
 ### Infrastructure
 
 - **Plugin loader** — discovers and instantiates plugins from package manifests.
+
+## Format
+
+Manifests use `schemaVersion: 2`. Project config uses `configVersion: 2` and a flat `plugins` list. There is no changelog file in this package; this note is the migration record.
 
 ## Usage
 

@@ -1,0 +1,80 @@
+- op: modified
+  description: 'Spec-consent recovery excludes ready'
+  selector:
+    type: section
+    matches: 'Scenario: Scope change reconciles fingerprints atomically'
+  content: |
+    - **WHEN** effective spec scope changes
+    - **THEN** affected artifact review and evidence are updated in the same mutation
+    - **AND** required stale spec consent returns to design from a state after `ready` while ungated preserve retains state
+
+- op: added
+  description: 'Ready keeps stale consent in place'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Approval invalidation on effective change'
+  content: |
+    #### Scenario: Scope change in ready keeps the change in ready
+
+    - **GIVEN** a change in `ready` with valid required spec consent
+    - **WHEN** effective spec scope changes
+    - **THEN** the approval is reported stale and no automatic return is committed
+    - **AND** the change stays in `ready` so consent can be renewed there
+
+- op: modified
+  description: 'Audit round 9 wording'
+  selector:
+    type: section
+    matches: 'Scenario: Unknown invalidation policy rejected'
+  content: |
+    - **GIVEN** a change exists
+    - **WHEN** `execute` is called with `invalidation: { artifacts: 'sugical' }`
+    - **THEN** `InvalidInputError` is thrown quoting `sugical` and listing `none`, `surgical`, `downstream`, `global`
+    - **AND** nothing is persisted
+
+- op: modified
+  description: 'Audit round 9 wording'
+  selector:
+    type: section
+    matches: 'Scenario: Invalid invalidation policy is rejected together with valid edits'
+  content: |
+    - **GIVEN** a change exists
+    - **WHEN** `execute` is called with `description: 'x'` and `invalidation: { workflow: 'bogus' }`
+    - **THEN** `InvalidInputError` is thrown and the description is not changed
+
+- op: modified
+  description: 'Audit round 10 wording'
+  selector:
+    type: section
+    matches: 'Scenario: Persisted dependency state seeds new spec entry'
+  content: |
+    - **GIVEN** a persisted spec being added to the change has persisted state available through `readPersistedState(spec)`
+    - **WHEN** `EditChange.execute` adds that spec to the change
+    - **THEN** the seeded `change.specDependsOn` entry equals the `dependsOn` of that persisted state
+
+- op: removed
+  description: 'Audit round 10 rename'
+  selector:
+    type: section
+    matches: 'Scenario: Legacy metadata seeds when persisted semantic state is absent'
+
+- op: removed
+  description: 'Audit round 10 rename'
+  selector:
+    type: section
+    matches: 'Scenario: Stale metadata still seeds as legacy fallback'
+
+- op: added
+  description: 'Audit round 10 scenario'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Seed specDependsOn for added specs'
+  content: |
+    #### Scenario: Absent persisted state seeds an empty dependency list
+
+    - **GIVEN** a spec being added to the change has no persisted state (or does not exist in its repository)
+    - **WHEN** `EditChange.execute` adds that spec
+    - **THEN** the seeded `change.specDependsOn` entry is an empty array
+    - **AND** `metadata.json.dependsOn` is not consulted

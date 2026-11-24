@@ -3,12 +3,13 @@ import { type ArtifactParserRegistry } from '../../application/ports/artifact-pa
 import { type ChangeRepository } from '../../application/ports/change-repository.js'
 import { type ContentHasher } from '../../application/ports/content-hasher.js'
 import { type SchemaProvider } from '../../application/ports/schema-provider.js'
+import { type ResolveChangeSchema } from '../../application/services/resolve-change-schema.js'
 import { type SpecWorkspaceRoute } from '../../application/use-cases/_shared/spec-reference-resolver.js'
 import { type ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
+import { type ReconcileChangeValidity } from '../../application/use-cases/reconcile-change-validity.js'
 import { ValidateArtifacts } from '../../application/use-cases/validate-artifacts.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import { type ExtractorTransformRegistry } from '../../domain/services/content-extraction.js'
-import { type LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
 import {
   createCompositionResolver,
   type CompositionResolver,
@@ -23,12 +24,14 @@ export interface ValidateArtifactsDeps {
   readonly changes: ChangeRepository
   readonly listWorkspaces: ListWorkspaces
   readonly schemaProvider: SchemaProvider
+  readonly resolveChangeSchema?: ResolveChangeSchema
   readonly parsers: ArtifactParserRegistry
   readonly actor: ActorResolver
   readonly contentHasher: ContentHasher
   readonly extractorTransforms: ExtractorTransformRegistry
   readonly workspaceRoutes: readonly SpecWorkspaceRoute[]
-  readonly lifecycle: LifecycleEngine
+  /** Canonical reconciler shared by the composition session. */
+  readonly reconcile: ReconcileChangeValidity
 }
 
 /**
@@ -38,16 +41,22 @@ export interface ValidateArtifactsDeps {
  * @returns The resolved dependencies for `ValidateArtifacts`
  */
 export function resolveValidateArtifactsDeps(resolver: CompositionResolver): ValidateArtifactsDeps {
+  const changes = resolver.getChangeRepository()
+  const listWorkspaces = resolver.getListWorkspaces()
+  const parsers = resolver.getArtifactParserRegistry()
+  const extractorTransforms = resolver.getExtractorTransforms()
+  const workspaceRoutes = resolver.getSpecWorkspaceRoutes()
   return {
-    changes: resolver.getChangeRepository(),
-    listWorkspaces: resolver.getListWorkspaces(),
+    changes,
+    listWorkspaces,
     schemaProvider: resolver.getSchemaProvider(),
-    parsers: resolver.getArtifactParserRegistry(),
+    resolveChangeSchema: resolver.getResolveChangeSchema(),
+    parsers,
     actor: resolver.getActorResolver(),
     contentHasher: resolver.getContentHasher(),
-    extractorTransforms: resolver.getExtractorTransforms(),
-    workspaceRoutes: resolver.getSpecWorkspaceRoutes(),
-    lifecycle: resolver.getLifecycleEngine(),
+    extractorTransforms,
+    workspaceRoutes,
+    reconcile: resolver.getReconcileChangeValidity(),
   }
 }
 
@@ -108,7 +117,8 @@ function createValidateArtifactsFromNormalized(
       contentHasher,
       extractorTransforms,
       workspaceRoutes,
-      lifecycle,
+      reconcile,
+      resolveChangeSchema,
     } = input.deps
     return new ValidateArtifacts(
       changes,
@@ -119,7 +129,8 @@ function createValidateArtifactsFromNormalized(
       contentHasher,
       extractorTransforms,
       workspaceRoutes,
-      lifecycle,
+      reconcile,
+      resolveChangeSchema,
     )
   }
 
@@ -145,6 +156,6 @@ function isValidateArtifactsDeps(
     'contentHasher' in value &&
     'extractorTransforms' in value &&
     'workspaceRoutes' in value &&
-    'lifecycle' in value
+    'reconcile' in value
   )
 }

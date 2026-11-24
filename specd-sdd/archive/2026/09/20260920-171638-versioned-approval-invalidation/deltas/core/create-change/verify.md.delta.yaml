@@ -1,0 +1,60 @@
+- op: modified
+  selector: { type: section, matches: '^Requirement: Input contract$' }
+  content: |
+    Scenarios:
+
+    #### Scenario: Creation accepts a complete structured override
+
+    - **WHEN** valid artifact and workflow policy values are supplied
+    - **THEN** they are passed as one structured input without parsing legacy aliases in the use case
+
+    #### Scenario: Partial schema override remains invalid
+
+    - **WHEN** creation supplies only one member of the schema override pair
+    - **THEN** input validation rejects the request independently of policy input
+
+- op: modified
+  selector: { type: section, matches: '^Requirement: Initial invalidation policy$' }
+  content: |
+    Scenarios:
+
+    #### Scenario: Explicit policy wins over preserve default
+
+    - **WHEN** a new change is created with explicit structured policy
+    - **THEN** its v2 manifest persists that policy and no legacy scalar
+    - **AND** omission resolves configured values or `{ downstream, preserve }`
+
+    #### Scenario: Later policy edits do not rewrite creation history
+
+    - **WHEN** the persisted policy changes after creation
+    - **THEN** no retroactive drift or recovery is fabricated
+
+- op: modified
+  description: 'Test project-default injection through both config factory and kernel'
+  selector:
+    type: section
+    matches: '^Requirement: Config-based factory delegates through resolveCreateChangeDeps$'
+  content: |
+    #### Scenario: Config factory injects nondefault project policy
+
+    - **GIVEN** resolved project configuration sets `{ artifacts: surgical, workflow: redesign }`
+    - **WHEN** `createCreateChange(config).execute` creates a change without an input policy
+    - **THEN** `resolveCreateChangeDeps` supplies that structured default
+    - **AND** the persisted v2 manifest uses `{ artifacts: surgical, workflow: redesign }`, not the native default
+
+    #### Scenario: Kernel creation shares the config factory default
+
+    - **GIVEN** the same nondefault project policy
+    - **WHEN** `kernel.changes.create.execute` receives no input policy
+    - **THEN** it persists the same project default without a CLI-supplied overlay
+
+    #### Scenario: Explicit policy overrides injected project default
+
+    - **GIVEN** a config-based factory or kernel with a nondefault project policy
+    - **WHEN** creation supplies an explicit structured input policy
+    - **THEN** the explicit policy is persisted and only one creation event is recorded
+
+    #### Scenario: Direct dependencies without project default use native default
+
+    - **WHEN** `createCreateChange(deps)` receives no injected default and execute supplies no policy
+    - **THEN** it persists `{ artifacts: downstream, workflow: preserve }`

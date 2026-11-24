@@ -4,6 +4,7 @@ import { type ExternalHookRunner } from '../../application/ports/external-hook-r
 import { type HookRunner } from '../../application/ports/hook-runner.js'
 import { type SchemaProvider } from '../../application/ports/schema-provider.js'
 import { RunStepHooks } from '../../application/use-cases/run-step-hooks.js'
+import { type ResolveChangeSchema } from '../../application/services/resolve-change-schema.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import {
   createCompositionResolver,
@@ -26,6 +27,8 @@ export interface RunStepHooksDeps {
   readonly schemaProvider: SchemaProvider
   /** Registered external hook runners used by the use case. */
   readonly externalHookRunners: ReadonlyMap<string, ExternalHookRunner>
+  /** Shared change schema resolver. */
+  readonly resolveChangeSchema?: ResolveChangeSchema
 }
 
 /**
@@ -41,6 +44,7 @@ export function resolveRunStepHooksDeps(resolver: CompositionResolver): RunStepH
     hooks: resolver.getHookRunner(),
     schemaProvider: resolver.getSchemaProvider(),
     externalHookRunners: resolver.registry.externalHookRunners,
+    resolveChangeSchema: resolver.getResolveChangeSchema(),
   }
 }
 
@@ -92,8 +96,16 @@ function createRunStepHooksFromNormalized(
   input: FactoryInput<RunStepHooksDeps, CompositionResolutionOptions>,
 ): RunStepHooks {
   if (input.kind === 'deps') {
-    const { changes, archive, hooks, externalHookRunners, schemaProvider } = input.deps
-    return new RunStepHooks(changes, archive, hooks, externalHookRunners, schemaProvider)
+    const { changes, archive, hooks, externalHookRunners, schemaProvider, resolveChangeSchema } =
+      input.deps
+    return new RunStepHooks(
+      changes,
+      archive,
+      hooks,
+      externalHookRunners,
+      schemaProvider,
+      resolveChangeSchema,
+    )
   }
 
   const resolver = createCompositionResolver(input.config, input.options)

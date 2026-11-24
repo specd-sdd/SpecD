@@ -38,6 +38,18 @@
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message
 
+#### Scenario: Drafted JSON blockers use the CLI projection
+
+- **GIVEN** a drafted change whose `GetStatus` result has a blocker with `isSkippable: true` and `checkId`
+- **WHEN** status is rendered in JSON or TOON
+- **THEN** the blocker carries `label`, `checkId`, and `bypassFlag` and no raw `isSkippable`
+
+#### Scenario: Drafted artifacts never render undefined status
+
+- **GIVEN** a drafted change whose artifact rows have no `displayStatus`
+- **WHEN** status is rendered in JSON or TOON
+- **THEN** each artifact status falls back to `effectiveStatus`, then to the persisted state, and is never `undefined`
+
 ### Requirement: Output format
 
 #### Scenario: Text output shows artifact and file state
@@ -47,13 +59,6 @@
 - **WHEN** `specd change status <name>` is run
 - **THEN** stdout shows the artifact aggregate state
 - **AND** it lists the individual file row with `drifted-pending-review`
-
-#### Scenario: Text output shows review section when review is required
-
-- **GIVEN** `GetStatus` returns `review.required: true`
-- **WHEN** `specd change status <name>` is run in text mode
-- **THEN** stdout includes a `review:` section
-- **AND** it shows the route, reason, and affected absolute file paths
 
 #### Scenario: JSON output includes review and file state
 
@@ -99,6 +104,12 @@
 - **THEN** the `state` field in `artifactDag` is reported as `complete-with-drift`
 - **AND** agents can detect drift without manually comparing hashes
 
+#### Scenario: Help schema lists every emitted field
+
+- **WHEN** `specd change status --help` is rendered
+- **THEN** the JSON schema describes `validity`, `verification`, `invalidation`, `implementationTracking`, `approvalGates`, `lifecycle.checks`, `lifecycle.checksByTarget`, and the artifact and file `displayStatus` and file `hasDrift` fields
+- **AND** every field it lists carries a description
+
 ### Requirement: Task completion display in DAG
 
 #### Scenario: DAG shows task completion counts when data is available
@@ -130,14 +141,245 @@
 - **THEN** the serialized row includes canonical state
 - **AND** it includes the display-state projection
 
+### Requirement: Lifecycle projections come from GetStatus checks
+
+#### Scenario: Incomplete tasks do not list verifying as available
+
+- **GIVEN** `GetStatus` omits `verifying` from `availableTransitions`
+- **WHEN** `specd changes status <name>` is rendered
+- **THEN** the displayed available transitions omit `verifying`
+- **AND** the CLI does not add it from `VALID_TRANSITIONS` alone
+
+#### Scenario: nextAction implements vs verify follows GetStatus
+
+- **GIVEN** `GetStatus.nextAction` recommends `/specd-verify`
+- **WHEN** the status command is rendered
+- **THEN** it does not recommend `/specd-implement` instead
+
+#### Scenario: Pipeline display annotates optional steps and omits disabled steps
+
+- **GIVEN** a schema with optional step `implementing` and disabled step `verifying`
+- **WHEN** `specd changes status <name>` is rendered
+- **THEN** the pipeline output annotates `implementing` as optional
+- **AND** `verifying` is excluded from the pipeline rendering
+- **AND** available transitions include bypass paths permitted by step-skip checks
+
+#### Scenario: Drafted JSON empties hops even if Core leaks them
+
+- **GIVEN** a drafted change
+- **AND** `GetStatus.lifecycle.availableTransitions` includes `ready`
+- **AND** `GetStatus.lifecycle.availableSteps` is non-empty
+- **WHEN** `specd change status <name> --format json` is rendered
+- **THEN** JSON `availableTransitions` is `[]`
+- **AND** JSON `availableSteps` is `[]`
+- **AND** JSON `nextAction.command` is `null`
+
+#### Scenario: Pipeline follows canonical order and omits disabled steps
+
+- **GIVEN** a schema whose rows are declared as `verifying [disabled]`, `implementing [optional]`, `ready`
+- **WHEN** `specd change status <name>` is rendered in text and JSON
+- **THEN** the pipeline lists `ready`, `implementing [optional]` in canonical order
+- **AND** `verifying` is absent from both outputs
+- **AND** JSON `availableSteps` entries expose `optional`
+
+#### Scenario: Artifact DAG comes from the change's schema
+
+- **GIVEN** a change whose `schemaName` is `custom-workflow` with a workspace default exposing a different artifact DAG
+- **WHEN** `specd change status <name>` is rendered
+- **THEN** the artifact DAG shown is the `custom-workflow` DAG
+
+### Requirement: Reconciled validity and next-action output
+
+#### Scenario: Status renders committed recovery and verification records
+
+- **GIVEN** reconciliation returns the change to design and an unfinished verification attempt exists
+- **WHEN** text and structured status are rendered
+- **THEN** both show the committed state and cause
+- **AND** distinguish the attempt from absent or stale completed evidence without exposing source content
+
+#### Scenario: All formats preserve the same recovery semantics
+
+- **GIVEN** validity contains an automatic return, multiple blockers, and a next action
+- **WHEN** status is rendered as text, JSON, and TOON
+- **THEN** every format carries the same state, recovery cause, blocker codes, and command
+- **AND** structured output remains machine-readable rather than embedding prose-only recovery
+
+#### Scenario: Fingerprint evidence is safe to display
+
+- **WHEN** status reports implementation or artifact differences
+- **THEN** it exposes paths, difference kinds, algorithms, and freshness only
+- **AND** it does not expose source contents, actor-private metadata, or raw internal evaluator objects
+
+#### Scenario: Unreadable fingerprint inputs are displayed as non-blocking diagnostics
+
+- **GIVEN** a change has unreadable or missing artifact files reported in validity.fingerprintIssues
+- **WHEN** status is rendered in text, JSON, or TOON
+- **THEN** unreadable fingerprint inputs are not rendered as progress blockers
+- **AND** they are rendered under validity diagnostics or warnings
+
+### Requirement: Text status omits duplicated review file lists
+
+#### Scenario: Artifact-review-required does not reprint files under review
+
+- **GIVEN** `GetStatus.review.required` is true
+- **AND** `reason` is `'artifact-review-required'`
+- **AND** `affectedArtifacts` lists pending-review files
+- **WHEN** `specd changes status <name>` is rendered as `format=text`
+- **THEN** `artifacts (details):` still lists those files with `pending-review`
+- **AND** stdout includes a `review:` header with `required` / `route` / `reason`
+- **AND** when Core supplies `review.message`, that message is printed
+- **AND** the output does not list those file paths under `review:`
+- **AND** JSON output still includes `review.affectedArtifacts`
+
+#### Scenario: Drift is shown only in artifacts details
+
+- **GIVEN** `review.reason` is `'artifact-drift'`
+- **WHEN** status is rendered as `format=text`
+- **THEN** drifted files appear under `artifacts (details):` with `[drift]`
+- **AND** the output does not reprint those paths under `review:`
+
+#### Scenario: Overlap peers still print in text
+
+- **GIVEN** `review.reason` is `'spec-overlap-conflict'`
+- **AND** `overlapDetail` contains an archived change name and overlapping spec ids
+- **WHEN** status is rendered as `format=text`
+- **THEN** the output includes those overlap peers
+- **AND** it does not list `affectedArtifacts` file paths under `review:`
+
+### Requirement: Text blockers include check labels
+
+#### Scenario: DEPS_INCONSISTENT blocker shows Checking spec dependencies
+
+- **GIVEN** `GetStatus.blockers` includes `{ code: 'DEPS_INCONSISTENT', label: 'Checking spec dependencies', checkId: 'deps.consistent', message: '…' }`
+- **WHEN** `specd changes status <name>` is rendered as `format=text`
+- **THEN** the blockers section includes `DEPS_INCONSISTENT` and `Checking spec dependencies`
+- **AND** JSON output includes `blockers[].label`
+
+### Requirement: Archive bypass hints come from resolved bindings
+
+#### Scenario: Skippable overlap blocker shows the canonical bypass
+
+- **GIVEN** a change in `archivable` whose only blocker is `spec.overlap` with `isSkippable: true` and `checkId: 'spec.overlap'`
+- **WHEN** the user runs `specd changes status my-change`
+- **THEN** the blocker renders a `    bypass: --skip-checks spec.overlap` line under the blocker in text mode
+- **AND** Core's `nextAction.reason` carries no flag
+- **AND** the CLI-projected next-action reason ends with `Use --skip-checks spec.overlap to archive anyway.`
+
+#### Scenario: Overlap suffix is absent while another blocker drives the next action
+
+- **GIVEN** a change in `archivable` with stale verification and a skippable live `spec.overlap` blocker
+- **AND** Core's `nextAction.intent` is `'verify'`
+- **WHEN** the user runs `specd changes status my-change`
+- **THEN** the blocker still renders its `bypass: --skip-checks spec.overlap` line
+- **AND** the displayed next-action reason does not end with `to archive anyway.`
+
+#### Scenario: The shown flag is accepted by changes archive
+
+- **GIVEN** status shows `--skip-checks spec.overlap` on an archive blocker
+- **WHEN** the user runs `specd changes archive my-change --skip-checks spec.overlap`
+- **THEN** the flag is accepted by `changes archive`, whereas the same `    bypass: --skip-checks <checkId>` format on a skippable transition blocker (such as `impl.linksInScope`) is accepted by `changes transition`
+
+#### Scenario: Locked check shows no bypass
+
+- **GIVEN** a change blocked by a `workspace.readOnly` failure on archive
+- **WHEN** the user runs `specd changes status my-change`
+- **THEN** the blocker carries no bypass flag in text, JSON, or TOON output
+
+#### Scenario: Schema-hardened overlap shows no bypass
+
+- **GIVEN** the schema declares `spec.overlap` with `skippable: false` and the change overlaps a peer
+- **WHEN** the user runs `specd changes status my-change`
+- **THEN** no bypass flag is shown
+- **AND** the next-action reason does not suggest one
+
+#### Scenario: The CLI never invents a bypass when isSkippable is false
+
+- **GIVEN** `GetStatus` returns a blocker with `isSkippable: false`
+- **WHEN** the CLI renders it
+- **THEN** it does not add a `--skip-checks` flag
+
+#### Scenario: Several archive blockers each carry their own flag
+
+- **GIVEN** a change blocked by both `spec.overlap` and `impl.linksInScope`, both with `isSkippable: true`
+- **WHEN** the user runs `specd changes status my-change`
+- **THEN** each blocker shows its own `--skip-checks <checkId>` flag
+
+#### Scenario: Plugin archive check follows its resolved skippability
+
+- **GIVEN** `@security.code-scan` fails on archive
+- **WHEN** its resolved binding has `isSkippable: true`
+- **THEN** the blocker shows `--skip-checks @security.code-scan`
+- **AND** when `isSkippable` is `false` no flag is shown
+
+#### Scenario: Structured output includes the same hints
+
+- **WHEN** the user runs `specd changes status my-change --format json` or `toon`
+- **THEN** the blockers carry `bypassFlag` exactly when text output shows one
+
+#### Scenario: Disabled spec.overlap produces no overlap blocker
+
+- **GIVEN** the schema disables `spec.overlap` through `archiveChecks`
+- **WHEN** the change overlaps another active change
+- **THEN** status shows no overlap blocker and no bypass hint for it
+
+#### Scenario: A hardened archive blocker mixed with a skippable one
+
+- **GIVEN** `workspace.readOnly` and `spec.overlap` both fail
+- **WHEN** status is rendered
+- **THEN** only the `spec.overlap` blocker shows a bypass flag
+
+#### Scenario: Gate action is rendered as a command
+
+- **GIVEN** `GetStatus` returns `nextAction` with `intent: null` and `action: { kind: 'approve-spec' }`
+- **WHEN** the user runs `specd changes status my-change`
+- **THEN** the next action command is `specd changes approve spec`
+
+#### Scenario: Unknown plugin action renders guidance without a command
+
+- **GIVEN** `GetStatus` returns `nextAction` with `intent: null` and `action: { kind: '@security.code-scan', guidance: 'Run the security scan' }`
+- **WHEN** status is rendered in text, JSON, and TOON
+- **THEN** `nextAction.command` is `null` and `nextAction.guidance` is `Run the security scan`
+- **AND** the text output shows the guidance line without a command
+
+#### Scenario: Intent wins over an informational action
+
+- **GIVEN** `nextAction` has `intent: 'verify'` and `action: { kind: 'start-verification', params: { changeName: 'my-change' } }`
+- **WHEN** status is rendered
+- **THEN** the next action command is `/specd-verify`
+
+#### Scenario: Structured output exposes intent and action additively
+
+- **WHEN** the user runs `specd changes status my-change --format json` or `toon` on an active change
+- **THEN** `nextAction` carries `command`, `intent`, and `action`, and blockers carry `bypassFlag` and `action` when present
+
+#### Scenario: Drafted status does not leak intent or action
+
+- **GIVEN** a change that exists only under `drafts/`
+- **WHEN** status is rendered in JSON or TOON
+- **THEN** `nextAction.command` is `null` and no `intent` or `action` field is present
+
+#### Scenario: Unknown plugin action falls back to guidance
+
+- **GIVEN** `nextAction.action` is `{ kind: '@audit.fix', guidance: 'Run the audit fixer' }`
+- **WHEN** status is rendered
+- **THEN** the CLI shows the guidance and invents no command
+
 ### Requirement: Schema version warning
 
 #### Scenario: Schema mismatch
 
-- **GIVEN** the change was created with schema version 1 and the active schema is version 2
+- **GIVEN** the change was created with schema `custom-workflow` version 1 and the provider resolves `custom-workflow` version 2
 - **WHEN** `specd change status <name>` is run
-- **THEN** stderr contains a `warning:` line mentioning both schema versions
+- **THEN** stdout contains a `warnings:` section with `! SCHEMA_VERSION_DRIFT: …` naming both versions
+- **AND** stderr contains no schema warning
+- **AND** `--format json` includes `schemaWarnings` with `recordedVersion: 1` and `resolvedVersion: 2`
 - **AND** the process exits with code 0
+
+#### Scenario: Different workspace default is not drift
+
+- **GIVEN** the change records `custom-workflow` version 1 and the workspace default is `@specd/schema-std`
+- **WHEN** `specd change status <name>` is run
+- **THEN** no `warnings:` section is rendered and `schemaWarnings` is empty
 
 ### Requirement: Change not found
 
@@ -184,13 +426,15 @@
 - **WHEN** `specd change status <name>` is run in text mode
 - **THEN** the `design` subtree appears once in the DAG section (not duplicated under every parent path)
 
-#### Scenario: Text output shows overlap entries when reason is spec-overlap-conflict
+#### Scenario: Text output shows overlap peers without review file lists
 
 - **GIVEN** `GetStatus` returns `review.required: true` with `reason: 'spec-overlap-conflict'`
 - **AND** `review.overlapDetail` has two entries: `[{ archivedChangeName: 'beta', overlappingSpecIds: ['core:config'] }, { archivedChangeName: 'alpha', overlappingSpecIds: ['core:kernel'] }]`
-- **WHEN** `specd change status <name>` is run
-- **THEN** the review section shows `reason: spec-overlap-conflict`
-- **AND** an `overlap:` subsection lists both entries as bullets
+- **WHEN** `specd change status <name>` is run in text mode
+- **THEN** stdout includes an `overlap:` section listing both entries as bullets
+- **AND** stdout includes a `review:` header with `required` / `route` / `reason` / human `message`
+- **AND** stdout does not list `affectedArtifacts` file paths under `review:`
+- **AND** blockers do not include `OVERLAP_CONFLICT` for that invalidation
 
 ### Requirement: Delegates refresh policy to GetStatus
 
@@ -242,3 +486,19 @@
 - **WHEN** `change status --implementation` runs
 - **THEN** it renders the same outcomes and stored values as implementation review
 - **AND** performs no independent graph matching or mutation
+
+### Requirement: Stable display status and drafted JSON compatibility
+
+#### Scenario: Missing display status falls back to canonical state
+
+- **GIVEN** an artifact or file has no `displayStatus`
+- **WHEN** change status renders text or structured output
+- **THEN** it renders effective or canonical state
+- **AND** it does not render `undefined`
+
+#### Scenario: Drafted status stays read-only in JSON
+
+- **GIVEN** the requested change exists only as a draft
+- **WHEN** JSON status is rendered
+- **THEN** legacy top-level transition arrays are empty
+- **AND** no artifact DAG is emitted

@@ -1,0 +1,82 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Apply contract — atomic selector resolution$'
+  content: |
+    #### Scenario: All selectors resolve successfully
+
+    - **GIVEN** a valid AST and delta entries whose selectors all match exactly one node
+    - **WHEN** `apply` is called
+    - **THEN** it returns a `DeltaApplicationResult` whose `ast` has all operations applied
+    - **AND** `warnings` is empty when no semantic issues are detected
+
+    #### Scenario: One selector fails to resolve
+
+    - **GIVEN** a valid AST and delta entries where one selector matches no node
+    - **WHEN** `apply` is called
+    - **THEN** it throws a `DeltaApplicationError` and no changes are applied
+
+    #### Scenario: Ambiguous selector match
+
+    - **GIVEN** a valid AST and a delta entry whose selector matches multiple nodes
+    - **WHEN** `apply` is called
+    - **THEN** it throws a `DeltaApplicationError`
+
+    #### Scenario: modified entry without payload throws DeltaApplicationError
+
+    - **GIVEN** a valid AST and a `modified` entry with a matching `selector` but none of `content`, `value`, or `rename`
+    - **WHEN** `apply` is called
+    - **THEN** it throws a `DeltaApplicationError` and no changes are applied
+
+    #### Scenario: rename on node without matches identifier throws DeltaApplicationError
+
+    - **GIVEN** a valid AST and a `modified` entry with `rename` targeting a node whose descriptor `identifiedBy` does not include `"matches"` (such as `paragraph` or `line`)
+    - **WHEN** `apply` is called
+    - **THEN** it throws a `DeltaApplicationError`
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Serialize round-trip$'
+  content: |
+    #### Scenario: Parse then serialize produces equivalent content
+
+    - **GIVEN** a valid content string
+    - **WHEN** `parse` is called followed by `serialize`
+    - **THEN** parsing the serialized output produces an AST equivalent to the original
+
+    #### Scenario: Markdown serialize preserves untouched inline formatting
+
+    - **GIVEN** a markdown AST containing inline code, emphasis, and strong in one paragraph
+    - **AND** delta application modifies a different node in the same document
+    - **WHEN** the markdown adapter serializes the resulting AST
+    - **THEN** the untouched paragraph preserves inline formatting intent (inline code/emphasis/strong)
+
+    #### Scenario: Markdown serialize emits updated paragraph value and list-item label instead of stale _inlines
+
+    - **GIVEN** a markdown AST whose `paragraph` and `list-item` nodes carry parsed `_inlines`
+    - **WHEN** `apply` updates a `paragraph` via `value` or a `list-item` via `rename` and `serialize` is called
+    - **THEN** `serialize` emits the updated `value` and `label` rather than the stale `_inlines`
+
+    #### Scenario: YAML serialize emits mutated AST instead of stale _yaml root cache
+
+    - **GIVEN** a YAML AST whose `root` carries `_yaml` from `parse()`
+    - **WHEN** `apply` executes a `modified`, `added`, or `removed` entry and `serialize` is called
+    - **THEN** `serialize` emits the updated YAML reflecting the mutation rather than returning the stale `_yaml` string
+
+    #### Scenario: Plaintext serialize emits updated paragraph value
+
+    - **GIVEN** a plaintext AST parsed from a multi-paragraph document
+    - **WHEN** `apply` updates a `paragraph` via `value` and `serialize` is called
+    - **THEN** `serialize` outputs the updated paragraph text while preserving untouched paragraphs
+
+    #### Scenario: Markdown serializer uses source style when unambiguous
+
+    - **GIVEN** a markdown source that consistently uses `-` bullets and `_` emphasis
+    - **WHEN** the markdown adapter parses, applies delta, and serializes
+    - **THEN** output keeps `-` as bullet marker and `_` as emphasis marker where representable
+
+    #### Scenario: Markdown serializer resolves mixed style deterministically
+
+    - **GIVEN** a markdown source that mixes both supported markers for bullets or emphasis
+    - **WHEN** the markdown adapter serializes the AST
+    - **THEN** output uses deterministic project markdown conventions for the ambiguous construct

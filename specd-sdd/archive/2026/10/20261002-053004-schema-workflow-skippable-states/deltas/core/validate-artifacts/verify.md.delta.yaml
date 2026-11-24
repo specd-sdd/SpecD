@@ -1,0 +1,24 @@
+- op: removed
+  description: Replace renamed requirement section
+  selector:
+    type: section
+    matches: 'Requirement:\ Schema\ name\ guard'
+- op: added
+  description: Verify sovereign schema resolution when workspace default differs
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement:\ Input'
+  content: |
+    ### Requirement: Sovereign schema resolution
+
+    #### Scenario: Resolves sovereign schema when workspace default differs
+
+    - **GIVEN** the change was created under schema `custom-workflow@1.0.0`
+    - **AND** the workspace default schema is `@specd/schema-std`
+    - **WHEN** `ValidateArtifacts.execute` is called
+    - **THEN** it resolves the schema via `SchemaProvider.get('custom-workflow@1.0.0')`
+    - **AND** validates artifacts against `custom-workflow@1.0.0` without throwing `SchemaMismatchError`

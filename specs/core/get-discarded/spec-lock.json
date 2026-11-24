@@ -13,5 +13,41 @@
     {
       "file": "core:src/composition/use-cases/get-discarded.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Retrieve a named discarded change read-only from discarded-change storage.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:51d6fc3a31de070a216a2dc2357a212363b8bb0340d028db5e8cb30cda7816a2",
+          "lastModified": "2026-08-25T15:37:19.291Z"
+        },
+        "verify.md": {
+          "hash": "sha256:fb6f6a794bf65f8d325c7c6033b771ad96653b0e34500d9d1c14c101caf89666",
+          "lastModified": "2026-08-25T15:37:19.291Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# GetDiscarded\n## Rules\n- Load requested discarded change through `DiscardedChangeRepository`.\n- Missing entry raises typed not-found error; return persisted discarded record unchanged.\n- Factory uses canonical resolver-backed dependency construction.\n## Constraints\n- Read-only; no lifecycle recovery or archive lookup.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:51d6fc3a31de070a216a2dc2357a212363b8bb0340d028db5e8cb30cda7816a2",
+          "lastModified": "2026-08-25T15:37:19.291Z"
+        },
+        "verify.md": {
+          "hash": "sha256:fb6f6a794bf65f8d325c7c6033b771ad96653b0e34500d9d1c14c101caf89666",
+          "lastModified": "2026-08-25T15:37:19.291Z"
+        }
+      }
+    }
+  }
 }

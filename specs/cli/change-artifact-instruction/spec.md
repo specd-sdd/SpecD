@@ -59,6 +59,10 @@ When `--format` is `json` or `toon`, output to stdout:
 
 `availableOutlines` MUST contain only spec IDs (`string[]`) that have an existing artifact file eligible for outlining. The command MUST NOT embed full outline trees in this response. Full outline content is obtained on demand with `specd specs outline <specPath> --artifact <artifactId>`.
 
+### Requirement: Artifact instruction retrieval timing
+
+An agent workflow MUST load change context before requesting an artifact instruction, then retrieve the instruction immediately before authoring that artifact. It MUST NOT treat template I/O as context loading or prefetch instructions for later artifacts.
+
 ## Constraints
 
 - The command is read-only — it never modifies state

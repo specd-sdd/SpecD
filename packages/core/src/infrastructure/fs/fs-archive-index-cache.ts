@@ -8,7 +8,9 @@ import { isEnoent } from './is-enoent.js'
 import { normalizeRelativePath } from './path-confinement.js'
 import { paginateList } from './list-pagination.js'
 import { FsIndexCache, type IndexWireLine } from './fs-index-cache-base.js'
-import { type ChangeManifest, changeManifestSchema } from './manifest.js'
+import { UnsupportedManifestVersionError } from '../../domain/errors/unsupported-manifest-version-error.js'
+import { CorruptedManifestError } from '../../domain/errors/corrupted-manifest-error.js'
+import { type ChangeManifest, parseChangeManifest } from './manifest.js'
 
 /** Internal index row: public list fields plus helper-only archive-relative path. */
 export type ArchiveIndexEntry = ArchiveListEntry & { readonly path: string }
@@ -291,9 +293,14 @@ async function collectArchivedManifests(
         fs.readFile(manifestPath, 'utf8'),
         fs.stat(manifestPath),
       ])
-      const parsed = changeManifestSchema.safeParse(JSON.parse(content))
-      if (!parsed.success) continue
-      const manifest = parsed.data as ChangeManifest
+      let manifest: ChangeManifest
+      try {
+        manifest = parseChangeManifest(JSON.parse(content))
+      } catch (err) {
+        if (err instanceof UnsupportedManifestVersionError) throw err
+        if (err instanceof CorruptedManifestError || err instanceof SyntaxError) continue
+        throw err
+      }
       if (manifest.archivedAt !== undefined) {
         const relPath = path.relative(root, fullPath).split(path.sep).join('/')
         results.push({
@@ -353,12 +360,17 @@ async function collectManifestStamps(
         fs.readFile(manifestPath, 'utf8'),
         fs.stat(manifestPath),
       ])
-      const parsed = changeManifestSchema.safeParse(JSON.parse(content))
-      if (!parsed.success) {
-        await collectManifestStamps(fullPath, root, results)
-        continue
+      let manifest: ChangeManifest
+      try {
+        manifest = parseChangeManifest(JSON.parse(content))
+      } catch (err) {
+        if (err instanceof UnsupportedManifestVersionError) throw err
+        if (err instanceof CorruptedManifestError || err instanceof SyntaxError) {
+          await collectManifestStamps(fullPath, root, results)
+          continue
+        }
+        throw err
       }
-      const manifest = parsed.data as ChangeManifest
       if (manifest.archivedAt !== undefined) {
         results.push({ name: manifest.name, mtimeIso: stat.mtime.toISOString() })
         continue

@@ -8,7 +8,7 @@ Task-completion parsing is needed by both status reporting and lifecycle gating,
 
 ### Requirement: Counts qualifying task artifacts
 
-`CountTasks.execute()` MUST accept a `Change` and obtain the resolved schema through `SchemaProvider`.
+`CountTasks.execute()` MUST accept a `Change` and obtain that change's sovereign schema through `ResolveChangeSchema`.
 
 For each artifact attached to the change, the use case MUST consider it task-capable only when its schema artifact type declares both `hasTasks: true` and `taskCompletionCheck`. It MUST read the artifact files through `ChangeRepository.artifact()` and aggregate matches across all existing, non-empty files for that artifact.
 
@@ -31,9 +31,15 @@ An absent `byArtifact` entry MUST mean only that `CountTasks` found no qualifyin
 
 ### Requirement: Supports composition and kernel wiring
 
-`CountTasks` MUST accept `ChangeRepository` and `SchemaProvider` as constructor dependencies. `createCountTasks(deps)` and `createCountTasks(config, options?)` MUST follow the shared normalized factory-argument contract and construct the config form through `resolveCountTasksDeps(resolver)`.
+`CountTasks` MUST accept `ChangeRepository` and the shared `ResolveChangeSchema` as constructor dependencies. `createCountTasks(deps)` and `createCountTasks(config, options?)` MUST follow the shared normalized factory-argument contract and construct the config form through `resolveCountTasksDeps(resolver)`.
 
 As an exported application use case, `CountTasks` MUST be exposed as `kernel.changes.countTasks` and use the same resolver-backed dependencies as its standalone factory.
+
+### Requirement: Sovereign schema resolution
+
+`CountTasks.execute({ change })` MUST resolve the change's schema through `ResolveChangeSchema` and derive task-bearing artifacts and task patterns from that sovereign schema.
+
+The workspace default schema MUST NOT influence task discovery or counts for an existing change, including when it declares a different task artifact or pattern. Schema resolution errors MUST propagate rather than returning counts produced from another schema.
 
 ## Constraints
 
@@ -46,3 +52,4 @@ As an exported application use case, `CountTasks` MUST be exposed as `kernel.cha
 - [`core:change`](../change/spec.md) — supplies the change and its attached artifacts.
 - [`core:schema-format`](../schema-format/spec.md) — defines task-capability and completion-check configuration.
 - [`core:composition-resolver`](../composition-resolver/spec.md) — supplies resolver-backed factory dependencies.
+- [core:resolve-change-schema](../resolve-change-schema/spec.md) — named sovereign lookup, provider identity validation, and same-name version advisory

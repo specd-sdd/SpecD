@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'The extracted createProgram contract already defines the target CLI structure; lifecycle commands only need to be ported into it.'

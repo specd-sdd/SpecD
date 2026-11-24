@@ -42,6 +42,7 @@ export class DiscardChange {
    * @param input - Discard parameters
    * @returns The updated change
    * @throws {ChangeNotFoundError} If no change with the given name exists
+   * @throws {HistoricalImplementationGuardError} If the change reached `implementing` and `force` is not `true`
    */
   async execute(input: DiscardChangeInput): Promise<Change> {
     const active = await this._changes.get(input.name)

@@ -12,46 +12,52 @@
     "core:lifecycle-engine",
     "core:refresh-implementation-tracking",
     "core:composition-resolver",
-    "core:count-tasks"
+    "core:count-tasks",
+    "core:transition-checks",
+    "core:check-registry",
+    "core:workflow-topology",
+    "core:resolve-change-schema"
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/transition-change.ts",
-      "symbols": ["TransitionChange.execute"]
+      "file": "core:src/application/use-cases/transition-change.ts"
+    },
+    {
+      "file": "core:src/application/errors/reconciled-operation-blocked-error.ts"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "TransitionChange centralises lifecycle transitions, gates, requires, tasks, and hooks via LifecycleEngine, and owns persistence.",
+      "value": "Central lifecycle transition authority: reconcile, authorize schema edges, run effects, persist atomically.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:20db5c9471cfe19451618003ad34c7457d1aa81c45f3517fd1c8094cf4bc3180",
-          "lastModified": "2026-08-26T20:39:48.272Z"
+          "hash": "sha256:2d59fb64b7b02a568cc5eea6fbb5c6943c5273cb37fbe2c74076cefad68f8fc0",
+          "lastModified": "2026-10-20T14:34:09.505Z"
         },
         "verify.md": {
-          "hash": "sha256:9abdd19cfa9fdbef0a8e27fc9c15bbfb45aec51dddf18e9a9c683dd1aeafbf0e",
-          "lastModified": "2026-08-26T20:39:48.273Z"
+          "hash": "sha256:992323b812e6db82260ea44d73735c091e18fb44159555b07a52ca39b80e2f26",
+          "lastModified": "2026-10-20T14:34:09.506Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# TransitionChange\n\n## Rules\n\n### Input\n- `execute(input, onProgress?)`. Input: required `name`, `to: ChangeState`; optional `skipHookPhases` (`source.pre|source.post|target.pre|target.post|all`, default empty = run all; `all` skips all); optional `refreshImplementationTrackingBefore` (omit/`true` refresh active changes; `false` skip).\n- MUST NOT accept `approvalsSpec`/`approvalsSignoff`. Gates baked at construction from `SpecdConfig.approvals`.\n- `implementingTaskChecks` and `implementingRequires` removed. Task checks come from schema `requiresTaskCompletion`. `verifying→implementing` clearing reads `implementing` step `requires` from schema.\n\n### Approval gates\n- Constructor `approvals: ApprovalGates` `{ readonly spec: boolean; readonly signoff: boolean }`. `createTransitionChange(config)` and kernel pass `config.approvals`. `execute` reads constructor gates. Callers MUST NOT pass flags per call.\n\n### Existence and refresh\n- Missing change → `ChangeNotFoundError`.\n- `refreshImplementationTrackingBefore !== false` and active storage → `RefreshImplementationTracking.execute({ name })` before lifecycle, hooks, mutation. `false` MUST NOT invoke it. MUST NOT call `ImplementationDetector` or duplicate merge. Lifecycle sees post-refresh tracked state.\n\n### Routing\n- `ready` + target `implementing` + `approvals.spec: true` → `pending-spec-approval` via `LifecycleEngine`.\n- `done` + target `archivable` + `approvals.signoff: true` → `pending-signoff` via `LifecycleEngine`.\n- Else transition to the exact requested target.\n- Before `change.transition`: `pending-spec-approval` and target ≠ `designing` → `InvalidStateTransitionError` reason `{ type: \"approval-required\", gate: \"spec\" }`. `pending-signoff` and target ≠ `designing` → `{ type: \"approval-required\", gate: \"signoff\" }`.\n\n### Requires\n- After effective target: `SchemaProvider` → `schema.workflowStep(effectiveTarget)`. Non-empty `requires` checked via `LifecycleEngine`, not `Change` directly. Status other than `complete` or `skipped` → `InvalidStateTransitionError` reason `type: \"incomplete-artifact\"`, `artifactId`, `status`, optional `blockedBy` (id + status of first upstream parent when status is `pending-parent-artifact-review`).\n- No step or unresolved schema → skip requires. Emit `requires-check` per artifact (`satisfied`).\n\n### Tasks\n- Each `requiresTaskCompletion` artifact: schema type MUST have `hasTasks: true` and `taskCompletionCheck`; else reason `missing-task-capability`.\n- Count once via `CountTasks`; look up `CountTasksResult.byArtifact`. Absent entry after capability check = no qualifying tasks → do not block.\n- `incomplete > 0` → emit `task-completion-failed`, throw reason `incomplete-tasks` with complete/incomplete/total.\n- MAY ask `LifecycleEngine` for decision context first. Content inspection stays in this use case. Empty/absent `requiresTaskCompletion` → no task gating.\n- Patterns via `safeRegex`. Compile failure or nested quantifiers → non-matching, no throw.\n\n### verifying → implementing\n- Implementation-only retry. MUST NOT clear unchanged validated artifacts. MUST NOT downgrade artifact/file states because verification failed. Artifact changes or new tasks → callers route to `designing`. Clearing that applies reads `implementing` step `requires` from schema.\n\n### designing\n- Every state except `drafting` allows `designing`, including `archiving`.\n- Effective target `designing` and not already `designing` or `drafting`: invalidate spec approval (also clears signoff); downgrade files to `pending-review` except keep `drifted-pending-review`; recompute artifact aggregate `state`; `change.transition(\"designing\", actor)`.\n- Already `designing` or `drafting` → MUST NOT invalidate, downgrade, or `invalidate()`. Direct transition. Drift detection stays at repository layer.\n\n### archiving → archivable\n- Permit when valid in `VALID_TRANSITIONS`. Manual recovery after failed archive once canonical storage is restored. MUST NOT run archive hooks or `archivable` `requires`. Auto-invoke after failed archive owned by `ArchiveChange`.\n\n### Hooks and transition\n- Order: source.post → target.pre → state transition. Both fail-fast.\n- Before transition and pre-hooks: unless skip `all`/`source.post`, `schema.workflowStep(fromState)` `run:` post-hooks via `RunStepHooks.execute({ name, step: fromState, phase: \"post\" })`. Emit `hook-start`/`hook-done` `phase: \"post\"`. Fail → `HookFailedError`, no transition. Example: `implementing.post` runs on exit (`implementing→verifying`). No source step or unresolved schema → skip post-hooks.\n- Then unless skip `all`/`target.pre`, target `run:` pre-hooks `phase: \"pre\"` on `effectiveTarget`. Fail → `HookFailedError`, no transition.\n- Then `change.transition(effectiveTarget, actor)`. Entity enforces validity. Emit `transitioned` `from`/`to`.\n- `effectiveTarget === \"implementing\"` and `!change.isImplementationTrackingActive` → `change.startImplementationTracking()` in the same mutation; timestamp is the baseline.\n\n### Persistence and result\n- Final mutation via `ChangeRepository.mutate(name, fn)`, not a prior snapshot. Callback gets fresh `Change`; apply redesign invalidation, `verifying→implementing` clearing, lifecycle transition, tracking activation. Serialized with concurrent mutations.\n- Result `TransitionChangeResult.change` only. `postHookFailures` removed.\n- Progress: `requires-check`; `task-completion-failed`; `hook-start`/`hook-done`; `transitioned`.\n\n### Dependencies and factory\n- Depends: `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, `RunStepHooks`, `RefreshImplementationTracking`, `CountTasks`. MUST NOT depend on `ImplementationDetector`.\n- `createTransitionChange(config, options?)` → `resolveTransitionChangeDeps(resolver)` → canonical deps. Resolver: `changes`, `actor`, `schemaProvider`, `runStepHooks`, `refreshImplementationTracking`, `approvals`, `lifecycle`, `countTasks`. No inline fs wiring.\n\n## Constraints\n\n- MUST NOT bypass `Change` transition validation. Resolve effective target, then delegate.\n- Task checks only for `requiresTaskCompletion` artifacts. `safeRegex` failures are non-matching.\n- `InvalidStateTransitionError` reasons: `incomplete-artifact`, `incomplete-tasks`, `missing-task-capability`, `invalid-transition`, `approval-required`, `gate-not-required`.\n- Gate routing config at construction; interpretation via `LifecycleEngine`.\n- Pre- and post-hook failure aborts with no state change.\n- Unresolved schema or missing workflow step → skip requires and hooks.\n- `verifying→implementing` clearing reads `implementing` step `requires` from schema.\n- `designing→designing` MUST NOT invalidate approvals or downgrade artifacts.\n",
+      "value": "# TransitionChange\n## Rules\n- Resolve change schema, refresh tracking, reconcile validity before authorization.\n- Resolve legal target/`next`; evaluate canonical transition bindings and predicates.\n- Run selected hooks/checks before atomic `ChangeRepository.mutate`; persist transition with actor.\n- Verification attempts/evidence and approvals are validity gates, not inferred hops.\n## Constraints\n- Entity owns edges; use case never invents them.\n- Skip hooks never skips predicates.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:20db5c9471cfe19451618003ad34c7457d1aa81c45f3517fd1c8094cf4bc3180",
-          "lastModified": "2026-08-26T20:39:48.272Z"
+          "hash": "sha256:2d59fb64b7b02a568cc5eea6fbb5c6943c5273cb37fbe2c74076cefad68f8fc0",
+          "lastModified": "2026-10-20T14:34:09.505Z"
         },
         "verify.md": {
-          "hash": "sha256:9abdd19cfa9fdbef0a8e27fc9c15bbfb45aec51dddf18e9a9c683dd1aeafbf0e",
-          "lastModified": "2026-08-26T20:39:48.273Z"
+          "hash": "sha256:992323b812e6db82260ea44d73735c091e18fb44159555b07a52ca39b80e2f26",
+          "lastModified": "2026-10-20T14:34:09.506Z"
         }
       }
     }

@@ -1,0 +1,10 @@
+- op: added
+  position:
+    parent: { type: section, matches: '^Requirements$' }
+  content: |
+    ### Requirement: Optional initialization and plugin configuration
+
+    #### Scenario: Initialization leaves optional plugin configuration absent
+
+    - **WHEN** a project is initialized without a plugin requiring configuration
+    - **THEN** no unrelated plugin configuration is synthesized

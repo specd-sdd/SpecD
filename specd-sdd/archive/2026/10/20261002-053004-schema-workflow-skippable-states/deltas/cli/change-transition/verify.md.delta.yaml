@@ -1,0 +1,120 @@
+- op: modified
+  description: Add scenario for topology-aware next transition resolution
+  selector:
+    type: section
+    matches: 'Requirement: Next-transition resolution'
+  content: |
+    #### Scenario: Next flag advances designing to ready
+
+    - **GIVEN** the change is in `designing` state
+    - **WHEN** `specd change transition my-change --next` is run
+    - **THEN** the command requests transition to `ready`
+
+    #### Scenario: Next flag from ready requests implementing and stays in ready when spec gate on
+
+    - **GIVEN** `approvals.spec: true` and the change is in `ready` state
+    - **AND** no spec approval is recorded
+    - **WHEN** `specd change transition my-change --next` is run
+    - **THEN** the command resolves `implementing` as the logical next target
+    - **AND** the change remains in `ready`
+    - **AND** it does not persist `pending-spec-approval`
+
+    #### Scenario: Next flag skips disabled step
+
+    - **GIVEN** a schema where `verifying` is `disabled: true`
+    - **AND** the change is in `implementing`
+    - **WHEN** `specd change transition my-change --next` is run
+    - **THEN** the command resolves `done` as the next active target
+    - **AND** transitions directly without visiting `verifying`
+
+    #### Scenario: Next flag enters the closest enabled optional step
+
+    - **GIVEN** a schema where `implementing` is `optional: true`
+    - **AND** its effective `step-skip` checks pass or the effective set is empty
+    - **AND** the change is in `ready`
+    - **WHEN** `specd change transition my-change --next` is run
+    - **THEN** Core resolves `implementing` as the closest enabled target
+    - **AND** the command does not bypass `implementing`
+    - **AND** an optional shortcut is available only by passing the explicit target advertised by `GetStatus.nextAction`
+
+    #### Scenario: Next flag fails in pending spec approval state
+
+    - **GIVEN** the change is in `pending-spec-approval` state
+    - **WHEN** `specd change transition my-change --next` is run
+    - **THEN** the command exits with code 1
+    - **AND** stderr contains an `error:` message explaining that the change is waiting for human spec approval
+
+    #### Scenario: Next flag fails in pending signoff state
+
+    - **GIVEN** the change is in `pending-signoff` state
+    - **WHEN** `specd change transition my-change --next` is run
+    - **THEN** the command exits with code 1
+    - **AND** stderr contains an `error:` message explaining that the change is waiting for human signoff
+
+    #### Scenario: Next flag fails in archivable state
+
+    - **GIVEN** the change is in `archivable` state
+    - **WHEN** `specd change transition my-change --next` is run
+    - **THEN** the command exits with code 1
+    - **AND** stderr contains an `error:` message explaining that archiving is not a lifecycle transition
+
+    #### Scenario: Next flag from signed-off maps to archivable
+
+    - **GIVEN** the change is in `signed-off` state
+    - **WHEN** `specd change transition my-change --next` is run
+    - **THEN** the CLI passes `to: 'next'` to `TransitionChange`
+    - **AND** Core resolves `archivable` as the target state
+
+    #### Scenario: CLI does not keep a from-to next table
+
+    - **WHEN** `--next` is used
+    - **THEN** the CLI does not resolve the target via a local from→to switch
+    - **AND** `TransitionChange.execute` receives `to: 'next'`
+
+    #### Scenario: Shared presentation with run-hooks is not the same JSON stream
+
+    - **WHEN** `change transition` emits structured progress
+    - **THEN** records use `stream: "change-transition"`
+    - **AND** they do not use `stream: "hook-progress"`
+- op: added
+  description: Explicit name and exactly one of step or --next
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Command signature'
+  content: |
+    #### Scenario: Missing step and --next is a usage error
+
+    - **WHEN** `specd change transition my-change` is run without `<step>` and without `--next`
+    - **THEN** the command exits with code 1 and prints `either <step> or --next is required`
+    - **AND** `TransitionChange.execute` is not called
+
+    #### Scenario: Step and --next together is a usage error
+
+    - **WHEN** `specd change transition my-change implementing --next` is run
+    - **THEN** the command exits with code 1 and prints `<step> and --next are mutually exclusive`
+
+    #### Scenario: Change name is required
+
+    - **WHEN** `specd change transition` is run with no arguments
+    - **THEN** the command fails with a missing-argument usage error
+- op: added
+  description: Skipped rendering and re-check labeling
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Check progress rendering'
+  content: |
+    #### Scenario: Skipped hooks render as skipped
+
+    - **GIVEN** `--skip-hooks all`
+    - **WHEN** the transition succeeds and Core reports `hook.pre` and `hook.post` with `outcome: 'skip'`
+    - **THEN** text output renders them with the skipped marker and a `--skip-hooks` reason
+    - **AND** no `✓ Running pre hooks` or `✓ Running post hooks` line is printed
+
+    #### Scenario: Re-check after hooks is shown only when hooks ran
+
+    - **GIVEN** `--skip-hooks all`
+    - **WHEN** Core re-evaluates predicates after the (skipped) hook phases
+    - **THEN** the check list is printed once
+    - **AND** when hooks did run, the second pass is labeled as a re-check

@@ -1,5 +1,10 @@
 import { type Command } from 'commander'
-import { createConfigWriter, createVcsAdapter, isValidWorkspaceName } from '@specd/sdk'
+import {
+  createConfigWriter,
+  createVcsAdapter,
+  isPluginName,
+  isValidWorkspaceName,
+} from '@specd/sdk'
 import { output, parseFormat, type OutputFormat } from '../../formatter.js'
 import { cliError, handleError } from '../../handle-error.js'
 import { renderBanner } from '../../banner.js'
@@ -9,6 +14,7 @@ import { collect } from '../../helpers/collect.js'
 import { fileExists } from '../../helpers/file-exists.js'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { installPluginsWithKernel } from '../plugins/install.js'
+import { CliExitError } from '../../helpers/cli-exit-error.js'
 
 const AVAILABLE_AGENT_PLUGINS = [
   '@specd/plugin-agent-claude',
@@ -59,91 +65,86 @@ export function registerProjectInit(parent: Command): void {
     workspaces: WorkspaceConfig[]
     metadataCachePath: string
     plugins: PluginInstallResult[]
-  }\n`,
+  }
+
+Interactive wizard: cancelling any prompt (or declining the overwrite) writes nothing and exits with code 0.
+`,
     )
-    .action(
-      async (opts: {
+    .action(async function (
+      this: Command,
+      opts: {
         schema?: string
         workspace: string
         workspacePath: string
         plugin: string[]
         force?: boolean
         format: string
-      }) => {
-        try {
-          const fmt = parseFormat(opts.format)
-          if (!isValidWorkspaceName(opts.workspace)) {
-            cliError(invalidWorkspaceMessage(opts.workspace), opts.format)
-          }
-          if (fmt === 'text') {
-            process.stdout.write(
-              renderBanner({
-                cliVersion: CLI_VERSION,
-                sdkVersion: SDK_VERSION,
-                coreVersion: CORE_VERSION,
-                codeGraphVersion: CODE_GRAPH_VERSION,
-              }) + '\n\n',
-            )
-          }
-
-          const hasFlags =
-            opts.schema !== undefined ||
-            opts.workspace !== 'default' ||
-            opts.workspacePath !== 'specs/' ||
-            opts.plugin.length > 0
-          const interactive = process.stdout.isTTY === true && fmt === 'text' && !hasFlags
-          if (interactive) {
-            await runInteractiveInit({ format: fmt, force: opts.force === true })
-            return
-          }
-
-          const projectRoot = await resolveProjectRoot()
-          const schemaRef = opts.schema ?? '@specd/schema-std'
-          const writer = createConfigWriter()
-          const initResult = await writer.initProject({
-            projectRoot,
-            schemaRef,
-            workspaceId: opts.workspace,
-            specsPath: opts.workspacePath,
-            ...(opts.force === true ? { force: true } : {}),
-          })
-
-          const installed = await installSelectedPlugins({
-            configPath: initResult.configPath,
-            pluginNames: opts.plugin,
-          })
-
-          if (fmt === 'text') {
-            output(`initialized specd in ${projectRoot}`, 'text')
-            output(
-              `metadata cache: ${initResult.metadataCachePath} (ignored in .gitignore)`,
-              'text',
-            )
-            for (const entry of installed.plugins) {
-              output(`plugins: ${entry.status} ${entry.name} (${entry.detail})`, 'text')
-            }
-          } else {
-            output(
-              {
-                result: 'ok',
-                configPath: initResult.configPath,
-                schema: initResult.schemaRef,
-                workspaces: initResult.workspaces,
-                metadataCachePath: initResult.metadataCachePath,
-                plugins: installed.plugins,
-              },
-              fmt,
-            )
-          }
-
-          if (installed.hasErrors) {
-            process.exit(1)
-          }
-        } catch (error) {
-          handleError(error, opts.format)
-        }
       },
-    )
+    ) {
+      try {
+        const fmt = parseFormat(opts.format)
+        if (!isValidWorkspaceName(opts.workspace)) {
+          cliError(invalidWorkspaceMessage(opts.workspace), opts.format)
+        }
+        const invalid = opts.plugin.find((name) => !isPluginName(name))
+        if (invalid !== undefined) {
+          cliError(`plugin name '${invalid}' must be a scoped package name`, opts.format)
+        }
+        const provided = (flag: string) => this.getOptionValueSource(flag) === 'cli'
+        const hasFlags =
+          provided('schema') ||
+          provided('workspace') ||
+          provided('workspacePath') ||
+          provided('plugin')
+        const interactive = process.stdout.isTTY === true && fmt === 'text' && !hasFlags
+        if (interactive) {
+          await runInteractiveInit({ format: fmt, force: opts.force === true })
+          return
+        }
+
+        const projectRoot = await resolveProjectRoot()
+        const schemaRef = opts.schema ?? '@specd/schema-std'
+        const writer = createConfigWriter()
+        const initResult = await writer.initProject({
+          projectRoot,
+          schemaRef,
+          workspaceId: opts.workspace,
+          specsPath: opts.workspacePath,
+          ...(opts.force === true ? { force: true } : {}),
+        })
+
+        const installed = await installSelectedPlugins({
+          configPath: initResult.configPath,
+          pluginNames: opts.plugin,
+        })
+
+        if (fmt === 'text') {
+          output(`initialized specd in ${projectRoot}`, 'text')
+          output(`metadata cache: ${initResult.metadataCachePath} (ignored in .gitignore)`, 'text')
+          for (const entry of installed.plugins) {
+            output(`plugins: ${entry.status} ${entry.name} (${entry.detail})`, 'text')
+          }
+        } else {
+          output(
+            {
+              result: 'ok',
+              configPath: initResult.configPath,
+              schema: initResult.schemaRef,
+              workspaces: initResult.workspaces,
+              metadataCachePath: initResult.metadataCachePath,
+              plugins: installed.plugins,
+            },
+            fmt,
+          )
+        }
+
+        if (installed.hasErrors) {
+          throw new CliExitError(1)
+        }
+      } catch (error) {
+        handleError(error, opts.format)
+      }
+    })
 }
 
 /**
@@ -171,7 +172,10 @@ async function installSelectedPlugins(input: {
   if (input.pluginNames.length === 0) {
     return { plugins: [], hasErrors: false }
   }
-  const { config } = await resolveCliContext({ configPath: input.configPath })
+  const { config } = await resolveCliContext({
+    configPath: input.configPath,
+    plugins: false,
+  })
   return installPluginsWithKernel({
     config,
     configPath: input.configPath,
@@ -192,9 +196,31 @@ async function runInteractiveInit(options: {
 }): Promise<void> {
   const { intro, text, multiselect, confirm, isCancel, outro } = await import('@clack/prompts')
 
+  process.stdout.write(
+    renderBanner({
+      cliVersion: CLI_VERSION,
+      sdkVersion: SDK_VERSION,
+      coreVersion: CORE_VERSION,
+      codeGraphVersion: CODE_GRAPH_VERSION,
+    }) + '\n\n',
+  )
+
   const projectRoot = await resolveProjectRoot()
   const defaultConfigPath = path.join(projectRoot, 'specd.yaml')
   intro('specd project init')
+
+  const overwriteNeeded = await fileExists(defaultConfigPath)
+  let force = options.force
+  if (overwriteNeeded && !force) {
+    const overwrite = await confirm({
+      message: `specd.yaml already exists at ${defaultConfigPath}. Overwriting replaces it with a new configuration (including its declared plugins and workspaces). Overwrite it?`,
+    })
+    if (isCancel(overwrite) || !overwrite) {
+      outro('Cancelled.')
+      throw new CliExitError(0)
+    }
+    force = true
+  }
 
   const schema = await text({
     message: 'Schema reference',
@@ -203,7 +229,7 @@ async function runInteractiveInit(options: {
   })
   if (isCancel(schema)) {
     outro('Cancelled.')
-    process.exit(0)
+    throw new CliExitError(0)
   }
 
   const workspace = await text({
@@ -214,7 +240,7 @@ async function runInteractiveInit(options: {
   })
   if (isCancel(workspace)) {
     outro('Cancelled.')
-    process.exit(0)
+    throw new CliExitError(0)
   }
 
   const workspacePath = await text({
@@ -224,7 +250,7 @@ async function runInteractiveInit(options: {
   })
   if (isCancel(workspacePath)) {
     outro('Cancelled.')
-    process.exit(0)
+    throw new CliExitError(0)
   }
 
   const selectedPlugins = await multiselect({
@@ -234,20 +260,7 @@ async function runInteractiveInit(options: {
   })
   if (isCancel(selectedPlugins)) {
     outro('Cancelled.')
-    process.exit(0)
-  }
-
-  const overwriteNeeded = await fileExists(defaultConfigPath)
-  let force = options.force
-  if (overwriteNeeded && !force) {
-    const overwrite = await confirm({
-      message: `specd.yaml already exists at ${defaultConfigPath}. Overwrite it?`,
-    })
-    if (isCancel(overwrite) || !overwrite) {
-      outro('Cancelled.')
-      process.exit(0)
-    }
-    force = true
+    throw new CliExitError(0)
   }
 
   const writer = createConfigWriter()
@@ -285,6 +298,6 @@ async function runInteractiveInit(options: {
   }
 
   if (installed.hasErrors) {
-    process.exit(1)
+    throw new CliExitError(1)
   }
 }

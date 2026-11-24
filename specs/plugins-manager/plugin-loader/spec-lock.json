@@ -4,5 +4,20 @@
     "version": 1
   },
   "dependsOn": ["core:config", "plugin-manager:specd-plugin-type", "plugin-manager:plugin-errors"],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "plugin-manager:src/infrastructure/loader/plugin-loader.ts",
+      "symbols": ["createPluginLoader", "RuntimePluginLoader"]
+    },
+    {
+      "file": "plugin-manager:test/domain/plugin-config-schema.spec.ts"
+    },
+    {
+      "file": "plugin-manager:src/domain/services/merge-handlers.ts",
+      "symbols": ["mergeHandlers"]
+    },
+    {
+      "file": "plugin-manager:test/infrastructure/plugin-loader.spec.ts"
+    }
+  ]
 }

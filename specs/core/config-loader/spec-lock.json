@@ -7,15 +7,18 @@
     "core:config",
     "core:composition",
     "core:schema-merge",
-    "default:_global/architecture",
     "core:vcs-adapter-port",
     "core:vcs-adapter",
+    "default:_global/architecture",
     "core:spec-id-format"
   ],
   "implementation": [
     {
       "file": "core:src/infrastructure/fs/config-loader.ts",
-      "symbols": ["loadConfig"]
+      "symbols": ["assertCurrentConfigFormat"]
+    },
+    {
+      "file": "core:test/infrastructure/fs/config-loader.spec.ts"
     }
   ]
 }

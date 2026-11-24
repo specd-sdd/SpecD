@@ -1,112 +1,142 @@
-import type { SpecdConfig } from '@specd/core'
-
-/**
- * Known plugin types. Single source of truth for runtime validation
- * and compile-time type derivation. Add new types here.
- */
-export const PLUGIN_TYPES = ['agent'] as const
-
-/**
- * Plugin type discriminator, derived from {@link PLUGIN_TYPES}.
- */
-export type PluginType = (typeof PLUGIN_TYPES)[number]
-
-/**
- * Single configurable entry for a plugin option.
- */
-export interface ConfigSchemaEntry {
-  /**
-   * Primitive config type.
-   */
-  readonly type: 'string' | 'boolean' | 'number'
-
-  /**
-   * Human-readable option description.
-   */
-  readonly description: string
-
-  /**
-   * Optional default value.
-   */
-  readonly default?: unknown
-
-  /**
-   * Whether the option must be provided.
-   */
-  readonly required?: boolean
-}
+import { isPluginName, type SpecdConfig } from '@specd/core'
+import { InvalidContributionAddressError } from '../errors/invalid-contribution-address-error.js'
 
 /**
  * Runtime context passed into plugin initialization.
  */
 export interface PluginContext {
-  /**
-   * Fully-resolved project configuration.
-   */
+  /** Fully-resolved project configuration. */
   readonly config: SpecdConfig
+  /**
+   * This plugin's own config, validated against `configSchema` with defaults applied.
+   * `{}` when the plugin declares no schema.
+   */
+  readonly pluginConfig: Readonly<Record<string, unknown>>
+}
+
+/**
+ * Context passed to optional install and uninstall hooks.
+ */
+export interface PluginInstallContext {
+  /** Fully-resolved project configuration. */
+  readonly config: SpecdConfig
+  /** Selected contribution ids (all declared ids when no allowlist). */
+  readonly contributions: readonly string[]
+  /** Optional caller options forwarded by install, uninstall, and update. */
+  readonly options?: Readonly<Record<string, unknown>>
 }
 
 /**
  * Base contract implemented by all specd plugins.
  */
 export interface SpecdPlugin {
-  /**
-   * NPM package name.
-   */
+  /** Scoped package name (`@scope/name`). */
   readonly name: string
-
-  /**
-   * Plugin type.
-   */
-  readonly type: PluginType
-
-  /**
-   * Plugin semantic version.
-   */
+  /** Plugin semantic version. */
   readonly version: string
-
-  /**
-   * Declared configuration schema.
-   */
-  readonly configSchema: Record<string, ConfigSchemaEntry>
-
   /**
    * Initializes plugin runtime.
    *
-   * @param context - Plugin context.
-   * @returns A promise that resolves when initialization completes.
+   * @param context - Plugin context
    */
   init(context: PluginContext): Promise<void>
-
   /**
    * Cleans up plugin resources.
-   *
-   * @returns A promise that resolves when cleanup finishes.
    */
   destroy(): Promise<void>
+  /**
+   * Optional install hook. Not invoked during host startup.
+   *
+   * @param context - Install context
+   */
+  install?(context: PluginInstallContext): Promise<unknown>
+  /**
+   * Optional uninstall hook.
+   *
+   * @param context - Uninstall context
+   */
+  uninstall?(context: PluginInstallContext): Promise<void>
+  /**
+   * Returns the runtime value for one declared contribution.
+   *
+   * Required when any declared kind's handler implements `activate`.
+   *
+   * @param kind - Contribution kind
+   * @param id - Contribution id
+   */
+  contribution?(kind: string, id: string): unknown
+}
+
+/** Contribution id: lowercase, no `.`. */
+export const CONTRIBUTION_ID_REGEX = /^[a-z0-9][a-z0-9_-]*$/
+
+/**
+ * Builds the address `@scope/name.id`.
+ *
+ * @param pluginName - Scoped plugin name
+ * @param id - Contribution id
+ * @returns The contribution address
+ * @throws {InvalidContributionAddressError} When the name or id is not valid
+ */
+export function buildContributionAddress(pluginName: string, id: string): string {
+  if (!isPluginName(pluginName) || !CONTRIBUTION_ID_REGEX.test(id)) {
+    throw new InvalidContributionAddressError(`${pluginName}.${id}`)
+  }
+  return `${pluginName}.${id}`
+}
+
+/**
+ * Splits an address on its single `.`.
+ *
+ * @param address - Contribution address
+ * @returns The plugin name and contribution id
+ * @throws {InvalidContributionAddressError} When the address is not `<plugin name>.<id>`
+ */
+export function parseContributionAddress(address: string): { pluginName: string; id: string } {
+  const match = /^(?<pluginName>@[a-z0-9][a-z0-9_-]*\/[a-z0-9][a-z0-9_-]*)\.(?<id>[^.]+)$/.exec(
+    address,
+  )
+  const pluginName = match?.groups?.['pluginName']
+  const id = match?.groups?.['id']
+  if (
+    pluginName === undefined ||
+    id === undefined ||
+    !isPluginName(pluginName) ||
+    !CONTRIBUTION_ID_REGEX.test(id)
+  ) {
+    throw new InvalidContributionAddressError(address)
+  }
+  return { pluginName, id }
+}
+
+/**
+ * Lists the base-contract fields that fail for a runtime value.
+ *
+ * @param value - Candidate plugin
+ * @returns Failing field names, empty when the value satisfies {@link SpecdPlugin}
+ */
+export function baseContractFields(value: unknown): readonly string[] {
+  if (typeof value !== 'object' || value === null) {
+    return ['name', 'version', 'init', 'destroy']
+  }
+  const record = value as Record<string, unknown>
+  const fields: string[] = []
+  if (typeof record['name'] !== 'string' || !isPluginName(record['name'])) fields.push('name')
+  if (typeof record['version'] !== 'string') fields.push('version')
+  if (typeof record['init'] !== 'function') fields.push('init')
+  if (typeof record['destroy'] !== 'function') fields.push('destroy')
+  for (const key of ['install', 'uninstall', 'contribution'] as const) {
+    if (record[key] !== undefined && typeof record[key] !== 'function') fields.push(key)
+  }
+  return fields
 }
 
 /**
  * Checks whether a value satisfies the base plugin contract.
  *
- * Validates that the value is a non-null object with the required
- * {@link SpecdPlugin} properties and that its `type` field is one
- * of the known {@link PLUGIN_TYPES}.
- *
- * @param value - Candidate runtime value.
- * @returns `true` when the value matches {@link SpecdPlugin}.
+ * @param value - Candidate runtime value
+ * @returns `true` when the value matches {@link SpecdPlugin}
  */
 export function isSpecdPlugin(value: unknown): value is SpecdPlugin {
-  if (typeof value !== 'object' || value === null) return false
-  const record = value as Record<string, unknown>
-  return (
-    typeof record['name'] === 'string' &&
-    typeof record['type'] === 'string' &&
-    typeof record['version'] === 'string' &&
-    typeof record['configSchema'] === 'object' &&
-    record['configSchema'] !== null &&
-    typeof record['init'] === 'function' &&
-    typeof record['destroy'] === 'function' &&
-    (PLUGIN_TYPES as readonly string[]).includes(record['type'])
-  )
+  return baseContractFields(value).length === 0
 }

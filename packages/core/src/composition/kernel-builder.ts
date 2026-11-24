@@ -1,4 +1,5 @@
 import { type ArtifactParser } from '../application/ports/artifact-parser.js'
+import { InvalidDisposerError } from '../application/errors/invalid-disposer-error.js'
 import { RegistryConflictError } from '../application/errors/registry-conflict-error.js'
 import { type ExternalHookRunner } from '../application/ports/external-hook-runner.js'
 import { type SpecdConfig } from '../application/specd-config.js'
@@ -7,6 +8,8 @@ import { type ChangeRepository } from '../application/ports/change-repository.js
 import { type ArchiveRepository } from '../application/ports/archive-repository.js'
 import { type SpecRepository } from '../application/ports/spec-repository.js'
 import { type SchemaRepository } from '../application/ports/schema-repository.js'
+import { type CustomCheckDefinition } from '../domain/services/transition-checks.js'
+import { type PluginCheckRegistrationOptions } from '../domain/services/check-registry.js'
 import {
   createBuiltinCompositionRegistry,
   createCompositionRegistryView,
@@ -16,8 +19,12 @@ import {
   type SchemaStorageFactory,
   type SpecStorageFactory,
   type VcsProvider,
+  type PluginCheckRegistration,
+  type PluginCheckDefaultBinding,
 } from './composition-registries.js'
 import { createKernel, type Kernel, type KernelOptions } from './kernel.js'
+import { type KernelDisposer } from './kernel-disposal.js'
+import type { LogDestination } from '../application/ports/logger.port.js'
 
 /**
  * Mutable working state used internally by {@link createKernelBuilder}.
@@ -33,6 +40,9 @@ interface KernelBuilderState {
   readonly vcsProviders: VcsProvider[]
   readonly actorProviders: ActorProvider[]
   readonly externalHookRunners: ExternalHookRunner[]
+  readonly checks: PluginCheckRegistration[]
+  readonly disposers: KernelDisposer[]
+  readonly additionalDestinations?: LogDestination[]
   readonly repositories: {
     changes?: ChangeRepository
     archive?: ArchiveRepository
@@ -164,6 +174,37 @@ export interface KernelBuilder {
   registerExternalHookRunner(name: string, runner: ExternalHookRunner): this
 
   /**
+   * Registers a custom transition check with the builder.
+   *
+   * @param pluginName - Scoped plugin name matching ^@[a-z0-9][a-z0-9_-]*\/[a-z0-9][a-z0-9_-]*$
+   * @param check - Custom check definition
+   * @param defaultBindings - Optional default bindings for this check
+   * @param options - Check-level governance and configuration options
+   * @returns The same builder for fluent chaining
+   */
+  registerCheck(
+    pluginName: string,
+    check: CustomCheckDefinition,
+    defaultBindings?: readonly PluginCheckDefaultBinding[],
+    options?: PluginCheckRegistrationOptions,
+  ): this
+
+  /**
+   * Registers a named cleanup action for a resource that exists before the kernel.
+   *
+   * On a successful `build()` the disposer belongs to the kernel and `kernel.dispose()`
+   * runs it; the builder never runs it. On a failed `build()`, `createKernel` releases the
+   * registered disposers in reverse order before the error propagates.
+   *
+   * @param name - Non-empty name, unique per builder; used in warnings and aggregated errors
+   * @param dispose - Cleanup work, synchronous or asynchronous
+   * @returns The same builder for fluent chaining
+   * @throws {InvalidDisposerError} When `name` is empty
+   * @throws {RegistryConflictError} When `name` is already registered
+   */
+  registerDisposer(name: string, dispose: () => void | Promise<void>): this
+
+  /**
    * Builds the final kernel using the accumulated additive registrations.
    *
    * @returns A kernel equivalent to `createKernel(config, accumulatedOptions)`
@@ -219,6 +260,11 @@ function cloneOptions(base?: Partial<KernelOptions>): KernelBuilderState {
     vcsProviders: [...(base?.vcsProviders ?? [])],
     actorProviders: [...(base?.actorProviders ?? [])],
     externalHookRunners: [...(base?.externalHookRunners ?? [])],
+    checks: [...(base?.checks ?? [])],
+    disposers: [...(base?.disposers ?? [])],
+    ...(base?.additionalDestinations !== undefined
+      ? { additionalDestinations: [...base.additionalDestinations] }
+      : {}),
     repositories: {
       ...(base?.repositories ?? {}),
     },
@@ -256,6 +302,11 @@ function toKernelOptions(state: KernelBuilderState): KernelOptions {
     ...(state.actorProviders.length > 0 ? { actorProviders: [...state.actorProviders] } : {}),
     ...(state.externalHookRunners.length > 0
       ? { externalHookRunners: [...state.externalHookRunners] }
+      : {}),
+    ...(state.checks.length > 0 ? { checks: [...state.checks] } : {}),
+    ...(state.disposers.length > 0 ? { disposers: [...state.disposers] } : {}),
+    ...(state.additionalDestinations !== undefined && state.additionalDestinations.length > 0
+      ? { additionalDestinations: [...state.additionalDestinations] }
       : {}),
     ...(state.repositories && Object.keys(state.repositories).length > 0
       ? { repositories: { ...state.repositories } }
@@ -373,6 +424,35 @@ export function createKernelBuilder(
         }
       }
       options.externalHookRunners.push(runner)
+      return builder
+    },
+
+    registerCheck(
+      pluginName: string,
+      check: CustomCheckDefinition,
+      defaultBindings?: readonly PluginCheckDefaultBinding[],
+      checkOptions?: PluginCheckRegistrationOptions,
+    ): KernelBuilder {
+      options.checks.push({
+        pluginName,
+        check,
+        ...(defaultBindings !== undefined ? { defaultBindings } : {}),
+        ...(checkOptions !== undefined ? { options: checkOptions } : {}),
+      })
+      return builder
+    },
+
+    registerDisposer(name: string, dispose: () => void | Promise<void>): KernelBuilder {
+      if (typeof name !== 'string' || name === '') {
+        throw new InvalidDisposerError('name must be a non-empty string')
+      }
+      if (typeof dispose !== 'function') {
+        throw new InvalidDisposerError(`disposer '${name}' must have a callable dispose`)
+      }
+      if (options.disposers.some((existing) => existing.name === name)) {
+        throw new RegistryConflictError('disposers', name)
+      }
+      options.disposers.push({ name, dispose })
       return builder
     },
 

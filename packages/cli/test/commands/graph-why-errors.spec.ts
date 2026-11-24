@@ -62,6 +62,12 @@ async function runFailing(
     config,
     configFilePath: '/project/specd.yaml',
     kernel,
+    host: {
+      kernel,
+      createGraphProvider: vi.fn(),
+      dispose: vi.fn(async () => {}),
+      [Symbol.asyncDispose]: vi.fn(async () => {}),
+    } as never,
     projectRoot: '/project',
     vcsRoot: '/project',
   })

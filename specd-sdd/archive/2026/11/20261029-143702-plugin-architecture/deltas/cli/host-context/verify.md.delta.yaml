@@ -1,0 +1,74 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: resolveCliContext delegates to openSpecdHost'
+    after:
+      type: section
+      matches: 'Scenario: Kernel options forwarded for verbosity'
+  content: |
+    #### Scenario: Plugins enabled by default
+
+    - **WHEN** `resolveCliContext` is called without a `plugins` option
+    - **THEN** the SDK host is opened with plugins enabled
+
+    #### Scenario: Plugins disabled for management commands
+
+    - **WHEN** `resolveCliContext({ plugins: false })` is called
+    - **THEN** `openSpecdHost` receives `options.plugins: false`
+    - **AND** no plugin is loaded or initialized
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Graph index worker releases its host'
+    after:
+      type: section
+      matches: 'Scenario: Worker disposes on failure'
+  content: |
+    #### Scenario: Worker opens its host without plugins
+
+    - **WHEN** the graph index worker opens its host
+    - **THEN** it passes `plugins: false`
+    - **AND** a broken configured plugin does not fail indexing
+    - **AND** the same holds when the worker opens its host from a bootstrap context without a resolved config
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Kernel options forwarded for verbosity'
+  content: |
+    - **GIVEN** the process argv includes `-vv` or `--verbose`
+    - **WHEN** `resolveCliContext` runs
+    - **THEN** `openSpecdHost` receives `options.kernel` with elevated console log level
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Optional onLog callback wired'
+  content: |
+    - **GIVEN** `resolveCliContext` is called with an `onLog` callback
+    - **WHEN** `resolveCliContext` builds the kernel options
+    - **THEN** `options.kernel` carries the callback destination
+    - **AND** a log entry emitted at the resolved level reaches the callback
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: CLI cleanup registry'
+    after:
+      type: section
+      matches: 'Scenario: A failing cleanup does not stop the others or the exit code'
+  content: |
+    #### Scenario: Cleanup runs on error exit and on signals
+
+    - **WHEN** a command fails with an error exit, or the process receives a termination signal
+    - **THEN** `runCliCleanup()` is awaited before the process exits
+
+    #### Scenario: Failure warning text
+
+    - **GIVEN** a cleanup that rejects with message `boom`
+    - **WHEN** `runCliCleanup()` is awaited
+    - **THEN** stderr contains `warning: cleanup failed: boom`

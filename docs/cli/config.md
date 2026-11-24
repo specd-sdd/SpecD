@@ -41,6 +41,8 @@ The output displays:
 - Graph inclusion/exclusion patterns.
 - Resolved template settings and lifecycle hooks.
 
+`specd config show --help` prints the JSON/TOON shape of the output. It is generated from a typed table of the `SpecdConfig` keys, so the documented workspace, storage and context-entry fields always match the configuration type. The command reads the configuration only; it does not load plugins, so a broken plugin never prevents it from running. Configuration warnings are printed to stderr as `warning: ...` before the output.
+
 ### Exit Codes
 
 | Exit Code | Condition                                 |

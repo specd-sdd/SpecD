@@ -3,8 +3,12 @@ import { type ChangeRepository } from '../ports/change-repository.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
 import { ChangeAlreadyExistsError } from '../errors/change-already-exists-error.js'
 import { InvalidCreateChangeInputError } from '../errors/invalid-create-change-input-error.js'
-import { InvalidInputError } from '../../domain/errors/invalid-input-error.js'
+import {
+  DEFAULT_INVALIDATION_POLICY,
+  type InvalidationPolicy,
+} from '../../domain/value-objects/invalidation-policy.js'
 import { IncompatibleSchemaError } from '../../domain/errors/incompatible-schema-error.js'
+import { InvalidInputError } from '../../domain/errors/invalid-input-error.js'
 import { ReadOnlyWorkspaceError } from '../../domain/errors/read-only-workspace-error.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
@@ -38,8 +42,13 @@ export interface CreateChangeInput {
   readonly schemaName?: string
   /** Explicit schema version override. When omitted, resolved via {@link GetActiveSchema}. */
   readonly schemaVersion?: number
-  /** Invalidation policy to seed on the new change. Defaults to `'downstream'`. */
-  readonly invalidationPolicy?: string
+  /**
+   * Complete invalidation policy to persist on the new change.
+   *
+   * When omitted, the injected project default is used. Downstream hosts that do
+   * not inject one retain the native `{ artifacts: 'downstream', workflow: 'preserve' }` fallback.
+   */
+  readonly invalidation?: InvalidationPolicy
   /** When `true` and `specIds` is non-empty, run overlap detection after persistence. */
   readonly includeOverlapCheck?: boolean
 }
@@ -65,6 +74,7 @@ export class CreateChange {
   private readonly _actor: ActorResolver
   private readonly _getActiveSchema: GetActiveSchema
   private readonly _detectOverlap: DetectOverlap
+  private readonly _defaultInvalidation: InvalidationPolicy
 
   /**
    * Creates a new `CreateChange` use case instance.
@@ -74,6 +84,7 @@ export class CreateChange {
    * @param actor - Resolver for the actor identity
    * @param getActiveSchema - Resolves the project's active schema when not overridden on input
    * @param detectOverlap - Detects spec overlap across active changes
+   * @param defaultInvalidation - Resolved project policy used when input omits an override
    */
   constructor(
     changes: ChangeRepository,
@@ -81,12 +92,14 @@ export class CreateChange {
     actor: ActorResolver,
     getActiveSchema: GetActiveSchema,
     detectOverlap: DetectOverlap,
+    defaultInvalidation: InvalidationPolicy = DEFAULT_INVALIDATION_POLICY,
   ) {
     this._changes = changes
     this._listWorkspaces = listWorkspaces
     this._actor = actor
     this._getActiveSchema = getActiveSchema
     this._detectOverlap = detectOverlap
+    this._defaultInvalidation = defaultInvalidation
   }
 
   /**
@@ -118,7 +131,7 @@ export class CreateChange {
 
     const { schemaName, schemaVersion } = await this._resolveSchemaIdentity(input)
 
-    const invalidationPolicy = assertInvalidationPolicy(input.invalidationPolicy)
+    const invalidationPolicy = assertInvalidationPolicy(input.invalidation)
 
     const actor = await this._actor.identity()
     const now = new Date()
@@ -194,7 +207,7 @@ export class CreateChange {
       schemaVersion,
       history: [created],
       specDependsOn,
-      ...(invalidationPolicy !== undefined ? { invalidationPolicy } : {}),
+      invalidationPolicy: invalidationPolicy ?? this._defaultInvalidation,
     })
 
     await this._changes.create(change)

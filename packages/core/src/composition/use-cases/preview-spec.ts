@@ -2,6 +2,7 @@ import { type ArtifactParserRegistry } from '../../application/ports/artifact-pa
 import { type ChangeRepository } from '../../application/ports/change-repository.js'
 import { type DiffGenerator } from '../../application/ports/diff-generator.js'
 import { type SchemaProvider } from '../../application/ports/schema-provider.js'
+import { type ResolveChangeSchema } from '../../application/services/resolve-change-schema.js'
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { PreviewSpec } from '../../application/use-cases/preview-spec.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
@@ -20,6 +21,7 @@ export interface PreviewSpecDeps {
   readonly changes: ChangeRepository
   readonly specs: ReadonlyMap<string, SpecRepository>
   readonly schemaProvider: SchemaProvider
+  readonly resolveChangeSchema?: ResolveChangeSchema
   readonly parsers: ArtifactParserRegistry
   readonly diffGenerator?: DiffGenerator
 }
@@ -35,6 +37,7 @@ export function resolvePreviewSpecDeps(resolver: CompositionResolver): PreviewSp
     changes: resolver.getChangeRepository(),
     specs: resolver.getSpecRepositories(),
     schemaProvider: resolver.getSchemaProvider(),
+    resolveChangeSchema: resolver.getResolveChangeSchema(),
     parsers: resolver.getArtifactParserRegistry(),
     diffGenerator: resolver.getDiffGenerator(),
   }
@@ -88,9 +91,16 @@ function createPreviewSpecFromNormalized(
   input: FactoryInput<PreviewSpecDeps, CompositionResolutionOptions>,
 ): PreviewSpec {
   if (input.kind === 'deps') {
-    const { changes, specs, schemaProvider, parsers } = input.deps
+    const { changes, specs, schemaProvider, parsers, resolveChangeSchema } = input.deps
     const diffGenerator = input.deps.diffGenerator ?? createDefaultDiffGenerator()
-    return new PreviewSpec(changes, specs, schemaProvider, parsers, diffGenerator)
+    return new PreviewSpec(
+      changes,
+      specs,
+      schemaProvider,
+      parsers,
+      diffGenerator,
+      resolveChangeSchema,
+    )
   }
 
   const resolver = createCompositionResolver(input.config, input.options)

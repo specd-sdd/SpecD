@@ -1986,8 +1986,8 @@ export function compute() {
         ).toBe(true)
       }
 
-      expect(expectedCalls).toBe(72)
-      expect(extractedCalls).toBe(72)
+      expect(expectedCalls).toBe(126)
+      expect(extractedCalls).toBe(126)
     }, 120000)
   })
 })

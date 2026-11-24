@@ -10,6 +10,7 @@ import {
   captureStdout,
   captureStderr,
   ExitSentinel,
+  makeMockHost,
 } from './helpers.js'
 
 vi.mock('../../src/helpers/cli-context.js', () => ({
@@ -22,7 +23,9 @@ import { registerDiscardedShow } from '../../src/commands/discarded/show.js'
 function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
-  vi.mocked(resolveCliContext).mockResolvedValue({ config, configFilePath: null, kernel })
+  vi.mocked(resolveCliContext).mockResolvedValue(
+    makeMockHost({ config, configFilePath: null, kernel }),
+  )
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()

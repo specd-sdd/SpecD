@@ -2,7 +2,7 @@
 
 ## Requirements
 
-### Requirement: Two hook types
+### Requirement: Three hook entry forms
 
 #### Scenario: instruction hook is not executed by RunStepHooks
 
@@ -10,6 +10,13 @@
 - **WHEN** `RunStepHooks` executes pre-hooks for this step
 - **THEN** only the `lint` hook is executed via `HookRunner`
 - **AND** the `guidance` instruction hook is skipped entirely
+
+#### Scenario: External entry remains a schema form without an installed runner
+
+- **GIVEN** a workflow declares an `external:` hook entry
+- **WHEN** its matching phase is evaluated without an accepting external runner
+- **THEN** it is treated as the third declared hook form
+- **AND** execution fails with the documented unknown external hook type error
 
 ### Requirement: External hooks are explicit workflow entries
 
@@ -104,43 +111,37 @@
 
 ### Requirement: Pre-hook failure semantics
 
-#### Scenario: Deterministic pre-hook failure aborts archive
+#### Scenario: Pre-hook with onFailure abort halts transition
 
-- **GIVEN** the archiving step with pre-hooks `[{ id: "test", run: "pnpm test" }, { id: "lint", run: "pnpm lint" }]`
-- **AND** `pnpm test` exits with code 1
-- **WHEN** `ArchiveChange` executes pre-hooks
-- **THEN** `HookFailedError` is thrown with command `pnpm test`, exit code 1, and stderr
-- **AND** `pnpm lint` is never executed
-- **AND** no files are modified
+- **GIVEN** a pre-hook configured with `onFailure: 'abort'` that exits with code 1
+- **WHEN** `RunStepHooks.execute` runs for the pre phase
+- **THEN** execution halts immediately
+- **AND** `RunStepHooksResult.success` is false
+- **AND** the state transition is blocked
 
-#### Scenario: Agent-driven pre-hook failure exits code 2
+#### Scenario: Pre-hook with onFailure warn records telemetry and permits transition
 
-- **GIVEN** the implementing step with pre-hooks `[{ id: "check", run: "pnpm typecheck" }]`
-- **AND** `pnpm typecheck` exits with code 1
-- **WHEN** the agent runs `specd change run-hooks <name> implementing --phase pre`
-- **THEN** the CLI exits with code 2
-- **AND** the result includes the failed hook details
+- **GIVEN** a pre-hook configured with `onFailure: 'warn'` that exits with code 1
+- **WHEN** `RunStepHooks.execute` runs for the pre phase
+- **THEN** execution captures the exit code, stdout, and stderr into `warnings`
+- **AND** `RunStepHooksResult.success` is true
+- **AND** the state transition proceeds successfully
 
 ### Requirement: Post-hook failure semantics
 
-#### Scenario: Deterministic post-hook failure does not rollback
+#### Scenario: Post-hook failure with abort halts execution
 
-- **GIVEN** the archiving step with post-hooks `[{ id: "branch", run: "git checkout -b x" }, { id: "notify", run: "curl webhook" }]`
-- **AND** `git checkout -b x` exits with code 1
-- **WHEN** `ArchiveChange` executes post-hooks
-- **THEN** `curl webhook` is still executed
-- **AND** both results are collected
-- **AND** `postHookFailures` includes the `branch` hook failure
-- **AND** the archive is NOT rolled back
+- **GIVEN** a post-hook configured with `onFailure: 'abort'` that exits with code 1
+- **WHEN** `RunStepHooks.execute` runs for the post phase
+- **THEN** execution halts and reports failure
+- **AND** `RunStepHooksResult.success` is false
 
-#### Scenario: Agent-driven post-hook failure continues execution
+#### Scenario: Post-hook failure with warn logs warning without error
 
-- **GIVEN** the implementing step with post-hooks `[{ id: "test", run: "pnpm test" }, { id: "lint", run: "pnpm lint" }]`
-- **AND** `pnpm test` exits with code 1
-- **WHEN** the agent runs `specd change run-hooks <name> implementing --phase post`
-- **THEN** `pnpm lint` is still executed
-- **AND** the CLI exits with code 2 (at least one hook failed)
-- **AND** results for both hooks are returned
+- **GIVEN** a post-hook configured with `onFailure: 'warn'` that exits with code 1
+- **WHEN** `RunStepHooks.execute` runs for the post phase
+- **THEN** `RunStepHooksResult.warnings` contains the failed hook record
+- **AND** `RunStepHooksResult.success` is true
 
 ### Requirement: Hook ordering
 
@@ -152,15 +153,15 @@
 - **THEN** `pnpm lint` executes first
 - **AND** `pnpm typecheck` executes second
 
-### Requirement: change transition does not execute hooks
+### Requirement: Change entity does not execute hooks
 
-#### Scenario: Transition with hooks defined does not run them
+#### Scenario: TransitionChange auto-runs matching run effects
 
 - **GIVEN** the implementing step has `run:` pre-hooks defined
+- **AND** `skipHookPhases` is empty
 - **WHEN** the agent runs `specd change transition <name> implementing`
-- **THEN** the transition succeeds
-- **AND** no hooks are executed
-- **AND** the change state is updated to `implementing`
+- **THEN** matching pre effects execute before persist
+- **AND** the `Change` entity itself does not invoke `HookRunner`
 
 ### Requirement: Default hook execution for transitions and archives
 
@@ -171,12 +172,12 @@
 - **THEN** pre-hooks are executed before the state transition
 - **AND** pre-hook failure aborts the transition
 
-#### Scenario: TransitionChange executes post-hooks after state change
+#### Scenario: TransitionChange executes post-hooks before persist
 
-- **GIVEN** a transition to `implementing` step with post-hooks
+- **GIVEN** a forward transition from a step with post-hooks
 - **WHEN** `TransitionChange.execute` is called
-- **THEN** post-hooks are executed after the state transition
-- **AND** post-hook failures are collected without rollback
+- **THEN** those post effects execute after predicates pass and before persist
+- **AND** post-hook failure with `onFailure = abort` does not persist the state change
 
 #### Scenario: ArchiveChange executes pre-hooks before archive
 
@@ -200,6 +201,26 @@
 - **AND** `HookRunner` expands the command
 - **AND** `RunStepHooks` does not expand the command
 
+#### Scenario: Transition source.post skipped on redesign
+
+- **GIVEN** a change in `implementing` with `implementing.hooks.post`
+- **WHEN** `TransitionChange` targets `designing`
+- **THEN** those post hooks are not executed
+- **AND** predicates still ran
+
+#### Scenario: Transition source.post skipped on backward
+
+- **GIVEN** a change in `verifying` with `verifying.hooks.post`
+- **WHEN** `TransitionChange` targets `implementing`
+- **THEN** those post hooks are not executed
+- **AND** `along` is `backward`
+
+#### Scenario: Recovery omits hook.pre and hook.post
+
+- **WHEN** the attempt is `archiving → archivable`
+- **THEN** `hook.post` does not match
+- **AND** `hook.pre` does not match (`exceptAlong` includes `recovery`)
+
 ### Requirement: Manual hook control with skipHooks
 
 #### Scenario: TransitionChange accepts skipHookPhases selector
@@ -217,6 +238,26 @@
 - **GIVEN** `TransitionChange` accepts phase selectors 'source.pre', 'source.post', 'target.pre', 'target.post'
 - **WHEN** `skipHookPhases: ['target.pre']` is provided
 - **THEN** only target pre-hooks are skipped
+
+#### Scenario: skip source.pre is a no-op on this table
+
+- **GIVEN** `skipHookPhases` contains `source.pre`
+- **WHEN** `TransitionChange.execute` runs a forward hop
+- **THEN** matching `hook.pre` / `hook.post` still execute unless another selector skips them
+
+#### Scenario: skip target.post is a no-op on this table
+
+- **GIVEN** `skipHookPhases` contains `target.post`
+- **WHEN** `TransitionChange.execute` runs a forward hop
+- **THEN** matching `hook.pre` / `hook.post` still execute unless another selector skips them
+
+### Requirement: Resilient hook failure policy
+
+#### Scenario: Hook entry parses onFailure warn policy
+
+- **GIVEN** a workflow hook declaration with `onFailure: 'warn'`
+- **WHEN** loading the hook entry
+- **THEN** `entry.onFailure` is `'warn'`
 
 ### Requirement: Template variable expansion
 
@@ -253,3 +294,11 @@
 - **WHEN** the hook command is expanded
 - **THEN** the command is `mkdir "/repo/add-auth"`
 - **AND** neither value is wrapped in an extra pair of quotes
+
+#### Scenario: Host-incompatible quote syntax is translated after expansion
+
+- **GIVEN** a developer-authored `run:` hook whose quotes are valid for the configured source syntax but unsupported by the selected host shell
+- **WHEN** `HookRunner` expands the variables and prepares the command for execution
+- **THEN** substituted values remain verbatim
+- **AND** only the unsupported quote syntax is translated for the host shell
+- **AND** callers do not pre-escape or add quotes around substituted values

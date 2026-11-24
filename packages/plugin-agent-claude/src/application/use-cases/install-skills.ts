@@ -2,10 +2,12 @@ import { mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { SpecdConfig } from '@specd/core'
 import {
+  addSharedOwner,
   createSkillRepository,
   injectSpecdBlock,
   renderBaseAgentInstruction,
   ResolveBundle,
+  resolveSharedFolder,
 } from '@specd/skills'
 import type {
   AgentInstallOptions,
@@ -14,7 +16,6 @@ import type {
 } from '@specd/plugin-manager'
 import type { Frontmatter } from '../../domain/types/frontmatter.js'
 import { skillFrontmatter, agentFrontmatter } from '../../domain/frontmatter/index.js'
-import { resolveSharedFolder } from './shared-folder.js'
 
 /**
  * Installs selected skills into Claude's project-local skills directory.
@@ -44,7 +45,6 @@ export class InstallSkills {
     const requestedNames = [...requestedSkills, ...requestedAgents]
 
     const skillsTargetDir = path.join(config.projectRoot, '.claude', 'skills')
-    const agentsTargetDir = path.join(config.projectRoot, '.claude', 'agents')
     const resolvedSharedFolder = resolveSharedFolder(
       config.projectRoot,
       config.configPath,
@@ -53,15 +53,20 @@ export class InstallSkills {
         : undefined,
     )
     const sharedDir = resolvedSharedFolder.absolutePath
+    const capabilities = options?.capabilities ?? ['mcp', 'agents', 'frontmatter']
+    const supportsAgents = capabilities.includes('agents')
+    const agentsTargetDir = supportsAgents
+      ? path.join(config.projectRoot, '.claude', 'agents')
+      : sharedDir
 
     await mkdir(skillsTargetDir, { recursive: true })
-    await mkdir(agentsTargetDir, { recursive: true })
+    if (supportsAgents) {
+      await mkdir(agentsTargetDir, { recursive: true })
+    }
 
     const installed: Array<{ skill: string; path: string }> = []
     const skipped: Array<{ skill: string; reason: string }> = []
-
-    // Claude capabilities
-    const capabilities = ['mcp', 'agents', 'frontmatter']
+    let ownerRegistered = false
 
     for (const name of requestedNames) {
       const item = await repository.get(name)
@@ -77,10 +82,8 @@ export class InstallSkills {
         agentFrontmatterVars = {
           name: metadata.name ?? name,
           description: metadata.description ?? item.description,
-          ...(metadata.allowed_tools
-            ? { tools: metadata.allowed_tools.split(', ').join(', ') }
-            : {}),
-          ...(metadata.model ? { model: metadata.model } : {}),
+          ...(metadata.allowed_tools ? { tools: metadata.allowed_tools } : {}),
+          ...(item.metadata.model ? { model: item.metadata.model } : {}),
         }
       }
 
@@ -96,6 +99,7 @@ export class InstallSkills {
                   frontmatter: toTemplateVariables(
                     skillFrontmatter[name] ??
                       ({ description: item.description } satisfies Frontmatter),
+                    SKILL_YAML_KEYS,
                   ),
                 }
               : {
@@ -134,11 +138,15 @@ export class InstallSkills {
         const content = file.content
 
         if (isAgentInAgentsDir) {
-          // Claude convention for agents: flattened in agents/ directory
-          finalFilename = `${name}.md`
+          finalFilename = supportsAgents ? `${name}.md` : `${name}.agent.md`
         }
 
         const outputPath = path.join(baseDir, finalFilename)
+        if ((file.shared === true || baseDir === sharedDir) && !ownerRegistered) {
+          // Register ownership before the first shared write so a partial failure still leaves the marker.
+          await addSharedOwner(sharedDir, 'claude')
+          ownerRegistered = true
+        }
         await mkdir(path.dirname(outputPath), { recursive: true })
         await writeFile(outputPath, content, 'utf8')
       }
@@ -148,7 +156,7 @@ export class InstallSkills {
         path:
           item.kind === 'skill'
             ? path.join(skillsTargetDir, name)
-            : path.join(agentsTargetDir, `${name}.md`),
+            : path.join(agentsTargetDir, supportsAgents ? `${name}.md` : `${name}.agent.md`),
       })
     }
 
@@ -162,14 +170,28 @@ export class InstallSkills {
 }
 
 /**
+ * Claude Code reads hyphenated skill frontmatter keys; the internal value model keeps snake_case.
+ */
+const SKILL_YAML_KEYS: Readonly<Record<string, string>> = {
+  allowed_tools: 'allowed-tools',
+  argument_hint: 'argument-hint',
+  disable_model_invocation: 'disable-model-invocation',
+  user_invocable: 'user-invocable',
+}
+
+/**
  * Converts plugin frontmatter data into recursive template variables.
  *
  * @param frontmatter - Runtime-specific frontmatter object.
+ * @param keyMap - Optional internal-key to YAML-key renames.
  * @returns Recursive template variable map.
  */
-function toTemplateVariables(frontmatter: Frontmatter): Readonly<Record<string, TemplateVariable>> {
+function toTemplateVariables(
+  frontmatter: Frontmatter,
+  keyMap: Readonly<Record<string, string>> = {},
+): Readonly<Record<string, TemplateVariable>> {
   const entries = Object.entries(frontmatter)
-    .map(([key, value]) => [key, normalizeTemplateVariable(value)] as const)
+    .map(([key, value]) => [keyMap[key] ?? key, normalizeTemplateVariable(value)] as const)
     .filter((entry): entry is readonly [string, TemplateVariable] => entry[1] !== undefined)
 
   return Object.fromEntries(entries)

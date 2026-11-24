@@ -1,0 +1,23 @@
+releases:
+  core:lifecycle-engine: minor
+  core:get-status: minor
+  cli:change-status: minor
+  cli:change-transition: minor
+  cli:change-invalidate: minor
+  core:transition-checks: minor
+  core:transition-change: minor
+  core:invalidate-change: minor
+  cli:change-verification: minor
+  default:_global/error-handling-conventions: patch
+  core:change: minor
+  core:workflow-topology: minor
+  core:approve-spec: minor
+  core:approve-signoff: minor
+  core:archive-change: minor
+  core:workflow-model: minor
+  cli:change-archive: minor
+  skills:skill-templates-source: patch
+  cli:change-approve: minor
+  core:edit-change: minor
+  cli:change-edit: minor
+  core:create-change: minor

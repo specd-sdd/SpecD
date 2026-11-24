@@ -1,0 +1,1435 @@
+{
+  "manifestVersion": 2,
+  "name": "decouple-core-cli-error-hints",
+  "createdAt": "2026-11-14T10:45:25.499Z",
+  "updatedAt": "2026-11-14T14:15:43.272Z",
+  "description": "Decouples @specd/core domain and application errors, services, and use cases from CLI-specific flags and command syntax by rewriting their messages in host-neutral terms while preserving structured metadata properties. Introduces centralized, command-aware hint resolution (resolveCliErrorHint) in @specd/cli so handleError, cliError, and custom repair guides render accurate command-specific hints on stderr and in structured json/toon output without mutating core error messages. Eliminates misleading hints such as --force appearing on specs validate when DependsOnOverwriteError is surfaced.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "default:_global/error-handling-conventions",
+    "core:generate-metadata",
+    "core:invalidate-change",
+    "core:update-spec-deps",
+    "cli:entrypoint",
+    "cli:spec-generate-metadata",
+    "cli:spec-validate",
+    "core:transition-change",
+    "core:draft-change",
+    "core:discard-change",
+    "core:transition-checks",
+    "core:edit-change",
+    "core:validate-artifacts",
+    "core:preview-spec",
+    "cli:change-invalidate",
+    "cli:change-transition",
+    "cli:change-draft",
+    "cli:change-discard",
+    "cli:change-archive",
+    "cli:change-deps"
+  ],
+  "specDependsOn": {
+    "default:_global/error-handling-conventions": ["default:_global/conventions"],
+    "core:generate-metadata": [
+      "core:spec-metadata",
+      "core:content-extraction",
+      "core:schema-format",
+      "core:spec-id-format",
+      "core:spec-repository-port",
+      "core:composition-resolver",
+      "core:spec-optimization",
+      "core:resolve-change-schema",
+      "core:spec-lock"
+    ],
+    "core:invalidate-change": [
+      "core:change",
+      "core:lifecycle-engine",
+      "core:config",
+      "default:_global/architecture",
+      "core:composition-resolver",
+      "core:resolve-change-schema"
+    ],
+    "core:update-spec-deps": [
+      "core:change",
+      "core:spec-id-format",
+      "core:compile-context",
+      "core:composition",
+      "default:_global/error-handling-conventions",
+      "core:composition-resolver"
+    ],
+    "cli:entrypoint": ["core:config", "default:_global/error-handling-conventions"],
+    "cli:spec-generate-metadata": [
+      "core:regenerate-spec-metadata",
+      "core:spec-metadata",
+      "default:_global/architecture"
+    ],
+    "cli:spec-validate": ["default:_global/architecture", "default:_global/conventions"],
+    "core:transition-change": [
+      "core:change",
+      "core:run-step-hooks",
+      "core:hook-execution-model",
+      "core:workflow-model",
+      "default:_global/architecture",
+      "core:lifecycle-engine",
+      "core:refresh-implementation-tracking",
+      "core:composition-resolver",
+      "core:count-tasks",
+      "core:transition-checks",
+      "core:check-registry",
+      "core:workflow-topology",
+      "core:resolve-change-schema"
+    ],
+    "core:draft-change": [
+      "core:change",
+      "default:_global/architecture",
+      "core:drafted-change-view",
+      "core:composition-resolver"
+    ],
+    "core:discard-change": [
+      "core:change",
+      "default:_global/architecture",
+      "core:composition-resolver"
+    ],
+    "core:transition-checks": [
+      "core:change",
+      "core:workflow-model",
+      "core:workflow-topology",
+      "core:schema-format",
+      "default:_global/architecture",
+      "core:check-registry",
+      "core:archive-change",
+      "core:get-status"
+    ],
+    "core:edit-change": [
+      "core:change",
+      "core:composition",
+      "core:composition-resolver",
+      "core:list-workspaces",
+      "core:resolve-change-schema",
+      "core:spec-id-format",
+      "core:workspace"
+    ],
+    "core:validate-artifacts": [
+      "core:change",
+      "core:change-layout",
+      "core:change-manifest",
+      "core:lifecycle-engine",
+      "core:delta-format",
+      "core:selector-model",
+      "core:storage",
+      "default:_global/architecture",
+      "core:spec-id-format",
+      "core:schema-format",
+      "core:composition-resolver",
+      "core:transition-checks",
+      "core:resolve-change-schema"
+    ],
+    "core:preview-spec": [
+      "core:delta-format",
+      "core:artifact-parser-port",
+      "core:change-layout",
+      "core:file-reader-port",
+      "core:composition-resolver",
+      "core:diff-generator",
+      "core:resolve-change-schema",
+      "core:spec-id-format"
+    ],
+    "cli:change-invalidate": [
+      "cli:entrypoint",
+      "core:invalidate-change",
+      "core:get-status",
+      "default:_global/docs"
+    ],
+    "cli:change-transition": [
+      "cli:entrypoint",
+      "core:change",
+      "core:transition-change",
+      "core:hook-execution-model",
+      "core:get-status",
+      "core:transition-checks",
+      "core:lifecycle-engine"
+    ],
+    "cli:change-draft": ["cli:entrypoint", "core:change", "cli:command-resource-naming"],
+    "cli:change-discard": ["cli:entrypoint", "core:change"],
+    "cli:change-archive": [
+      "cli:entrypoint",
+      "core:change",
+      "core:archive-change",
+      "core:hook-execution-model",
+      "cli:command-resource-naming",
+      "core:transition-checks"
+    ],
+    "cli:change-deps": ["core:change", "core:change-manifest", "core:compile-context"]
+  },
+  "invalidation": {
+    "artifacts": "downstream",
+    "workflow": "preserve"
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:b73a23802008b2487a0a2f8c04d37b7dea62150e98194c286a4c840a9a5bb476"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "default:_global/error-handling-conventions",
+          "filename": "deltas/default/_global/error-handling-conventions/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f6ec187540d8496f0ef2593532864eaa381d2f50d7c81796fb0e89a67e3d119c"
+        },
+        {
+          "key": "core:generate-metadata",
+          "filename": "deltas/core/generate-metadata/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ac35bf741bfefa89d94da0931b5c2844c76f5cb9216b53429e8c443482a2eab9"
+        },
+        {
+          "key": "core:invalidate-change",
+          "filename": "deltas/core/invalidate-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6c9a1c34a5a6dfbc563569aae56193c6a46239e6ed024161ff07f242c793feb7"
+        },
+        {
+          "key": "core:update-spec-deps",
+          "filename": "deltas/core/update-spec-deps/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:edd8cba4cf2a51131b4a05abd7583a74dedc4067ff05a6594befa77592693999"
+        },
+        {
+          "key": "cli:entrypoint",
+          "filename": "deltas/cli/entrypoint/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:558615a7f847da69eadc7a2be2e86286b6530f82f189073ccf7cf4c37bab74be"
+        },
+        {
+          "key": "cli:spec-generate-metadata",
+          "filename": "deltas/cli/spec-generate-metadata/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5bd99428b85290b6adcd520dca37de1949c4410a46c56569e60a44f978756df8"
+        },
+        {
+          "key": "cli:spec-validate",
+          "filename": "deltas/cli/spec-validate/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:37516d3a0d4dcce6d74674272d03159f2d92d535103606e62ecd75c7aaad02d9"
+        },
+        {
+          "key": "core:transition-change",
+          "filename": "deltas/core/transition-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e13a1160d132652d5f3e9bcfd313e3f5052962c1c804b0c6686135f147b46272"
+        },
+        {
+          "key": "core:draft-change",
+          "filename": "deltas/core/draft-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8eada2a21c6cb98b5913a118ddedfd8ca60760a33e44cc81c67bb8a8d53a20cd"
+        },
+        {
+          "key": "core:discard-change",
+          "filename": "deltas/core/discard-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2e2cf832fdcf2c3a04dc710eb13ab43819e2e9e51dd6646345044ef259c2470b"
+        },
+        {
+          "key": "core:transition-checks",
+          "filename": "deltas/core/transition-checks/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:dd069b55c132c93840ca1e3f2653af671162bfeed95568d98df09a74b719c7de"
+        },
+        {
+          "key": "core:edit-change",
+          "filename": "deltas/core/edit-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:fc8c2bacb3de6eeb3b4ee099939cf47f17fa9b8d79ed3e29163b2c75bcdb4a44"
+        },
+        {
+          "key": "core:validate-artifacts",
+          "filename": "deltas/core/validate-artifacts/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1370bd24a235f950227a8001eeb3375449ed55e23c865a20f1906cd0640065db"
+        },
+        {
+          "key": "core:preview-spec",
+          "filename": "deltas/core/preview-spec/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:466ca5eee690bd4332a555db6bceb5162e839e33e187fd687b187c5e48b67c1d"
+        },
+        {
+          "key": "cli:change-invalidate",
+          "filename": "deltas/cli/change-invalidate/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9884925549965a751c60afe868ca34e01761183bb63ed42d284dcef20e6cfa1b"
+        },
+        {
+          "key": "cli:change-transition",
+          "filename": "deltas/cli/change-transition/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:01f655a83c89a10d9e78b1216438328304be65c5e7f1858aa1c82f0980256b0c"
+        },
+        {
+          "key": "cli:change-draft",
+          "filename": "deltas/cli/change-draft/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:87be9de678b19eb75733e9923f4810b51fb05f2271cc6d41c2308ed3901a46e9"
+        },
+        {
+          "key": "cli:change-discard",
+          "filename": "deltas/cli/change-discard/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:792edec1aff39f4268bc5e4ce6b3f3f3e4fcfa74eb48e40d899cf45ee1f40791"
+        },
+        {
+          "key": "cli:change-archive",
+          "filename": "deltas/cli/change-archive/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:214f48601fcca8ab660932f4d20bc734d1d6e9234287039952d72a78adf9428b"
+        },
+        {
+          "key": "cli:change-deps",
+          "filename": "deltas/cli/change-deps/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5641dc47fdd8252a5b8a4f277569d41775ff25a9cf774bc0420d8daeb1ea0fd9"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "default:_global/error-handling-conventions",
+          "filename": "deltas/default/_global/error-handling-conventions/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f491637fadb3669faa6391876212f5875f8e4a4c87522f35bba019da72a86817"
+        },
+        {
+          "key": "core:generate-metadata",
+          "filename": "deltas/core/generate-metadata/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2f4d5103b38b3af66f153f646a2e9c6b4f06dafd3d73fccecade3ddfe7214022"
+        },
+        {
+          "key": "core:invalidate-change",
+          "filename": "deltas/core/invalidate-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:df248727e625d2516a328c8322ae43ce58f7aaeea8652a2ee6831d35f355cb7d"
+        },
+        {
+          "key": "core:update-spec-deps",
+          "filename": "deltas/core/update-spec-deps/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:936559688c1d87f45221366bb20ca8c46fdc7b5de6907cc93bddb79a756382be"
+        },
+        {
+          "key": "cli:entrypoint",
+          "filename": "deltas/cli/entrypoint/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:542b60efaf6f166d002ea8ab0a8a163745bef3134797bea60c16a87a00e3ca9d"
+        },
+        {
+          "key": "cli:spec-generate-metadata",
+          "filename": "deltas/cli/spec-generate-metadata/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:73179b5279a78bc46c09a1a6772bea380afeea3c442d1ae9a5584c5dcd917492"
+        },
+        {
+          "key": "cli:spec-validate",
+          "filename": "deltas/cli/spec-validate/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:cbfe97806cfddf78bdb1cdbbc291d6481fbfcc1f37e4a4a06612eb2b1216542e"
+        },
+        {
+          "key": "core:transition-change",
+          "filename": "deltas/core/transition-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1d2d3f9029433e8a634200c2727a05ac2b377a4c405f8307dc16a6bddf3b4888"
+        },
+        {
+          "key": "core:draft-change",
+          "filename": "deltas/core/draft-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:29517e95474049d157a93300f404fe73cbdd224bc52e025bb191d2d612e34299"
+        },
+        {
+          "key": "core:discard-change",
+          "filename": "deltas/core/discard-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0f4d4bdf96ccea89ca08ba30b66168b59ac14e325c4d9996854929b2c7391fb0"
+        },
+        {
+          "key": "core:transition-checks",
+          "filename": "deltas/core/transition-checks/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5e3ab03545ca1520ac7b63fd38e142242054549124073a559db5411aa491196e"
+        },
+        {
+          "key": "core:edit-change",
+          "filename": "deltas/core/edit-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:457f94738b14ed92567a7fcb6b7e6427400113e81cd3f0c3465c87c6ced2113e"
+        },
+        {
+          "key": "core:validate-artifacts",
+          "filename": "deltas/core/validate-artifacts/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:103bcc8c3ae7eeff948b1353e29bf901b4d027a11a1f2bfe203c0242681cca35"
+        },
+        {
+          "key": "core:preview-spec",
+          "filename": "deltas/core/preview-spec/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:228c4cdfb4cdf7eaedd2c38dc651fbefc60d2fb28e7ff5c5cc99e4e26e460fb3"
+        },
+        {
+          "key": "cli:change-invalidate",
+          "filename": "deltas/cli/change-invalidate/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8cd18bf9998fbe00f117317fa5e011333b1d3b9b8cb3f53ee09af1f1309bb73c"
+        },
+        {
+          "key": "cli:change-transition",
+          "filename": "deltas/cli/change-transition/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:aafe4f31467379257541bd9400ee95b9fe654fd7dd8f11e9395ce918cbd8ff95"
+        },
+        {
+          "key": "cli:change-draft",
+          "filename": "deltas/cli/change-draft/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:86d24d3b6721e61ebfa6e4249acd40a4ca1fd70607f652828ed0ff2fd156f8d9"
+        },
+        {
+          "key": "cli:change-discard",
+          "filename": "deltas/cli/change-discard/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9f78c716ed18bcf786bdaf0b058793701f5ec5f35ad702cf3b155e8185f5215a"
+        },
+        {
+          "key": "cli:change-archive",
+          "filename": "deltas/cli/change-archive/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:cec468ea65aa0adeac280980ea37bcb7e6f20e47e1cb6a8311db47d60085188b"
+        },
+        {
+          "key": "cli:change-deps",
+          "filename": "deltas/cli/change-deps/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9ba348261dac3dbf79cc361c9a7da623bc70a94929d9899ada6c0512bb0c7d21"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:65cfc2f50ccff26aac70e936035f1a3a138b82dc2e6c80cb041c7bbf711ab69d"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:bd5973c87d1fbc11720af406e232a1410328613355850dd29ef30b4534b3d69c"
+        }
+      ]
+    }
+  ],
+  "trackedImplementationFiles": [
+    {
+      "file": "EXPLORATION-checks-gates-getstatus.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_ARCHIVE_LINK_REMEDIATION.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/core/errors.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/archive.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/deps.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/discard.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/draft.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/invalidate.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/transition.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/deps.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/generate-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/validate.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/error-hints.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/handle-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change/spec-preview.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change/transition.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/error-hints.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/handle-error.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/errors/invalidate-requires-force-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/errors/spec-not-in-change-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/services/detect-impl-links-in-scope.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/invalidate-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/update-spec-deps.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/depends-on-overwrite-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/happy-path-next-unavailable-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/historical-implementation-guard-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/invalidate-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/errors/host-neutral-errors.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/guide/generated/guides-sdk.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change/archive.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/discard-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/draft-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/generate-spec-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/transition-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/validate-artifacts.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/services/detect-impl-links-in-scope.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-generate-metadata.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/services/validate-skip-checks.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/regenerate-spec-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/services/validate-skip-checks.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/regenerate-spec-metadata.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-deps.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-discard.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-draft.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change/change-invalidate.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-validate.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/discard-change.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "cli:entrypoint",
+      "file": "packages/cli/src/error-hints.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["resolveCliErrorHint"]
+    },
+    {
+      "specId": "cli:entrypoint",
+      "file": "packages/cli/src/handle-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["handleError"]
+    },
+    {
+      "specId": "cli:spec-generate-metadata",
+      "file": "packages/cli/src/commands/spec/generate-metadata.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerSpecGenerateMetadata"]
+    },
+    {
+      "specId": "cli:spec-validate",
+      "file": "packages/cli/src/commands/spec/validate.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerSpecValidate"]
+    },
+    {
+      "specId": "cli:entrypoint",
+      "file": "packages/cli/src/commands/spec/deps.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerSpecDeps"]
+    },
+    {
+      "specId": "cli:change-invalidate",
+      "file": "packages/cli/src/commands/change/invalidate.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerChangeInvalidate"]
+    },
+    {
+      "specId": "cli:change-transition",
+      "file": "packages/cli/src/commands/change/transition.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerChangeTransition"]
+    },
+    {
+      "specId": "cli:change-draft",
+      "file": "packages/cli/src/commands/change/draft.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerChangeDraft"]
+    },
+    {
+      "specId": "cli:change-discard",
+      "file": "packages/cli/src/commands/change/discard.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerChangeDiscard"]
+    },
+    {
+      "specId": "cli:change-archive",
+      "file": "packages/cli/src/commands/change/archive.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerChangeArchive"]
+    },
+    {
+      "specId": "cli:change-deps",
+      "file": "packages/cli/src/commands/change/deps.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerChangeDeps"]
+    },
+    {
+      "specId": "core:generate-metadata",
+      "file": "packages/core/src/domain/errors/depends-on-overwrite-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["DependsOnOverwriteError"]
+    },
+    {
+      "specId": "core:draft-change",
+      "file": "packages/core/src/domain/errors/historical-implementation-guard-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["HistoricalImplementationGuardError"]
+    },
+    {
+      "specId": "core:transition-change",
+      "file": "packages/core/src/domain/errors/happy-path-next-unavailable-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["HappyPathNextUnavailableError"]
+    },
+    {
+      "specId": "core:invalidate-change",
+      "file": "packages/core/src/application/errors/invalidate-requires-force-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InvalidateRequiresForceError"]
+    },
+    {
+      "specId": "core:preview-spec",
+      "file": "packages/core/src/application/errors/spec-not-in-change-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SpecNotInChangeError"]
+    },
+    {
+      "specId": "core:transition-checks",
+      "file": "packages/core/src/application/services/detect-impl-links-in-scope.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["detectImplLinksInScope"]
+    },
+    {
+      "specId": "core:invalidate-change",
+      "file": "packages/core/src/application/use-cases/invalidate-change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InvalidateChange"]
+    },
+    {
+      "specId": "core:update-spec-deps",
+      "file": "packages/core/src/application/use-cases/update-spec-deps.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["UpdateSpecDeps"]
+    }
+  ],
+  "implementationTrackingStartedAt": "2026-11-14T11:31:56.498Z",
+  "verification": {
+    "completed": {
+      "id": "verification-4",
+      "attemptId": "verification-attempt-4",
+      "status": "valid",
+      "completedAt": "2026-11-14T14:03:22.846Z",
+      "completedBy": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "fingerprint": {
+        "version": 1,
+        "artifacts": {
+          "version": 1,
+          "algorithm": "artifact-pre-hash-v1",
+          "files": {
+            "design:design": "sha256:65cfc2f50ccff26aac70e936035f1a3a138b82dc2e6c80cb041c7bbf711ab69d",
+            "proposal:proposal": "sha256:b73a23802008b2487a0a2f8c04d37b7dea62150e98194c286a4c840a9a5bb476",
+            "specs:cli:change-archive": "sha256:214f48601fcca8ab660932f4d20bc734d1d6e9234287039952d72a78adf9428b",
+            "specs:cli:change-deps": "sha256:5641dc47fdd8252a5b8a4f277569d41775ff25a9cf774bc0420d8daeb1ea0fd9",
+            "specs:cli:change-discard": "sha256:792edec1aff39f4268bc5e4ce6b3f3f3e4fcfa74eb48e40d899cf45ee1f40791",
+            "specs:cli:change-draft": "sha256:87be9de678b19eb75733e9923f4810b51fb05f2271cc6d41c2308ed3901a46e9",
+            "specs:cli:change-invalidate": "sha256:9884925549965a751c60afe868ca34e01761183bb63ed42d284dcef20e6cfa1b",
+            "specs:cli:change-transition": "sha256:01f655a83c89a10d9e78b1216438328304be65c5e7f1858aa1c82f0980256b0c",
+            "specs:cli:entrypoint": "sha256:558615a7f847da69eadc7a2be2e86286b6530f82f189073ccf7cf4c37bab74be",
+            "specs:cli:spec-generate-metadata": "sha256:5bd99428b85290b6adcd520dca37de1949c4410a46c56569e60a44f978756df8",
+            "specs:cli:spec-validate": "sha256:37516d3a0d4dcce6d74674272d03159f2d92d535103606e62ecd75c7aaad02d9",
+            "specs:core:discard-change": "sha256:2e2cf832fdcf2c3a04dc710eb13ab43819e2e9e51dd6646345044ef259c2470b",
+            "specs:core:draft-change": "sha256:8eada2a21c6cb98b5913a118ddedfd8ca60760a33e44cc81c67bb8a8d53a20cd",
+            "specs:core:edit-change": "sha256:fc8c2bacb3de6eeb3b4ee099939cf47f17fa9b8d79ed3e29163b2c75bcdb4a44",
+            "specs:core:generate-metadata": "sha256:ac35bf741bfefa89d94da0931b5c2844c76f5cb9216b53429e8c443482a2eab9",
+            "specs:core:invalidate-change": "sha256:6c9a1c34a5a6dfbc563569aae56193c6a46239e6ed024161ff07f242c793feb7",
+            "specs:core:preview-spec": "sha256:466ca5eee690bd4332a555db6bceb5162e839e33e187fd687b187c5e48b67c1d",
+            "specs:core:transition-change": "sha256:e13a1160d132652d5f3e9bcfd313e3f5052962c1c804b0c6686135f147b46272",
+            "specs:core:transition-checks": "sha256:dd069b55c132c93840ca1e3f2653af671162bfeed95568d98df09a74b719c7de",
+            "specs:core:update-spec-deps": "sha256:edd8cba4cf2a51131b4a05abd7583a74dedc4067ff05a6594befa77592693999",
+            "specs:core:validate-artifacts": "sha256:1370bd24a235f950227a8001eeb3375449ed55e23c865a20f1906cd0640065db",
+            "specs:default:_global/error-handling-conventions": "sha256:f6ec187540d8496f0ef2593532864eaa381d2f50d7c81796fb0e89a67e3d119c",
+            "verify:cli:change-archive": "sha256:cec468ea65aa0adeac280980ea37bcb7e6f20e47e1cb6a8311db47d60085188b",
+            "verify:cli:change-deps": "sha256:9ba348261dac3dbf79cc361c9a7da623bc70a94929d9899ada6c0512bb0c7d21",
+            "verify:cli:change-discard": "sha256:9f78c716ed18bcf786bdaf0b058793701f5ec5f35ad702cf3b155e8185f5215a",
+            "verify:cli:change-draft": "sha256:86d24d3b6721e61ebfa6e4249acd40a4ca1fd70607f652828ed0ff2fd156f8d9",
+            "verify:cli:change-invalidate": "sha256:8cd18bf9998fbe00f117317fa5e011333b1d3b9b8cb3f53ee09af1f1309bb73c",
+            "verify:cli:change-transition": "sha256:aafe4f31467379257541bd9400ee95b9fe654fd7dd8f11e9395ce918cbd8ff95",
+            "verify:cli:entrypoint": "sha256:542b60efaf6f166d002ea8ab0a8a163745bef3134797bea60c16a87a00e3ca9d",
+            "verify:cli:spec-generate-metadata": "sha256:73179b5279a78bc46c09a1a6772bea380afeea3c442d1ae9a5584c5dcd917492",
+            "verify:cli:spec-validate": "sha256:cbfe97806cfddf78bdb1cdbbc291d6481fbfcc1f37e4a4a06612eb2b1216542e",
+            "verify:core:discard-change": "sha256:0f4d4bdf96ccea89ca08ba30b66168b59ac14e325c4d9996854929b2c7391fb0",
+            "verify:core:draft-change": "sha256:29517e95474049d157a93300f404fe73cbdd224bc52e025bb191d2d612e34299",
+            "verify:core:edit-change": "sha256:457f94738b14ed92567a7fcb6b7e6427400113e81cd3f0c3465c87c6ced2113e",
+            "verify:core:generate-metadata": "sha256:2f4d5103b38b3af66f153f646a2e9c6b4f06dafd3d73fccecade3ddfe7214022",
+            "verify:core:invalidate-change": "sha256:df248727e625d2516a328c8322ae43ce58f7aaeea8652a2ee6831d35f355cb7d",
+            "verify:core:preview-spec": "sha256:228c4cdfb4cdf7eaedd2c38dc651fbefc60d2fb28e7ff5c5cc99e4e26e460fb3",
+            "verify:core:transition-change": "sha256:1d2d3f9029433e8a634200c2727a05ac2b377a4c405f8307dc16a6bddf3b4888",
+            "verify:core:transition-checks": "sha256:5e3ab03545ca1520ac7b63fd38e142242054549124073a559db5411aa491196e",
+            "verify:core:update-spec-deps": "sha256:936559688c1d87f45221366bb20ca8c46fdc7b5de6907cc93bddb79a756382be",
+            "verify:core:validate-artifacts": "sha256:103bcc8c3ae7eeff948b1353e29bf901b4d027a11a1f2bfe203c0242681cca35",
+            "verify:default:_global/error-handling-conventions": "sha256:f491637fadb3669faa6391876212f5875f8e4a4c87522f35bba019da72a86817"
+          }
+        },
+        "implementation": {
+          "version": 1,
+          "hashAlgorithm": "sha256",
+          "textNormalization": "text-v1",
+          "binaryNormalization": "bytes-v1",
+          "files": {
+            "packages/cli/src/commands/change/archive.ts": {
+              "hash": "sha256:5d0d1c848c890b3d026cbf0ee210fdae2cea023ace52dfcdbb3293857735925a",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/commands/change/deps.ts": {
+              "hash": "sha256:3166bbc9bb2ca5404d9afad2a6625061f4cccaa5798ff12780b6c8fa103ad18c",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/commands/change/discard.ts": {
+              "hash": "sha256:3fc1b9390b28dcacbd4201876ae203d1fe924b7d70961825ee2ab327812d585f",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/commands/change/draft.ts": {
+              "hash": "sha256:44f4134d99314aaf802732e8fe592cd87cb1f83727d7bee2e498c65b2fe4799b",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/commands/change/invalidate.ts": {
+              "hash": "sha256:3a854dacc6da69175e5362eac68ecf925213126674c35a8d96e8e016f5c7fd5f",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/commands/change/transition.ts": {
+              "hash": "sha256:af0ef15a746eec6055f7acf37f04d53279550b8efb69c84477433c7cb79e4b4a",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/commands/spec/deps.ts": {
+              "hash": "sha256:b35b43a495bec49b84fb466914af071cd1ebfa9de1b0ab4441788b75fb003793",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/commands/spec/generate-metadata.ts": {
+              "hash": "sha256:a3eba644f71b276ed0dc407932e5fe8e88e6d23949e0f628d9c71ee13d662d7d",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/commands/spec/validate.ts": {
+              "hash": "sha256:793d271e5514410bccbde9d60897cfb63603adfdf8c84a73dd2f7307c13ce56d",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/error-hints.ts": {
+              "hash": "sha256:3db0e955b253be5a72eddb6cb09c2ee9ce19ab3db5d30093c5b3b6945989a813",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/cli/src/handle-error.ts": {
+              "hash": "sha256:f81ee4240df7115ce6182545053fa2850025b1c1bafbc4f40b1fd39a31c98fb1",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/application/errors/invalidate-requires-force-error.ts": {
+              "hash": "sha256:7d9bf517504243c522c72b7a224c4c36940916fcc4d4d4896f517c5cf0863ff0",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/application/errors/spec-not-in-change-error.ts": {
+              "hash": "sha256:481a7e71b2977d2d85e26ae05677edcfbe9b9e12da91111e10723b80c69631a4",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/application/services/detect-impl-links-in-scope.ts": {
+              "hash": "sha256:c9634766b5b9b3d9e3a7b8e39f1a7bb7e8d1e1353b9507f9afa46f525a11ab6b",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/application/use-cases/invalidate-change.ts": {
+              "hash": "sha256:3a46c0d8fc82949912c18bd20a27e72b02b8c8d286374ead912d4d0f36cfe6a1",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/application/use-cases/update-spec-deps.ts": {
+              "hash": "sha256:ce73853af6a87b02ebb4425c3f21aabae45dc6eff6b7e7ad87a3b09b578d5c89",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/domain/errors/depends-on-overwrite-error.ts": {
+              "hash": "sha256:a69638d1a4a1f99f4f5e5941954e9248f153ae9a8551317de20361e99ede7c20",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/domain/errors/happy-path-next-unavailable-error.ts": {
+              "hash": "sha256:85cf43837e40c0d2dda06f1feff08e0e64c44667a40b94af6d68c8abad92911c",
+              "content": "text",
+              "normalization": "text-v1"
+            },
+            "packages/core/src/domain/errors/historical-implementation-guard-error.ts": {
+              "hash": "sha256:6a69836c7ef0feb6739d51fc554a705c1f3bbddade0b4cb2605977e7a0eb2fab",
+              "content": "text",
+              "normalization": "text-v1"
+            }
+          }
+        }
+      }
+    }
+  },
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-11-14T10:45:25.499Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "default:_global/error-handling-conventions",
+        "core:generate-metadata",
+        "core:invalidate-change",
+        "core:update-spec-deps",
+        "cli:entrypoint",
+        "cli:spec-generate-metadata",
+        "cli:spec-validate"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-14T10:45:25.543Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "default:_global/error-handling-conventions"
+        },
+        {
+          "type": "specs",
+          "key": "core:generate-metadata"
+        },
+        {
+          "type": "specs",
+          "key": "core:invalidate-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:update-spec-deps"
+        },
+        {
+          "type": "specs",
+          "key": "cli:entrypoint"
+        },
+        {
+          "type": "specs",
+          "key": "cli:spec-generate-metadata"
+        },
+        {
+          "type": "specs",
+          "key": "cli:spec-validate"
+        },
+        {
+          "type": "verify",
+          "key": "default:_global/error-handling-conventions"
+        },
+        {
+          "type": "verify",
+          "key": "core:generate-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "core:invalidate-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:update-spec-deps"
+        },
+        {
+          "type": "verify",
+          "key": "cli:entrypoint"
+        },
+        {
+          "type": "verify",
+          "key": "cli:spec-generate-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "cli:spec-validate"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-14T10:49:28.748Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-14T11:04:56.667Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:transition-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:draft-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:discard-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:transition-checks"
+        },
+        {
+          "type": "specs",
+          "key": "core:edit-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:validate-artifacts"
+        },
+        {
+          "type": "specs",
+          "key": "core:preview-spec"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-invalidate"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-transition"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-draft"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-discard"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-archive"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-deps"
+        },
+        {
+          "type": "verify",
+          "key": "core:transition-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:draft-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:discard-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:transition-checks"
+        },
+        {
+          "type": "verify",
+          "key": "core:edit-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:validate-artifacts"
+        },
+        {
+          "type": "verify",
+          "key": "core:preview-spec"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-invalidate"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-transition"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-draft"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-discard"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-archive"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-deps"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-14T11:18:51.158Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-11-14T11:28:54.281Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-drift",
+      "message": "Artifact files require review",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-14T11:31:56.498Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-14T12:22:46.095Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-11-14T12:48:58.053Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-1",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-14T13:01:21.314Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-14T13:03:19.993Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-14T13:03:58.571Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-14T13:28:34.403Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-11-14T13:28:57.825Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-2",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-14T13:39:17.257Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-14T13:49:14.940Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-11-14T13:52:21.111Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-3",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-14T13:57:20.316Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-14T14:01:55.557Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-11-14T14:02:03.342Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-4",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "verification-completed",
+      "at": "2026-11-14T14:03:22.846Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-4",
+      "verificationId": "verification-4"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-14T14:03:36.938Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-14T14:03:42.923Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-11-14T14:15:23.951Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Decouples @specd/core domain and application errors, services, and use cases from CLI-specific flags and command syntax by rewriting their messages in host-neutral terms while preserving structured metadata properties. Introduces centralized, command-aware hint resolution (resolveCliErrorHint) in @specd/cli so handleError, cliError, and custom repair guides render accurate command-specific hints on stderr and in structured json/toon output without mutating core error messages. Eliminates misleading hints such as --force appearing on specs validate when DependsOnOverwriteError is surfaced."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-14T14:15:43.256Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-11-14T14:15:45.329Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

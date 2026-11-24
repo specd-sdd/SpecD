@@ -1,5 +1,12 @@
 import * as path from 'node:path'
-import { type Change } from '../../domain/entities/change.js'
+import {
+  type ApprovalDecision,
+  type Change,
+  type CompletedVerification,
+  type ProjectionInvalidation,
+  type ProjectionStatus,
+  type VerificationAttempt,
+} from '../../domain/entities/change.js'
 import { type DraftedChangeView } from '../../domain/read-only-change-view.js'
 import { type ArtifactStatus } from '../../domain/value-objects/artifact-status.js'
 import { type ArtifactDisplayStatus } from '../../domain/value-objects/artifact-display-status.js'
@@ -8,17 +15,54 @@ import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
+import { SchemaProviderIdentityMismatchError } from '../errors/schema-provider-identity-mismatch-error.js'
 import {
-  LifecycleEngine,
+  ResolveChangeSchema,
+  type ChangeSchemaAdvisory,
+} from '../services/resolve-change-schema.js'
+import { type Schema } from '../../domain/value-objects/schema.js'
+import {
   type LifecycleReviewSummary,
-} from '../../domain/services/lifecycle-engine.js'
-import { CountTasks, type TaskCompletionStatus } from './count-tasks.js'
+  type LifecycleBlocker,
+  type LifecycleStepVerdict,
+  projectArtifacts,
+} from '../../domain/services/lifecycle-verdict.js'
+import { evaluateLifecycle, type LifecycleActionIntent } from '../services/lifecycle-evaluation.js'
+import {
+  resolveEffectiveBindings,
+  type CheckAction,
+  type CheckAttempt,
+  type CheckBinding,
+  type CheckResult,
+  type TaskCompletionCounts,
+} from '../../domain/services/transition-checks.js'
+import { type CheckRegistry } from '../../domain/services/check-registry.js'
+import {
+  bindingMatches,
+  transitionAttempt,
+} from '../../domain/services/evaluate-transition-predicates.js'
 import { Logger } from '../logger.js'
+import {
+  buildCheckExecutionContext,
+  evaluateLegalTargets,
+  executeMatchingPredicates,
+} from '../services/execute-matching-predicates.js'
 import {
   type ImplementationTrackingProjection,
   projectImplementationTracking,
 } from './_shared/implementation-tracking.js'
 import { RefreshImplementationTracking } from './refresh-implementation-tracking.js'
+import { type ReconcileChangeValidity } from './reconcile-change-validity.js'
+import { InvalidCompositionFactoryArgumentsError } from '../../domain/errors/invalid-composition-factory-arguments-error.js'
+import {
+  type ArtifactReviewTarget,
+  type AutomaticRecovery,
+  type ChangeValidityVerdict,
+  type FingerprintInputFailure,
+  type ProjectionChange,
+  type ValidityBlocker,
+} from '../../domain/services/change-validity.js'
+import { type TaskCompletionStatus } from './count-tasks.js'
 
 /** Input for the {@link GetStatus} use case. */
 export interface GetStatusInput {
@@ -35,6 +79,54 @@ export interface GetStatusInput {
    * case returns early without re-evaluating full status.
    */
   readonly ifModifiedSince?: string
+}
+
+/**
+ * Combines the committed aggregate evidence with its canonical verdict.
+ *
+ * @param change - Committed aggregate
+ * @param verdict - Canonical validity verdict
+ * @param nextAction - Lifecycle guidance derived by Core
+ * @returns Rich status projection
+ */
+function projectValidityStatus(
+  change: Change,
+  verdict: ChangeValidityVerdict,
+  nextAction: NextAction,
+): ValidityStatusProjection {
+  const spec = change.specApproval
+  const signoff = change.signoff
+  const verification = change.verification
+  return {
+    specApproval: {
+      required: verdict.specApproval !== 'not-required',
+      status: verdict.specApproval,
+      ...(spec?.decision !== undefined ? { decision: spec.decision } : {}),
+      ...(spec?.invalidation !== undefined ? { invalidation: spec.invalidation } : {}),
+    },
+    signoff: {
+      required: verdict.signoff !== 'not-required',
+      status: verdict.signoff,
+      ...(signoff?.decision !== undefined ? { decision: signoff.decision } : {}),
+      ...(signoff?.invalidation !== undefined ? { invalidation: signoff.invalidation } : {}),
+    },
+    verification: {
+      requiredAtCurrentBoundary: verdict.verification !== 'not-required',
+      freshness: verdict.verification === 'attempt-active' ? 'in-progress' : verdict.verification,
+      ...(verification.activeAttempt !== undefined
+        ? { activeAttempt: verification.activeAttempt }
+        : {}),
+      ...(verification.completed !== undefined ? { completed: verification.completed } : {}),
+    },
+    automaticReturn: verdict.recovery,
+    projectionChanges: verdict.projectionChanges,
+    affectedArtifacts: verdict.affectedArtifacts,
+    ...(verdict.fingerprintIssues !== undefined && verdict.fingerprintIssues.length > 0
+      ? { fingerprintIssues: verdict.fingerprintIssues }
+      : {}),
+    blockers: verdict.blockers,
+    nextAction,
+  }
 }
 
 /** Per-file status detail within an artifact. */
@@ -77,6 +169,41 @@ function aggregateDisplayStatus(files: readonly ArtifactFileStatus[]): ArtifactD
     if (files.some((f) => f.displayStatus === candidate)) return candidate
   }
   return files[0]!.displayStatus
+}
+
+/**
+ * Paints artifact task counts from `workflow.taskCompletion` details.
+ *
+ * @param checksByTarget - Predicate results per protocol-legal target
+ * @returns Counts keyed by artifact id
+ */
+function taskCompletionFromChecks(
+  checksByTarget: Readonly<Partial<Record<ChangeState, readonly CheckResult[]>>>,
+): Readonly<Record<string, TaskCompletionCounts>> {
+  const painted: Record<string, TaskCompletionCounts> = {}
+  for (const rows of Object.values(checksByTarget)) {
+    for (const check of rows ?? []) {
+      if (check.id !== 'workflow.taskCompletion' || check.details === undefined) {
+        continue
+      }
+      const byArtifact = check.details.byArtifact
+      if (byArtifact !== undefined && typeof byArtifact === 'object' && byArtifact !== null) {
+        for (const [artifactId, counts] of Object.entries(
+          byArtifact as Record<string, TaskCompletionCounts>,
+        )) {
+          if (
+            counts !== undefined &&
+            typeof counts.complete === 'number' &&
+            typeof counts.incomplete === 'number' &&
+            typeof counts.total === 'number'
+          ) {
+            painted[artifactId] = counts
+          }
+        }
+      }
+    }
+  }
+  return painted
 }
 
 /** Completed vs incomplete task counts for one artifact type. */
@@ -130,6 +257,8 @@ export interface ReviewSummary {
   readonly route: 'designing' | null
   /** Primary review reason derived from current file states. */
   readonly reason: 'artifact-drift' | 'artifact-review-required' | 'spec-overlap-conflict' | null
+  /** Human prose when review is required. */
+  readonly message?: string
   /** Affected artifacts and their concrete file paths. */
   readonly affectedArtifacts: readonly ReviewArtifactSummary[]
   /** Merged overlap entries from unhandled spec-overlap-conflict invalidations. */
@@ -138,10 +267,20 @@ export interface ReviewSummary {
 
 /** Describes a specific condition blocking lifecycle progress. */
 export interface Blocker {
-  /** Machine-readable blocker code (e.g. 'ARTIFACT_DRIFT', 'MISSING_ARTIFACT'). */
+  /** Machine-readable blocker code (e.g. 'ARTIFACT_DRIFT', 'INCOMPLETE_ARTIFACT'). */
   readonly code: string
   /** Human-readable explanation of the blocker. */
   readonly message: string
+  /** Whether the blocker can be bypassed via configuration or check skip. */
+  readonly isSkippable: boolean
+  /** Host-neutral remediation action declared by the failed check or validity blocker. */
+  readonly action?: CheckAction
+  /** Gerund label from the failed check when projected from a predicate. */
+  readonly label?: string
+  /** Check id that produced this blocker when projected from a predicate. */
+  readonly checkId?: string
+  /** Structured diagnostic context (for example schema identity mismatch names). */
+  readonly details?: Readonly<Record<string, unknown>>
 }
 
 /** A recommended next step for the user or agent. */
@@ -152,8 +291,39 @@ export interface NextAction {
   readonly actionType: 'cognitive' | 'mechanical'
   /** Human-readable rationale for the recommendation. */
   readonly reason: string
-  /** The recommended CLI command or skill to run. */
-  readonly command: string | null
+  /** Host-neutral workflow phase intent, or `null` when superseded or inapplicable. */
+  readonly intent: LifecycleActionIntent | null
+  /** Optional check-declared remediation action. */
+  readonly action?: CheckAction
+}
+
+/** Materialized approval status exposed by GetStatus. */
+export interface ApprovalStatusProjection {
+  readonly required: boolean
+  readonly status: 'not-required' | 'absent' | ProjectionStatus
+  readonly decision?: ApprovalDecision
+  readonly invalidation?: ProjectionInvalidation
+}
+
+/** Materialized verification status retaining attempt and completed evidence together. */
+export interface VerificationStatusProjection {
+  readonly requiredAtCurrentBoundary: boolean
+  readonly activeAttempt?: VerificationAttempt
+  readonly completed?: CompletedVerification
+  readonly freshness: 'not-required' | 'absent' | 'in-progress' | 'valid' | 'stale'
+}
+
+/** Canonical validity projection returned to delivery adapters. */
+export interface ValidityStatusProjection {
+  readonly specApproval: ApprovalStatusProjection
+  readonly signoff: ApprovalStatusProjection
+  readonly verification: VerificationStatusProjection
+  readonly automaticReturn: AutomaticRecovery | null
+  readonly projectionChanges: readonly ProjectionChange[]
+  readonly affectedArtifacts: readonly ArtifactReviewTarget[]
+  readonly fingerprintIssues?: readonly FingerprintInputFailure[]
+  readonly blockers: readonly ValidityBlocker[]
+  readonly nextAction: NextAction
 }
 
 /** Describes why a structurally valid transition is not currently available. */
@@ -170,8 +340,10 @@ export interface TransitionBlocker {
 export interface LifecycleContext {
   /** All structurally valid transitions from the current state. */
   readonly validTransitions: readonly ChangeState[]
-  /** Subset of validTransitions where workflow requires are satisfied. */
+  /** Subset of validTransitions whose blocking predicates passed or skipped. */
   readonly availableTransitions: readonly ChangeState[]
+  /** Extras-bearing `schema.workflow()` rows from evaluateLifecycle (not protocol membership). */
+  readonly availableSteps: readonly LifecycleStepVerdict[]
   /** For each valid-but-unavailable transition, what's blocking it. */
   readonly blockers: readonly TransitionBlocker[]
   /** Whether approval gates are active in the project config. */
@@ -186,6 +358,10 @@ export interface LifecycleContext {
     readonly version: number
     readonly artifacts: readonly ArtifactType[]
   } | null
+  /** Per-target predicate results from the same evaluate pass. */
+  readonly checksByTarget: Readonly<Partial<Record<ChangeState, readonly CheckResult[]>>>
+  /** Predicate rows for the happy-path nextAction candidate. */
+  readonly checks: readonly CheckResult[]
 }
 
 /** Result returned by the {@link GetStatus} use case. */
@@ -213,6 +389,78 @@ export interface GetStatusResult {
   readonly blockers: readonly Blocker[]
   /** Recommended next action. */
   readonly nextAction: NextAction
+  /** Canonical validity verdict when status reconciled before projecting. */
+  readonly validity?: ValidityStatusProjection
+  /** Advisories from change schema resolution (empty when none). */
+  readonly schemaWarnings: readonly ChangeSchemaAdvisory[]
+}
+
+/**
+ * Projects a schema resolution failure to a public blocker.
+ *
+ * @param error - Resolution error, when one was thrown
+ * @returns `SCHEMA_IDENTITY_MISMATCH` with structured names, or `SCHEMA_RESOLUTION_FAILED`
+ */
+function schemaResolutionBlocker(error: Error | undefined): Blocker {
+  if (error instanceof SchemaProviderIdentityMismatchError) {
+    return {
+      code: 'SCHEMA_IDENTITY_MISMATCH',
+      message: error.message,
+      isSkippable: false,
+      details: { requestedName: error.expectedSchemaName, returnedName: error.actualSchemaName },
+    }
+  }
+  return {
+    code: 'SCHEMA_RESOLUTION_FAILED',
+    message:
+      'Schema resolution failed; lifecycle transitions are unavailable until the schema is restored.',
+    isSkippable: false,
+  }
+}
+
+/** Condition families shared by validity blockers and gate-check failures. */
+type ConditionFamily = 'spec-consent' | 'signoff-consent' | 'verification'
+
+const VERIFICATION_CODES: ReadonlySet<string> = new Set([
+  'VERIFICATION_REQUIRED',
+  'VERIFICATION_IN_PROGRESS',
+  'VERIFICATION_STALE',
+])
+
+/**
+ * Resolves the condition family of a checkId-less validity blocker code.
+ *
+ * @param code - Validity blocker code
+ * @returns The family, or `undefined` for per-artifact and per-spec codes
+ */
+function validityFamily(code: string): ConditionFamily | undefined {
+  if (code === 'APPROVAL_REQUIRED' || code === 'APPROVAL_STALE' || code === 'APPROVAL_REVOKED') {
+    return 'spec-consent'
+  }
+  if (code === 'SIGNOFF_REQUIRED' || code === 'SIGNOFF_STALE' || code === 'SIGNOFF_REVOKED') {
+    return 'signoff-consent'
+  }
+  return VERIFICATION_CODES.has(code) ? 'verification' : undefined
+}
+
+/**
+ * Resolves the condition family a gate-check failure describes. `approval.signoff`
+ * names its consent codes `APPROVAL_*`; its `VERIFICATION_*` failures describe the
+ * verification family. `VERIFICATION_VALIDITY_UNAVAILABLE` and per-artifact codes
+ * belong to no family.
+ *
+ * @param checkId - Id of the failing check
+ * @param code - Failure code reported by the check
+ * @returns The family, or `undefined` when the failure never merges
+ */
+function checkFamily(checkId: string, code: string): ConditionFamily | undefined {
+  const consent =
+    code === 'APPROVAL_REQUIRED' || code === 'APPROVAL_STALE' || code === 'APPROVAL_REVOKED'
+  if (checkId === 'approval.spec' && consent) return 'spec-consent'
+  if (checkId === 'approval.signoff' && consent) return 'signoff-consent'
+  if (checkId === 'verification.current' && VERIFICATION_CODES.has(code)) return 'verification'
+  if (checkId === 'approval.signoff' && VERIFICATION_CODES.has(code)) return 'verification'
+  return undefined
 }
 
 /**
@@ -224,37 +472,63 @@ export interface GetStatusResult {
 export class GetStatus {
   private readonly _changes: ChangeRepository
   private readonly _schemaProvider: SchemaProvider
+  private readonly _resolveChangeSchema: ResolveChangeSchema
   private readonly _approvals: { readonly spec: boolean; readonly signoff: boolean }
   private readonly _refresh: RefreshImplementationTracking
-  private readonly _lifecycle: LifecycleEngine
-  private readonly _countTasks: CountTasks
+  private readonly _transitionBindings: readonly CheckBinding[]
+  private readonly _archiveBindings: readonly CheckBinding[]
+  private readonly _reconcile: ReconcileChangeValidity
+  private readonly _checkRegistry?: CheckRegistry
 
   /**
    * Creates a new `GetStatus` use case instance.
    *
    * @param changes - Repository for loading the change
-   * @param schemaProvider - Provider for the fully-resolved schema
+   * @param schemaProvider - Provider for the fully-resolved schema or shared resolver
    * @param approvals - Whether approval gates are active
    * @param approvals.spec - Whether the spec approval gate is enabled
    * @param approvals.signoff - Whether the signoff gate is enabled
    * @param refreshImplementationTracking - Primitive for optional pre-read refresh
-   * @param lifecycle - Shared lifecycle interpreter
-   * @param countTasks - Shared task-completion query
+   * @param transitionBindings - Composed transition check bindings
+   * @param archiveBindings - Composed archive check bindings (status in `archivable`)
+   * @param reconcile - Optional validity reconciler applied before projection
+   * @param checkRegistry - Optional CheckRegistry for open check catalog and bindings
+   * @param resolveChangeSchema - Optional shared resolver for sovereign change schemas
    */
   constructor(
     changes: ChangeRepository,
-    schemaProvider: SchemaProvider,
+    schemaProvider: SchemaProvider | ResolveChangeSchema,
     approvals: { readonly spec: boolean; readonly signoff: boolean },
     refreshImplementationTracking: RefreshImplementationTracking,
-    lifecycle: LifecycleEngine,
-    countTasks: CountTasks,
+    transitionBindings: readonly CheckBinding[],
+    archiveBindings: readonly CheckBinding[],
+    reconcile?: ReconcileChangeValidity,
+    checkRegistry?: CheckRegistry,
+    resolveChangeSchema?: ResolveChangeSchema,
   ) {
     this._changes = changes
-    this._schemaProvider = schemaProvider
+    if (
+      schemaProvider instanceof ResolveChangeSchema ||
+      ('execute' in schemaProvider &&
+        typeof (schemaProvider as unknown as ResolveChangeSchema).execute === 'function')
+    ) {
+      this._resolveChangeSchema = schemaProvider as unknown as ResolveChangeSchema
+      this._schemaProvider = schemaProvider as unknown as SchemaProvider
+    } else {
+      this._schemaProvider = schemaProvider
+      this._resolveChangeSchema = resolveChangeSchema ?? new ResolveChangeSchema(schemaProvider)
+    }
     this._approvals = approvals
     this._refresh = refreshImplementationTracking
-    this._lifecycle = lifecycle
-    this._countTasks = countTasks
+    this._transitionBindings = transitionBindings
+    this._archiveBindings = archiveBindings
+    if (reconcile === undefined) {
+      throw new InvalidCompositionFactoryArgumentsError('GetStatus', 'reconcile is required')
+    }
+    this._reconcile = reconcile
+    if (checkRegistry !== undefined) {
+      this._checkRegistry = checkRegistry
+    }
   }
 
   /**
@@ -274,35 +548,58 @@ export class GetStatus {
       if (draftView === null) {
         throw new ChangeNotFoundError(input.name)
       }
-      return this._buildDraftedResult(draftView)
+      return await this._buildDraftedResult(draftView)
     }
 
-    if (input.ifModifiedSince !== undefined) {
-      const clientRevision = Date.parse(input.ifModifiedSince)
-      if (!Number.isNaN(clientRevision) && clientRevision >= change.updatedAt.getTime()) {
-        return this._buildUnchangedResult(change)
-      }
+    let schema: Schema
+    let schemaWarnings: readonly ChangeSchemaAdvisory[] = []
+    try {
+      const resolved = await this._resolveChangeSchema.execute({
+        changeName: change.name,
+        schemaName: change.schemaName,
+        schemaVersion: change.schemaVersion,
+      })
+      schema = resolved.schema
+      schemaWarnings = resolved.warnings
+    } catch (err) {
+      return this._buildActiveResult(
+        change,
+        undefined,
+        null,
+        err instanceof Error ? err : undefined,
+      )
     }
 
-    if (input.refreshImplementationTracking !== false) {
-      await this._refresh.execute({ name: input.name })
-    }
-
-    const refreshedChange = await this._changes.get(input.name)
-    if (refreshedChange === null) {
-      throw new ChangeNotFoundError(input.name)
-    }
-
-    return this._buildActiveResult(refreshedChange)
+    const reconciled = await this._reconcile.execute({
+      name: input.name,
+      refreshImplementationTracking: input.refreshImplementationTracking !== false,
+    })
+    return this._buildActiveResult(
+      reconciled.change,
+      reconciled.verdict,
+      schema,
+      undefined,
+      schemaWarnings,
+    )
   }
 
   /**
    * Builds the full status projection for an active change.
    *
    * @param change - Active change loaded from the repository
+   * @param validity - Reconciled validity verdict when a reconciler ran
+   * @param schema - Schema resolved before any active-status mutation, or null on degradation
+   * @param failureError - Error causing schema resolution failure when schema is null
+   * @param schemaWarnings - Advisories emitted by change schema resolution
    * @returns Full status result
    */
-  private async _buildActiveResult(change: Change): Promise<GetStatusResult> {
+  private async _buildActiveResult(
+    change: Change,
+    validity?: ChangeValidityVerdict,
+    schema: Schema | null = null,
+    failureError?: Error,
+    schemaWarnings: readonly ChangeSchemaAdvisory[] = [],
+  ): Promise<GetStatusResult> {
     const changePath = this._changes.changePath(change)
     const artifactStatuses: ArtifactStatusEntry[] = []
     let schemaInfo: LifecycleContext['schemaInfo'] = null
@@ -318,80 +615,32 @@ export class GetStatus {
       targetStep: change.state,
       actionType: 'cognitive',
       reason: 'Proceed to next lifecycle step',
-      command: null,
+      intent: null,
     }
     let validTransitions: readonly ChangeState[] = VALID_TRANSITIONS[change.state]
     let availableTransitions: readonly ChangeState[] = []
+    let availableSteps: readonly LifecycleStepVerdict[] = []
     let transitionBlockers: readonly TransitionBlocker[] = []
     let nextArtifact: string | null = null
+    let checksByTarget: Readonly<Partial<Record<ChangeState, readonly CheckResult[]>>> = {}
+    let checks: readonly CheckResult[] = []
 
-    try {
-      const schema = await this._schemaProvider.get()
-      schemaInfo = {
-        name: schema.name(),
-        version: schema.version(),
-        artifacts: schema.artifacts(),
+    if (schema === null) {
+      const isIdentityMismatch = failureError instanceof SchemaProviderIdentityMismatchError
+      blockers = [schemaResolutionBlocker(failureError)]
+      validTransitions = []
+      availableTransitions = []
+      checksByTarget = {}
+      nextArtifact = null
+      schemaInfo = null
+      nextAction = {
+        targetStep: change.state,
+        actionType: 'cognitive',
+        reason: isIdentityMismatch
+          ? 'Provider returned the wrong schema identity'
+          : 'Schema resolution failed; lifecycle transitions are unavailable until the schema is restored.',
+        intent: null,
       }
-      const verdict = this._lifecycle.evaluate(change, schema, {
-        approvals: this._approvals,
-      })
-      const artifactStatusByType = new Map(
-        verdict.artifacts.map((artifact) => [artifact.type, artifact]),
-      )
-
-      for (const artifactType of schema.artifacts()) {
-        const type = artifactType.id
-        const artifact = change.getArtifact(type)
-        const files: ArtifactFileStatus[] = []
-
-        if (artifact !== null) {
-          for (const file of artifact.files.values()) {
-            files.push({
-              key: file.key,
-              filename: file.filename,
-              state: file.status,
-              ...(file.validatedHash !== undefined ? { validatedHash: file.validatedHash } : {}),
-              hasDrift: file.hasDrift,
-              displayStatus: file.displayStatus(),
-            })
-          }
-        }
-
-        artifactStatuses.push({
-          type,
-          state: artifact?.status ?? 'missing',
-          effectiveStatus: artifactStatusByType.get(type)?.effectiveStatus ?? 'missing',
-          displayStatus: aggregateDisplayStatus(files),
-          files,
-        })
-      }
-
-      const taskCounts = await this._countTasks.execute({ change })
-      for (let index = 0; index < artifactStatuses.length; index += 1) {
-        const entry = artifactStatuses[index]!
-        const taskCompletion = taskCounts.byArtifact[entry.type]
-        if (taskCompletion !== undefined) artifactStatuses[index] = { ...entry, taskCompletion }
-      }
-
-      review = this._projectReview(verdict.review, changePath)
-      blockers = verdict.blockers.map((blocker) => ({
-        code: blocker.code,
-        message: blocker.message,
-      }))
-      nextAction = verdict.nextAction
-      validTransitions = verdict.validTransitions
-      availableTransitions = verdict.availableTransitions
-      transitionBlockers = verdict.transitionBlockers
-      nextArtifact = verdict.nextArtifact
-
-      Logger.debug('GetStatus projected lifecycle engine verdict', {
-        change: change.name,
-        blockerCodes: verdict.blockers.map((blocker) => blocker.code),
-        reviewReason: verdict.review.reason,
-        nextAction: verdict.nextAction.command,
-      })
-    } catch {
-      validTransitions = VALID_TRANSITIONS[change.state]
       for (const [type, artifact] of change.artifacts) {
         const files: ArtifactFileStatus[] = [...artifact.files.values()].map((file) => ({
           key: file.key,
@@ -409,16 +658,159 @@ export class GetStatus {
           files,
         })
       }
+      const lifecycle: LifecycleContext = {
+        validTransitions,
+        availableTransitions,
+        availableSteps,
+        blockers: transitionBlockers,
+        approvals: this._approvals,
+        nextArtifact,
+        changePath,
+        schemaInfo,
+        checksByTarget,
+        checks,
+      }
+      const specDependsOn: Record<string, string[]> = {}
+      for (const [specId, deps] of change.specDependsOn) {
+        specDependsOn[specId] = [...deps]
+      }
+      return {
+        change,
+        artifactStatuses,
+        specDependsOn,
+        lifecycle,
+        implementationTracking: projectImplementationTracking(change),
+        review,
+        blockers,
+        nextAction,
+        schemaWarnings,
+      }
     }
+
+    schemaInfo = {
+      name: schema.name(),
+      version: schema.version(),
+      artifacts: schema.artifacts(),
+    }
+    const projectedArtifacts = projectArtifacts(change, schema)
+    const effectiveStatusByArtifact = new Map(
+      projectedArtifacts.map((artifact) => [artifact.type, artifact.effectiveStatus]),
+    )
+    const passMemo = new Map<string, unknown>()
+    const legalTargets = await evaluateLegalTargets(this._transitionBindings, {
+      change,
+      schema,
+      approvals: this._approvals,
+      effectiveStatusByArtifact,
+      passMemo,
+      ...(this._checkRegistry !== undefined ? { checkRegistry: this._checkRegistry } : {}),
+      ...(validity !== undefined ? { validity } : {}),
+    })
+    const checksByTargetMap = legalTargets.checksByTarget
+    let archiveChecks: readonly CheckResult[] = []
+    // Archive predicates and their bypass policy come from the same resolved bindings
+    // `ArchiveChange` uses, so a hint always matches what archive accepts.
+    let effectiveArchiveBindings: readonly CheckBinding[] = this._archiveBindings
+    if (change.state === 'archivable') {
+      effectiveArchiveBindings = resolveEffectiveBindings({
+        baseBindings: this._archiveBindings,
+        schema,
+        operation: 'archive',
+        ...(this._checkRegistry !== undefined ? { registry: this._checkRegistry } : {}),
+      })
+      const archiveEvaluation = await executeMatchingPredicates(
+        effectiveArchiveBindings,
+        buildCheckExecutionContext({
+          change,
+          schema,
+          attempt: { scope: 'archive' },
+          approvals: this._approvals,
+          effectiveStatusByArtifact,
+          passMemo,
+          ...(this._checkRegistry !== undefined ? { checkRegistry: this._checkRegistry } : {}),
+          ...(validity !== undefined ? { validity } : {}),
+        }),
+      )
+      archiveChecks = archiveEvaluation.checks
+    }
+    const verdict = evaluateLifecycle(change, schema, {
+      approvals: this._approvals,
+      checksByTarget: checksByTargetMap,
+      bindingsByTarget: legalTargets.bindingsByTarget,
+      archiveBindings: effectiveArchiveBindings,
+      ...(validity !== undefined ? { validity } : {}),
+    })
+    const artifactStatusByType = new Map(
+      verdict.artifacts.map((artifact) => [artifact.type, artifact]),
+    )
+    const taskCompletionByArtifact = taskCompletionFromChecks(checksByTargetMap)
+
+    for (const artifactType of schema.artifacts()) {
+      const type = artifactType.id
+      const artifact = change.getArtifact(type)
+      const files: ArtifactFileStatus[] = []
+
+      if (artifact !== null) {
+        for (const file of artifact.files.values()) {
+          files.push({
+            key: file.key,
+            filename: file.filename,
+            state: file.status,
+            ...(file.validatedHash !== undefined ? { validatedHash: file.validatedHash } : {}),
+            hasDrift: file.hasDrift,
+            displayStatus: file.displayStatus(),
+          })
+        }
+      }
+
+      const taskCompletion = taskCompletionByArtifact[type]
+      artifactStatuses.push({
+        type,
+        state: artifact?.status ?? 'missing',
+        effectiveStatus: artifactStatusByType.get(type)?.effectiveStatus ?? 'missing',
+        displayStatus: aggregateDisplayStatus(files),
+        files,
+        ...(taskCompletion !== undefined ? { taskCompletion } : {}),
+      })
+    }
+
+    review = this._projectReview(verdict.review, changePath)
+    blockers = this._mergeBlockers(
+      verdict.blockers,
+      verdict.checksByTarget,
+      legalTargets.bindingsByTarget,
+      archiveChecks,
+      effectiveArchiveBindings,
+      (target) => transitionAttempt(change.state, target, schema, this._approvals),
+    )
+    nextAction = this._nextActionAfterArchiveOverlap(verdict.nextAction, blockers)
+    validTransitions = verdict.validTransitions
+    availableTransitions = verdict.availableTransitions
+    availableSteps = verdict.availableSteps
+    transitionBlockers = verdict.transitionBlockers
+    nextArtifact = verdict.nextArtifact
+    checksByTarget = verdict.checksByTarget
+    checks = verdict.checks
+
+    Logger.debug('GetStatus projected evaluateLifecycle verdict', {
+      change: change.name,
+      blockerCodes: verdict.blockers.map((blocker) => blocker.code),
+      reviewReason: verdict.review.reason,
+      nextActionIntent: verdict.nextAction.intent,
+      nextActionKind: verdict.nextAction.action?.kind,
+    })
 
     const lifecycle: LifecycleContext = {
       validTransitions,
       availableTransitions,
+      availableSteps,
       blockers: transitionBlockers,
       approvals: this._approvals,
       nextArtifact,
       changePath,
       schemaInfo,
+      checksByTarget,
+      checks,
     }
 
     const specDependsOn: Record<string, string[]> = {}
@@ -435,6 +827,10 @@ export class GetStatus {
       review,
       blockers,
       nextAction,
+      schemaWarnings,
+      ...(validity !== undefined
+        ? { validity: projectValidityStatus(change, validity, nextAction) }
+        : {}),
     }
   }
 
@@ -459,11 +855,14 @@ export class GetStatus {
       lifecycle: {
         validTransitions: VALID_TRANSITIONS[change.state],
         availableTransitions: [],
+        availableSteps: [],
         blockers: [],
         approvals: this._approvals,
         nextArtifact: null,
         changePath,
         schemaInfo: null,
+        checksByTarget: {},
+        checks: [],
       },
       implementationTracking: projectImplementationTracking(change),
       review: {
@@ -478,8 +877,9 @@ export class GetStatus {
         targetStep: change.state,
         actionType: 'cognitive',
         reason: 'Client revision is current',
-        command: null,
+        intent: null,
       },
+      schemaWarnings: [],
     }
   }
 
@@ -489,23 +889,58 @@ export class GetStatus {
    * @param draftView - Drafted change loaded via `getDraft`
    * @returns Status without lifecycle transitions or mutable `Change`
    */
-  private _buildDraftedResult(draftView: DraftedChangeView): GetStatusResult {
+  private async _buildDraftedResult(draftView: DraftedChangeView): Promise<GetStatusResult> {
     const changePath = this._changes.draftChangePath(draftView)
     const artifactStatuses: ArtifactStatusEntry[] = []
+    const source = {
+      name: draftView.name,
+      artifacts: draftView.artifacts,
+      getArtifact: (type: string) => draftView.artifacts.get(type) ?? null,
+    }
 
-    for (const [type, artifact] of draftView.artifacts) {
-      const files: ArtifactFileStatus[] = [...artifact.files.values()].map((file) => ({
-        key: file.key,
-        filename: file.filename,
-        state: file.status,
-        ...(file.validatedHash !== undefined ? { validatedHash: file.validatedHash } : {}),
-        hasDrift: file.hasDrift,
-        displayStatus: file.displayStatus(),
-      }))
+    let schema: Schema | undefined
+    let schemaWarnings: readonly ChangeSchemaAdvisory[] = []
+    let resolutionBlocker: Blocker | undefined
+    try {
+      const resolved = await this._resolveChangeSchema.execute({
+        changeName: draftView.name,
+        schemaName: draftView.schemaName,
+        schemaVersion: draftView.schemaVersion,
+      })
+      schema = resolved.schema
+      schemaWarnings = resolved.warnings
+    } catch (err) {
+      schema = undefined
+      resolutionBlocker = schemaResolutionBlocker(err instanceof Error ? err : undefined)
+    }
+
+    const projected = schema === undefined ? null : projectArtifacts(source, schema)
+    const verdictByType = new Map((projected ?? []).map((artifact) => [artifact.type, artifact]))
+    const artifactEntries =
+      schema === undefined
+        ? [...draftView.artifacts.entries()].map(([type, artifact]) => ({ type, artifact }))
+        : schema.artifacts().map((artifactType) => ({
+            type: artifactType.id,
+            artifact: draftView.artifacts.get(artifactType.id) ?? null,
+          }))
+
+    for (const { type, artifact } of artifactEntries) {
+      const files: ArtifactFileStatus[] =
+        artifact === null
+          ? []
+          : [...artifact.files.values()].map((file) => ({
+              key: file.key,
+              filename: file.filename,
+              state: file.status,
+              ...(file.validatedHash !== undefined ? { validatedHash: file.validatedHash } : {}),
+              hasDrift: file.hasDrift,
+              displayStatus: file.displayStatus(),
+            }))
+      const projectedArtifact = verdictByType.get(type)
       artifactStatuses.push({
         type,
-        state: artifact.status,
-        effectiveStatus: artifact.status,
+        state: artifact?.status ?? 'missing',
+        effectiveStatus: projectedArtifact?.effectiveStatus ?? artifact?.status ?? 'missing',
         displayStatus: aggregateDisplayStatus(files),
         files,
       })
@@ -514,15 +949,21 @@ export class GetStatus {
     const lifecycle: LifecycleContext = {
       validTransitions: [],
       availableTransitions: [],
+      availableSteps: [],
       blockers: [],
       approvals: this._approvals,
       nextArtifact: null,
       changePath,
-      schemaInfo: {
-        name: draftView.schemaName,
-        version: draftView.schemaVersion,
-        artifacts: [],
-      },
+      schemaInfo:
+        schema === undefined
+          ? null
+          : {
+              name: draftView.schemaName,
+              version: draftView.schemaVersion,
+              artifacts: schema.artifacts(),
+            },
+      checksByTarget: {},
+      checks: [],
     }
 
     const specDependsOn: Record<string, string[]> = {}
@@ -543,20 +984,246 @@ export class GetStatus {
         affectedArtifacts: [],
         overlapDetail: [],
       },
-      blockers: [],
+      blockers: resolutionBlocker === undefined ? [] : [resolutionBlocker],
       nextAction: {
         targetStep: draftView.state,
         actionType: 'cognitive',
         reason: 'Change is drafted; restore before lifecycle transitions',
-        command: null,
+        intent: null,
       },
+      schemaWarnings,
     }
   }
 
   /**
-   * Projects engine review details into the public GetStatus shape with absolute file paths.
+   * Merges review blockers with failed predicates from every protocol-legal target.
+   * Flattening is required so incomplete `verifying` tasks still surface while
+   * `nextAction` keeps the `implement` intent.
    *
-   * @param review - Engine-derived review summary
+   * Skippability is keyed by check id AND message: a blocker takes the skippability of its own
+   * binding, and only blockers with the same check id and the same message merge, ANDing their
+   * skippability across targets and across transition/archive contexts. A verdict blocker with a
+   * check id and no failing transition predicate keeps its own `isSkippable` (`false` when absent);
+   * it never borrows from archive bindings.
+   *
+   * @param reviewBlockers - Verdict review/requested-target blockers
+   * @param checksByTarget - Predicate results per protocol-legal target
+   * @param bindingsByTarget - Resolved bindings per target (derived policy)
+   * @param archiveChecks - Archive-scope predicates when `state === 'archivable'`
+   * @param archiveBindings - Effective archive bindings (derived policy for archive checks)
+   * @param attemptFor - Builds the transition attempt of a target so skippability is read from the
+   * binding that applies to that target, not from the first binding sharing the check id
+   * @returns Deduplicated public blockers
+   */
+  private _mergeBlockers(
+    reviewBlockers: readonly LifecycleBlocker[],
+    checksByTarget: Readonly<Partial<Record<ChangeState, readonly CheckResult[]>>>,
+    bindingsByTarget: Readonly<Partial<Record<ChangeState, readonly CheckBinding[]>>>,
+    archiveChecks: readonly CheckResult[] = [],
+    archiveBindings: readonly CheckBinding[] = this._archiveBindings,
+    attemptFor?: (target: ChangeState) => Extract<CheckAttempt, { scope: 'transition' }>,
+  ): Blocker[] {
+    // Skippability comes from the resolved bindings of the target the failure belongs to
+    // (schema-composed), or from the archive bindings for archive checks.
+    // Archive failures are judged only against the archive bindings: a check that is
+    // skippable on a transition may be locked or hardened on archive (and vice versa), so
+    // the two sources never share a skippability verdict.
+    const candidates: {
+      check: CheckResult
+      bindings: readonly CheckBinding[]
+      target?: ChangeState
+      source: 'transition' | 'archive'
+    }[] = [
+      ...Object.entries(checksByTarget).flatMap(([target, rows]) =>
+        (rows ?? []).map((check) => ({
+          check,
+          bindings: bindingsByTarget[target as ChangeState] ?? this._transitionBindings,
+          target: target as ChangeState,
+          source: 'transition' as const,
+        })),
+      ),
+      ...archiveChecks.map((check) => ({
+        check,
+        bindings: archiveBindings,
+        source: 'archive' as const,
+      })),
+    ]
+    const skipKey = (id: string, message: string): string => `${id}\u0000${message}`
+    const transitionSkippable = new Map<string, boolean>()
+    const archiveSkippable = new Map<string, boolean>()
+    const archiveIdSkippable = new Map<string, boolean>()
+    // A merged blocker is skippable only when it is skippable on every target it appears on,
+    // so verdicts combine as AND (a missing entry is the identity).
+    if (archiveChecks.length > 0) {
+      for (const binding of archiveBindings) {
+        archiveIdSkippable.set(
+          binding.check.id,
+          (archiveIdSkippable.get(binding.check.id) ?? true) && binding.skippable === true,
+        )
+      }
+    }
+    for (const { check, bindings, source, target: candidateTarget } of candidates) {
+      if (check.outcome !== 'fail') continue
+      const attempt =
+        source === 'transition' && candidateTarget !== undefined && attemptFor !== undefined
+          ? attemptFor(candidateTarget)
+          : undefined
+      const sameCheck = bindings.filter((b) => b.check.id === check.id)
+      const applicable =
+        attempt === undefined
+          ? undefined
+          : sameCheck.find((b) => bindingMatches(b, attempt, attempt.along))
+      const skippable = (applicable ?? sameCheck[0])?.skippable === true
+      const map = source === 'archive' ? archiveSkippable : transitionSkippable
+      const key = skipKey(check.id, check.message ?? `Check '${check.id}' failed`)
+      const seed = source === 'archive' ? (archiveIdSkippable.get(check.id) ?? true) : true
+      map.set(key, (map.get(key) ?? seed) && skippable)
+    }
+
+    // Condition families with at least one check failure (from the predicates or from
+    // check-derived verdict blockers). A family with a check failure owns its condition:
+    // every checkId-less validity blocker of that family is dropped, whatever its code.
+    const families = new Set<ConditionFamily>()
+    let hasVerificationCurrent = false
+    const noteFailure = (checkId: string, code: string): void => {
+      const family = checkFamily(checkId, code)
+      if (family !== undefined) families.add(family)
+      if (checkId === 'verification.current' && family !== undefined) hasVerificationCurrent = true
+    }
+    for (const { check } of candidates) {
+      if (check.outcome === 'fail' && check.code !== undefined) noteFailure(check.id, check.code)
+    }
+    for (const blocker of reviewBlockers) {
+      if (blocker.checkId !== undefined) noteFailure(blocker.checkId, blocker.code)
+    }
+    // An `approval.signoff` VERIFICATION_* failure yields to `verification.current`.
+    const yieldsToVerification = (checkId: string, code: string): boolean =>
+      hasVerificationCurrent && checkId === 'approval.signoff' && VERIFICATION_CODES.has(code)
+    // Actions of dropped validity blockers, adopted when the winning check declares none.
+    const droppedActions = new Map<ConditionFamily, CheckAction>()
+
+    const merged = new Map<string, Blocker>()
+    const absorbed = new Map<string, string>()
+    for (const blocker of reviewBlockers) {
+      if (blocker.checkId === undefined) {
+        const family = validityFamily(blocker.code)
+        if (family !== undefined && families.has(family)) {
+          if (blocker.action !== undefined && !droppedActions.has(family)) {
+            droppedActions.set(family, blocker.action)
+          }
+          continue
+        }
+      } else if (yieldsToVerification(blocker.checkId, blocker.code)) {
+        continue
+      }
+      // Verdict blockers are transition-origin: only a failing transition predicate with the
+      // same check id and message decides skippability; archive bindings never apply.
+      const resolved =
+        blocker.checkId !== undefined
+          ? transitionSkippable.get(skipKey(blocker.checkId, blocker.message))
+          : undefined
+      const isSkippable = resolved ?? blocker.isSkippable ?? false
+      merged.set(`${blocker.checkId ?? ''}\u0000${blocker.code}:${blocker.message}`, {
+        code: blocker.code,
+        message: blocker.message,
+        isSkippable,
+        ...(blocker.action !== undefined ? { action: blocker.action } : {}),
+        ...(blocker.label !== undefined ? { label: blocker.label } : {}),
+        ...(blocker.checkId !== undefined ? { checkId: blocker.checkId } : {}),
+      })
+    }
+
+    for (const { check, source } of candidates) {
+      if (check.outcome !== 'fail' || check.code === undefined) continue
+      if (yieldsToVerification(check.id, check.code)) continue
+      const message = check.message ?? `Check '${check.id}' failed`
+      const text = `${check.code}:${message}`
+      const ownKey = `${check.id}\u0000${text}`
+      // A check merges with a blocker carrying the same check id. A family check also merges with
+      // the first checkId-less validity blocker of the same code:message; a failure without a
+      // family (per-artifact or per-spec codes) never absorbs into a checkId-less blocker.
+      const family = checkFamily(check.id, check.code)
+      const anonymousKey = `\u0000${text}`
+      const absorbedBy = absorbed.get(anonymousKey)
+      const key = merged.has(ownKey)
+        ? ownKey
+        : family !== undefined &&
+            merged.has(anonymousKey) &&
+            (absorbedBy === undefined || absorbedBy === check.id)
+          ? anonymousKey
+          : undefined
+      const action = check.action ?? (family !== undefined ? droppedActions.get(family) : undefined)
+      const existing = key === undefined ? undefined : merged.get(key)
+      if (key !== undefined && existing !== undefined) {
+        if (key === anonymousKey) absorbed.set(anonymousKey, check.id)
+        // A validity blocker without a remediation adopts the matching check's declared action.
+        const ownSkippable =
+          (source === 'archive' ? archiveSkippable : transitionSkippable).get(
+            skipKey(check.id, message),
+          ) === true
+        // A blocker present in both contexts is skippable only when skippable in both.
+        const nextSkippable = key === ownKey ? existing.isSkippable && ownSkippable : undefined
+        if (
+          (existing.action === undefined && action !== undefined) ||
+          (nextSkippable !== undefined && nextSkippable !== existing.isSkippable)
+        ) {
+          merged.set(key, {
+            ...existing,
+            ...(existing.action === undefined && action !== undefined ? { action } : {}),
+            ...(nextSkippable !== undefined ? { isSkippable: nextSkippable } : {}),
+          })
+        }
+        continue
+      }
+      const isSkippable =
+        (source === 'archive' ? archiveSkippable : transitionSkippable).get(
+          skipKey(check.id, message),
+        ) === true
+      merged.set(ownKey, {
+        code: check.code,
+        message,
+        isSkippable,
+        label: check.label,
+        checkId: check.id,
+        ...(action !== undefined ? { action } : {}),
+      })
+    }
+
+    return [...merged.values()]
+  }
+
+  /**
+   * Archive overlap is an operation predicate, not a hop, so the verdict can still
+   * recommend "Ready to archive". Public status must not advertise a clean archive.
+   *
+   * @param nextAction - Application next-action projection
+   * @param blockers - Merged public blockers including archive predicates
+   * @returns Next action with overlap-aware reason when live overlap is the only blocker;
+   * the guidance action unchanged when any other blocker exists
+   */
+  private _nextActionAfterArchiveOverlap(
+    nextAction: NextAction,
+    blockers: readonly Blocker[],
+  ): NextAction {
+    const overlap = blockers.find((blocker) => blocker.code === 'OVERLAP_CONFLICT')
+    if (
+      overlap === undefined ||
+      !blockers.every((blocker) => blocker.code === 'OVERLAP_CONFLICT')
+    ) {
+      return nextAction
+    }
+    return {
+      targetStep: 'archivable',
+      actionType: 'mechanical',
+      reason: overlap.message,
+      intent: 'archive',
+    }
+  }
+
+  /**
+   * Projects verdict review details into the public GetStatus shape with absolute file paths.
+   *
+   * @param review - Verdict-derived review summary
    * @param changePath - Absolute path to the change directory
    * @returns Review summary with absolute file paths
    */
@@ -565,6 +1232,7 @@ export class GetStatus {
       required: review.required,
       route: review.route,
       reason: review.reason,
+      ...(review.message !== undefined ? { message: review.message } : {}),
       affectedArtifacts: review.affectedArtifacts.map((artifact) => ({
         type: artifact.type,
         files: artifact.files.map((file) => ({

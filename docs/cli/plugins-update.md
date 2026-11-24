@@ -15,9 +15,10 @@ Options:
 
 ## Behavior
 
-- Without positional plugin names: updates all declared `plugins.agents`.
+- Without positional plugin names: updates every plugin in the flat `plugins` list.
 - With plugin names: updates only the selected names.
-- For undeclared names, emits `skipped` with detail.
+- For undeclared names, emits `error` with detail. The status is `updated`, `skipped` or `error`.
+- A plugin name listed more than once is updated once; the repeat is reported as `skipped` with the detail `already processed`.
 - Does not add or remove plugin declarations.
 - Exits with code `1` if at least one plugin update fails.
 

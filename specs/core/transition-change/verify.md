@@ -25,66 +25,74 @@
 - **WHEN** `TransitionChange.execute({ name, to })` is called without `refreshImplementationTrackingBefore`
 - **THEN** it invokes `RefreshImplementationTracking.execute({ name })` before lifecycle evaluation
 
-#### Scenario: Explicit opt-out skips refresh
+#### Scenario: Explicit opt-out skips only the pre-evaluation refresh
 
 - **GIVEN** an active change exists in `changes/` storage
 - **GIVEN** `TransitionChange` is constructed with project approval configuration
-- **WHEN** `TransitionChange.execute({ name, to, refreshImplementationTrackingBefore: false })` is called
-- **THEN** it does not invoke `RefreshImplementationTracking`
+- **WHEN** `TransitionChange.execute({ name, to, refreshImplementationTrackingBefore: false })` is called and the candidate passes
+- **THEN** no tracking refresh runs before lifecycle evaluation
+- **AND** the post-hook reconciliation before persistence still refreshes implementation tracking
 
-### Requirement: Approval-gate routing for spec approval
+#### Scenario: Post-hook refresh catches files changed by hooks
 
-#### Scenario: Ready to implementing is rerouted when spec approval is active
+- **GIVEN** a pre-persist `run:` hook that creates an implementation file outside the change's resolved tracking
+- **WHEN** `TransitionChange.execute({ name, to: 'verifying' })` runs that hook
+- **THEN** post-hook reconciliation refreshes tracking, `impl.filesResolved` re-runs against the new open file, and the transition is not persisted
 
-- **GIVEN** a change in `ready` state
-- **GIVEN** `TransitionChange` is constructed with `approvals.spec: true`
-- **WHEN** `execute` is called with `to: 'implementing'`
-- **THEN** the `LifecycleEngine` identifies `pending-spec-approval` as the effective target
-- **AND** the change transitions to `pending-spec-approval`
+### Requirement: Spec approval is a check not a pending hop
 
-#### Scenario: Ready to implementing is direct when spec approval is inactive
+Scenarios:
 
-- **GIVEN** a change in `ready` state
-- **GIVEN** `TransitionChange` is constructed with `approvals.spec: false`
-- **WHEN** `execute` is called with `to: 'implementing'`
-- **THEN** the `LifecycleEngine` identifies `implementing` as the effective target
-- **AND** the change transitions to `implementing`
+#### Scenario: Stale approval returns to design instead of parking
 
-### Requirement: Approval-gate routing for signoff
+- **GIVEN** required spec approval is stale in `implementing`
+- **WHEN** a forward transition is requested
+- **THEN** reconciliation commits `designing` recovery and the request fails
+- **AND** no pending approval state is entered
 
-#### Scenario: Done to archivable is rerouted when signoff is active
+#### Scenario: Stale approval at ready stays in ready and the check blocks
 
-- **GIVEN** a change in `done` state
-- **GIVEN** `TransitionChange` is constructed with `approvals.signoff: true`
-- **WHEN** `execute` is called with `to: 'archivable'`
-- **THEN** the `LifecycleEngine` identifies `pending-signoff` as the effective target
-- **AND** the change transitions to `pending-signoff`
+- **GIVEN** required spec approval is stale or revoked at `ready` with the spec gate enabled
+- **WHEN** a forward transition is requested
+- **THEN** reconciliation commits no recovery and the change stays in `ready`
+- **AND** the request fails with `CheckPredicateFailedError` for `approval.spec` carrying `action: { kind: 'approve-spec' }`
+- **AND** no pending approval state is entered
 
-#### Scenario: Done to archivable is direct when signoff is inactive
+#### Scenario: Valid current consent permits normal edge evaluation
 
-- **GIVEN** a change in `done` state
-- **GIVEN** `TransitionChange` is constructed with `approvals.signoff: false`
-- **WHEN** `execute` is called with `to: 'archivable'`
-- **THEN** the `LifecycleEngine` identifies `archivable` as the effective target
-- **AND** the change transitions to `archivable`
+- **WHEN** spec approval is valid for current canonical scope and artifacts
+- **THEN** approval check passes without rewriting the requested target
+
+### Requirement: Signoff is a check not a pending hop
+
+Scenarios:
+
+#### Scenario: Signoff requires current verification and fingerprints
+
+- **GIVEN** signoff exists but verification or signed inputs are stale
+- **WHEN** `done → archivable` is requested
+- **THEN** the request fails with verification or signoff recovery guidance
+- **AND** no pending signoff state is entered
+
+#### Scenario: Disabled signoff predicate skips
+
+- **WHEN** the signoff gate is disabled for `done → archivable`
+- **THEN** signoff check skips while other transition checks remain applicable
 
 ### Requirement: Human-approval pending states produce explicit transition failures
 
 #### Scenario: Pending spec approval blocks normal forward transition
 
-- **GIVEN** a change in `pending-spec-approval` state
-- **WHEN** `execute` is called with `to: 'spec-approved'`
-- **THEN** the `LifecycleEngine` identifies an approval-required blocker
-- **AND** it throws `InvalidStateTransitionError`
-- **AND** the error reason equals `{ type: 'approval-required', gate: 'spec' }`
+- **GIVEN** a change in `pending-spec-approval` state with the spec gate on and no spec approval
+- **WHEN** `execute` is called with `to: 'implementing'`
+- **THEN** `approval.spec` fails and it throws `CheckPredicateFailedError` with `checkId: 'approval.spec'`, `code: 'APPROVAL_REQUIRED'`, and `action.kind: 'approve-spec'`
+- **AND** the error carries `from: 'pending-spec-approval'` and `to: 'implementing'`
 
 #### Scenario: Pending signoff blocks normal forward transition
 
-- **GIVEN** a change in `pending-signoff` state
-- **WHEN** `execute` is called with `to: 'signed-off'`
-- **THEN** the `LifecycleEngine` identifies an approval-required blocker
-- **AND** it throws `InvalidStateTransitionError`
-- **AND** the error reason equals `{ type: 'approval-required', gate: 'signoff' }`
+- **GIVEN** a change in `pending-signoff` state with the signoff gate on and no signoff
+- **WHEN** `execute` is called with `to: 'archivable'`
+- **THEN** `approval.signoff` fails and it throws `CheckPredicateFailedError` with `checkId: 'approval.signoff'` and `action.kind: 'approve-signoff'`
 
 #### Scenario: Pending approval still allows redesign
 
@@ -99,19 +107,19 @@
 - **GIVEN** a completion-gated artifact has an incomplete count returned by `CountTasks`
 - **WHEN** `TransitionChange.execute()` targets that step
 - **THEN** it emits `task-completion-failed`
-- **AND** throws `InvalidStateTransitionError` with reason `incomplete-tasks` and the counts
+- **AND** throws `CheckPredicateFailedError` for `workflow.taskCompletion` whose `details` carry `artifactId`, `incomplete`, `complete`, and `total`
 
 #### Scenario: Missing task capability blocks a gated artifact
 
 - **GIVEN** a workflow step requires task completion for an artifact without `hasTasks: true`
 - **WHEN** `TransitionChange.execute()` targets that step
-- **THEN** it throws `InvalidStateTransitionError` with reason `missing-task-capability`
+- **THEN** it throws `CheckPredicateFailedError` for `workflow.taskCompletion` whose `details.reason` is `missing-task-capability`
 
 #### Scenario: Missing completion configuration blocks a gated artifact
 
 - **GIVEN** a workflow step requires task completion for an artifact with `hasTasks: true` but no `taskCompletionCheck`
 - **WHEN** `TransitionChange.execute()` targets that step
-- **THEN** it throws `InvalidStateTransitionError` with reason `missing-task-capability`
+- **THEN** it throws `CheckPredicateFailedError` for `workflow.taskCompletion` whose `details.reason` is `missing-task-capability`
 
 #### Scenario: All completed tasks allow transition
 
@@ -132,86 +140,193 @@
 - **WHEN** `TransitionChange.execute()` targets that step
 - **THEN** it does not block the transition for task completion
 
+#### Scenario: Task-completion check owns CountTasks
+
+- **GIVEN** `GetStatus` already evaluated `workflow.taskCompletion` as fail
+- **WHEN** `TransitionChange.execute()` targets `verifying`
+- **THEN** it throws `CheckPredicateFailedError` for `workflow.taskCompletion` with the task counts in `details`
+- **AND** the use case does not invoke `CountTasks` after a green predicate `execute`
+
+### Requirement: Canonical pre-transition validity reconciliation
+
+#### Scenario: Unauthorized bypass of mandatory check throws CheckNotSkippableError
+
+- **GIVEN** a mandatory check `protocol.edge` with `skippable: false`
+- **WHEN** attempting transition with `skipChecks: ['protocol.edge']`
+- **THEN** it throws `CheckNotSkippableError` and state remains unchanged
+
+#### Scenario: Bypassing hook effect check with skipChecks throws CheckNotSkippableError
+
+- **GIVEN** an effect check `hook.pre`
+- **WHEN** attempting transition with `skipChecks: ['hook.pre']`
+- **THEN** it throws `CheckNotSkippableError` enforcing that effects must be skipped via `skipHookPhases`
+
+#### Scenario: Authorized bypass of skippable check succeeds
+
+- **GIVEN** a skippable check `impl.linksInScope` with out-of-scope files present
+- **WHEN** attempting transition with `skipChecks: ['impl.linksInScope']`
+- **THEN** `impl.linksInScope` is bypassed and the transition succeeds
+
+#### Scenario: Disabled step check is omitted from execution
+
+- **GIVEN** a step schema declaring a custom check with `disabled: true` (where `allowDisable !== false`)
+- **WHEN** executing transition to that step
+- **THEN** the check is omitted from predicate evaluation and does not block the transition
+
+#### Scenario: Skip validation uses the attempt's resolved binding
+
+- **GIVEN** a check whose first base binding is non-skippable but whose resolved binding for this attempt is skippable by schema declaration
+- **WHEN** `TransitionChange.execute({ skipChecks: [checkId] })` is called for that attempt
+- **THEN** no `CheckNotSkippableError` is thrown and the check is reported as bypassed by the user
+
+#### Scenario: Collected failures abort before effects
+
+- **GIVEN** two non-protocol predicates that both fail for a protocol-legal candidate
+- **WHEN** `TransitionChange` evaluates the candidate
+- **THEN** both predicates are evaluated and reported
+- **AND** no hook, effect, or persistence runs
+
+#### Scenario: Committed recovery with verifying disabled does not route to verification
+
+- **GIVEN** a change whose schema disables `verifying`
+- **AND** post-hook reconciliation commits an automatic recovery away from the source state
+- **WHEN** `TransitionChange` throws the committed-recovery error
+- **THEN** the error reports the committed state and carries `nextAction` with an `intent` or `action` from lifecycle guidance for that state
+- **AND** `nextAction.intent` is not `'verify'` and no action has kind `start-verification`
+- **AND** neither the error message nor the guidance contains a CLI command or slash command
+
+#### Scenario: Committed recovery to designing reports the design intent
+
+- **GIVEN** a spec gate is enabled and reconciliation commits a recovery to `designing` because spec consent is stale in a state after `ready`
+- **WHEN** `TransitionChange` throws the committed-recovery error
+- **THEN** `nextAction.intent` is `'design'` and `nextAction.action` is undefined
+- **AND** neither the error message nor the guidance contains a CLI command or slash command
+
+#### Scenario: Committed recovery to done reports the sign-off action from the check
+
+- **GIVEN** a sign-off gate is enabled and reconciliation commits a recovery to `done` because sign-off is stale while verification is still current
+- **WHEN** `TransitionChange` throws the committed-recovery error
+- **THEN** `nextAction.action` is the action declared by the failing `approval.signoff` check evaluated for the committed state
+- **AND** the use case did not hardcode that action
+
+#### Scenario: skipChecks are validated on the designing to designing redesign path
+
+- **GIVEN** a change in `designing`
+- **WHEN** `TransitionChange.execute` is called with `to: 'designing'` and `skipChecks: ['unknown.check']`
+- **THEN** it throws `UnknownCheckError` before any neutral no-op return
+- **AND** `skipChecks: ['hook.pre']` or a non-skippable check id on the same request throws `CheckNotSkippableError`
+- **AND** with an empty or valid `skipChecks` the request returns the unchanged change without appending an event
+
 ### Requirement: Workflow requires enforcement
 
 #### Scenario: Unsatisfied requirement throws with structured reason
 
 - **GIVEN** a workflow step with `requires: [specs, tasks]`
-- **AND** `LifecycleEngine` reports `specs` with effective status `in-progress`
+- **AND** `projectArtifacts` reports `specs` with effective status `in-progress`
 - **WHEN** `execute` is called
-- **THEN** `InvalidStateTransitionError` is thrown with reason `incomplete-artifact` and blocking artifact `specs`
+- **THEN** `CheckPredicateFailedError` is thrown for `workflow.requires` with `details.artifactId: 'specs'` and `details.status: 'in-progress'`
 
 #### Scenario: Transition blocked by recursive parent review
 
 - **GIVEN** a workflow step requires artifact `design`
-- **AND** `LifecycleEngine` reports `design` as `pending-parent-artifact-review`
-- **AND** the detailed blocker context includes `blockedBy: { artifactId: 'specs', status: 'pending-review' }`
+- **AND** `projectArtifacts` reports `design` as `pending-parent-artifact-review`
+- **AND** the parent chain makes `specs` the blocking artifact with status `pending-review`
 - **WHEN** `execute` is called
-- **THEN** it throws `InvalidStateTransitionError`
-- **AND** the error reason includes `status: 'pending-parent-artifact-review'`
-- **AND** it includes `blockedBy: { artifactId: 'specs', status: 'pending-review' }`
+- **THEN** it throws `CheckPredicateFailedError` for `workflow.requires`
+- **AND** `details.status` is `pending-parent-artifact-review` and `details.blockedBy` is `{ artifactId: 'specs', status: 'pending-review' }`, computed by the check
 
-### Requirement: Artifact validation clearing on verifying to implementing
+#### Scenario: Requires failure matches predicate evaluation
+
+- **GIVEN** matching `workflow.requires` already failed for the attempt
+- **WHEN** `TransitionChange.execute()` runs
+- **THEN** the thrown `CheckPredicateFailedError` carries the same `details.artifactId`
+
+### Requirement: Implementation-only retry from verifying
 
 #### Scenario: Implementation-only retry preserves validated artifacts
 
-- **GIVEN** a change in `verifying` state with validated artifacts
-- **AND** verification fails for implementation-only reasons
-- **WHEN** `execute` is called with `to: 'implementing'`
-- **THEN** unchanged validated artifacts are not cleared
+- **GIVEN** a change in `verifying` with validated artifacts and an implementation-only verification failure
+- **WHEN** `verifying → implementing` executes
+- **THEN** unchanged artifact and file states remain complete
+- **AND** `implementing.requires` is not used to clear their validation
 
-#### Scenario: Artifact review required does not route through implementing
+#### Scenario: Artifact or task revision routes to designing
 
-- **GIVEN** a change in `verifying` state
-- **AND** the required fix needs new tasks or revised artifacts
-- **WHEN** lifecycle routing is resolved
-- **THEN** the caller must transition to `designing`, not `implementing`
+- **GIVEN** verification discovers that the intended artifacts or task plan must change
+- **WHEN** the failure is classified
+- **THEN** the caller routes to `designing`, not through an implementation-only retry
+
+### Requirement: Verification attempt lifecycle
+
+#### Scenario: Entering verifying checks readiness only
+
+- **GIVEN** all implementation files and links are resolved
+- **WHEN** a real transition enters `verifying`
+- **THEN** readiness checks pass and the state changes
+- **AND** no verification attempt or completion is created
+
+#### Scenario: Exit rejects evidence changed by hooks
+
+- **GIVEN** completed evidence initially matches
+- **WHEN** a pre-persist hook changes a fingerprinted input before `verifying → done`
+- **THEN** fresh `verification.current` evaluation blocks persistence
+- **AND** recommends renewing verification in the current reconciled state
+
+#### Scenario: Implementing to verifying deduplicates readiness checks
+
+- **GIVEN** the hop matches forward-exit and verifying-entry bindings
+- **WHEN** transition checks execute
+- **THEN** each implementation readiness check runs once
+
+#### Scenario: Other implementation boundaries remain guarded
+
+- **WHEN** a permitted forward hop exits `implementing` without targeting `verifying`, or another state enters `verifying`
+- **THEN** the applicable implementation readiness checks still execute
+
+#### Scenario: Missing verification verdict blocks exit
+
+- **WHEN** `verifying → done` has no canonical verification verdict
+- **THEN** exit fails closed with typed unavailable-validity guidance
+- **AND** only an explicit `not-required` verdict may skip the predicate
+
+### Requirement: Skill-aligned backward hop invalidation
+
+Scenarios:
+
+#### Scenario: Backward movement preserves matching verification
+
+- **GIVEN** completed verification still matches current inputs
+- **WHEN** the change moves backward below verification
+- **THEN** verification remains valid
+- **AND** independently affected signoff follows its recovery rules
+
+#### Scenario: Changed inputs stale evidence independently
+
+- **WHEN** a backward transition accompanies actual artifact or implementation drift
+- **THEN** reconciliation stales only evidence whose fingerprint changed
+
+#### Scenario: Backward skill hop from a post-verification state invalidates sign-off in the mutation
+
+- **GIVEN** a change in `done`, `signed-off`, or `archivable` with a valid sign-off
+- **WHEN** it transitions to `implementing` or `verifying`
+- **THEN** sign-off is invalidated inside the `ChangeRepository.mutate` callback together with the state change
+- **AND** spec approval is preserved unless its fingerprint changed
 
 ### Requirement: Transition to designing from any state
 
-#### Scenario: Transition from archivable to designing
+Scenarios:
 
-- **GIVEN** a change in `archivable` state
-- **WHEN** `execute` is called with `to: 'designing'`
-- **THEN** the change transitions to `designing`
+#### Scenario: Explicit redesign applies focused policy
 
-#### Scenario: Transition to designing downgrades files to pending-review
+- **WHEN** a non-drafting change explicitly transitions to `designing`
+- **THEN** artifact reopening follows the configured artifact policy
+- **AND** spec consent is preserved when its artifact fingerprint is unchanged and no explicit consent revocation is requested
+- **AND** unchanged verification is preserved unless its inputs changed
 
-- **GIVEN** a change with validated artifacts
-- **AND** one file is already `drifted-pending-review`
-- **WHEN** `execute` is called with `to: 'designing'`
-- **THEN** every other tracked file becomes `pending-review`
-- **AND** the drifted file remains `drifted-pending-review`
+#### Scenario: Designing self-entry remains validity neutral
 
-#### Scenario: Transition to designing invalidates active approvals
-
-- **GIVEN** a change in `implementing` state with an active spec approval
-- **WHEN** `execute` is called with `to: 'designing'`
-- **THEN** the approval is invalidated before the transition
-
-#### Scenario: Transition from designing to designing does not invalidate
-
-- **GIVEN** a change already in `designing` state
-- **WHEN** `execute` is called with `to: 'designing'`
-- **THEN** `change.invalidate()` is not called
-- **AND** `change.transition('designing', actor)` is called directly
-- **AND** no artifact files are downgraded
-- **AND** no approvals are cleared
-
-#### Scenario: Transition from drafting to designing does not invalidate
-
-- **GIVEN** a change in `drafting` state
-- **WHEN** `execute` is called with `to: 'designing'`
-- **THEN** `change.invalidate()` is not called
-- **AND** `change.transition('designing', actor)` is called directly
-
-#### Scenario: Transition from implementing to designing invalidates
-
-- **GIVEN** a change in `implementing` state with validated artifacts
-- **WHEN** `execute` is called with `to: 'designing'`
-- **THEN** `change.invalidate()` is called with cause `'artifact-review-required'`
-- **AND** all artifact files are downgraded to `pending-review`
-- **AND** any active spec approval is cleared
+- **WHEN** `designing → designing` is requested
+- **THEN** no approval revocation, artifact reopening, or `transitioned` event is invented
 
 ### Requirement: Transition from archiving to archivable
 
@@ -227,7 +342,14 @@
 - **GIVEN** a change in `archiving` state with validated artifacts
 - **WHEN** `TransitionChange.execute` is called with `to: 'designing'`
 - **THEN** the change transitions to `designing`
-- **AND** artifact files are downgraded for review
+- **AND** artifact files are not marked pending review unless real drift or a reconciler verdict requires it
+
+#### Scenario: Recovery does not run archiving.post
+
+- **GIVEN** a change in `archiving` with `archiving.hooks.post` configured
+- **WHEN** `execute` is called with `to: 'archivable'`
+- **THEN** those post hooks are not executed
+- **AND** `archivable` requires are not enforced
 
 ### Requirement: Post-hook execution
 
@@ -295,6 +417,13 @@
 - **THEN** no hooks are executed
 - **AND** the state transition occurs
 
+#### Scenario: source.post skipped on backward hop
+
+- **GIVEN** a change in `done` with `done.hooks.post` configured
+- **WHEN** `execute` is called with `to: 'implementing'`
+- **THEN** those post hooks are not executed
+- **AND** the transition still persists if predicates pass
+
 ### Requirement: Transition delegation
 
 #### Scenario: Invalid transition is rejected by entity
@@ -309,21 +438,20 @@
 
 - **WHEN** `TransitionChange.execute` completes successfully
 - **THEN** `ChangeRepository.mutate(input.name, fn)` was called for the final persisted mutation
-- **AND** the callback applied any redesign invalidation, validation clearing, and lifecycle transition on the fresh persisted `Change`
+- **AND** the callback applied any sign-off invalidation for a skill hop and the lifecycle transition on the fresh persisted `Change`, without clearing unchanged artifact validation
 
 ### Requirement: Input contract
 
-#### Scenario: Input accepts transition controls without approval flags
+#### Scenario: Input accepts skipChecks array
 
-- **WHEN** `TransitionChange.execute` is called
-- **THEN** its input accepts `name`, `to`, and optional `skipHookPhases` and `refreshImplementationTrackingBefore`
-- **AND** its input does not accept `approvalsSpec` or `approvalsSignoff`
+- **GIVEN** a transition execution request
+- **WHEN** passing `TransitionChangeInput` with `skipChecks: ['impl.linksInScope', 'spec.overlap']`
+- **THEN** the orchestrator receives the bypass list without legacy boolean flags
 
-#### Scenario: Approval gates are fixed at construction
+#### Scenario: Legacy boolean flags omitted from input
 
-- **GIVEN** `TransitionChange` is constructed with `approvals: { spec: true, signoff: false }`
-- **WHEN** `execute` is called with `to: 'implementing'` from `ready`
-- **THEN** routing uses the constructor-provided `approvals.spec` value
+- **WHEN** inspecting `TransitionChangeInput` type contract
+- **THEN** `allowOutOfScope` and `allowOverlap` are not present on the input interface
 
 ### Requirement: Approval gates baked at construction
 
@@ -354,6 +482,14 @@
 - **WHEN** `execute` is called and hooks are not skipped
 - **THEN** those target pre-hooks execute before the lifecycle transition
 
+#### Scenario: designing pre-hooks run on redesign
+
+- **GIVEN** a change in `implementing`
+- **AND** `designing.hooks.pre` is configured
+- **WHEN** `execute` is called with `to: 'designing'`
+- **THEN** designing pre-hooks execute
+- **AND** implementing post-hooks do not
+
 ### Requirement: Transition event
 
 #### Scenario: Successful transition emits transitioned progress event
@@ -382,14 +518,133 @@
 #### Scenario: Progress callback receives hook and requires events
 
 - **WHEN** `TransitionChange.execute` is called with an `onProgress` callback
-- **THEN** the callback receives lifecycle progress events such as `requires-check`, `hook-start`, `hook-done`, and `transitioned`
+- **THEN** the callback receives lifecycle progress events such as `requires-check`, `check-start`, `check-done`, and `transitioned`
+- **AND** it does not require first-class `hook-start` / `hook-done` event types
+
+### Requirement: to next is the happy-path next state
+
+#### Scenario: next from implementing is verifying
+
+- **GIVEN** a change in `implementing`
+- **WHEN** `execute` is called with `to: 'next'`
+- **THEN** Core resolves the target to `verifying` before predicate evaluation
+
+#### Scenario: next skips disabled step
+
+- **GIVEN** a change in `implementing`
+- **AND** a schema where `verifying` is `disabled: true`
+- **WHEN** `execute` is called with `to: 'next'`
+- **THEN** Core resolves the target to `done` via `nextWorkflowStep`
+
+#### Scenario: next is rejected from archivable
+
+- **GIVEN** a change in `archivable`
+- **WHEN** `execute` is called with `to: 'next'`
+- **THEN** it throws `HappyPathNextUnavailableError` (a typed `SpecdError`)
+- **AND** it does not invent an archive execute
+
+### Requirement: Bypassed step evaluation and hook suppression
+
+#### Scenario: Bypassed step executes step-skip checks
+
+- **GIVEN** a transition from `ready` to `verifying` bypassing optional step `implementing`
+- **AND** check `workflow.tasksEmpty` bound under `scope: 'step-skip'`
+- **WHEN** `TransitionChange.execute` runs
+- **THEN** the step-skip checks for `implementing` are executed
+- **AND** neither `implementing.hooks.pre` nor `implementing.hooks.post` are executed
+
+#### Scenario: Failed step-skip check aborts transition
+
+- **GIVEN** a transition from `ready` to `verifying` bypassing optional step `implementing`
+- **AND** `tasks.md` has incomplete tasks causing `workflow.tasksEmpty` to fail
+- **WHEN** `TransitionChange.execute` runs
+- **THEN** the transition aborts and throws `CheckPredicateFailedError`
+
+#### Scenario: Bypassed step evaluation queries sovereign change schema
+
+- **GIVEN** a change with recorded schema `custom-workflow`
+- **WHEN** `TransitionChange.execute` resolves topology and bypassed steps
+- **THEN** it resolves `custom-workflow` through `ResolveChangeSchema`
+- **AND** it does not evaluate against the default project schema
+
+#### Scenario: Target step executes schema-declared checks
+
+- **GIVEN** a schema workflow step `implementing` declaring `@security.code-scan` with `config: { severity: 'critical' }`
+- **WHEN** `TransitionChange.execute` transitions to `implementing`
+- **THEN** `@security.code-scan` is executed as part of transition predicates
+- **AND** it receives `{ severity: 'critical' }` in `ctx.config`
+
+#### Scenario: Target step omits schema-disabled check
+
+- **GIVEN** a schema workflow step `implementing` declaring `impl.linksInScope: { disabled: true }`
+- **WHEN** `TransitionChange.execute` transitions to `implementing`
+- **THEN** `impl.linksInScope` is not executed
+
+#### Scenario: Bypassed step executes custom skipChecks declared in schema
+
+- **GIVEN** an optional step declaring `skipChecks: [{ id: '@qa.allow-bypass' }]`
+- **WHEN** `TransitionChange.execute` bypasses this step
+- **THEN** `@qa.allow-bypass` is executed under `scope: 'step-skip'`
+
+#### Scenario: Empty effective skip-check set permits bypass
+
+- **GIVEN** an intermediate step declared `optional: true`
+- **AND** no registry binding or schema `skipChecks` declaration applies to it
+- **WHEN** `TransitionChange.execute` requests a legal shortcut across the step
+- **THEN** the bypass succeeds without inventing a predicate
+
+#### Scenario: Status projection cannot authorize a stale transition
+
+- **GIVEN** status previously projected a candidate as available
+- **AND** persisted facts change before mutation
+- **WHEN** `TransitionChange.execute` attempts that target
+- **THEN** it recalculates the complete candidate through the shared evaluator
+- **AND** it rejects the transition if the fresh predicates fail
+
+#### Scenario: Effects begin only after the complete candidate passes
+
+- **GIVEN** a candidate with normal and step-skip predicates
+- **WHEN** any predicate fails
+- **THEN** no hook, aggregate mutation, or persistence occurs
+- **AND** `TransitionChange` owns those effects only after a passing verdict
+
+### Requirement: Shared runner errors propagate on transition
+
+#### Scenario: Failed predicate check throws unified CheckPredicateFailedError
+
+- **GIVEN** an active check returning `outcome: 'fail'` with code `'SPEC_OVERLAP'` and `action: { kind: '@plugin.fix' }`
+- **WHEN** `TransitionChange.execute` evaluates transition preflight
+- **THEN** it throws `CheckPredicateFailedError` containing the check's `checkId`, `label`, `code`, `message`, `action`, `skippable`, and the attempted `from` / `to`
+- **AND** the error has no `command` property
+- **AND** legacy error classes like `ArchiveImplementationStateError` are not thrown
+
+#### Scenario: Multiple failed checks with collect policy populate details
+
+- **GIVEN** multiple checks failing under `onFailure: 'collect'`
+- **WHEN** transition preflight completes
+- **THEN** `CheckPredicateFailedError` contains structured diagnostic details for all failed checks
+
+#### Scenario: Canonical built-in failures map to InvalidStateTransitionError reasons
+
+- **WHEN** `protocol.edge`, `workflow.requires`, `workflow.taskCompletion`, or `approval.spec` fails during `TransitionChange.execute`
+- **THEN** it throws `CheckPredicateFailedError` with the failing check's `checkId`, `code`, `details`, and the attempted `from` / `to`
+- **AND** it does not throw `InvalidStateTransitionError` for those checks
+- **AND** the error class and reason are not chosen by switching on the check id (the use case may key on a check id only to emit `requires-check` / `task-completion-failed` progress events)
+
+#### Scenario: Failed step-skip and plugin checks use CheckPredicateFailedError
+
+- **GIVEN** a failing `workflow.tasksEmpty` step-skip predicate or a failing plugin check
+- **WHEN** `TransitionChange.execute` evaluates the candidate
+- **THEN** it throws `CheckPredicateFailedError` with that check's `checkId` and `skippable` flag
 
 ### Requirement: Dependencies
 
-#### Scenario: TransitionChange depends on LifecycleEngine and RunStepHooks
+#### Scenario: TransitionChange depends on transitionBindings
 
-- **WHEN** `TransitionChange` is assembled
-- **THEN** it receives `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, `RunStepHooks`, and `RefreshImplementationTracking`
+- **WHEN** `TransitionChange` is constructed
+- **THEN** it receives `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `RefreshImplementationTracking`, `approvals`, and `transitionBindings`
+- **AND** it does not receive `LifecycleEngine`, `RunStepHooks`, or `CountTasks` as use-case ports
+- **AND** it does not default `transitionBindings` to domain stub `TRANSITION_BINDINGS`
 
 ### Requirement: Config-based factory delegates through resolveTransitionChangeDeps
 
@@ -398,12 +653,42 @@
 - **WHEN** `createTransitionChange(config, options?)` is invoked
 - **THEN** it creates a composition resolver for that composition session
 - **AND** it derives `TransitionChangeDeps` through `resolveTransitionChangeDeps(resolver)`
-- **AND** `resolveTransitionChangeDeps(resolver)` resolves:
-- `changes: ChangeRepository`
-- `actor: ActorResolver`
-- `schemaProvider: SchemaProvider`
-- `runStepHooks: RunStepHooks`
-- `refreshImplementationTracking: RefreshImplementationTracking`
-- `approvals: ApprovalGates`
-- `lifecycle: LifecycleEngine`
+- **AND** `resolveTransitionChangeDeps(resolver)` resolves `transitionBindings` from `resolveWorkflowCheckRegistry`
+- **AND** it does not resolve `runStepHooks` onto the use case
+- **AND** it does not resolve `lifecycle` or `LifecycleEngine`
 - **AND** the factory delegates to canonical `createTransitionChange(deps)`
+
+### Requirement: Historic parked approval repair precedence
+
+#### Scenario: next from a parked state resolves to the delivery edge
+
+- **GIVEN** a change in `pending-spec-approval` or `pending-signoff` (each case starts from its own parked state)
+- **WHEN** `TransitionChange` is called with `to: 'next'`
+- **THEN** the target resolves to `implementing` or `archivable` respectively
+- **AND** the bound approval check decides whether the hop proceeds
+
+#### Scenario: Parked spec approval rejects a target without a protocol edge
+
+- **GIVEN** a change is in `pending-spec-approval` with a valid spec approval recorded
+- **AND** each request below is made independently, starting from that parked state rather than from the result of the previous request
+- **WHEN** it requests `implementing`
+- **THEN** the change transitions to `implementing`
+- **AND** requesting `spec-approved` fails with `CheckPredicateFailedError` for `protocol.edge`
+
+#### Scenario: Parked signoff rejects a target without a protocol edge
+
+- **GIVEN** a change is in `pending-signoff` with a valid sign-off recorded
+- **AND** each request below is made independently, starting from that parked state rather than from the result of the previous request
+- **WHEN** it requests `archivable`
+- **THEN** the change transitions to `archivable`
+- **AND** requesting `signed-off` fails with `CheckPredicateFailedError` for `protocol.edge`
+
+### Requirement: Host-neutral HappyPathNextUnavailableError
+
+#### Scenario: HappyPathNextUnavailableError message omits --next and exposes state
+
+- **GIVEN** a change in a state with no happy-path next hop (`archivable` or `archiving`)
+- **WHEN** `TransitionChange` is called with `to: 'next'`
+- **THEN** `HappyPathNextUnavailableError` (`HAPPY_PATH_NEXT_UNAVAILABLE`) is thrown
+- **AND** `error.message` does not contain `--next`
+- **AND** `error.state` equals the current change state

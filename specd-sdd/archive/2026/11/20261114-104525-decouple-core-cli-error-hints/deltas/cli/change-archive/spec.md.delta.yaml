@@ -1,0 +1,13 @@
+- op: added
+  description: 'Document CLI-rendered bypass hint for impl.linksInScope in change archive'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Error cases'
+  content: |
+    ### Requirement: CLI-rendered out-of-scope implementation hint
+
+    When `ArchiveChange` fails on `impl.linksInScope`, `change archive` SHALL reuse the centralized CLI hint-resolution helper (`change.archive` context) to render `--skip-checks impl.linksInScope` (and `--allow-out-of-scope` alias) guidance, rather than relying on CLI flags embedded in `@specd/core` failure messages.

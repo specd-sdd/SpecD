@@ -4,27 +4,36 @@ import {
   type HookPhaseSelector,
   type TransitionProgressEvent,
   type OnTransitionProgress,
-  VALID_TRANSITIONS,
   InvalidStateTransitionError,
+  UnknownCheckError,
+  HappyPathNextUnavailableError,
 } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat, serializeOutput, type OutputFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
+import { resolveCliErrorHint, skippableCheckHint } from '../../error-hints.js'
+import {
+  describeCheckFailure,
+  isCheckPredicateFailed,
+  isReconciledOperationBlocked,
+  isCheckNotSkippable,
+  projectCliBlocker,
+  projectCliNextAction,
+  projectCliNextActionRecord,
+  projectReconciledOperationBlocked,
+  reconciledRepairGuideLines,
+  resolveCliBypassFlag,
+  resolveCliWorkflowCommand,
+  resolveCliWorkflowGuidance,
+} from '../../guidance-presenter.js'
 import { parseCommaSeparatedValues } from '../../helpers/parse-comma-values.js'
-import { createHookProgressPresenter, type HookPresenterEvent } from './_hook-progress-presenter.js'
-
-/**
- * Renders the separator written to stderr after transition hooks complete.
- *
- * @param result - Aggregate hook completion counts observed during the transition.
- * @param result.hooks - Total number of hooks observed.
- * @param result.done - Hooks that completed successfully.
- * @param result.failed - Hooks that failed.
- * @returns One-line summary marker followed by a blank line.
- */
-function renderAllHooksDoneMarker(result: { hooks: number; done: number; failed: number }): string {
-  return `[all hooks done] hooks=${result.hooks} done=${result.done} failed=${result.failed} -------------------------------------\n\n`
-}
+import { createCheckProgressPresenter } from './_check-progress-presenter.js'
+import {
+  publicValidity,
+  publicVerificationEvidence,
+  validityTextLines,
+} from './_validity-present.js'
+import { CliExitError } from '../../helpers/cli-exit-error.js'
 
 /**
  * Writes one structured stream record for machine-readable transition output.
@@ -44,8 +53,235 @@ const VALID_HOOK_PHASES = new Set<HookPhaseSelector>([
   'all',
 ])
 
-/** All valid `ChangeState` values. */
-const VALID_STATES = Object.keys(VALID_TRANSITIONS) as ChangeState[]
+/** All valid `ChangeState` values (argument validation only; not availability). */
+const CHANGE_STATES = [
+  'drafting',
+  'designing',
+  'ready',
+  'pending-spec-approval',
+  'spec-approved',
+  'implementing',
+  'verifying',
+  'done',
+  'pending-signoff',
+  'signed-off',
+  'archivable',
+  'archiving',
+] as const satisfies readonly ChangeState[]
+
+/**
+ * Returns whether `value` is a known change lifecycle state.
+ *
+ * @param value - Candidate step name from the CLI
+ * @returns `true` when `value` is a `ChangeState`
+ */
+function isChangeState(value: string): value is ChangeState {
+  return (CHANGE_STATES as readonly string[]).includes(value)
+}
+
+/** GetStatus payload used to fill the Repair Guide after a failed transition. */
+type TransitionFailureStatus = Awaited<
+  ReturnType<import('@specd/sdk').Kernel['changes']['status']['execute']>
+>
+
+/**
+ * Typed transition failures that must render a Repair Guide from GetStatus.
+ *
+ * @param err - Caught rejection from `TransitionChange.execute`
+ * @returns Whether the CLI should exit 1 with a repair guide
+ */
+function isRepairGuideError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') {
+    return false
+  }
+  const name = (err as Error).name
+  return (
+    err instanceof InvalidStateTransitionError ||
+    isCheckPredicateFailed(err) ||
+    isCheckNotSkippable(err) ||
+    err instanceof UnknownCheckError ||
+    err instanceof HappyPathNextUnavailableError ||
+    name === 'InvalidStateTransitionError' ||
+    name === 'UnknownCheckError' ||
+    name === 'HappyPathNextUnavailableError'
+  )
+}
+
+/**
+ * Copies hash-free validity fields from a fresh status result.
+ *
+ * @param status - GetStatus payload used to fill a failed transition
+ * @returns Fields to merge into structured failure output
+ */
+function repairValidityFields(status: TransitionFailureStatus): {
+  readonly validity?: ReturnType<typeof publicValidity>
+  readonly verification?: ReturnType<typeof publicVerificationEvidence>
+} {
+  const validity = publicValidity(status.validity)
+  const verification =
+    status.change !== undefined ? publicVerificationEvidence(status.change) : undefined
+  return {
+    ...(validity !== undefined ? { validity } : {}),
+    ...(verification !== undefined ? { verification } : {}),
+  }
+}
+
+/**
+ * Resolves the CLI hint for a `CheckNotSkippableError` (hook checks point at `--skip-hooks`).
+ *
+ * @param err - Caught rejection
+ * @returns Hint text, or `undefined` when the error is not a non-skippable check failure
+ */
+function checkNotSkippableHint(err: Error): string | undefined {
+  if (!isCheckNotSkippable(err)) {
+    return undefined
+  }
+  const checkId = (err as { checkId?: unknown }).checkId
+  if (typeof checkId !== 'string') return undefined
+  return resolveCliErrorHint(
+    (err as { code?: string }).code ?? 'CHECK_NOT_SKIPPABLE',
+    { command: 'change.transition' },
+    { checkId },
+  )
+}
+
+/**
+ * Builds the machine-readable `error` object of a structured failure record.
+ *
+ * @param err - Caught rejection
+ * @returns `code`, `message` and, when known, `checkId`
+ */
+function structuredErrorField(err: Error): {
+  readonly error: { readonly code: string; readonly message: string; readonly checkId?: string }
+} {
+  const code = (err as { code?: unknown }).code
+  const checkId = (err as { checkId?: unknown }).checkId
+  return {
+    error: {
+      code: typeof code === 'string' ? code : err.name,
+      message: err.message,
+      ...(typeof checkId === 'string' ? { checkId } : {}),
+    },
+  }
+}
+
+/**
+ * Write text repair guide.
+ *
+ * @param err - err
+ * @param status - status
+ */
+function writeTextRepairGuide(err: Error, status: TransitionFailureStatus): void {
+  process.stderr.write(`error: ${err.message}\n`)
+  if (
+    err instanceof HappyPathNextUnavailableError ||
+    err.name === 'HappyPathNextUnavailableError'
+  ) {
+    const hint = resolveCliErrorHint('HAPPY_PATH_NEXT_UNAVAILABLE', {
+      command: 'change.transition',
+    })
+    if (hint !== undefined) {
+      process.stderr.write(`${hint}\n`)
+    }
+  }
+  const notSkippableHint = checkNotSkippableHint(err)
+  if (notSkippableHint !== undefined) {
+    process.stderr.write(`${notSkippableHint}\n`)
+  }
+  if (status.blockers) {
+    for (const b of status.blockers) {
+      process.stderr.write(
+        b.label !== undefined
+          ? `! ${b.code} — ${b.label}: ${b.message}\n`
+          : `! ${b.code}: ${b.message}\n`,
+      )
+    }
+  }
+  process.stderr.write('\n')
+  process.stderr.write('repair guide:\n')
+  if (status.change !== undefined) {
+    process.stderr.write(`  state:   ${status.change.state}\n`)
+  }
+  const validity = publicValidity(status.validity)
+  const evidence =
+    status.change !== undefined ? publicVerificationEvidence(status.change) : undefined
+  for (const line of validityTextLines(validity, evidence)) {
+    process.stderr.write(`  ${line}\n`)
+  }
+  if (status.nextAction?.targetStep) {
+    process.stderr.write(`  target:  ${status.nextAction.targetStep}\n`)
+  }
+  const projectedNextAction =
+    status.nextAction !== undefined
+      ? projectCliNextAction(status.nextAction, status.blockers)
+      : undefined
+  if (isCheckPredicateFailed(err)) {
+    const cpErr = err
+    process.stderr.write(`  check:   ${cpErr.label} (${cpErr.checkId})\n`)
+    process.stderr.write(`  code:    ${cpErr.checkCode}\n`)
+    if (cpErr.from !== undefined && cpErr.to !== undefined) {
+      process.stderr.write(`  hop:     ${cpErr.from} → ${cpErr.to}\n`)
+    }
+    for (const detailLine of describeCheckFailure(cpErr)) {
+      process.stderr.write(`  detail:  ${detailLine}\n`)
+    }
+    // The failed check's own guidance is always shown; a next-action command may accompany it
+    // but never replaces it.
+    const ownGuidance = resolveCliWorkflowGuidance(null, cpErr.action)
+    const cpCommand = resolveCliWorkflowCommand(null, cpErr.action) ?? projectedNextAction?.command
+    if (cpCommand) {
+      process.stderr.write(`  command: ${cpCommand}\n`)
+    }
+    const cpGuidance = ownGuidance ?? (cpCommand ? undefined : projectedNextAction?.guidance)
+    if (cpGuidance !== undefined) {
+      process.stderr.write(`  guidance: ${cpGuidance}\n`)
+    }
+    if (cpErr.skippable) {
+      const checkHint =
+        resolveCliErrorHint(
+          cpErr.checkId,
+          { command: 'change.transition' },
+          { isSkippable: true },
+        ) ?? skippableCheckHint(cpErr.checkId)
+      process.stderr.write(`  bypass:  ${checkHint}\n`)
+    } else {
+      const checkHint = resolveCliErrorHint(
+        cpErr.checkId,
+        { command: 'change.transition' },
+        { isSkippable: false },
+      )
+      if (checkHint !== undefined) {
+        process.stderr.write(`  hint:    ${checkHint}\n`)
+      }
+    }
+    const bypassed = new Set<string>([cpErr.checkId])
+    for (const blocker of status.blockers ?? []) {
+      if (blocker.checkId !== undefined && bypassed.has(blocker.checkId)) continue
+      if (resolveCliBypassFlag(blocker) !== undefined) {
+        bypassed.add(blocker.checkId ?? '')
+        process.stderr.write(`  bypass:  ${skippableCheckHint(blocker.checkId ?? '')}\n`)
+      }
+    }
+  } else {
+    if (projectedNextAction?.command) {
+      process.stderr.write(`  command: ${projectedNextAction.command}\n`)
+    } else if (projectedNextAction?.guidance !== undefined) {
+      process.stderr.write(`  guidance: ${projectedNextAction.guidance}\n`)
+    }
+    const bypassed = new Set<string>()
+    for (const blocker of status.blockers ?? []) {
+      if (resolveCliBypassFlag(blocker) !== undefined) {
+        const id = blocker.checkId ?? ''
+        if (bypassed.has(id)) continue
+        bypassed.add(id)
+        process.stderr.write(`  bypass:  ${skippableCheckHint(id)}\n`)
+      }
+    }
+  }
+  if (projectedNextAction?.reason) {
+    process.stderr.write(`  reason:  ${projectedNextAction.reason}\n`)
+  }
+}
 
 /**
  * Validates the user-facing target selection arguments.
@@ -68,69 +304,8 @@ function validateRequestedTarget(
     return cliError('either <step> or --next is required', format)
   }
 
-  if (step !== undefined && !(VALID_STATES as string[]).includes(step)) {
-    return cliError(`invalid state '${step}'. valid states: ${VALID_STATES.join(', ')}`, format)
-  }
-}
-
-/**
- * Resolves the effective target requested by the CLI invocation.
- *
- * @param fromState - The change's current lifecycle state
- * @param step - The explicit step argument, if provided
- * @param useNext - Whether `--next` was requested
- * @param format - The CLI output format for structured errors
- * @returns The target state to pass to the transition use case
- */
-function resolveRequestedTarget(
-  fromState: ChangeState,
-  step: string | undefined,
-  useNext: boolean,
-  format?: string,
-): ChangeState {
-  if (step !== undefined) {
-    return step as ChangeState
-  }
-
-  return resolveNextTarget(fromState, format)
-}
-
-/**
- * Resolves the next logical lifecycle target for `--next`.
- *
- * @param fromState - The change's current lifecycle state
- * @param format - The CLI output format for structured errors
- * @returns The next transition target
- */
-function resolveNextTarget(fromState: ChangeState, format?: string): ChangeState {
-  switch (fromState) {
-    case 'drafting':
-      return 'designing'
-    case 'designing':
-      return 'ready'
-    case 'ready':
-      return 'implementing'
-    case 'spec-approved':
-      return 'implementing'
-    case 'implementing':
-      return 'verifying'
-    case 'verifying':
-      return 'done'
-    case 'done':
-      return 'archivable'
-    case 'signed-off':
-      return 'archivable'
-    case 'pending-spec-approval':
-      return cliError(
-        'cannot advance with --next: change is waiting for human spec approval',
-        format,
-      )
-    case 'pending-signoff':
-      return cliError('cannot advance with --next: change is waiting for human signoff', format)
-    case 'archivable':
-      return cliError('cannot advance with --next: archiving is not a lifecycle transition', format)
-    case 'archiving':
-      return cliError('cannot advance with --next: archiving is a terminal state', format)
+  if (step !== undefined && !isChangeState(step)) {
+    return cliError(`invalid state '${step}'. valid states: ${CHANGE_STATES.join(', ')}`, format)
   }
 }
 
@@ -139,45 +314,36 @@ function resolveNextTarget(fromState: ChangeState, format?: string): ChangeState
  * feedback to stderr in text format and stdout stream records for structured formats.
  *
  * @param format - The CLI output format for visual or structured progress
+ * @param skips - User-requested check and hook bypasses used to label skipped rows
+ * @param skips.skipChecks - Check ids bypassed with `--skip-checks`
+ * @param skips.skipHooks - Hook phase selectors skipped with `--skip-hooks`
  * @returns The progress callback and collected events
  */
-function makeProgressRenderer(format: OutputFormat): {
+function makeProgressRenderer(
+  format: OutputFormat,
+  skips: { readonly skipChecks: ReadonlySet<string>; readonly skipHooks: ReadonlySet<string> },
+): {
   onProgress: OnTransitionProgress
   events: TransitionProgressEvent[]
-  finishHookStream(): void
 } {
   const events: TransitionProgressEvent[] = []
-  const presenter = createHookProgressPresenter({
+  const checkPresenter = createCheckProgressPresenter({
     format,
+    streamName: 'change-transition',
     stream: format === 'text' ? process.stderr : process.stdout,
-    autoFinalizeOnDone: true,
+    skipChecks: skips.skipChecks,
+    skipHooks: skips.skipHooks,
   })
-  let sawHookEvent = false
-  let renderedHookCompletion = false
-  const hookResults = new Map<string, boolean>()
-
-  const hookKeyFor = (event: Extract<HookPresenterEvent, { hookId: string }>): string =>
-    `${event.phase ?? 'none'}:${event.hookId}`
-
-  const finishHookStream = (): void => {
-    presenter.flush()
-    if (format !== 'text' || !sawHookEvent || renderedHookCompletion) return
-    const doneCount = Array.from(hookResults.values()).filter(Boolean).length
-    const failedCount = hookResults.size - doneCount
-    process.stderr.write(
-      renderAllHooksDoneMarker({
-        hooks: hookResults.size,
-        done: doneCount,
-        failed: failedCount,
-      }),
-    )
-    renderedHookCompletion = true
-  }
 
   const onProgress: OnTransitionProgress = (evt) => {
     events.push(evt)
 
     switch (evt.type) {
+      case 'check-start':
+      case 'check-progress':
+      case 'check-done':
+        checkPresenter.onEvent(evt)
+        break
       case 'requires-check': {
         if (format !== 'text') {
           writeStructuredRecord(format, { stream: 'change-transition', event: evt })
@@ -188,21 +354,17 @@ function makeProgressRenderer(format: OutputFormat): {
         process.stderr.write(`  ${mark} requires ${evt.artifactId} [${status}]\n`)
         break
       }
-      case 'hook-start':
-      case 'hook-output':
-      case 'hook-heartbeat': {
-        sawHookEvent = true
-        presenter.onEvent(evt)
-        break
-      }
-      case 'hook-done': {
-        sawHookEvent = true
-        hookResults.set(hookKeyFor(evt), evt.success)
-        presenter.onEvent(evt)
+      case 'task-completion-failed': {
+        if (format !== 'text') {
+          writeStructuredRecord(format, { stream: 'change-transition', event: evt })
+          break
+        }
+        process.stderr.write(
+          `  ✗ tasks incomplete for ${evt.artifactId} (${evt.incomplete}/${evt.total})\n`,
+        )
         break
       }
       case 'transitioned': {
-        finishHookStream()
         if (format !== 'text') {
           writeStructuredRecord(format, { stream: 'change-transition', event: evt })
           break
@@ -213,7 +375,7 @@ function makeProgressRenderer(format: OutputFormat): {
     }
   }
 
-  return { onProgress, events, finishHookStream }
+  return { onProgress, events }
 }
 
 /**
@@ -226,9 +388,21 @@ export function registerChangeTransition(parent: Command): void {
     .command('transition <name> [step]')
     .allowExcessArguments(false)
     .description(
-      'Transition a change to a new lifecycle state (e.g. designing → ready → implementing → verifying).',
+      'Transition a change to a new lifecycle state. Approval gates stay in ready/done; pending states drain in-flight work only.',
     )
     .option('--next', 'transition to the next logical lifecycle step')
+    .option(
+      '--skip-checks <ids>',
+      'comma-separated check identifiers to bypass (e.g. impl.linksInScope,spec.overlap)',
+    )
+    .option(
+      '--allow-out-of-scope',
+      'permit the hop when implementation links resolve outside the change scope (impl.linksInScope) [deprecated alias]',
+    )
+    .option(
+      '--allow-overlap',
+      'permit the archive hop when spec overlaps exist (spec.overlap) [deprecated alias]',
+    )
     .option(
       '--skip-hooks <phases>',
       'skip hook phases (source.pre,source.post,target.pre,target.post,all)',
@@ -240,16 +414,27 @@ export function registerChangeTransition(parent: Command): void {
       `
 JSON/TOON output schema:
   Stream records on stdout:
-    { stream: "hook-progress", event: ... }
-    { stream: "change-transition", event: ... }
-    { stream: "change-transition", event: { type: "complete", result: ... } }
+    { stream: "change-transition", event: { type: "check-start"|"check-progress"|"check-done"|… } }
+    { stream: "change-transition", event: { type: "complete", result: { result: "ok", name, from, to } } }
+    { stream: "change-transition", event: { type: "complete", result: { result: "failure", name, from, to, error?: { code, message, checkId? }, hint?, state?, validity?, verification?,
+        blockers: [{ code, message, label?, checkId?, action?, bypassFlag?, details? }],
+        nextAction: { targetStep, actionType, command: string|null, guidance?: string, reason, intent, action? },
+        automaticReturn? (committed recovery: state, automaticReturn, blockers, nextAction) } } }
 `,
     )
     .action(
       async (
         name: string,
         step: string | undefined,
-        opts: { format: string; config?: string; next?: boolean; skipHooks?: string },
+        opts: {
+          format: string
+          config?: string
+          next?: boolean
+          skipHooks?: string
+          skipChecks?: string
+          allowOutOfScope?: true
+          allowOverlap?: true
+        },
       ) => {
         const fmt = parseFormat(opts.format)
         try {
@@ -259,6 +444,22 @@ JSON/TOON output schema:
             opts.skipHooks !== undefined
               ? parseCommaSeparatedValues(opts.skipHooks, VALID_HOOK_PHASES, '--skip-hooks')
               : new Set<HookPhaseSelector>()
+
+          const skipChecks = new Set<string>()
+          if (opts.skipChecks) {
+            for (const id of opts.skipChecks
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean)) {
+              skipChecks.add(id)
+            }
+          }
+          if (opts.allowOutOfScope === true) {
+            skipChecks.add('impl.linksInScope')
+          }
+          if (opts.allowOverlap === true) {
+            skipChecks.add('spec.overlap')
+          }
 
           const { kernel } = await resolveCliContext({ configPath: opts.config })
 
@@ -271,14 +472,13 @@ JSON/TOON output schema:
             cliError(`change '${name}' is drafted; restore it before transitioning`, opts.format)
           }
           const fromState = statusBefore.state
-          const requestedTarget = resolveRequestedTarget(
-            fromState,
-            step,
-            opts.next ?? false,
-            opts.format,
-          )
+          const requestedTarget: ChangeState | 'next' =
+            opts.next === true ? 'next' : (step as ChangeState)
 
-          const progressRenderer = makeProgressRenderer(fmt)
+          const progressRenderer = makeProgressRenderer(fmt, {
+            skipChecks,
+            skipHooks: skipHookPhases,
+          })
 
           try {
             const result = await kernel.changes.transition.execute(
@@ -286,6 +486,7 @@ JSON/TOON output schema:
                 name,
                 to: requestedTarget,
                 skipHookPhases,
+                skipChecks: Array.from(skipChecks),
               },
               progressRenderer.onProgress,
             )
@@ -307,24 +508,9 @@ JSON/TOON output schema:
               })
             }
           } catch (err) {
-            progressRenderer.finishHookStream()
-            if (err instanceof InvalidStateTransitionError) {
-              const status = await kernel.changes.status.execute({
-                name,
-                refreshImplementationTracking: false,
-              })
-
+            if (isReconciledOperationBlocked(err)) {
               if (fmt === 'text') {
-                process.stderr.write(`error: ${err.message}\n`)
-                for (const b of status.blockers) {
-                  process.stderr.write(`! ${b.code}: ${b.message}\n`)
-                }
-                process.stderr.write('\n')
-                process.stderr.write('repair guide:\n')
-                process.stderr.write(`  target:  ${status.nextAction.targetStep}\n`)
-                process.stderr.write(`  command: ${status.nextAction.command ?? '(none)'}\n`)
-                process.stderr.write(`  reason:  ${status.nextAction.reason}\n`)
-                process.exit(1)
+                process.stderr.write(`${reconciledRepairGuideLines(err).join('\n')}\n`)
               } else {
                 writeStructuredRecord(fmt, {
                   stream: 'change-transition',
@@ -335,18 +521,66 @@ JSON/TOON output schema:
                       name,
                       from: fromState,
                       to: requestedTarget,
-                      blockers: status.blockers,
-                      nextAction: status.nextAction,
+                      ...structuredErrorField(err),
+                      ...projectReconciledOperationBlocked(err),
                     },
                   },
                 })
-                process.exit(1)
+              }
+              throw new CliExitError(1)
+            }
+            if (isRepairGuideError(err) && err instanceof Error) {
+              // A failing status read must not mask the original transition error.
+              const status = await kernel.changes.status
+                .execute({ name, refreshImplementationTracking: false })
+                .catch(() => undefined)
+              if (status === undefined) throw err
+
+              if (fmt === 'text') {
+                writeTextRepairGuide(err, status)
+                throw new CliExitError(1)
+              } else {
+                const structuredHint =
+                  err instanceof HappyPathNextUnavailableError ||
+                  err.name === 'HappyPathNextUnavailableError'
+                    ? resolveCliErrorHint('HAPPY_PATH_NEXT_UNAVAILABLE', {
+                        command: 'change.transition',
+                      })
+                    : isCheckPredicateFailed(err)
+                      ? err.skippable === true
+                        ? skippableCheckHint(err.checkId)
+                        : resolveCliErrorHint(
+                            err.checkId,
+                            { command: 'change.transition' },
+                            { isSkippable: false },
+                          )
+                      : checkNotSkippableHint(err)
+                const projectedBlockers = status.blockers.map(projectCliBlocker)
+                writeStructuredRecord(fmt, {
+                  stream: 'change-transition',
+                  event: {
+                    type: 'complete',
+                    result: {
+                      result: 'failure',
+                      name,
+                      from: fromState,
+                      to: requestedTarget,
+                      ...structuredErrorField(err),
+                      blockers: projectedBlockers,
+                      nextAction: projectCliNextActionRecord(status.nextAction, status.blockers),
+                      ...(structuredHint !== undefined ? { hint: structuredHint } : {}),
+                      ...(status.change !== undefined ? { state: status.change.state } : {}),
+                      ...repairValidityFields(status),
+                    },
+                  },
+                })
+                throw new CliExitError(1)
               }
             }
             throw err
           }
         } catch (err) {
-          handleError(err, opts.format)
+          handleError(err, opts.format, { command: 'change.transition' })
         }
       },
     )

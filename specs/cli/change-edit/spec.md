@@ -8,24 +8,19 @@ A change's scope often evolves after creation — specs get added, removed, or s
 
 ### Requirement: Command signature
 
+The canonical command is:
+
+```text
+specd changes edit <name>
+  [--add-spec <id> ...] [--remove-spec <id> ...]
+  [--description <text>]
+  [--artifact-policy none|surgical|downstream|global]
+  [--workflow-policy preserve|redesign]
+  [--format text|json|toon]
+  [--config <path>]
 ```
-specd change edit <name>
-  [--add-spec <id>] [--remove-spec <id>]
-  [--description <text>] [--invalidation-policy <policy>]
-  [--format text|json|toon] [--config <path>]
-```
 
-- `<name>` — required positional; the name of the change to edit
-- `--add-spec <id>` — repeatable; adds a spec ID to `specIds`. `<id>` follows the `[<workspace>:]<capability-path>` format of `core:spec-id-format`; the value is passed to `EditChange` unchanged and the use case validates it and resolves a missing workspace to `default`
-- `--remove-spec <id>` — repeatable; removes a spec ID from `specIds`; passed unchanged
-- `--description <text>` — optional; sets or replaces the free-text description of the change
-- `--invalidation-policy <policy>` — optional; sets the invalidation policy of the change (`none`, `surgical`, `downstream`, or `global`)
-- `--format text|json|toon` — optional; output format, defaults to `text`
-- `--config <path>` — optional; path to `specd.yaml`
-
-Each value is one whole spec ID and is never split on commas. The command does not validate, qualify, or normalize spec IDs.
-
-At least one of `--add-spec`, `--remove-spec`, `--description`, or `--invalidation-policy` must be provided; running with none of them is a CLI usage error (exit code 1). The usage check happens before configuration is resolved, so a missing `specd.yaml` never masks the usage error.
+Scope options remain repeatable and use `[<workspace>:]<capability-path>` (`core:spec-id-format`); each value is one whole spec ID, is never split on commas, and is passed to `EditChange` unchanged (the command does not validate, qualify, or normalize spec IDs). At least one of `--add-spec`, `--remove-spec`, `--description`, `--artifact-policy`, or `--workflow-policy` is required; running with none of them is a CLI usage error (exit code 1) checked before configuration is resolved, so a missing `specd.yaml` never masks the usage error. The CLI maps only supplied policy dimensions to the structured `EditChange` input and does not synthesize unspecified values.
 
 ### Requirement: Workspace derivation
 
@@ -39,14 +34,22 @@ The `--remove-spec` flag is not subject to ownership checks — removing a spec 
 
 ### Requirement: Approval invalidation
 
-Any modification to `specIds` (and by extension `workspaces`) causes the domain to append an `invalidated` event followed by a `transitioned` event rolling back to `designing`. The CLI reports this in the output. Updating `--description` alone does not trigger invalidation.
+The command SHALL delegate scope and policy edits to `EditChange` and MUST NOT invalidate approvals or move lifecycle state itself.
+
+Output SHALL report `scopeChanged` separately from actual validity changes, which approval or verification projections became stale or revoked, which artifact files require review, canonical blockers and next action, and any automatic return committed by reconciliation. With a required stale spec approval in a state after `ready`, it SHALL report `designing` even when the workflow policy is `preserve`; in `ready` it SHALL report `ready` with the stale approval and no automatic return. Without that gate, a preserved state remains visible together with the forward-progress blocker.
+
+The command SHALL warn that approval was invalidated only when Core reports a committed projection change. A scope edit that leaves the approved canonical spec set and all fingerprinted inputs unchanged MUST NOT emit that warning. Any retained legacy `invalidated` field is deprecated and reflects actual validity change, not merely scope mutation.
+
+Blockers returned by Core are rendered through the same CLI blocker projection as `changes status` and `changes invalidate`. In text mode each blocker is printed as `! <CODE> — <label>: <message>` (the ` — <label>` part is omitted when the blocker carries no label), followed by an indented `bypass: <flag>` line only for a skippable blocker whose bypass flag resolves. In JSON and TOON each blocker is projected through the CLI blocker projection (`code`, `message`, and, when present, `label`, `checkId`, `details`, `action`, `bypassFlag`); the raw Core `isSkippable` field is never emitted.
+
+Description-only and policy-only edits MUST NOT be described as approval invalidation unless core reports a separately detected fresh drift.
 
 ### Requirement: Output on success
 
 On success, output depends on `--format`:
 
-- `text` (default): prints a human-readable success message to stdout showing the updated change name, spec IDs, and workspaces. If approval invalidation occurred, a warning is also printed to stderr.
-- `json` or `toon`: outputs `{ result: "ok", name, specIds, workspaces, invalidated, state }` (encoded in the respective format); `specIds` and `workspaces` are arrays, one whole name per element.
+- `text` (default): prints a human-readable success message to stdout showing the updated change name, spec IDs, and workspaces, followed by the effective policy, projection changes, automatic return, blockers (in the same form as `changes status`, see "Approval invalidation") and next action when Core reports them. The next action prints `target:`, `command:` (`(none)` when null) and `reason:` lines, and, when `command` is `null` and Core's next action carries `guidance`, an additional indented `guidance: <text>` line before `reason:` (as in `changes status`, `changes invalidate` and `changes verification`). If a validity change occurred, a warning is also printed to stderr.
+- `json` or `toon`: outputs `{ result: "ok", name, specIds, workspaces, invalidated, scopeChanged, validityChanged, state }` plus, when Core reports them, `blockers` (only when non-empty, each projected through the CLI blocker projection with `label`, `checkId`, `details`, `action` and `bypassFlag`, never raw `isSkippable`), `nextAction`, `effectivePolicy`, `projectionChanges` and `automaticReturn` (encoded in the respective format); `specIds` and `workspaces` are arrays, one whole name per element.
 
 ### Requirement: Error cases
 
@@ -55,7 +58,7 @@ On success, output depends on `--format`:
 - If an `--add-spec` value is not a valid spec ID, exits with code 1 and prints the `InvalidSpecIdError` message, which quotes the full value.
 - If an `--add-spec` value uses a workspace not declared in `specd.yaml`, exits with code 1 and prints the `WorkspaceNotFoundError` message.
 - If an `--add-spec` value targets a workspace with `readOnly` ownership, exits with code 1.
-- If `--invalidation-policy` is not one of `none`, `surgical`, `downstream`, or `global`, exits with code 1 and prints the `InvalidInputError` message from `EditChange`.
+- If `--artifact-policy` is not one of `none`, `surgical`, `downstream`, or `global`, or `--workflow-policy` is not `preserve` or `redesign`, exits with code 1 and prints the `InvalidInputError` message.
 
 ## Constraints
 
@@ -85,8 +88,9 @@ specd change edit add-oauth-login --description "Add OAuth2 login via Google and
 
 ## Spec Dependencies
 
-- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:change`](../../core/change/spec.md) — mutable fields, approval invalidation rules
-- [`cli:change-create`](../change-create/spec.md) — spec id format and workspace derivation logic
-- [`core:spec-id-format`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format
-- [`core:edit-change`](../../core/edit-change/spec.md) — validation, `readOnly` rejection, invalidation policy and `specIds` rules live in the use case
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, and output conventions
+- [`core:change`](../../core/change/spec.md) — mutable fields and validity projections
+- [`core:edit-change`](../../core/edit-change/spec.md) — canonical structured edit, reconciliation result, validation, and `readOnly` rejection
+- [`core:config`](../../core/config/spec.md) — structured invalidation policy contract
+- [`cli:change-create`](../change-create/spec.md) — shared spec ID option conventions
+- [`core:spec-id-format`](../../core/spec-id-format/spec.md) — canonical spec ID format

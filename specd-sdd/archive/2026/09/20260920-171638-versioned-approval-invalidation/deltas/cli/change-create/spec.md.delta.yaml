@@ -1,0 +1,44 @@
+- op: added
+  description: 'Accept structured invalidation policy overrides'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Command signature$'
+  content: |
+    ### Requirement: Structured invalidation policy input
+
+    The command SHALL expose independent optional inputs for artifact policy (`none | surgical | downstream | global`) and workflow policy (`preserve | redesign`). It SHALL resolve omitted values from validated project configuration and pass one structured policy to `CreateChange`.
+
+    With no explicit or configured value, the created change uses `{ artifacts: downstream, workflow: preserve }`. Legacy `invalidationPolicy` compatibility and rejection of simultaneous old/new config shapes belong to core configuration loading; the CLI MUST NOT duplicate them. New manifests persist only the v2 structured shape.
+
+- op: modified
+  description: 'Document structured policy flags in the command signature'
+  selector:
+    type: section
+    matches: '^Requirement: Command signature$'
+  content: |
+    ```text
+    specd changes create <name>
+      [--description <text>]
+      [--spec <id> ...]
+      [--artifact-policy none|surgical|downstream|global]
+      [--workflow-policy preserve|redesign]
+      [--format text|json|toon]
+    ```
+
+    The name is required; spec and policy flags are optional and repeatability follows their value shape. The command validates policy values before delegating creation. It does not expose the deprecated scalar policy as a new-write option.
+
+- op: modified
+  description: 'Declare use-case and config dependencies'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, and output conventions
+    - [`core:change`](../../core/change/spec.md) — change identity and structured policy projection
+    - [`core:create-change`](../../core/create-change/spec.md) — canonical creation input and v2 persistence
+    - [`core:config`](../../core/config/spec.md) — structured defaults and legacy alias adaptation
+    - [`core:spec-id-format`](../../core/spec-id-format/spec.md) — canonical spec ID format and bare-path shorthand

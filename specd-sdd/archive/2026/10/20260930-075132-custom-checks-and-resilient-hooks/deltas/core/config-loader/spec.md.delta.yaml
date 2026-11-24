@@ -1,0 +1,17 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Layer merge semantics'
+  content: |
+    After resolving the active config chain, the loader MUST merge layers in chain order from lowest to highest precedence using the core `deepMergeConfig` service.
+
+    Merge rules are:
+
+    - scalars: later active layer wins
+    - objects: deep merge by key (recursively across arbitrary nested records of records)
+    - arrays: append by default
+    - `remove.root`: delete optional top-level fields from the accumulated config
+    - `remove.<mapName>`: delete named keys from keyed object maps such as `workspaces` and `storage`
+    - `remove.<arrayName>`: delete inherited array entries using that array's defined identity keys
+
+    A standalone layer without `extends` resets the accumulated base from that point and discards any earlier inherited state outside the current chain.

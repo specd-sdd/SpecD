@@ -14,5 +14,41 @@
       "file": "core:src/application/use-cases/get-spec.ts",
       "symbols": ["GetSpec"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "GetSpec loads Spec + present artifacts Map keyed by filename; WorkspaceNotFoundError / SpecNotFoundError; missing artifacts omitted.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:39dd47c607fa990e5cbbdda8eeae323705db3527d6d253b9474248b73522f60d",
+          "lastModified": "2026-08-25T15:37:19.311Z"
+        },
+        "verify.md": {
+          "hash": "sha256:f25419edbc96b7454387b22ab75fff443fb872c28edb78e6c2f8d765f2ff73eb",
+          "lastModified": "2026-08-25T15:37:19.311Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Get Spec\n\n## Rules\n- Lookup `SpecRepository` by `workspace`; missing → `WorkspaceNotFoundError`.\n- `repo.get(specPath)`; null → `SpecNotFoundError` w/ `workspace:capabilityPath`.\n- Iterate `spec.artifacts`; load present via `repo.artifact(spec, entry.filename)`. Result `artifacts` Map keyed by filename. Values = content-bearing `SpecArtifact` from `artifact()`, not presence rows from `get()`.\n- Result: `{ spec, artifacts: Map<string, SpecArtifact> }`.\n- Input: `workspace` string, `specPath` `SpecPath`.\n- Config factory via `resolveGetSpecDeps` (`specRepos: ReadonlyMap<string, SpecRepository>`) only.\n\n## Constraints\n- MUST NOT mutate repo map or repositories\n- Missing workspace/spec throws — never return null\n- `repo.artifact` null → silently omit; no per-file error",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:39dd47c607fa990e5cbbdda8eeae323705db3527d6d253b9474248b73522f60d",
+          "lastModified": "2026-08-25T15:37:19.311Z"
+        },
+        "verify.md": {
+          "hash": "sha256:f25419edbc96b7454387b22ab75fff443fb872c28edb78e6c2f8d765f2ff73eb",
+          "lastModified": "2026-08-25T15:37:19.311Z"
+        }
+      }
+    }
+  }
 }

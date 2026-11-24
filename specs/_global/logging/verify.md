@@ -46,3 +46,17 @@
 
 - **WHEN** analyzing production code
 - **THEN** any direct call to `console.log/warn/error` (excluding bootstrapping or infrastructure adapters) SHOULD be flagged as a violation
+
+### Requirement: Ambient Logger
+
+#### Scenario: Logger is safe before composition wiring
+
+- **WHEN** any layer imports `Logger` before the composition root assigns an implementation
+- **THEN** `Logger.debug` and other methods MUST NOT throw
+- **AND** they MUST NOT write to `console` unless an implementation was assigned
+
+#### Scenario: Ambient import without logger port
+
+- **GIVEN** a domain service that emits diagnostic logs
+- **WHEN** it logs via the ambient `Logger`
+- **THEN** it does not require a logger port in its constructor or input options

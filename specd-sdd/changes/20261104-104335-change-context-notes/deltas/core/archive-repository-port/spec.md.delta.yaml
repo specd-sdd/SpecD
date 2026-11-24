@@ -1,0 +1,7 @@
+- op: added
+  position:
+    parent: { type: section, matches: '^Requirements$' }
+  content: |
+    ### Requirement: Success-cleaned note snapshot commit
+
+    Archive persistence SHALL commit the supplied successful-operation note snapshot and its note audit together with the staged archived manifest, rather than silently retaining stale disk notes. The original active manifest notes/history SHALL be retained for restoration if archive commit fails. Success-cleaned notes SHALL not be independently persisted in active storage before success or patched into immutable archive storage afterward. Return archived detail from the exact committed manifest, preserving actor IDs and legacy missing-ID compatibility. Post-commit metadata/hook warnings do not undo success cleanup. The staged serializer SHALL preserve unrelated manifest facts and prior append-only events.

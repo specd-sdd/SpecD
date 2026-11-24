@@ -1,0 +1,150 @@
+- op: modified
+  selector:
+    type: section
+    matches: ^Requirement:\ Machine\-readable\ blockers$
+  content: |
+    #### Scenario: Detailed affected artifacts for drift
+
+    - **GIVEN** a change with two spec-scoped files in the `specs` artifact
+    - **AND** one file has drifted on disk
+    - **WHEN** `evaluateLifecycleVerdict` is called
+    - **THEN** it returns a blocker with code `ARTIFACT_DRIFT`
+    - **AND** `affectedArtifacts` contains exactly the drifted filename and spec ID
+
+    #### Scenario: Blocker skippability and bypass flag come from resolved bindings
+
+    - **GIVEN** a failed `spec.overlap` check with code `OVERLAP_CONFLICT`
+    - **AND** the resolved `spec.overlap` binding has `skippable: false` (via schema `archiveChecks` or `resolvedBindings`)
+    - **WHEN** `evaluateLifecycleVerdict` projects `blockers`
+    - **THEN** the `OVERLAP_CONFLICT` blocker has `isSkippable: false` and no `bypassFlag`
+- op: modified
+  selector:
+    type: section
+    matches: ^Requirement:\ Available\ steps\ and\ domain\ next\ hop$
+  content: |
+    #### Scenario: Skip bypass allows transition despite blocker
+
+    - **GIVEN** an `OVERLAP_CONFLICT` blocker that is skippable
+    - **AND** `spec.overlap` is bypassed through `skipChecks`
+    - **WHEN** `evaluateLifecycleVerdict` is called
+    - **THEN** `OVERLAP_CONFLICT` is absent from `blockers`
+    - **AND** the verdict does not include a warning object for that overlap
+    - **AND** `isPermitted` for the target step is `true`
+
+    #### Scenario: Overlap review hop is designing
+
+    - **GIVEN** a change with an unhandled `spec-overlap-conflict` invalidation
+    - **WHEN** `evaluateLifecycleVerdict` runs
+    - **THEN** `review.reason` is `spec-overlap-conflict`
+    - **AND** `nextHop.targetStep` is `designing`
+
+    #### Scenario: Incomplete tasks exclude verifying from availableTransitions
+
+    - **GIVEN** a change in `implementing` with incomplete tasks
+    - **WHEN** `evaluateLifecycle` projects from those check results
+    - **THEN** `validTransitions` includes `verifying`
+    - **AND** `availableTransitions` does not include `verifying`
+    - **AND** `nextAction` recommends `/specd-implement`
+    - **AND** `nextAction.targetStep` is `implementing`
+
+    #### Scenario: Complete tasks recommend verify
+
+    - **GIVEN** a change in `implementing` with complete gated tasks
+    - **AND** verifying requires are satisfied
+    - **WHEN** `evaluateLifecycle` runs
+    - **THEN** `availableTransitions` includes `verifying`
+    - **AND** `nextAction` recommends `/specd-verify`
+    - **AND** `nextAction.targetStep` is `verifying`
+
+    #### Scenario: Passing skip checks recommend bypassing optional implementing
+
+    - **GIVEN** a change in `ready`
+    - **AND** `implementing` is optional
+    - **AND** its effective `step-skip` predicates pass
+    - **WHEN** `evaluateLifecycle` runs
+    - **THEN** `availableTransitions` contains both `implementing` and the legal shortcut target
+    - **AND** `nextAction.targetStep` is the shortcut target
+
+    #### Scenario: Failed skip check recommends entering optional implementing
+
+    - **GIVEN** a change in `ready`
+    - **AND** `implementing` is optional
+    - **AND** one effective `step-skip` predicate fails
+    - **WHEN** `evaluateLifecycle` runs
+    - **THEN** the shortcut target is absent from `availableTransitions`
+    - **AND** `nextAction.targetStep` is `implementing`
+
+    #### Scenario: checksByTarget contains the complete failed shortcut evidence
+
+    - **GIVEN** a legal shortcut whose normal predicates pass and whose bypassed-step predicate fails
+    - **WHEN** `evaluateLifecycle` projects the candidate
+    - **THEN** `checksByTarget` includes both the normal and `step-skip` results
+    - **AND** the shortcut is absent from `availableTransitions`
+
+    #### Scenario: Empty skip-check set recommends unconditional bypass
+
+    - **GIVEN** a change whose immediate next step is optional
+    - **AND** that step has no effective `step-skip` bindings
+    - **WHEN** `evaluateLifecycle` runs
+    - **THEN** Core recommends the first later available target
+    - **AND** entering the optional step remains an explicit available alternative
+
+    #### Scenario: Consecutive optional steps use the furthest passing shortcut
+
+    - **GIVEN** two consecutive optional steps after the current state
+    - **AND** every effective skip predicate for both steps passes
+    - **WHEN** `evaluateLifecycle` runs
+    - **THEN** `nextAction.targetStep` is the first later mandatory available step
+
+    #### Scenario: Disabled verifying recommends done
+
+    - **GIVEN** a change in `implementing` with complete tasks
+    - **AND** a schema where `verifying` is `disabled: true`
+    - **WHEN** `evaluateLifecycle` runs
+    - **THEN** `availableTransitions` includes `done`
+    - **AND** `nextAction.targetStep` is `done`
+
+    #### Scenario: designing with ready available targets ready
+
+    - **GIVEN** a change in `designing` with all required design artifacts complete
+    - **AND** `ready` is in `availableTransitions`
+    - **WHEN** `evaluateLifecycle` runs
+    - **THEN** `nextAction.targetStep` is `ready`
+    - **AND** `nextAction.command` is `/specd-design`
+
+    #### Scenario: verifying with done available targets done
+
+    - **GIVEN** a change in `verifying`
+    - **AND** `done` is in `availableTransitions`
+    - **WHEN** `evaluateLifecycle` runs
+    - **THEN** `nextAction.targetStep` is `done`
+    - **AND** `nextAction.command` is `/specd-verify`
+
+    #### Scenario: done lists backward hops without making them nextAction
+
+    - **GIVEN** a change in `done` with signoff satisfied or disabled
+    - **WHEN** `evaluateLifecycle` runs
+    - **THEN** `availableTransitions` includes `implementing` and `verifying`
+    - **AND** `nextAction.targetStep` is `archivable`
+    - **AND** `nextAction.command` is `/specd-archive`
+
+    #### Scenario: archivable recommends archive skill
+
+    - **GIVEN** a change in `archivable`
+    - **WHEN** `evaluateLifecycle` runs
+    - **THEN** `nextAction.targetStep` is `archiving`
+    - **AND** `nextAction.command` is `/specd-archive`
+
+    #### Scenario: Non-recommended available target remains explicit alternative
+
+    - **GIVEN** `nextAction` recommends a forward lifecycle target
+    - **AND** `designing` is also present in `availableTransitions`
+    - **WHEN** lifecycle guidance is projected
+    - **THEN** the recommendation remains unchanged
+    - **AND** the advertised redesign target remains selectable by an explicit skill invocation
+
+    #### Scenario: availableSteps follow canonical order regardless of row order
+
+    - **GIVEN** a schema whose `workflow` rows are declared as `verifying`, `implementing`, `ready`
+    - **WHEN** `evaluateLifecycleVerdict` projects `availableSteps`
+    - **THEN** the steps appear as `ready`, `implementing`, `verifying`

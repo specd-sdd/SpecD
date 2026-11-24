@@ -21,6 +21,7 @@ Understand why spec-driven development matters and how projects are structured:
 
 - **[Philosophy](./philosophy.md)** — The core problem with traditional software development, why specs must come before code, and the contract between human intent and AI execution.
 - **[Installation & Initialization](./installation.md)** — Installing the SpecD CLI globally or locally, system requirements, initializing projects (`specd project init`), and installing agent plugins.
+- **[Plugins](./plugins.md)** — Plugin manifests, contribution addresses, project selection, and the `plugins` commands.
 - **[Getting Started Quickstart](./getting-started.md)** — A 10-minute walkthrough taking you from zero to your first verified and archived change with slash skills.
 - **[Project Structure](./project-structure.md)** — The directory layout of a SpecD repository, including `specs/`, `.specd/`, workspaces, and application code.
 

@@ -1050,6 +1050,66 @@ describe('MarkdownParser', () => {
         ]),
       ).toThrow(DeltaApplicationError)
     })
+
+    it('paragraph + value serializes updated text while preserving untouched sibling _inlines', () => {
+      const ast = parser.parse(
+        '# Spec\n\nTarget `old` paragraph.\n\nUntouched *preserved* sibling.\n',
+      )
+      const res = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'paragraph', contains: 'Target' },
+          value: 'Updated paragraph text.',
+        },
+      ])
+      const serialized = parser.serialize(res.ast)
+      expect(serialized).toContain('Updated paragraph text.')
+      expect(serialized).not.toContain('Target `old` paragraph.')
+      expect(serialized).toContain('Untouched *preserved* sibling.')
+      expect(res.warnings).toEqual([])
+    })
+
+    it('blockquote paragraph + value serializes updated text', () => {
+      const ast = parser.parse('# Spec\n\n> Old quote text.\n')
+      const res = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'paragraph', contains: 'Old quote text' },
+          value: 'Replaced quote text.',
+        },
+      ])
+      const serialized = parser.serialize(res.ast)
+      expect(serialized).toContain('Replaced quote text.')
+      expect(serialized).not.toContain('Old quote text.')
+    })
+
+    it('list-item + rename serializes updated item text', () => {
+      const ast = parser.parse('# List\n\n- Old item\n- Sibling *kept*\n')
+      const res = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'list-item', matches: '^Old item$' },
+          rename: 'New item',
+        },
+      ])
+      const serialized = parser.serialize(res.ast)
+      expect(serialized).toContain('- New item')
+      expect(serialized).not.toContain('- Old item')
+      expect(serialized).toContain('- Sibling *kept*')
+    })
+
+    it('paragraph + rename throws DeltaApplicationError', () => {
+      const ast = parser.parse('# Spec\n\nOld paragraph.\n')
+      expect(() =>
+        parser.apply(ast, [
+          {
+            op: 'modified',
+            selector: { type: 'paragraph', contains: 'Old paragraph' },
+            rename: 'New label',
+          },
+        ]),
+      ).toThrow(DeltaApplicationError)
+    })
   })
 })
 

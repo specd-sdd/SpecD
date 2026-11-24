@@ -1,3 +1,13 @@
+import { type ChangeState } from './change-state.js'
+import { type TransitionAlong } from '../services/transition-checks.js'
+
+/**
+ * Failure policy for hook execution.
+ * - 'abort' (default): Halt execution immediately and fail phase.
+ * - 'warn': Capture failure as warning and proceed with remaining hooks.
+ */
+export type HookFailurePolicy = 'abort' | 'warn'
+
 /**
  * A single hook entry within a workflow step's `pre` or `post` array.
  *
@@ -16,6 +26,8 @@ export type HookEntry =
        * `{{change.name}}`, `{{change.path}}`, `{{project.root}}`.
        */
       readonly command: string
+      /** Hook failure policy ('abort' or 'warn'). Defaults to 'abort'. */
+      readonly onFailure?: HookFailurePolicy
     }
   | {
       /** Unique identifier for this hook entry within its array. */
@@ -34,15 +46,71 @@ export type HookEntry =
       readonly externalType: string
       /** Runner-owned opaque config payload declared in workflow YAML. */
       readonly config: Record<string, unknown>
+      /** Hook failure policy ('abort' or 'warn'). Defaults to 'abort'. */
+      readonly onFailure?: HookFailurePolicy
     }
 
 /**
- * A single entry in a schema's `workflow[]` array, defining a named lifecycle
- * phase, which artifact IDs must be complete before the phase becomes available,
- * and optional pre/post hook arrays.
+ * Declaration associating a transition check with a workflow step in schema.yaml.
+ * Evaluated when transitioning INTO this step (scope: 'transition').
+ */
+export interface WorkflowStepCheckDeclaration {
+  /** Check identifier (must be registered in CheckRegistry). */
+  readonly id: string
+  /** Source state filter (defaults to '*'). */
+  readonly from?: ChangeState | '*'
+  /** Transition direction filter ('forward', 'backward', 'recovery', 'redesign', or '*'). Defaults to 'forward'. */
+  readonly along?: TransitionAlong | '*'
+  /** Failure policy ('abort' or 'collect'). Defaults to 'abort'. */
+  readonly onFailure?: 'abort' | 'collect'
+  /** Permission to bypass through the orchestrator's check-bypass input, subject to governance locks. */
+  readonly skippable?: boolean
+  /** Whether this check is disabled for this workflow step, subject to governance locks. */
+  readonly disabled?: boolean
+  /** Step-specific configuration merged over check defaults. */
+  readonly config?: Readonly<Record<string, unknown>>
+}
+
+/**
+ * Declaration associating a step-skip check with an optional workflow step in schema.yaml.
+ * Evaluated when this optional step is BYPASSED during a transition (scope: 'step-skip').
+ */
+export interface WorkflowStepSkipCheckDeclaration {
+  /** Check identifier (must be registered in CheckRegistry). */
+  readonly id: string
+  /** Failure policy ('abort' or 'collect'). Defaults to 'abort'. */
+  readonly onFailure?: 'abort' | 'collect'
+  /** Permission to bypass through the orchestrator's check-bypass input, subject to governance locks. */
+  readonly skippable?: boolean
+  /** Whether this check is disabled for skipping this step, subject to governance locks. */
+  readonly disabled?: boolean
+  /** Step-specific configuration merged over check defaults. */
+  readonly config?: Readonly<Record<string, unknown>>
+}
+
+/**
+ * Declaration tuning a check of the archive operation in schema.yaml
+ * (`scope: 'archive'`). Valid only on the `archiving` workflow entry.
  *
- * Schema workflow steps fire first; project-level steps (`specd.yaml`) are
- * matched by `step` name and appended after.
+ * There is deliberately no `onFailure`: archive predicate failures have no
+ * abort/collect distinction.
+ */
+export interface WorkflowStepArchiveCheckDeclaration {
+  /** Check identifier (must be registered in CheckRegistry). */
+  readonly id: string
+  /** Permission to bypass through the orchestrator's check-bypass input, subject to governance locks. */
+  readonly skippable?: boolean
+  /** Whether this check is disabled for the archive operation, subject to governance locks. */
+  readonly disabled?: boolean
+  /** Step-specific configuration merged over check and binding defaults. */
+  readonly config?: Readonly<Record<string, unknown>>
+}
+
+/**
+ * A lookup row in schema `workflow[]`. `step` names an existing `ChangeState`;
+ * the row attaches extras (`requires`, `requiresTaskCompletion`, `hooks`, `checks`, `skipChecks`,
+ * `archiveChecks`).
+ * It does not define protocol membership or legal hops.
  */
 export interface WorkflowStep {
   /**
@@ -51,8 +119,23 @@ export interface WorkflowStep {
   readonly step: string
 
   /**
-   * Artifact IDs (from the same schema) that must have status `complete` before
-   * this step becomes available. Empty array means the step is always available.
+   * Whether this step is optional in the active workflow topology.
+   * When true, the step may be bypassed if its associated step-skip checks pass.
+   * Bedrock states cannot be optional. Defaults to false.
+   */
+  readonly optional?: boolean
+
+  /**
+   * Whether this step is disabled in the active workflow topology.
+   * When true, the step is excluded from the active lifecycle graph.
+   * Bedrock states cannot be disabled. Defaults to false.
+   */
+  readonly disabled?: boolean
+
+  /**
+   * Artifact IDs that must be complete/skipped for this lookup row’s extras.
+   * Empty array means no artifact extras (`workflow.requires` skips). Other
+   * predicates may still block the hop.
    */
   readonly requires: readonly string[]
 
@@ -70,4 +153,16 @@ export interface WorkflowStep {
     /** Hooks that fire after the step completes. */
     readonly post: readonly HookEntry[]
   }
+
+  /** Checks declared for this workflow step (evaluated when entering this step). */
+  readonly checks?: readonly WorkflowStepCheckDeclaration[]
+
+  /** Checks declared for skipping this workflow step (evaluated when bypassing this optional step). */
+  readonly skipChecks?: readonly WorkflowStepSkipCheckDeclaration[]
+
+  /**
+   * Checks declared for the archive operation. Valid only on the `archiving` row;
+   * evaluated by `ArchiveChange` and `GetStatus` for `scope: 'archive'`.
+   */
+  readonly archiveChecks?: readonly WorkflowStepArchiveCheckDeclaration[]
 }

@@ -8,22 +8,42 @@
 
 - **WHEN** PluginRepositoryPort is inspected
 - **THEN** it has `addPlugin()`, `removePlugin()`, and `listPlugins()`
+- **AND** every method takes `configPath` as its first parameter
 
-#### Scenario: addPlugin accepts type, name, and optional config
+#### Scenario: addPlugin accepts name and optional config and contributions
 
-- **WHEN** `addPlugin()` is called
-- **THEN** it accepts `type`, `name`, and optional `config` parameters
+- **WHEN** `addPlugin(configPath, name, options)` is called
+- **THEN** it accepts `name` and optional `config` and `contributions`
+- **AND** it has no `type` parameter
 
 #### Scenario: removePlugin removes a plugin
 
-- **WHEN** `removePlugin()` is called
+- **WHEN** `removePlugin(configPath, name)` is called
 - **THEN** the specified plugin is removed
 
-#### Scenario: listPlugins returns plugins optionally filtered by type
+#### Scenario: listPlugins returns the flat list
 
-- **WHEN** `listPlugins()` is called
-- **THEN** it returns an array of plugins
-- **AND** when `type` is provided, only plugins of that type are returned
+- **WHEN** `listPlugins(configPath)` is called
+- **THEN** it returns every declared plugin with its optional `config` and `contributions`
+
+#### Scenario: DeclaredPlugin is the core type
+
+- **WHEN** the port's `DeclaredPlugin` is compared with core `ConfigDeclaredPlugin`
+- **THEN** they are the same type
+
+### Requirement: ConfigWriter conformance
+
+#### Scenario: ConfigWriter is assignable to the port
+
+- **GIVEN** a type-level test that assigns a `ConfigWriter` value to `PluginRepositoryPort`
+- **WHEN** the test suite is type-checked
+- **THEN** compilation succeeds
+
+#### Scenario: Signature drift fails compilation
+
+- **GIVEN** a change to a `ConfigWriter` plugin method signature without the port
+- **WHEN** the conformance test is type-checked
+- **THEN** compilation fails
 
 ### Requirement: Implementation note
 

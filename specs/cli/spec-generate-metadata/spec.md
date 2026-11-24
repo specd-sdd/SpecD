@@ -48,7 +48,7 @@ If the core use case returns `hasExtraction: false` (schema has no `metadataExtr
 
 ### Requirement: Error — dependsOn overwrite
 
-When `--force` is not set, if the regenerated metadata would change existing `dependsOn` entries, `RegenerateSpecMetadata` throws a `DependsOnOverwriteError`. The error propagates through `handleError` which writes `error: dependsOn would change (...)` to stderr and exits with code 1. Stdout remains empty on error.
+When `--force` is not set, if the regenerated metadata would change existing `dependsOn` entries, `RegenerateSpecMetadata` throws a `DependsOnOverwriteError`. The error propagates through `handleError` with the `specs.generate-metadata` command context, which writes `error: dependsOn would change (...)` to stderr, renders a command-specific `hint` indicating `--force` on stderr (and as `hint` in `json`/`toon` output), and exits with code 1. Stdout remains empty on text error.
 
 When `--force` is used, the overwrite check is skipped entirely.
 

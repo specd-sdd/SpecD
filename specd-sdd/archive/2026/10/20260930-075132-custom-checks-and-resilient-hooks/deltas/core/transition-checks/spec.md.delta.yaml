@@ -1,0 +1,97 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Check identity and result'
+  content: |
+    Every check SHALL have a stable identifier. The `CheckId` type MUST be an open `string` rather than a closed union to support dynamic plugin checks alongside built-in core invariants. Built-in check identifiers SHALL NOT contain an `@` prefix (e.g. `protocol.edge`, `workflow.requires`), whereas custom plugin check identifiers SHALL be canonically namespaced as `@${pluginName}.${id}`.
+
+    Every check SHALL also declare a mandatory human-readable `label`: a short gerund phrase suitable for UI logs and progress rendering (e.g. `"Checking required artifacts"`).
+
+    A check result (`CheckResult`) SHALL include:
+    - `id`: The canonical check identifier string.
+    - `label`: Human-readable gerund phrase matching the check definition.
+    - `kind`: `predicate` or `effect`.
+    - `outcome`: `pass`, `fail`, or `skip`.
+    - `code`: Diagnostic error code when `outcome === 'fail'`.
+    - `message`: Diagnostic message when `outcome === 'fail'`.
+    - `command`: Optional CLI remediation command suggested to resolve a failure.
+    - `details`: Optional structured payload (e.g. counts, identifiers, metadata).
+
+    The `skip` outcome SHALL originate from exactly two canonical sources:
+    1. **Check Self-Discard**: A check inspects its `CheckExecutionContext` (such as active schema, step config, or change scope) and determines that its invariant does not apply, returning `{ outcome: 'skip', message: '...' }`.
+    2. **Orchestrator Bypass (`--skip-checks`)**: The user explicitly requests a bypass for a check whose active binding declares `skippable: true`. The orchestrator skips `check.execute()` and injects a synthetic `{ outcome: 'skip', details: { bypassedByUser: true } }`.
+
+    instruction: workflow hooks MUST NOT appear as user-defined checks.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Check ABI create and WorkflowCheck'
+  content: |
+    Every check implementation MUST implement the `Check` domain interface:
+    ```typescript
+    export interface Check {
+      readonly id: string
+      readonly label: string
+      readonly kind: CheckKind // 'predicate' | 'effect'
+      readonly command?: string
+      execute(ctx: CheckExecutionContext): Promise<CheckResult>
+    }
+    ```
+    Bypassability (`skippable: boolean`), disablement governance (`allowDisable: boolean`), and routing policies live on `CheckBindingSpec`, `CheckBinding`, and `WorkflowStepCheckDeclaration`, keeping `Check` strictly focused on invariant evaluation.
+
+    The `CheckExecutionContext` passed to `execute` MUST contain strictly contextual evaluation facts:
+    - `change`: Active change aggregate.
+    - `schema`: Active workflow schema.
+    - `attempt`: Transition attempt target (`from`, `to`, `along`).
+    - `config`: Effective cascading configuration (`Readonly<Record<string, unknown>>`) resolved for this check instance.
+    - `validity`: Reconciled change validity verdict.
+    - `onCheckProgress`: Optional callback for streaming diagnostic progress events.
+
+    The execution context MUST NOT contain ad-hoc bypass booleans (such as `allowOutOfScope` or `allowOverlap`). Pure check functions SHALL evaluate strictly whether the domain invariant holds.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Check ABI create and WorkflowCheck'
+  content: |
+    ### Requirement: Public CustomCheckDefinition contract
+
+    The public authoring contract for external plugins SHALL be `CustomCheckDefinition`:
+    ```typescript
+    export interface CustomCheckDefinition {
+      readonly id: string
+      readonly label: string
+      readonly command?: string
+      execute(ctx: CheckExecutionContext): Promise<CheckResult>
+    }
+    ```
+    The public contract MUST NOT expose the engine-internal `kind` property or lifecycle routing bypass flags (`skippable`). The engine automatically sets `kind: 'predicate'` upon registration, while skippability is configured on bindings.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Registry bindings for this capability'
+  content: |
+    The system SHALL maintain explicit governance and skippability permissions across all built-in check bindings in `CheckBindingSpec` and `CheckBinding`:
+    - **Category A (Protocol & State Invariants)** (`protocol.edge`, `verification.current`, `archive.archivable`, `schema.nameMatch`, `hook.pre`, `hook.post`): MUST explicitly declare `allowBindingOverride: false`, `allowDisable: false`, and `skippable: false`. Cannot be embedded into steps or disabled in `schema.yaml`. Hook effects (`hook.pre`, `hook.post`) are bypassed via `--skip-hooks`, never `--skip-checks`.
+    - **Category B (Native Step Attributes)** (`workflow.requires`, `workflow.taskCompletion`, `approval.spec`, `approval.signoff`): Governed natively via dedicated step and workspace schema configurations (`requires: []`, `requiresTaskCompletion`, `approvals`). Declares `skippable: false`.
+    - **Category C (Policy & Consistency Checks)**: Declares `allowBindingOverride: true` and `allowDisable: true`, permitting project schemas to bind them to workflow steps or declaratively disable them (`disabled: true`).
+      - `impl.linksInScope`: Declares `skippable: true`. Bypassed via `--skip-checks impl.linksInScope` (or legacy alias `--allow-out-of-scope`).
+      - `spec.overlap`: Declares `skippable: true`. Bypassed via `--skip-checks spec.overlap` (or legacy alias `--allow-overlap`).
+      - `deps.consistent`, `impl.filesResolved`, `workspace.readOnly`: Declare `skippable: false`. Cannot be bypassed via CLI flag.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:change`](../change/spec.md) — lifecycle states, approval records, and VALID_TRANSITIONS
+    - [`core:workflow-model`](../workflow-model/spec.md) — workflow[] lookup rows, progress axis, requires, taskCompletion, hook declarations
+    - [`core:schema-format`](../schema-format/spec.md) — workflow step YAML shape
+    - [`default:_global/architecture`](../../../_global/architecture/spec.md) — domain purity vs application I/O
+    - [`core:check-registry`](../check-registry/spec.md) — Dynamic check resolution, namespacing, and two-tier governance.

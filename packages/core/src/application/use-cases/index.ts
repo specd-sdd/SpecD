@@ -48,7 +48,7 @@ export {
   type ValidateSchemaInput,
   type ValidateSchemaResult,
 } from './validate-schema.js'
-export { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
+export { ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
 export {
   GetProjectSummary,
   type GetProjectSummaryInput,
@@ -77,6 +77,14 @@ export {
   type GetStatus,
   type GetStatusInput,
   type GetStatusResult,
+  type ArtifactFileStatus,
+  type ReviewArtifactSummary,
+  type ReviewArtifactFileSummary,
+  type ValidityStatusProjection,
+  type ApprovalStatusProjection,
+  type VerificationStatusProjection,
+  type NextAction,
+  type Blocker,
   type ArtifactStatusEntry,
   type LifecycleContext,
   type TransitionBlocker,
@@ -120,10 +128,34 @@ export { type DiscardChange, type DiscardChangeInput } from './discard-change.js
 export { type ApproveSpec, type ApproveSpecInput } from './approve-spec.js'
 export { type ApproveSignoff, type ApproveSignoffInput } from './approve-signoff.js'
 export {
+  type StartVerification,
+  type StartVerificationInput,
+  type StartVerificationResult,
+} from './start-verification.js'
+export {
+  type CompleteVerification,
+  type CompleteVerificationInput,
+  type CompleteVerificationResult,
+} from './complete-verification.js'
+export {
+  type InvalidateVerification,
+  type InvalidateVerificationInput,
+  type InvalidateVerificationResult,
+} from './invalidate-verification.js'
+export {
+  type ReconcileChangeValidity,
+  type ReconcileChangeValidityInput,
+  type ReconcileChangeValidityResult,
+  type ReconciliationIntent,
+  type ReconciledMutationContext,
+  type ReconciledMutationResult,
+} from './reconcile-change-validity.js'
+export {
   type ArchiveHookPhaseSelector,
   type ArchiveChange,
   type ArchiveChangeInput,
   type ArchiveChangeResult,
+  type OnArchiveProgress,
   type InvalidatedChangesEntry,
 } from './archive-change.js'
 export {

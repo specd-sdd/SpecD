@@ -10,6 +10,9 @@
     "schema.yaml",
     "templates/"
   ],
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",

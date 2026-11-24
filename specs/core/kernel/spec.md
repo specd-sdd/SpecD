@@ -97,17 +97,29 @@ The kernel must expose the underlying `ChangeRepository` as `changes.repo` and t
 
 ### Requirement: KernelOptions supports additive registries
 
-`KernelOptions` SHALL support additive registration of external capabilities before kernel construction. At minimum, it SHALL include extension points for:
+`KernelOptions` and `CompositionRegistryInput` MUST accept arrays of additive registry items:
 
-- storage factories
-- VCS providers
-- actor providers
-- artifact parsers
-- external hook runners
+- `schemas`: Array of `PluginSchemaDistribution` objects.
+- `tasks`: Array of `PluginTaskDistribution` objects.
+- `checks`: Array of `PluginCheckRegistration` objects.
 
-These registrations SHALL extend the built-in capability set rather than replacing it.
+Each `PluginCheckRegistration` entry MUST provide:
 
-Code-graph graph-store registration is not part of the core kernel contract.
+- `pluginName`: Mandatory non-empty string.
+- `check`: The `CustomCheckDefinition` implementation.
+- `defaultConfig`: Optional check-level baseline configuration.
+- `allowConfigOverride`: Optional boolean lock governing schema overrides.
+- `allowBindingOverride`: Optional boolean lock governing step embedding.
+- `allowDisable`: Optional boolean lock governing step disablement.
+- `defaultBindings`: Optional array of `CheckBindingSpec` associations.
+
+### Requirement: Check Registration and KernelBuilder Extension
+
+The kernel composition layer MUST wire built-in checks and external plugin registrations into a unified `CheckRegistry`:
+
+- The fluent `KernelBuilder` interface in `@specd/core/extensions` MUST expose:
+- The builder MUST delegate check registration to the underlying `CheckRegistry`, ensuring strict `@pluginName.id` namespacing and setting `kind: 'predicate'`.
+- The resulting `Kernel` instance MUST expose the active check registry view under `kernel.registry.checks` for observability and tooling.
 
 ### Requirement: Kernel exposes merged registries
 
@@ -247,8 +259,8 @@ Optional `execute()` fields that select per-call behaviour (not config re-reads)
 | `CompileContext`    | `contextMode`, `llmOptimizedContext`, `includeChangeSpecs`, `followDeps`, `depth`, `sections`, `fingerprint` | Per-step context compilation controls chosen by the caller at invocation time |
 | `GetProjectContext` | `contextMode`, `llmOptimizedContext`, `followDeps`, `depth`, `sections`                                      | Per-call project context shaping                                              |
 | `GetSpecContext`    | `followDeps`, `depth`, `contextMode`, `sections`, `llmOptimizedContext`                                      | Per-call spec context shaping                                                 |
-| `TransitionChange`  | `skipHookPhases`, `refreshImplementationTrackingBefore`                                                      | Caller-controlled transition options for the specific invocation              |
-| `ArchiveChange`     | `skipHookPhases`, `allowOverlap`, `allowOutOfScope`                                                          | Caller-controlled archive options for the specific invocation                 |
+| `TransitionChange`  | `skipHookPhases`, `skipChecks`, `refreshImplementationTrackingBefore`                                        | Caller-controlled transition options for the specific invocation              |
+| `ArchiveChange`     | `skipHookPhases`, `skipChecks`                                                                               | Caller-controlled archive options for the specific invocation                 |
 | `RunStepHooks`      | `only`                                                                                                       | Caller scopes hook execution to one hook id                                   |
 | `GetStatus`         | `refreshImplementationTracking`                                                                              | Caller chooses whether to refresh tracking on this status read                |
 | `CreateChange`      | `includeOverlapCheck`                                                                                        | Caller opts into overlap detection for this create                            |
@@ -258,7 +270,35 @@ Use cases whose `execute()` accepts no input (`GetConfig`, `ListWorkspaces`, `Li
 
 ### Requirement: Kernel is a plain object, not a class
 
-`createKernel` returns a plain object literal conforming to the `Kernel` interface. The kernel has no internal state, no lifecycle methods, and no event system. It is a one-shot wiring of use cases — once created, it is immutable.
+`createKernel` returns a plain object literal conforming to the `Kernel` interface. The set of use cases it exposes is immutable: there is no `addUseCase()` or `removeUseCase()` mechanism, and no event system. The kernel has exactly one lifecycle operation, `dispose()` (with its `[Symbol.asyncDispose]` alias), defined by **Kernel disposal**. It has no `initialize()`, `shutdown()` or similar operation. Beyond a one-way closed state used by `dispose()`, the kernel holds no mutable state.
+
+### Requirement: Kernel disposal
+
+The `Kernel` SHALL expose `dispose(): Promise<void>` and `[Symbol.asyncDispose](): Promise<void>`. Both members MUST behave identically (the symbol member is an alias of `dispose`), so a kernel can be closed by calling `dispose()` or by `await using`. Neither member MAY throw synchronously.
+
+`dispose()` SHALL run the disposers supplied through `KernelOptions.disposers` in reverse registration order, awaiting each one before starting the next.
+
+**Idempotency and concurrency.** The first call starts disposal. Every later or concurrent call SHALL return the same promise. Each disposer SHALL run at most once.
+
+**Failure isolation.** When a disposer throws or rejects, the remaining disposers SHALL still run. After all disposers have run, if at least one failed, `dispose()` SHALL reject with an `AggregateError` whose `errors` contain one `Error` per failed disposer in execution order; each such error SHALL be a `DisposerFailedError` (exported from `@specd/core`) with the message `Disposer '<name>' failed` and the original failure as `cause`. When none failed, `dispose()` SHALL resolve.
+
+**Timeout.** Each disposer SHALL be bounded by a fixed timeout of 5000 ms. When it elapses the kernel SHALL log a warning through the ambient `Logger` that names the disposer, SHALL abandon the pending disposer (it MAY keep running), and SHALL continue with the next one. A timeout is not a failure and SHALL NOT appear in the `AggregateError`. The timeout timer MUST NOT keep the Node.js process alive.
+
+**Closed state.** Once `dispose()` has been called the kernel is closed. The behaviour of every other kernel member after that point is unspecified; only `dispose()` itself (idempotent) remains defined.
+
+A kernel with no disposers SHALL resolve `dispose()` without doing any work. The kernel treats every disposer as opaque and MUST NOT inspect what it releases.
+
+### Requirement: KernelOptions accepts named disposers
+
+`KernelOptions` SHALL accept an optional `disposers` array of `KernelDisposer` entries, each shaped `{ name: string, dispose: () => void | Promise<void> }`. `name` MUST be a non-empty string and `dispose` MUST be callable; an entry violating either rule MUST be rejected with an `InvalidDisposerError` (exported from `@specd/core`) before any disposer runs. Two entries with the same `name` MUST be rejected with a `RegistryConflictError` for the category `disposers` before any disposer runs. Array order is registration order. Ownership of the supplied disposers transfers to the kernel when `createKernel` succeeds.
+
+A disposer registers cleanup work for a resource that exists before, or independently of, the kernel (for example something a host initialized while composing it). Core MUST NOT assume anything about the resource.
+
+### Requirement: Failed construction releases registered disposers
+
+When `createKernel(config, options)` rejects after receiving `options.disposers`, it SHALL run those disposers in reverse order, with the same failure isolation and timeout as `dispose()`, before the rejection propagates. This includes rejections caused by invalid or conflicting `disposers` entries: every well-formed entry (non-empty name and a callable `dispose`) is still released, once.
+
+The original construction error MUST remain the rejection reason. Failures raised while releasing disposers MUST NOT replace or mask it; they SHALL be reported as warnings through the ambient `Logger`.
 
 ## Examples
 
@@ -353,6 +393,7 @@ await writer.initProject({
 - [`core:spec-overlap`](../spec-overlap/spec.md)
 - [`core:get-specs-health`](../get-specs-health/spec.md)
 - [`core:count-tasks`](../count-tasks/spec.md) — shared task-completion query exposed by the kernel.
+- [`core:check-registry`](../check-registry/spec.md) — Dynamic check catalog, namespacing, and governance.
 - [`core:archive-repository-port`](../archive-repository-port/spec.md) — `changes.archiveRepo`
 - [`core:get-draft`](../get-draft/spec.md) — `changes.getDraft`
 - [`core:get-discarded`](../get-discarded/spec.md) — `changes.getDiscarded`

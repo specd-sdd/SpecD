@@ -1,0 +1,272 @@
+{
+  "manifestVersion": 2,
+  "name": "cli-input-dash-stdin",
+  "createdAt": "2026-11-06T16:25:16.979Z",
+  "updatedAt": "2026-11-06T17:02:38.413Z",
+  "description": "Replace project update-metadata with project optimized-context get|set|clear; use --input <path|-> for content; update optimizer agent template only",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "cli:project-update-metadata",
+    "cli:project-optimized-context",
+    "cli:project-metadata",
+    "core:clear-project-metadata"
+  ],
+  "specDependsOn": {
+    "cli:project-update-metadata": [],
+    "cli:project-optimized-context": [
+      "cli:entrypoint",
+      "core:update-project-metadata",
+      "core:project-metadata",
+      "core:clear-project-metadata"
+    ],
+    "cli:project-metadata": ["core:project-metadata"],
+    "core:clear-project-metadata": ["core:project-metadata"]
+  },
+  "invalidation": {
+    "artifacts": "downstream",
+    "workflow": "preserve"
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:05df7cb4501c7af98cdf8a3e76e21ffc1a9cfd6d0d47c6b54382b48a92778558"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:project-update-metadata",
+          "filename": "deltas/cli/project-update-metadata/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6913ae31e49dc83d3b0897fc60723169f0aecca0ba36bf149c9718a25e88251b"
+        },
+        {
+          "key": "cli:project-optimized-context",
+          "filename": "specs/cli/project-optimized-context/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:c8757ada60e6a4443232fc6706c2a62a1d23b0aecebc77b1a4c5c36a50cd6cf1"
+        },
+        {
+          "key": "cli:project-metadata",
+          "filename": "deltas/cli/project-metadata/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ca4636ecb7dd80c6e0d134c3f71147a251c767dc922af3d99530b9fa68879627"
+        },
+        {
+          "key": "core:clear-project-metadata",
+          "filename": "specs/core/clear-project-metadata/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:5df3ca8d5f1307986e06451dc015dcd33cd9a0303adf74e136e012a8f26e7529"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:project-update-metadata",
+          "filename": "deltas/cli/project-update-metadata/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e34c0aa4329114a82326f172b8225cbb1350ad616afeb39f8924689d9ae3f15c"
+        },
+        {
+          "key": "cli:project-optimized-context",
+          "filename": "specs/cli/project-optimized-context/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:f1497b504742305b9fbbc4bbcdd71cac5dd16208e2957e1679f8184e7776dc4c"
+        },
+        {
+          "key": "cli:project-metadata",
+          "filename": "deltas/cli/project-metadata/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b4b6d4d4e3a08c3de63f85594e9be4c61476548639dae5ba2331b1273c019939"
+        },
+        {
+          "key": "core:clear-project-metadata",
+          "filename": "specs/core/clear-project-metadata/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:fd89b41e7969f5ac4729fe9af3145737e423936a027458972ccc97ca4a165f71"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:62243260f53ef2c0b3020fb1fc255df3d1b93bf8389b9eec181d62fa67bf0702"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:8d20deb35f1a6e28dc01fd43e39bea6b70242ce3d28bb1672e963f06ebe438f0"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-11-06T16:25:16.979Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["cli:project-update-metadata"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-06T16:25:17.029Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:project-update-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "cli:project-update-metadata"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-11-06T16:45:41.996Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Replace project update-metadata with project optimized-context get|set|clear; use --input <path|-> for content; update optimizer agent template only"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-06T16:45:42.002Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:project-optimized-context"
+        },
+        {
+          "type": "specs",
+          "key": "cli:project-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "cli:project-optimized-context"
+        },
+        {
+          "type": "verify",
+          "key": "cli:project-metadata"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-06T16:47:45.526Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-11-06T16:55:35.144Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:clear-project-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "core:clear-project-metadata"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-11-06T17:02:38.411Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    }
+  ]
+}

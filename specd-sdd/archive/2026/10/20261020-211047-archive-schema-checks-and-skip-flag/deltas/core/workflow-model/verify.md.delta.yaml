@@ -1,0 +1,168 @@
+- op: modified
+  selector:
+    type: section
+    matches: ^Requirement:\ Step\ names\ reference\ domain\ lifecycle\ states$
+  content: |
+    #### Scenario: Invalid step name rejected
+
+    - **GIVEN** a schema with `workflow: [{ step: "designing" }, { step: "reviewing" }]`
+    - **WHEN** the schema is built or resolved
+    - **THEN** `buildSchema` throws `SchemaValidationError` because `reviewing` is not a valid Change lifecycle state
+    - **AND** `TransitionChange` is never invoked with that name
+
+    #### Scenario: Drain-state row rejected
+
+    - **GIVEN** a schema with a `workflow` row `{ step: "pending-spec-approval" }` (or any other drain-only approval state)
+    - **WHEN** the schema is built or resolved
+    - **THEN** `buildSchema` throws `SchemaValidationError`
+    - **AND** the drain state never occupies a pipeline slot
+
+    #### Scenario: Omitted workflow row does not delete the protocol state
+
+    - **GIVEN** a schema whose `workflow[]` lists `designing` and `ready` but not `implementing`
+    - **WHEN** `workflowStep("implementing")` is resolved
+    - **THEN** the result is null (no extras)
+    - **AND** `implementing` remains enabled in the pipeline and `ready → implementing` remains legal
+
+    #### Scenario: A workflow row may attach archiveChecks
+
+    - **GIVEN** a `workflow[]` row with `step: archiving` and `archiveChecks`
+    - **WHEN** the schema is built
+    - **THEN** the row attaches those declarations without introducing a new lifecycle state
+- op: modified
+  selector:
+    type: section
+    matches: ^Requirement:\ Workflow\ step\ checks\ and\ skip\-checks\ declarations$
+  content: |
+    #### Scenario: Schema builds step checks and skip-checks declarations
+
+    - **GIVEN** a workflow step declaring valid `checks` and `skipChecks` with known IDs
+    - **WHEN** `buildSchema` builds the schema
+    - **THEN** `workflowStep.checks` contains the parsed transition check declarations
+    - **AND** `workflowStep.skipChecks` contains the parsed skip check declarations
+
+    #### Scenario: Referencing unknown check ID throws UnknownCheckError
+
+    - **GIVEN** a workflow step declaring a check or skipCheck with ID `@unknown.check`
+    - **WHEN** `buildSchema` executes
+    - **THEN** `UnknownCheckError` is thrown identifying `@unknown.check`
+
+    #### Scenario: Duplicate coordinate throws DuplicateCheckBindingError
+
+    - **GIVEN** a workflow step declaring two checks with the same ID, scope, and direction
+    - **WHEN** `buildSchema` executes
+    - **THEN** `DuplicateCheckBindingError` is thrown
+
+    #### Scenario: Unknown checks from state is rejected
+
+    - **GIVEN** a workflow `checks[]` declaration whose `from` value is neither `*` nor a known lifecycle state
+    - **WHEN** schema parsing and semantic validation execute
+    - **THEN** a typed schema validation error identifies the invalid source state
+
+    #### Scenario: Embedding locked check throws CheckEmbeddingForbiddenError
+
+    - **GIVEN** a check registered with `allowSchemaEmbedding: false`
+    - **WHEN** a schema declares this check in `checks` or `skipChecks` at a coordinate none of its code-defined bindings serves
+    - **THEN** `CheckEmbeddingForbiddenError` is thrown
+
+    #### Scenario: Declaring a check at its own code-defined coordinate is accepted
+
+    - **GIVEN** a built-in or plugin check with `allowSchemaEmbedding: false` and a code-defined binding entering step `verifying` along `forward`
+    - **WHEN** a schema declares the check in `verifying.checks` with `along: forward` and an allowed `config`
+    - **THEN** schema validation succeeds for both the built-in and the plugin check
+
+    #### Scenario: Later schema layer may change a schema-owned declaration
+
+    - **GIVEN** a base schema declaring a Category C check on a step where no code-defined binding serves it
+    - **WHEN** a later schema layer changes that declaration's `onFailure` or `skippable`
+    - **THEN** `buildSchema` validates the merged declaration without `CheckBindingOverrideForbiddenError`
+
+    #### Scenario: Overriding locked binding policy throws CheckBindingOverrideForbiddenError
+
+    - **GIVEN** a code-defined binding registered with `allowBindingOverride: false`
+    - **WHEN** a schema attempts to modify `onFailure` or `skippable`
+    - **THEN** `CheckBindingOverrideForbiddenError` is thrown
+
+    #### Scenario: Overriding locked configuration throws CheckConfigOverrideForbiddenError
+
+    - **GIVEN** a check or binding registered with `allowConfigOverride: false`
+    - **WHEN** a schema supplies a non-empty `config` object
+    - **THEN** `CheckConfigOverrideForbiddenError` is thrown
+
+    #### Scenario: Disabling locked check throws CheckDisableForbiddenError
+
+    - **GIVEN** a check or binding registered with `allowDisable: false`
+    - **WHEN** a schema declares `disabled: true`
+    - **THEN** `CheckDisableForbiddenError` is thrown
+
+    #### Scenario: Declaring skipChecks on disabled step throws SchemaValidationError
+
+    - **GIVEN** a workflow step declared with `disabled: true` and a non-empty `skipChecks` array
+    - **WHEN** `buildSchema` executes
+    - **THEN** `SchemaValidationError` is thrown indicating skipChecks cannot be declared on disabled steps
+
+    #### Scenario: archiveChecks on the archiving step
+
+    - **GIVEN** `step: archiving` with `archiveChecks: [{ id: spec.overlap, skippable: false }]`
+    - **WHEN** the schema is built
+    - **THEN** the declaration applies at the `{ id: spec.overlap, scope: 'archive' }` coordinate
+
+    #### Scenario: archiveChecks on another step is rejected
+
+    - **GIVEN** `step: verifying` with `archiveChecks`
+    - **WHEN** the schema is built
+    - **THEN** `SchemaValidationError` is thrown naming `verifying`
+
+    #### Scenario: archiveChecks with an unregistered id
+
+    - **GIVEN** `archiveChecks: [{ id: '@nope.check' }]`
+    - **WHEN** the schema is built
+    - **THEN** `UnknownCheckError` is thrown
+
+    #### Scenario: Duplicate archive coordinate
+
+    - **GIVEN** `archiveChecks` listing `spec.overlap` twice
+    - **WHEN** the schema is built
+    - **THEN** `DuplicateCheckBindingError` is thrown
+
+    #### Scenario: Archive locks are enforced for archiveChecks
+
+    - **GIVEN** `archiveChecks` that disable `workspace.readOnly`, make `impl.filesResolved` skippable, or configure `deps.consistent`
+    - **WHEN** the schema is built
+    - **THEN** `CheckDisableForbiddenError`, `CheckBindingOverrideForbiddenError`, and `CheckConfigOverrideForbiddenError` are thrown respectively
+
+    #### Scenario: Placement lock applies to archiveChecks
+
+    - **GIVEN** a plugin check with `allowSchemaEmbedding: false` and no archive binding
+    - **WHEN** `archiveChecks` declares it
+    - **THEN** `CheckEmbeddingForbiddenError` is thrown
+
+    #### Scenario: Same id in checks and archiveChecks of the archiving entry
+
+    - **GIVEN** `step: archiving` declares `checks: [{ id: impl.linksInScope }]` and `archiveChecks: [{ id: impl.linksInScope }]`
+    - **WHEN** the schema is built
+    - **THEN** no duplicate error is raised because the coordinates are `{ scope: 'transition', to: archiving }` and `{ scope: 'archive' }`
+
+    #### Scenario: Disabling one coordinate does not affect the other
+
+    - **GIVEN** `impl.linksInScope` is declared in `checks` and in `archiveChecks`, with `disabled: true` only in `archiveChecks`
+    - **WHEN** bindings are resolved for the transition and for the archive operation
+    - **THEN** the transition coordinate remains and the archive coordinate is removed
+
+    #### Scenario: Redundant declaration of a locked archive check is accepted
+
+    - **GIVEN** `archiveChecks: [{ id: workspace.readOnly, skippable: false }]`
+    - **WHEN** the schema is built
+    - **THEN** no governance error is raised
+
+    #### Scenario: Empty archiveChecks is valid
+
+    - **GIVEN** `step: archiving` with `archiveChecks: []`
+    - **WHEN** the schema is built
+    - **THEN** it builds without error
+
+    #### Scenario: Declarations for non-archive checks are unaffected
+
+    - **GIVEN** a schema with only `checks` and `skipChecks`
+    - **WHEN** it is built
+    - **THEN** its validation outcome is identical to before `archiveChecks` existed

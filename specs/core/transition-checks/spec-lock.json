@@ -1,0 +1,97 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:change",
+    "core:workflow-model",
+    "core:workflow-topology",
+    "core:schema-format",
+    "default:_global/architecture",
+    "core:check-registry",
+    "core:archive-change",
+    "core:get-status"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/domain/services/transition-checks.ts"
+    },
+    {
+      "file": "core:src/domain/services/check-registry.ts"
+    },
+    {
+      "file": "core:src/domain/services/check-bindings.ts"
+    },
+    {
+      "file": "core:src/domain/errors/check-predicate-failed-error.ts"
+    },
+    {
+      "file": "core:src/domain/services/find-blocking-parent.ts"
+    },
+    {
+      "file": "core:src/domain/checks/approval-spec.ts"
+    },
+    {
+      "file": "core:src/domain/checks/approval-signoff.ts"
+    },
+    {
+      "file": "core:src/domain/checks/verification-current.ts"
+    },
+    {
+      "file": "core:src/domain/checks/protocol-edge.ts"
+    },
+    {
+      "file": "core:src/domain/checks/workflow-requires.ts"
+    },
+    {
+      "file": "core:src/domain/checks/impl-links-in-scope.ts"
+    },
+    {
+      "file": "core:src/domain/checks/spec-overlap.ts"
+    },
+    {
+      "file": "core:src/domain/checks/schema-name-match.ts"
+    },
+    {
+      "file": "core:src/application/services/detect-impl-links-in-scope.ts",
+      "symbols": ["detectImplLinksInScope"]
+    }
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Shared binding registry evaluates transitions and archive once, reconciles validity, and makes lifecycle projections authoritative.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:e9e066001c23455953a786afe17069377e24e90cfb48cbce67b57f996b8982f7",
+          "lastModified": "2026-10-22T14:47:46.154Z"
+        },
+        "verify.md": {
+          "hash": "sha256:9ded1605e44f4af42ccec0a65c7630091b01b971745d49a1c2ee0108e33cf7ac",
+          "lastModified": "2026-10-22T14:47:46.155Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Transition Checks\n\n## Rules\n- Registry bindings select predicates/effects by transition or archive operation; `Check.execute(ctx)` returns pass/fail/skip. Effects have binding phase and failure policy.\n- Candidate evaluator runs `protocol.edge` first, matching transition predicates, then optional bypass step-skip predicates. `GetStatus` collects; `TransitionChange` fail-fast only on edge failure.\n- `ReconcileChangeValidity` owns fresh facts, verdict, review, approvals, verification, recovery, audit, atomic persistence. All mutators delegate.\n- Recovery priority: stale required spec approval -> `designing`; stale signoff later state -> `done`; stale verification renews in place; then artifact policy.\n- Bindings cover workflow, deps/workspace, implementation, approvals, verification, archive, hooks. Approval commands record consent; no pending approval transitions.\n\n## Constraints\n- No snapshot bag or duplicate check gathering.\n- Archive is operation, never fake transition.\n- Schema never lists check IDs.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:e9e066001c23455953a786afe17069377e24e90cfb48cbce67b57f996b8982f7",
+          "lastModified": "2026-10-22T14:47:46.154Z"
+        },
+        "verify.md": {
+          "hash": "sha256:9ded1605e44f4af42ccec0a65c7630091b01b971745d49a1c2ee0108e33cf7ac",
+          "lastModified": "2026-10-22T14:47:46.155Z"
+        }
+      }
+    }
+  }
+}

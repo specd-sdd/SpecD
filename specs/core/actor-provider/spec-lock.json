@@ -9,5 +9,41 @@
       "file": "core:src/composition/actor-resolver.ts",
       "symbols": ["createVcsActorResolver", "createLazyVcsActorResolver"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Actor-provider factories create configured resolvers; autodetect providers resolve matching environments only.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:c3ee4dde91d692a63d1ca651f8089d4214dfa8d41a195c6d9cbe74f8eab5e5bc",
+          "lastModified": "2026-08-25T15:37:19.251Z"
+        },
+        "verify.md": {
+          "hash": "sha256:58ea6cb9255b86c5307ac06eeb4da86d115bdec1828ccea61caea965e3a8faf1",
+          "lastModified": "2026-08-25T15:37:19.251Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Actor Provider\n## Rules\n- ActorProvider has readonly name: string and create(options: Record<string, unknown>): Promise<ActorResolver>.\n- AutoDetectActorProvider extends ActorProvider with detect(cwd: string): Promise<ActorResolver | null>; return resolver only matching environment.\n## Constraints\n- Provider is factory; explicit selection creates resolver.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:c3ee4dde91d692a63d1ca651f8089d4214dfa8d41a195c6d9cbe74f8eab5e5bc",
+          "lastModified": "2026-08-25T15:37:19.251Z"
+        },
+        "verify.md": {
+          "hash": "sha256:58ea6cb9255b86c5307ac06eeb4da86d115bdec1828ccea61caea965e3a8faf1",
+          "lastModified": "2026-08-25T15:37:19.251Z"
+        }
+      }
+    }
+  }
 }

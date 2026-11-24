@@ -230,17 +230,16 @@ remove:
     - id: ci-only-instruction
     - file: CI_AGENTS.md
   plugins:
-    agents:
-      - name: '@specd/plugin-agent-copilot'
+    - name: '@specd/plugin-agent-copilot'
 ```
 
-| Removal target   | Keyed by                       | Effect                                |
-| ---------------- | ------------------------------ | ------------------------------------- |
-| `root`           | field name                     | Removes the named top-level field     |
-| `workspaces`     | workspace name                 | Removes the named workspace           |
-| `storage`        | storage key                    | Removes a storage binding             |
-| `context`        | `id`, `file`, or `instruction` | Removes matching context entries      |
-| `plugins.agents` | `name`                         | Removes a matching plugin declaration |
+| Removal target | Keyed by                       | Effect                                |
+| -------------- | ------------------------------ | ------------------------------------- |
+| `root`         | field name                     | Removes the named top-level field     |
+| `workspaces`   | workspace name                 | Removes the named workspace           |
+| `storage`      | storage key                    | Removes a storage binding             |
+| `context`      | `id`, `file`, or `instruction` | Removes matching context entries      |
+| `plugins`      | `name`                         | Removes a matching plugin declaration |
 
 Removals are applied immediately after the layer that declares them is merged. A `remove` block without `extends` is an error.
 
@@ -267,8 +266,7 @@ context:
   - instruction: 'Running in CI. Skip interactive prompts.'
 remove:
   plugins:
-    agents:
-      - name: '@specd/plugin-agent-copilot'
+    - name: '@specd/plugin-agent-copilot'
 ```
 
 **Standalone local config (fresh start, no inheritance):**
@@ -312,7 +310,7 @@ In bootstrap mode, SpecD behaves as if the repository were a single synthetic `d
 
 ## Schema selection
 
-The `schema` field tells SpecD which workflow schema to use. Schemas define your artifact types, lifecycle steps, and validation rules. There is exactly one active schema per project.
+The `schema` field tells SpecD which workflow schema to use. Schemas define your artifact types, extras on named existing lifecycle states (`workflow[]` lookup rows), and validation rules. There is exactly one active schema per project.
 
 SpecD resolves the `schema` value using a prefix convention:
 
@@ -768,10 +766,10 @@ approvals:
 
 Setting either gate to `true` changes the lifecycle:
 
-| Gate      | Effect when `true`                                                                                                                                     |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `spec`    | `ready → implementing` is blocked until a human runs `specd approve spec`. The change must pass through `pending-spec-approval → spec-approved` first. |
-| `signoff` | `done → archivable` is blocked until a human runs `specd approve signoff`. The change must pass through `pending-signoff → signed-off` first.          |
+| Gate      | Effect when `true`                                                                                                                                                                                                                                                                                                              |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `spec`    | Any **forward** leave of `ready` (`ready → implementing`, or `ready → verifying` if `implementing` is omitted from `workflow[]`) is blocked until a human runs `specd changes approve spec`. Redesign (`ready → designing`) is not gated. The change stays in `ready`; approval records consent, then the same edge is allowed. |
+| `signoff` | `done → archivable` is blocked until a human runs `specd changes approve signoff`. The change stays in `done`; signoff records consent, then the same edge is allowed.                                                                                                                                                          |
 
 The two gates are independent — you can enable either or both.
 
@@ -781,34 +779,38 @@ Both approval records capture the approver's git identity, a reason, and a hash 
 
 ---
 
-## Invalidation policy
+## Invalidation
 
-When a change's validated artifacts drift from their baseline (files edited on disk after validation) or when you manually invalidate a change, SpecD reopens artifacts for review. The `invalidationPolicy` field controls how far that reopening propagates:
+When validated artifacts drift, or when you invalidate a change by hand, SpecD decides two separate things: which artifacts reopen, and whether the lifecycle should return to `designing`. Gate recovery is a third rule and is not configuration.
 
 ```yaml
-invalidationPolicy: downstream # default
+invalidation:
+  artifacts: downstream # default
+  workflow: preserve # default
 ```
 
-| Policy       | What gets reopened                                                                           |
-| ------------ | -------------------------------------------------------------------------------------------- |
-| `none`       | Nothing. Drift is tracked but artifacts stay `complete`. Status shows `complete-with-drift`. |
-| `surgical`   | Only the specific files that changed.                                                        |
-| `downstream` | Changed files plus all artifacts that depend on them in the DAG. This is the default.        |
-| `global`     | Every artifact in the change, regardless of which file triggered the invalidation.           |
+| Dimension   | Values                                     | What it controls                                                                                         |
+| ----------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `artifacts` | `none`, `surgical`, `downstream`, `global` | Which non-task artifacts reopen. `none` skips reopening and still leaves drift as a freshness blocker.   |
+| `workflow`  | `preserve`, `redesign`                     | `preserve` keeps the current phase for ordinary drift. `redesign` returns to `designing` for that drift. |
 
-The project-level default is persisted on each change at creation time. You can change it per-change with:
+`downstream` reopens the drifted files and their DAG descendants, and does not propagate review into a task artifact. `global` reopens every non-task artifact. `surgical` reopens only the drifted or targeted files.
+
+Omitting both this object and the deprecated scalar stores `{ artifacts: downstream, workflow: preserve }` on new changes. The deprecated scalar `invalidationPolicy` maps to `{ artifacts: <scalar>, workflow: redesign }`. Setting both keys is a config error. A version 1 manifest that has no scalar is read as `{ artifacts: downstream, workflow: redesign }`.
+
+Create and edit store the structured policy:
 
 ```bash
-specd changes edit my-change --invalidation-policy surgical
+specd changes edit my-change --artifact-policy surgical --workflow-policy preserve
 ```
 
-Or override it for a single manual invalidation:
+A manual invalidation can override one invocation without changing the stored policy:
 
 ```bash
-specd changes invalidate my-change --reason "API changed" --target specs --policy surgical
+specd changes invalidate my-change --reason "API changed" --target specs --artifact-policy surgical
 ```
 
-Under `none`, drift is still visible — `changes status` and `changes artifacts` show `complete-with-drift` and a `[drift]` tag — but the lifecycle is not blocked and artifacts are not reopened. Use `none` when you want informational drift tracking without automatic reopening.
+Required stale spec approval still returns the change to `designing` when the state is later than `ready`; in `ready` the change stays put and consent is renewed there. Required stale sign-off returns it to `done` only when the state is later than `done`. Those returns outrank `workflow`. Verification staleness never moves the lifecycle. See [Validity and verification](workflow.md#validity-and-verification).
 
 ---
 
@@ -832,19 +834,25 @@ Each operation targets one or more schema sections: `artifacts`, `workflow`, or 
 
 ### Common uses
 
-**Adding shell hooks to lifecycle steps:**
+**Adding shell hooks and transition checks to lifecycle steps:**
 
 ```yaml
 schemaOverrides:
   append:
     workflow:
       - step: implementing
+        checks:
+          - id: '@security.code-scan'
+            skippable: true
+            config:
+              minSeverity: high
         hooks:
           post:
             - id: run-tests
               run: 'pnpm test'
             - id: run-lint
               run: 'pnpm lint'
+              onFailure: warn
       - step: archiving
         hooks:
           pre:
@@ -852,7 +860,7 @@ schemaOverrides:
               run: 'pnpm test'
 ```
 
-This runs tests and lint after each implementing step, and runs tests again before archiving. If a `run:` hook exits non-zero, the transition is aborted.
+This runs tests and lint after each implementing step, capturing lint issues as non-blocking warnings while requiring tests to pass. It also runs security checks before advancing from implementing, and runs tests again before archiving. If a `run:` hook exits non-zero with `onFailure: abort` (the default), the transition is aborted; with `onFailure: warn`, non-fatal diagnostics are collected and the transition proceeds.
 
 **Adding instruction hooks:**
 
@@ -944,7 +952,7 @@ schemaPlugins:
   - '#billing:billing-plugin'
 ```
 
-Plugins are full schema layers — they can add or modify artifacts, workflow steps, and metadata extraction rules in bulk. They are applied in declaration order. `schemaOverrides` is applied after all plugins, so your inline overrides always take final precedence.
+Plugins are schema merge layers. A plugin cannot declare a top-level `metadataExtraction` block; declare extraction on the base schema or use `schemaOverrides` for project-specific extraction changes. Plugins are applied in declaration order. `schemaOverrides` is applied after all plugins, so your inline overrides always take final precedence.
 
 Use plugins when you have a set of schema customisations that is shared across multiple projects and you want to manage it as a versioned package.
 
@@ -1016,22 +1024,25 @@ graph:
 
 ## Plugins
 
-SpecD supports agent plugins that integrate with coding assistants (Claude Code, Copilot, Codex, OpenCode):
+A plugin is a package that contributes one or more features. Names are scoped (`@scope/name`). `configVersion` may be absent and accepts any positive integer up to the current version (`2`); an absent version means the current one, and a newer version fails with `UNSUPPORTED_CONFIG_VERSION`.
 
 ```yaml
+configVersion: 2
 plugins:
-  agents:
-    - name: '@specd/plugin-agent-claude'
-    - name: '@specd/plugin-agent-copilot'
-      config:
-        model: 'gpt-4o'
+  - name: '@specd/plugin-agent-claude'
+  - name: '@specd/plugin-agent-copilot'
+    config:
+      model: 'gpt-4o'
+    contributions:
+      - copilot
 ```
 
-- **`plugins.agents`**: A list of agent plugin declarations.
-  - `name`: Package or module name of the plugin (e.g. `'@specd/plugin-agent-claude'`).
-  - `config`: Optional plugin-specific configuration record passed to the plugin adapter during initialization.
-  - _Default:_ None (no third-party plugins loaded; built-in plugins activate via project defaults).
-  - _Cascade behavior:_ Array — an overlay config **appends** new plugin declarations to the inherited list. To remove an inherited plugin in an overlay config, use `remove.plugins.agents: [{ name: '@specd/plugin-agent-copilot' }]`.
+- **`plugins`**: A flat list of plugin declarations.
+  - `name`: Scoped package name (for example `'@specd/plugin-agent-claude'`).
+  - `config`: Optional object validated against the plugin manifest schema.
+  - `contributions`: Optional allowlist of contribution ids. Omitted means every id the manifest declares; when present it must list at least one id (an empty list is rejected).
+  - _Default:_ None.
+  - _Cascade behavior:_ Entries merge by `name`. A later layer replaces the same name in place and appends new names. A plugin name may appear only once within a single layer, extending layers included (a duplicate fails with a configuration error). Remove an inherited plugin with `remove.plugins: [{ name: '@specd/plugin-agent-copilot' }]`; only entries inherited from lower layers can be removed, so adding and removing one name in the same layer fails.
 
 ### Synchronizing plugin assets with `specd project update`
 
@@ -1042,7 +1053,7 @@ specd project update
 ```
 
 - **When `specd project update` is required:**
-  - After manually editing `plugins.agents` in `specd.yaml` (e.g. adding, removing, or reconfiguring plugins by hand rather than using `specd plugins install`).
+  - After manually editing `plugins` in `specd.yaml` (adding, removing, or reconfiguring plugins by hand rather than using `specd plugins install`).
   - After upgrading SpecD CLI or agent plugin packages (`pnpm update @specd/cli` or `@specd/plugin-agent-*`), to regenerate agent instructions and skill templates with the newest upstream definitions.
 - **When `specd project update` is NOT required:**
   - For normal configuration changes (`workspaces`, `codeRoot`, `ownership`, `specs`, `archivePattern`, `contextIncludeSpecs`, etc.). SpecD reloads `specd.yaml` dynamically on every command execution, so general configuration updates take effect immediately in real time without needing any update command.
@@ -1112,20 +1123,21 @@ SpecD validates `specd.yaml` before executing any command that requires configur
 
 The following conditions are hard errors — SpecD exits immediately:
 
-| Condition                                                                        | Error Cause                                                      |
-| :------------------------------------------------------------------------------- | :--------------------------------------------------------------- |
-| `schema` field is missing                                                        | Config is invalid without a schema reference.                    |
-| `workspaces` section is missing or has no `default` workspace                    | Every project must declare a default workspace.                  |
-| `specs` section is missing in any workspace                                      | SpecD cannot locate specs without a specs adapter path.          |
-| `codeRoot` is missing in any non-`default` workspace                             | Required for non-default workspaces; no sensible default exists. |
-| `storage` section is missing, or `changes` or `archive` sub-key is absent        | Both storage directories are mandatory.                          |
-| `adapter` is missing in any `specs`, `schemas`, or `storage` section             | Required in every storage declaration.                           |
-| Required adapter-specific fields are absent (e.g. `config.path` when `type: fs`) | The adapter cannot function without its required options.        |
-| An adapter name has no registered factory at kernel construction time            | The kernel rejects unknown named adapters with a clear error.    |
-| Storage or config path resolves outside the repository root                      | Paths must remain within the VCS repository root boundary.       |
-| Invalid `contextIncludeSpecs` or `contextExcludeSpecs` pattern syntax            | e.g. `*` in a disallowed position.                               |
-| `llmOptimizedContext` is not a boolean                                           | Any other type is rejected.                                      |
-| Legacy `artifactRules` or `skills` fields are present                            | Use `schemaOverrides` or the plugin system instead.              |
+| Condition                                                                        | Error Cause                                                           |
+| :------------------------------------------------------------------------------- | :-------------------------------------------------------------------- |
+| `schema` field is missing                                                        | Config is invalid without a schema reference.                         |
+| `workspaces` section is missing or has no `default` workspace                    | Every project must declare a default workspace.                       |
+| `specs` section is missing in any workspace                                      | SpecD cannot locate specs without a specs adapter path.               |
+| `codeRoot` is missing in any non-`default` workspace                             | Required for non-default workspaces; no sensible default exists.      |
+| `storage` section is missing, or `changes` or `archive` sub-key is absent        | Both storage directories are mandatory.                               |
+| `adapter` is missing in any `specs`, `schemas`, or `storage` section             | Required in every storage declaration.                                |
+| Required adapter-specific fields are absent (e.g. `config.path` when `type: fs`) | The adapter cannot function without its required options.             |
+| An adapter name has no registered factory at kernel construction time            | The kernel rejects unknown named adapters with a clear error.         |
+| Storage or config path resolves outside the repository root                      | Paths must remain within the VCS repository root boundary.            |
+| Invalid `contextIncludeSpecs` or `contextExcludeSpecs` pattern syntax            | e.g. `*` in a disallowed position.                                    |
+| `llmOptimizedContext` is not a boolean                                           | Any other type is rejected.                                           |
+| Legacy `artifactRules` or `skills` fields are present                            | Use `schemaOverrides` or the plugin system instead.                   |
+| A plugin name appears twice in one layer, or `contributions` is an empty list    | Each plugin is declared once per layer; omit `contributions` for all. |
 
 #### Warnings that allow startup to proceed
 
@@ -1196,13 +1208,14 @@ The table below catalogs every configuration option supported by `specd.yaml` an
 | `schemaPlugins`                            | Project       | `string[]`                                                      | `[]` (None)                                      | **Appends**                                   | Schema package references merged into active schema prior to inline `schemaOverrides`.                                                                                                                                              |
 | `schemaOverrides`                          | Project       | `SchemaOverrides`                                               | `null` (None)                                    | **Deep-merges**                               | Inline schema modification operations: `create`, `remove`, `set`, `append`, `prepend`.                                                                                                                                              |
 | `invalidationPolicy`                       | Project       | `'none' \| 'surgical' \| 'downstream' \| 'global'`              | `'downstream'`                                   | **Replaces**                                  | Default artifact invalidation propagation policy assigned to newly created changes.                                                                                                                                                 |
-| `plugins.agents`                           | Project       | `PluginEntry[]`                                                 | `[]` (None)                                      | **Appends**                                   | Registered agent plugin definitions (`name` and optional `config`). Remove with `remove.plugins.agents`.                                                                                                                            |
+| `configVersion`                            | Project       | `number`                                                        | omitted                                          | **Root only**                                 | Config format version. Current supported value is `2`. An extending layer cannot change it.                                                                                                                                         |
+| `plugins`                                  | Project       | `{ name, config?, contributions? }[]`                           | `[]` (None)                                      | **Merge by name**                             | Flat plugin list. Same name replaces in place; new names append. Remove with `remove.plugins`.                                                                                                                                      |
 | `extends`                                  | Cascade Layer | `true \| string`                                                | `null` (Standalone)                              | _Special_                                     | Controls inheritance: `true` inherits from preceding layer; `<path>` inherits from specific active file.                                                                                                                            |
 | `remove.root`                              | Cascade Layer | `string[]`                                                      | `null`                                           | _Removal_                                     | Drops inherited top-level fields (e.g. `contextExcludeSpecs`, `actorProvider`). Cannot remove `schema`.                                                                                                                             |
 | `remove.workspaces`                        | Cascade Layer | `string[]`                                                      | `null`                                           | _Removal_                                     | Drops inherited workspace definitions by name.                                                                                                                                                                                      |
 | `remove.storage`                           | Cascade Layer | `string[]`                                                      | `null`                                           | _Removal_                                     | Drops inherited storage adapter bindings by key (`changes`, `drafts`, `discarded`, `archive`).                                                                                                                                      |
 | `remove.context`                           | Cascade Layer | `RemovalMatcher[]`                                              | `null`                                           | _Removal_                                     | Drops matching inherited context injection entries by `id`, `file`, or `instruction`.                                                                                                                                               |
-| `remove.plugins.agents`                    | Cascade Layer | `{ name: string }[]`                                            | `null`                                           | _Removal_                                     | Drops inherited agent plugin declarations by package name.                                                                                                                                                                          |
+| `remove.plugins`                           | Cascade Layer | `{ name: string }[]`                                            | `null`                                           | _Removal_                                     | Drops inherited plugin declarations by package name.                                                                                                                                                                                |
 
 ---
 

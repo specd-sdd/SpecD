@@ -6,6 +6,8 @@ import {
 /** Input for {@link GetSpecMetadata}. */
 export interface GetSpecMetadataInput {
   readonly specId: string
+  /** Change schema to extract with when the spec is part of a change. */
+  readonly schemaName?: string
 }
 
 /** Result returned by {@link GetSpecMetadata}. */
@@ -30,6 +32,7 @@ export class GetSpecMetadata {
     return this.materializeSpecMetadata.execute({
       specId: input.specId,
       policy: 'if-needed',
+      ...(input.schemaName !== undefined ? { schemaName: input.schemaName } : {}),
     })
   }
 }

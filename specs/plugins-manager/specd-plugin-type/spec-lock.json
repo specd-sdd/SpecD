@@ -4,7 +4,22 @@
     "version": 1
   },
   "dependsOn": ["core:config", "default:_global/architecture"],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "plugin-manager:src/domain/types/specd-plugin.ts",
+      "symbols": [
+        "SpecdPlugin",
+        "isSpecdPlugin",
+        "buildContributionAddress",
+        "parseContributionAddress",
+        "baseContractFields",
+        "PluginInstallContext"
+      ]
+    },
+    {
+      "file": "plugin-manager:test/domain/specd-plugin.spec.ts"
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Base plugin runtime type contract: manifest-sourced identity, resolved config lifecycle, schemas, and strict pure guard.",

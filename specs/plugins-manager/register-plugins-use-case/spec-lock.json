@@ -1,0 +1,33 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "plugin-manager:specd-plugin-type",
+    "plugin-manager:plugin-loader",
+    "plugin-manager:plugin-errors",
+    "core:kernel-builder",
+    "core:config"
+  ],
+  "implementation": [
+    {
+      "file": "plugin-manager:src/application/use-cases/register-plugins.ts",
+      "symbols": ["registerPlugins"]
+    },
+    {
+      "file": "plugin-manager:test/application/register-plugins.spec.ts"
+    },
+    {
+      "file": "plugin-manager:test/domain/resolve-contributions.spec.ts"
+    },
+    {
+      "file": "plugin-manager:src/domain/services/merge-handlers.ts",
+      "symbols": ["mergeHandlers"]
+    },
+    {
+      "file": "plugin-manager:src/infrastructure/loader/register-plugins.ts",
+      "symbols": ["registerPlugins", "RegisterPluginsInput"]
+    }
+  ]
+}

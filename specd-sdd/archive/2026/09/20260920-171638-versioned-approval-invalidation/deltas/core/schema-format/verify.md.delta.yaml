@@ -1,0 +1,21 @@
+- op: added
+  position:
+    {
+      parent: { type: section, matches: '^Requirements$' },
+      after: { type: section, matches: '^Requirement: taskCompletionCheck$' },
+    }
+  content: |
+    ### Requirement: Task artifact validity semantics
+
+    #### Scenario: Marker controls operational semantics
+
+    - **GIVEN** an artifact has an arbitrary ID and declares `hasTasks: true`
+    - **WHEN** validity and archive are evaluated
+    - **THEN** its content is excluded from fingerprints and automatic drift propagation
+    - **AND** missing structure or incomplete live tasks still block applicable operations
+
+- op: removed
+  description: 'Remove obsolete unconditional per-spec approval acceptance scenarios'
+  selector:
+    type: section
+    matches: '^Requirement: Per-spec approval$'

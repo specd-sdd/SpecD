@@ -107,10 +107,38 @@
 
 #### Scenario: Plugin entry removed by name identity
 
-- **GIVEN** a base config defines `plugins.agents: [{ name: '@specd/plugin-agent-codex' }]`
-- **AND** a later inheriting layer removes that inherited agent entry
+- **GIVEN** a base config defines `plugins: [{ name: '@specd/plugin-agent-codex' }]`
+- **AND** a later inheriting layer declares `remove: { plugins: [{ name: '@specd/plugin-agent-codex' }] }`
 - **WHEN** the cascade is resolved
-- **THEN** the loader matches the inherited agent by `name`
+- **THEN** the loader matches the inherited plugin by `name`
+- **AND** the merged `plugins` list no longer contains it
+
+#### Scenario: Removing an absent plugin name fails
+
+- **GIVEN** a base config defines `plugins: [{ name: '@acme/x' }]`
+- **AND** a later layer declares `remove: { plugins: [{ name: '@acme/absent' }] }`
+- **WHEN** the cascade is resolved
+- **THEN** it fails with `ConfigValidationError`
+
+#### Scenario: Duplicate names in the removal list are rejected
+
+- **GIVEN** a base config defines `plugins: [{ name: '@acme/x' }]`
+- **AND** a later layer declares `remove: { plugins: [{ name: '@acme/x' }, { name: '@acme/x' }] }`
+- **WHEN** the cascade is resolved
+- **THEN** it fails with `ConfigValidationError`
+
+#### Scenario: Layer plugin entry replaces inherited entry with same name
+
+- **GIVEN** a base config declares `@acme/x` with `config: { a: 1 }`
+- **AND** an extending layer declares `@acme/x` with `config: { a: 2 }`
+- **WHEN** the cascade is resolved
+- **THEN** the merged list has one `@acme/x` entry with `a: 2` in the original position
+
+#### Scenario: Layer plugin with new name is appended
+
+- **GIVEN** a base config declaring `@acme/x` and an extending layer declaring `@acme/y`
+- **WHEN** the cascade is resolved
+- **THEN** the merged list is `@acme/x` then `@acme/y`
 
 #### Scenario: Workspace removed by name
 
@@ -175,15 +203,19 @@
 
 ### Requirement: Invalidation policy configuration
 
-#### Scenario: Root invalidationPolicy accepts the four canonical values
+Scenarios:
 
-- **WHEN** `specd.yaml` declares `invalidationPolicy` as `none`, `surgical`, `downstream`, or `global`
-- **THEN** config loading accepts the value
+#### Scenario: New defaults preserve lifecycle position
 
-#### Scenario: Unknown invalidationPolicy is rejected
+- **WHEN** configuration omits both invalidation shapes
+- **THEN** a new change resolves `{ artifacts: downstream, workflow: preserve }`
 
-- **WHEN** `specd.yaml` declares an unknown `invalidationPolicy`
-- **THEN** config loading fails with a validation error
+#### Scenario: Legacy and structured shapes cannot be combined
+
+- **GIVEN** effective configuration contains `invalidationPolicy` and `invalidation`
+- **WHEN** configuration is loaded
+- **THEN** validation fails as ambiguous
+- **AND** the legacy key alone maps its artifact value with `workflow: redesign`
 
 ### Requirement: Workspaces
 
@@ -600,36 +632,111 @@
 
 ### Requirement: Plugin declarations
 
-#### Scenario: Plugins section with agents array
+#### Scenario: Flat plugins list
 
-- **WHEN** `specd.yaml` has a `plugins` section
+- **WHEN** `specd.yaml` has a `plugins` list
 - **THEN** it is validated by the config loader's Zod schema at load time
 
-#### Scenario: Agent plugin entry
+#### Scenario: Plugin entry shape
 
-- **GIVEN** `plugins.agents` has an entry
-- **WHEN** config is loaded
-- **THEN** each entry has `name` (required) and optional `config`
+- **GIVEN** `plugins` has an entry
+- **WHEN** the entry is validated against the plugin schema
+- **THEN** each entry has `name` (required) and optional `config` and `contributions`
 
 #### Scenario: Invalid plugin structure rejected at startup
 
-- **WHEN** `specd.yaml` has `plugins.agents: [{ invalid: true }]` (missing `name`)
+- **WHEN** `specd.yaml` has `plugins: [{ invalid: true }]` (missing `name`)
 - **THEN** config validation fails with `ConfigValidationError`
 
-#### Scenario: ConfigWriter.addPlugin adds to array
+#### Scenario: Unscoped plugin name rejected
 
-- **WHEN** `ConfigWriter.addPlugin(configPath, 'agents', '@specd/plugin-agent-claude')` is called
-- **THEN** the plugin is added to `plugins.agents` array
+- **WHEN** `specd.yaml` has `plugins: [{ name: 'my-plugin' }]`
+- **THEN** config validation fails with `ConfigValidationError`
 
-#### Scenario: ConfigWriter.addPlugin with config
+#### Scenario: Duplicate plugin name rejected
 
-- **WHEN** `ConfigWriter.addPlugin(configPath, 'agents', '@specd/plugin-agent-claude', { commandsDir: '.claude/commands' })` is called
-- **THEN** the plugin entry includes both `name` and `config`
+- **WHEN** `plugins` lists `@acme/x` twice
+- **THEN** config validation fails with `ConfigValidationError`
 
-#### Scenario: ConfigWriter.removePlugin removes from array
+#### Scenario: Contributions allowlist accepted
 
-- **WHEN** `ConfigWriter.removePlugin(configPath, 'agents', '@specd/plugin-agent-claude')` is called
-- **THEN** the plugin is removed from the array
+- **WHEN** an entry has `contributions: ['audit']`
+- **THEN** config validation passes without loading the plugin
+- **AND** the entry keeps `contributions: ['audit']`
+
+#### Scenario: Empty contributions list rejected
+
+- **GIVEN** a plugin entry with `contributions: []`
+- **WHEN** config is loaded
+- **THEN** loading fails with a `ConfigValidationError`
+
+#### Scenario: Duplicate plugin name inside an extending layer rejected
+
+- **GIVEN** a root layer declaring `@acme/x` and an extending layer (`extends: true`) listing `@acme/x` twice
+- **WHEN** config is loaded
+- **THEN** loading fails with a `ConfigValidationError`
+
+#### Scenario: Adding and removing one name in the same layer fails
+
+- **GIVEN** an extending layer that declares `@acme/y` in `plugins` and also lists it in `remove.plugins`
+- **WHEN** the cascade is resolved
+- **THEN** loading fails with a `ConfigValidationError` because `@acme/y` is not inherited
+
+### Requirement: Config version
+
+#### Scenario: Absent configVersion accepted
+
+- **GIVEN** a `specd.yaml` with the current shape and no `configVersion`
+- **WHEN** config is loaded
+- **THEN** loading succeeds
+
+#### Scenario: Newer configVersion rejected
+
+- **GIVEN** `configVersion: 3` and the running specd supports `2`
+- **WHEN** config is loaded
+- **THEN** `UnsupportedConfigVersionError` with code `UNSUPPORTED_CONFIG_VERSION` is thrown
+
+#### Scenario: Legacy plugins format shows migration
+
+- **GIVEN** `plugins: { agents: [{ name: '@specd/plugin-agent-claude' }] }`
+- **WHEN** config is loaded
+- **THEN** `LegacyConfigFormatError` with code `LEGACY_CONFIG_FORMAT` is thrown
+- **AND** its message contains the equivalent flat `plugins` list and `configVersion: 2`
+
+#### Scenario: Legacy detection precedes schema errors
+
+- **GIVEN** a legacy `plugins` object
+- **WHEN** config is loaded
+- **THEN** the error is `LEGACY_CONFIG_FORMAT`, not a generic strict-schema error
+
+#### Scenario: Invalid configVersion value rejected
+
+- **GIVEN** `configVersion: 0` (or a negative or non-integer value)
+- **WHEN** config is loaded
+- **THEN** `ConfigValidationError` is thrown
+
+#### Scenario: Other legacy-looking plugins object is a generic schema error
+
+- **GIVEN** `plugins: { skills: [] }`
+- **WHEN** config is loaded
+- **THEN** the error is a generic `ConfigValidationError` and not `LegacyConfigFormatError`
+
+#### Scenario: Legacy format in an extending layer
+
+- **GIVEN** a valid root layer and an extending layer with `plugins: { agents: [...] }`
+- **WHEN** config is loaded
+- **THEN** `LegacyConfigFormatError` is thrown naming the extending layer path
+
+#### Scenario: init writes configVersion
+
+- **WHEN** `initProject` creates a `specd.yaml`
+- **THEN** the file contains `configVersion: 2`
+
+#### Scenario: Mismatching version in extending layer
+
+- **GIVEN** a root layer with `configVersion: 2` and an extending layer with `configVersion: 1`
+- **WHEN** the cascade is resolved
+- **THEN** validation fails with `ConfigValidationError`
 
 ### Requirement: Context spec selection
 
@@ -994,6 +1101,21 @@
 - **WHEN** config is loaded
 - **THEN** `approvals.signoff` is `true`
 
+#### Scenario: Spec gate on does not require pending-spec-approval in the graph
+
+- **GIVEN** `specd.yaml` declares `approvals.spec: true`
+- **WHEN** a change in `ready` is evaluated for `implementing`
+- **THEN** the wait is the `approval.spec` check
+- **AND** config MUST NOT be documented as requiring a pending hop
+- **AND** enforcement is verified in `core:transition-change` and `cli:change-transition` tests (in-place stay in `ready`)
+
+#### Scenario: Omitted implementing row does not create ready to verifying
+
+- **GIVEN** the spec approval gate is enabled and the schema omits an `implementing` workflow row
+- **WHEN** a caller requests `ready → verifying`
+- **THEN** the fixed protocol still rejects that edge
+- **AND** the spec gate remains bound to every legal forward leave of `ready`
+
 ### Requirement: Config writer port
 
 #### Scenario: ConfigWriter port defines initProject method
@@ -1004,17 +1126,37 @@
 #### Scenario: ConfigWriter port defines addPlugin method
 
 - **WHEN** `ConfigWriter` interface is inspected
-- **THEN** it declares `addPlugin(configPath, type, name, config?): Promise<void>`
+- **THEN** it declares `addPlugin(configPath, name, options?): Promise<void>` without a type parameter
 
 #### Scenario: ConfigWriter port defines removePlugin method
 
 - **WHEN** `ConfigWriter` interface is inspected
-- **THEN** it declares `removePlugin(configPath, type, name): Promise<void>`
+- **THEN** it declares `removePlugin(configPath, name): Promise<void>`
 
 #### Scenario: ConfigWriter port defines listPlugins method
 
 - **WHEN** `ConfigWriter` interface is inspected
-- **THEN** it declares `listPlugins(configPath, type?): Promise<Array<{ name: string; config?: Record<string, unknown> }>>`
+- **THEN** it declares `listPlugins(configPath): Promise<Array<{ name; config?; contributions? }>>`
+
+#### Scenario: addPlugin adds to the flat list
+
+- **WHEN** `ConfigWriter.addPlugin(configPath, '@specd/plugin-agent-claude')` is called
+- **THEN** the plugin is added to the `plugins` list
+
+#### Scenario: addPlugin with config and contributions
+
+- **WHEN** `addPlugin` is called with `{ config: { a: 1 }, contributions: ['x'] }`
+- **THEN** the entry includes `name`, `config` and `contributions`
+
+#### Scenario: addPlugin does not duplicate
+
+- **WHEN** `addPlugin` is called twice for the same name
+- **THEN** the list contains one entry
+
+#### Scenario: removePlugin removes from the list
+
+- **WHEN** `ConfigWriter.removePlugin(configPath, '@specd/plugin-agent-claude')` is called
+- **THEN** the entry is removed
 
 ### Requirement: Workspace names and context patterns use the shared rules
 

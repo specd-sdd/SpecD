@@ -5,6 +5,7 @@ import { collect } from '../../helpers/collect.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
 import { readStdin } from '../../helpers/read-stdin.js'
+import { CliExitError } from '../../helpers/cli-exit-error.js'
 
 /**
  * Supported persisted optimization field names.
@@ -37,13 +38,13 @@ const OPTIMIZATION_FIELD_NAMES = ['optimizedDescription', 'optimizedContext'] as
 const OPTIMIZATION_FIELDS = new Set<OptimizationField>(OPTIMIZATION_FIELD_NAMES)
 
 /**
- * Detects the test-only sentinel thrown by mocked `process.exit()`.
+ * Detects the control-flow signal that ends the process from a command action.
  *
  * @param error - Unknown error from a command action
- * @returns True when the error matches the process-exit sentinel shape
+ * @returns True when the error is a `CliExitError`, which must reach the entrypoint unchanged
  */
 function isProcessExitError(error: unknown): boolean {
-  return error instanceof Error && /^process\.exit\(\d+\)$/.test(error.message)
+  return error instanceof CliExitError
 }
 
 /**

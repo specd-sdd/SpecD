@@ -1,27 +1,21 @@
-import {
-  createCodeGraphProvider,
-  createSdkContext,
-  type Kernel,
-  type SdkHostContext,
-  type SpecdConfig,
-} from '@specd/sdk'
+import { type Kernel, type SdkHostContext, type SpecdConfig } from '@specd/sdk'
 import { buildCliKernelOptions } from '../../helpers/cli-context.js'
+import { openCliHost } from '../../helpers/cli-host.js'
 
 /**
- * Builds the SDK host context a graph command hands to its `run*` orchestration.
+ * Returns the SDK host context a graph command hands to its `run*` orchestration.
  *
- * With an already resolved kernel the context reuses it and creates graph providers from the
- * configuration; without one (bootstrap mode) a fresh SDK context is created.
+ * Reuses an already-opened host when available; otherwise opens one via `openCliHost`.
  *
  * @param config - The resolved specd configuration.
- * @param kernel - The kernel resolved with the configuration, or null in bootstrap mode.
+ * @param _kernel - Unused (retained for caller compatibility).
+ * @param host - Already opened SDK host, if any.
  * @returns The host context.
  */
 export async function createGraphHostContext(
   config: SpecdConfig,
-  kernel: Kernel | null | undefined,
+  _kernel: Kernel | null | undefined,
+  host?: SdkHostContext | null,
 ): Promise<SdkHostContext> {
-  return kernel !== undefined && kernel !== null
-    ? { kernel, createGraphProvider: () => createCodeGraphProvider(config) }
-    : createSdkContext(config, { kernel: buildCliKernelOptions() })
+  return host ?? openCliHost({ config, options: { kernel: buildCliKernelOptions() } })
 }

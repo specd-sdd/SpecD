@@ -1,15 +1,16 @@
 import { describe, it, expect, vi } from 'vitest'
+import { ResolveChangeSchema } from '../../../src/application/services/resolve-change-schema.js'
 import { makeSpec } from '../../helpers/make-spec.js'
-import { ArchiveChange } from '../../../src/application/use-cases/archive-change.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
-import { SchemaMismatchError } from '../../../src/application/errors/schema-mismatch-error.js'
+import { SchemaProviderIdentityMismatchError } from '../../../src/application/errors/schema-provider-identity-mismatch-error.js'
 import { HookFailedError } from '../../../src/domain/errors/hook-failed-error.js'
 import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-state-transition-error.js'
+import { ReconciledOperationBlockedError } from '../../../src/application/errors/reconciled-operation-blocked-error.js'
 import { DeltaApplicationError } from '../../../src/domain/errors/delta-application-error.js'
-import { SpecOverlapError } from '../../../src/domain/errors/spec-overlap-error.js'
-import { ArchiveDependencyMismatchError } from '../../../src/domain/errors/archive-dependency-mismatch-error.js'
 import { ArchiveImplementationStateError } from '../../../src/domain/errors/archive-implementation-state-error.js'
+import * as transitionPredicates from '../../../src/domain/services/evaluate-transition-predicates.js'
+import * as resolveInitialPersistedDependsOnModule from '../../../src/application/use-cases/resolve-initial-persisted-depends-on.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
 import { type ArchivedChange } from '../../../src/domain/entities/archived-change.js'
 import { toArchivedChangeView } from '../../../src/domain/read-only-change-view.js'
@@ -24,14 +25,38 @@ import { type ListResult } from '../../../src/application/ports/repository.js'
 import { type ArchiveListEntry } from '../../../src/domain/archived-change-index-entry.js'
 import { SpecPublicationError } from '../../../src/domain/errors/spec-publication-error.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
+import { type ChangeValidityVerdict } from '../../../src/domain/services/change-validity.js'
+import {
+  ReconcileChangeValidity,
+  type ReconcileChangeValidityInput,
+} from '../../../src/application/use-cases/reconcile-change-validity.js'
+import { ValidityFingerprintService } from '../../../src/application/services/validity-fingerprint-service.js'
+import { NodeBinaryContentHasher } from '../../../src/infrastructure/node/binary-content-hasher.js'
+import { type ValidityFingerprint } from '../../../src/domain/value-objects/validity-fingerprint.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
 import { type MaterializeSpecMetadata } from '../../../src/application/use-cases/materialize-spec-metadata.js'
+import { ArchiveChange } from '../../../src/application/use-cases/archive-change.js'
+import { CheckRegistry } from '../../../src/domain/services/check-registry.js'
+import { CheckPredicateFailedError } from '../../../src/domain/errors/check-predicate-failed-error.js'
+import {
+  CheckNotSkippableError,
+  UnknownCheckError,
+} from '../../../src/domain/errors/check-registry-errors.js'
+import {
+  fail as failResult,
+  pass as passResult,
+  type CheckBinding,
+  type CheckProgressEvent,
+} from '../../../src/domain/services/transition-checks.js'
+import { type ArchiveBatchSnapshotPort } from '../../../src/application/ports/archive-batch-snapshot.js'
 import { MarkdownParser } from '../../../src/infrastructure/artifact-parser/markdown-parser.js'
 import {
   type RunStepHooksInput,
   type RunStepHooksResult,
 } from '../../../src/application/use-cases/run-step-hooks.js'
+import { TRANSITION_BINDINGS } from '../../../src/domain/services/check-bindings.js'
 import {
+  makeChange,
   makeChangeRepository,
   makeListWorkspaces,
   makeActorResolver,
@@ -43,7 +68,12 @@ import {
   makeParser,
   makeParsers,
   makeMaterializeMetadata,
+  makeContentHasher,
+  newArchiveChange,
   testActor,
+  makeWorkflowStep,
+  makeRealReconcile,
+  makeArchiveBindings,
 } from './helpers.js'
 
 function makeMaterializeMetadataMock(
@@ -158,9 +188,48 @@ function makeArchivableChange(
 // ---------------------------------------------------------------------------
 
 describe('ArchiveChange', () => {
+  describe('constructor', () => {
+    it('rejects construction without the canonical reconciler', () => {
+      expect(
+        () =>
+          new ArchiveChange(
+            makeChangeRepository([]),
+            makeListWorkspaces(new Map()),
+            makeArchiveRepository(),
+            [],
+            makeActorResolver(),
+            makeParsers(),
+            makeSchemaProvider(makeSchema()),
+            makeMaterializeMetadata(),
+            new Map(),
+            [],
+            '/project',
+            undefined,
+            undefined,
+            undefined as never,
+          ),
+      ).toThrow('reconcile is required')
+    })
+
+    it('does not store RunStepHooks on the instance', () => {
+      const uc = newArchiveChange(
+        makeChangeRepository([]),
+        makeListWorkspaces(new Map()),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeMaterializeMetadata(),
+      )
+      expect('runStepHooks' in uc).toBe(false)
+      expect('_runStepHooks' in uc).toBe(false)
+    })
+  })
+
   describe('given no change with that name', () => {
     it('throws ChangeNotFoundError', async () => {
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([]),
         makeListWorkspaces(new Map()),
         makeArchiveRepository(),
@@ -177,7 +246,7 @@ describe('ArchiveChange', () => {
   describe('given the schema cannot be resolved', () => {
     it('throws SchemaNotFoundError', async () => {
       const change = makeArchivableChange('my-change')
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([change]),
         makeListWorkspaces(new Map()),
         makeArchiveRepository(),
@@ -234,7 +303,7 @@ describe('ArchiveChange', () => {
           // deliberately stopped at 'done' — not transitioned to 'archivable'
         ],
       })
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([change]),
         makeListWorkspaces(new Map()),
         makeArchiveRepository(),
@@ -248,11 +317,13 @@ describe('ArchiveChange', () => {
     })
   })
 
-  describe('given the active schema name differs from the change schema name', () => {
-    it('throws SchemaMismatchError', async () => {
+  describe('given the provider returns a schema inconsistent with the recorded schema request', () => {
+    it('rejects the sovereign lookup integrity failure without listing peer changes', async () => {
       const change = makeArchivableChange('my-change', { schemaName: 'schema-a' })
-      const uc = new ArchiveChange(
-        makeChangeRepository([change]),
+      const changeRepo = makeChangeRepository([change])
+      const list = vi.spyOn(changeRepo, 'list')
+      const uc = newArchiveChange(
+        changeRepo,
         makeListWorkspaces(new Map()),
         makeArchiveRepository(),
         makeRunStepHooks(),
@@ -261,14 +332,131 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(makeSchema({ name: 'schema-b' })),
         makeMaterializeMetadata(),
       )
-      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(SchemaMismatchError)
+      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(
+        SchemaProviderIdentityMismatchError,
+      )
+      expect(list).not.toHaveBeenCalled()
+    })
+
+    it('uses the recorded sovereign schema on a successful archive', async () => {
+      const change = makeArchivableChange('my-change', { schemaName: 'custom-workflow' })
+      const sovereign = makeSchema({ name: 'custom-workflow' })
+      const workspaceDefault = makeSchema({ name: 'workspace-default' })
+      const get = vi.fn(async (name?: string) =>
+        name === 'custom-workflow' ? sovereign : workspaceDefault,
+      )
+      const uc = newArchiveChange(
+        makeChangeRepository([change]),
+        makeListWorkspaces(new Map()),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        { get } as never,
+        makeMaterializeMetadata(),
+      )
+
+      await expect(uc.execute({ name: 'my-change' })).resolves.toMatchObject({
+        archivedChange: { name: 'my-change' },
+      })
+      expect(get).toHaveBeenCalledWith('custom-workflow')
+    })
+  })
+
+  describe('verification with the real validity reconciler', () => {
+    const disabledVerifying = makeSchema({
+      workflow: [makeWorkflowStep('verifying', { disabled: true })],
+    })
+    const enabledVerifying = makeSchema({ workflow: [makeWorkflowStep('verifying')] })
+
+    const build = (change: Change, schema: ReturnType<typeof makeSchema>) => {
+      const repo = makeChangeRepository([change])
+      const provider = makeSchemaProvider(schema)
+      return newArchiveChange(
+        repo,
+        makeListWorkspaces(new Map()),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        provider,
+        makeMaterializeMetadata(),
+        new Map(),
+        [],
+        process.cwd(),
+        undefined,
+        undefined,
+        makeRealReconcile(repo, provider),
+      )
+    }
+
+    it('archives without any verification evidence when verifying is disabled', async () => {
+      const change = makeArchivableChange('no-verify')
+      const result = await build(change, disabledVerifying).execute({ name: 'no-verify' })
+      expect(result.archivedChange).toBeDefined()
+    })
+
+    it('rejects archive when verifying is enabled and no evidence exists', async () => {
+      const change = makeArchivableChange('needs-verify')
+      const error = await build(change, enabledVerifying)
+        .execute({ name: 'needs-verify' })
+        .catch((e: unknown) => e)
+      expect(error).toBeInstanceOf(CheckPredicateFailedError)
+      expect((error as CheckPredicateFailedError).checkId).toBe('verification.current')
+      expect(String(error)).toContain('Completed verification is required')
+    })
+
+    it('rejects archive when verifying is enabled and the completed evidence is stale', async () => {
+      const change = makeArchivableChange('stale-verify')
+      // Evidence recorded against a file that no longer matches the live fingerprint.
+      change.startVerification(
+        {
+          version: 1,
+          artifacts: { version: 1, algorithm: 'artifact-pre-hash-v1', files: {} },
+          implementation: {
+            version: 1,
+            hashAlgorithm: 'sha256',
+            textNormalization: 'text-v1',
+            binaryNormalization: 'bytes-v1',
+            files: { 'src/gone.ts': 'sha256:' + 'f'.repeat(64) },
+          },
+        } as never,
+        testActor,
+      )
+      change.completeVerification(testActor)
+      const archive = makeArchiveRepository()
+      const archiveSpy = vi.spyOn(archive, 'archive')
+      const repo = makeChangeRepository([change])
+      const provider = makeSchemaProvider(enabledVerifying)
+      const uc = newArchiveChange(
+        repo,
+        makeListWorkspaces(new Map()),
+        archive,
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        provider,
+        makeMaterializeMetadata(),
+        new Map(),
+        [],
+        process.cwd(),
+        undefined,
+        undefined,
+        makeRealReconcile(repo, provider),
+      )
+
+      const error = await uc.execute({ name: 'stale-verify' }).catch((e: unknown) => e)
+      expect(error).toBeInstanceOf(CheckPredicateFailedError)
+      expect((error as CheckPredicateFailedError).checkId).toBe('verification.current')
+      expect(String(error)).toContain('Verification evidence is stale')
+      expect(archiveSpy).not.toHaveBeenCalled()
     })
   })
 
   describe('given the change is in archivable state', () => {
     it('proceeds without error', async () => {
       const change = makeArchivableChange('my-change')
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([change]),
         makeListWorkspaces(new Map()),
         makeArchiveRepository(),
@@ -287,7 +475,7 @@ describe('ArchiveChange', () => {
         createdAt: new Date('2024-01-15T12:00:00Z'),
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([change]),
         makeListWorkspaces(new Map()),
         makeArchiveRepository(),
@@ -303,7 +491,7 @@ describe('ArchiveChange', () => {
     })
 
     it('returns an ArchivedChange with no approval or wasStructural fields', async () => {
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
         makeListWorkspaces(new Map()),
         makeArchiveRepository(),
@@ -350,7 +538,7 @@ describe('ArchiveChange', () => {
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         changeRepo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -405,7 +593,7 @@ describe('ArchiveChange', () => {
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         changeRepo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -423,6 +611,488 @@ describe('ArchiveChange', () => {
         dependsOn: ['core:storage'],
         implementation: [],
       })
+    })
+
+    it('materializes metadata with the change schema when the workspace default differs', async () => {
+      const artifactType = makeArtifactType('spec', { delta: false, scope: 'spec' })
+      const sovereign = makeSchema({ name: 'custom-workflow', artifacts: [artifactType] })
+      const workspaceDefault = makeSchema({ name: 'workspace-default', artifacts: [artifactType] })
+      const get = vi.fn(async (name?: string) =>
+        name === 'custom-workflow' ? sovereign : workspaceDefault,
+      )
+      const specRepo = makeSpecRepository({
+        specs: [makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] })],
+        artifacts: { 'auth/oauth/spec.md': '# Spec' },
+      })
+      const materializeMetadata = makeMaterializeMetadataMock({
+        title: 'OAuth',
+        description: 'desc',
+        contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
+      })
+      const change = makeArchivableChange('my-change', {
+        specIds: ['default:auth/oauth'],
+        schemaName: 'custom-workflow',
+      })
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'spec',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'abc123',
+              }),
+            ],
+          ]),
+        }),
+      )
+      const changeRepo = Object.assign(makeChangeRepository([change]), {
+        async artifact() {
+          return new SpecArtifact('spec.md', '# Spec')
+        },
+      })
+      const uc = newArchiveChange(
+        changeRepo,
+        makeListWorkspaces(new Map([['default', specRepo]])),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        { get } as never,
+        materializeMetadata,
+      )
+
+      await uc.execute({ name: 'my-change' })
+
+      const calls = (materializeMetadata.execute as ReturnType<typeof vi.fn>).mock.calls
+      expect(calls.length).toBeGreaterThan(0)
+      for (const call of calls) {
+        expect(call[0]).toMatchObject({
+          specId: 'default:auth/oauth',
+          policy: 'force',
+          schemaName: 'custom-workflow',
+        })
+      }
+      expect(get).not.toHaveBeenCalledWith('workspace-default')
+    })
+
+    it('No-lock spec resolves initial dependsOn through resolveInitialPersistedDependsOn', async () => {
+      const specContent =
+        '# OAuth\n\n## Spec Dependencies\n\n- [`core:legacy`](../legacy/spec.md)\n'
+      const artifactType = makeArtifactType('spec', {
+        delta: false,
+        scope: 'spec',
+        output: 'spec.md',
+        format: 'markdown',
+      })
+      const schema = makeSchema({
+        artifacts: [artifactType],
+        metadataExtraction: {
+          dependsOn: {
+            artifact: 'spec',
+            extractor: {
+              selector: { type: 'section', matches: '^Spec Dependencies$' },
+              extract: 'content',
+              capture: '\\[.*?\\]\\(([^)]+)\\)',
+            },
+          },
+        },
+      })
+      const specRepo = makeSpecRepository({
+        specs: [makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] })],
+        artifacts: { 'auth/oauth/spec.md': specContent },
+      })
+      const resolveInitialSpy = vi.spyOn(
+        resolveInitialPersistedDependsOnModule,
+        'resolveInitialPersistedDependsOn',
+      )
+      const materializeMetadata = makeMaterializeMetadataMock({
+        title: 'OAuth',
+        description: 'desc',
+        contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
+      })
+      const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'spec',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'abc123',
+              }),
+            ],
+          ]),
+        }),
+      )
+      const changeRepo = Object.assign(makeChangeRepository([change]), {
+        async artifact() {
+          return new SpecArtifact('spec.md', specContent)
+        },
+      })
+      const markdownParser = makeParser({
+        parse: () => ({
+          root: {
+            type: 'document',
+            children: [
+              {
+                type: 'section',
+                label: 'Spec Dependencies',
+                children: [{ type: 'paragraph', value: '- [`core:legacy`](../legacy/spec.md)' }],
+              },
+            ],
+          },
+        }),
+        renderSubtree: (node) =>
+          (node.value as string | undefined) ??
+          (node.children ?? [])
+            .map((child) => ((child as { value?: unknown }).value as string | undefined) ?? '')
+            .join('\n'),
+      })
+
+      const uc = newArchiveChange(
+        changeRepo,
+        makeListWorkspaces(new Map([['default', specRepo]])),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(markdownParser),
+        makeSchemaProvider(schema),
+        materializeMetadata,
+      )
+
+      await uc.execute({ name: 'my-change' })
+
+      expect(resolveInitialSpy).toHaveBeenCalled()
+      expect(
+        resolveInitialSpy.mock.calls.some((call) => call[0].explicitDependsOn === undefined),
+      ).toBe(true)
+      resolveInitialSpy.mockRestore()
+      expect(JSON.parse(specRepo.saved.get('spec-lock.json') ?? '').dependsOn).toEqual([
+        '../legacy/spec.md',
+      ])
+    })
+
+    it('Publication plan skips resolveInitialPersistedDependsOn', async () => {
+      const artifactType = makeArtifactType('spec', { delta: false, scope: 'spec' })
+      const schema = makeSchema([artifactType])
+      const specRepo = makeSpecRepository({
+        specs: [makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] })],
+        artifacts: {
+          'auth/oauth/spec.md': '# Spec\n\n## Spec Dependencies\n- core:from-disk\n',
+        },
+      })
+      const materializeMetadata = makeMaterializeMetadataMock({
+        title: 'OAuth',
+        description: 'desc',
+        contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
+      })
+      const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
+      change.setSpecDependsOn('default:auth/oauth', ['core:from-change'])
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'spec',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'abc123',
+              }),
+            ],
+          ]),
+        }),
+      )
+      const changeRepo = Object.assign(makeChangeRepository([change]), {
+        async artifact() {
+          return new SpecArtifact('spec.md', '# Spec')
+        },
+      })
+      const resolveInitialSpy = vi.spyOn(
+        resolveInitialPersistedDependsOnModule,
+        'resolveInitialPersistedDependsOn',
+      )
+
+      const uc = newArchiveChange(
+        changeRepo,
+        makeListWorkspaces(new Map([['default', specRepo]])),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(schema),
+        materializeMetadata,
+      )
+
+      await uc.execute({ name: 'my-change' })
+
+      expect(resolveInitialSpy).not.toHaveBeenCalled()
+      resolveInitialSpy.mockRestore()
+      expect(JSON.parse(specRepo.saved.get('spec-lock.json') ?? '').dependsOn).toEqual([
+        'core:from-change',
+      ])
+    })
+
+    it('New spec without a plan seals extracted dependsOn', async () => {
+      const specContent =
+        '# OAuth\n\n## Spec Dependencies\n\n- [`core:legacy`](../legacy/spec.md)\n'
+      const artifactType = makeArtifactType('spec', {
+        delta: false,
+        scope: 'spec',
+        output: 'spec.md',
+        format: 'markdown',
+      })
+      const schema = makeSchema({
+        artifacts: [artifactType],
+        metadataExtraction: {
+          dependsOn: {
+            artifact: 'spec',
+            extractor: {
+              selector: { type: 'section', matches: '^Spec Dependencies$' },
+              extract: 'content',
+              capture: '\\[.*?\\]\\(([^)]+)\\)',
+            },
+          },
+        },
+      })
+      const specRepo = makeSpecRepository({ specs: [], artifacts: {} })
+      const resolveInitialSpy = vi.spyOn(
+        resolveInitialPersistedDependsOnModule,
+        'resolveInitialPersistedDependsOn',
+      )
+      const materializeMetadata = makeMaterializeMetadataMock({
+        title: 'OAuth',
+        description: 'desc',
+        contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
+      })
+      const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'spec',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'abc123',
+              }),
+            ],
+          ]),
+        }),
+      )
+      const changeRepo = Object.assign(makeChangeRepository([change]), {
+        async artifact() {
+          return new SpecArtifact('spec.md', specContent)
+        },
+      })
+      const markdownParser = makeParser({
+        parse: () => ({
+          root: {
+            type: 'document',
+            children: [
+              {
+                type: 'section',
+                label: 'Spec Dependencies',
+                children: [{ type: 'paragraph', value: '- [`core:legacy`](../legacy/spec.md)' }],
+              },
+            ],
+          },
+        }),
+        renderSubtree: (node) =>
+          (node.value as string | undefined) ??
+          (node.children ?? [])
+            .map((child) => ((child as { value?: unknown }).value as string | undefined) ?? '')
+            .join('\n'),
+      })
+
+      const uc = newArchiveChange(
+        changeRepo,
+        makeListWorkspaces(new Map([['default', specRepo]])),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(markdownParser),
+        makeSchemaProvider(schema),
+        materializeMetadata,
+      )
+
+      await uc.execute({ name: 'my-change' })
+
+      expect(resolveInitialSpy).not.toHaveBeenCalled()
+      resolveInitialSpy.mockRestore()
+      expect(JSON.parse(specRepo.saved.get('spec-lock.json') ?? '').dependsOn).toEqual([
+        '../legacy/spec.md',
+      ])
+    })
+
+    it('New spec without a plan seals empty dependsOn', async () => {
+      const artifactType = makeArtifactType('spec', { delta: false, scope: 'spec' })
+      const schema = makeSchema([artifactType])
+      const specRepo = makeSpecRepository({ specs: [], artifacts: {} })
+      const materializeMetadata = makeMaterializeMetadataMock({
+        title: 'OAuth',
+        description: 'desc',
+        contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
+      })
+      const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'spec',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'abc123',
+              }),
+            ],
+          ]),
+        }),
+      )
+      const changeRepo = Object.assign(makeChangeRepository([change]), {
+        async artifact() {
+          return new SpecArtifact('spec.md', '# Spec')
+        },
+      })
+      const resolveInitialSpy = vi.spyOn(
+        resolveInitialPersistedDependsOnModule,
+        'resolveInitialPersistedDependsOn',
+      )
+
+      const uc = newArchiveChange(
+        changeRepo,
+        makeListWorkspaces(new Map([['default', specRepo]])),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(schema),
+        materializeMetadata,
+      )
+
+      await uc.execute({ name: 'my-change' })
+
+      expect(resolveInitialSpy).not.toHaveBeenCalled()
+      resolveInitialSpy.mockRestore()
+      expect(JSON.parse(specRepo.saved.get('spec-lock.json') ?? '').dependsOn).toEqual([])
+    })
+
+    it('Lock without a plan keeps lock dependsOn', async () => {
+      const specContent =
+        '# OAuth\n\n## Spec Dependencies\n\n- [`core:from-extract`](../from-extract/spec.md)\n'
+      const artifactType = makeArtifactType('spec', {
+        delta: false,
+        scope: 'spec',
+        output: 'spec.md',
+        format: 'markdown',
+      })
+      const schema = makeSchema({
+        artifacts: [artifactType],
+        metadataExtraction: {
+          dependsOn: {
+            artifact: 'spec',
+            extractor: {
+              selector: { type: 'section', matches: '^Spec Dependencies$' },
+              extract: 'content',
+              capture: '\\[.*?\\]\\(([^)]+)\\)',
+            },
+          },
+        },
+      })
+      const specRepo = makeSpecRepository({
+        specs: [makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] })],
+        artifacts: {
+          'auth/oauth/spec.md': specContent,
+          'auth/oauth/spec-lock.json': JSON.stringify({
+            schema: { name: 'test-schema', version: 1 },
+            dependsOn: ['core:from-lock'],
+            implementation: [],
+          }),
+        },
+      })
+      const resolveInitialSpy = vi.spyOn(
+        resolveInitialPersistedDependsOnModule,
+        'resolveInitialPersistedDependsOn',
+      )
+      const materializeMetadata = makeMaterializeMetadataMock({
+        title: 'OAuth',
+        description: 'desc',
+        contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
+      })
+      const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'spec',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'abc123',
+              }),
+            ],
+          ]),
+        }),
+      )
+      const changeRepo = Object.assign(makeChangeRepository([change]), {
+        async artifact() {
+          return new SpecArtifact('spec.md', specContent)
+        },
+      })
+      const markdownParser = makeParser({
+        parse: () => ({
+          root: {
+            type: 'document',
+            children: [
+              {
+                type: 'section',
+                label: 'Spec Dependencies',
+                children: [
+                  { type: 'paragraph', value: '- [`core:from-extract`](../from-extract/spec.md)' },
+                ],
+              },
+            ],
+          },
+        }),
+        renderSubtree: (node) =>
+          (node.value as string | undefined) ??
+          (node.children ?? [])
+            .map((child) => ((child as { value?: unknown }).value as string | undefined) ?? '')
+            .join('\n'),
+      })
+
+      const uc = newArchiveChange(
+        changeRepo,
+        makeListWorkspaces(new Map([['default', specRepo]])),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(markdownParser),
+        makeSchemaProvider(schema),
+        materializeMetadata,
+      )
+
+      await expect(uc.execute({ name: 'my-change' })).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'deps.consistent',
+        checkCode: 'DEPS_INCONSISTENT',
+      })
+      expect(resolveInitialSpy).not.toHaveBeenCalled()
+      resolveInitialSpy.mockRestore()
     })
 
     it('preserves existing sidecar schema and refreshes dependsOn on re-archive', async () => {
@@ -467,7 +1137,7 @@ describe('ArchiveChange', () => {
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         changeRepo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -533,7 +1203,7 @@ describe('ArchiveChange', () => {
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         changeRepo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -620,8 +1290,9 @@ describe('ArchiveChange', () => {
           return new SpecArtifact('spec.md', '# Spec')
         },
       })
+      const depsSpy = vi.spyOn(transitionPredicates, 'runDepsConsistent')
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         changeRepo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -632,19 +1303,17 @@ describe('ArchiveChange', () => {
         materializeMetadata,
       )
 
-      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(
-        ArchiveDependencyMismatchError,
-      )
+      await expect(uc.execute({ name: 'my-change' })).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'deps.consistent',
+        checkCode: 'DEPS_INCONSISTENT',
+      })
+      depsSpy.mockRestore()
       expect(specRepo.saved.has('spec.md')).toBe(false)
       expect((materializeMetadata.execute as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0)
 
       const persisted = await changeRepo.get('my-change')
-      const lastEvent = persisted?.history.at(-1)
-      expect(lastEvent?.type).toBe('archive-failed')
-      if (lastEvent?.type === 'archive-failed') {
-        expect(lastEvent.step).toBe('prepare')
-        expect(lastEvent.commitStarted).toBe(false)
-      }
+      expect(persisted?.state).toBe('archivable')
     })
 
     it('blocks earlier spec publication when a later spec fails preflight', async () => {
@@ -737,7 +1406,7 @@ describe('ArchiveChange', () => {
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         changeRepo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -748,9 +1417,11 @@ describe('ArchiveChange', () => {
         makeMaterializeMetadata(),
       )
 
-      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(
-        ArchiveDependencyMismatchError,
-      )
+      await expect(uc.execute({ name: 'my-change' })).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'deps.consistent',
+        checkCode: 'DEPS_INCONSISTENT',
+      })
       expect(publishCalls).toEqual([])
       expect(specRepo.saved.has('auth/oauth/spec-lock.json')).toBe(false)
       expect(specRepo.saved.has('auth/shared/spec-lock.json')).toBe(false)
@@ -849,7 +1520,7 @@ describe('ArchiveChange', () => {
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         changeRepo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -918,7 +1589,7 @@ describe('ArchiveChange', () => {
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         changeRepo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -934,7 +1605,11 @@ describe('ArchiveChange', () => {
       expect((materializeMetadata.execute as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1)
       const materializeInput = (materializeMetadata.execute as ReturnType<typeof vi.fn>).mock
         .calls[0]?.[0]
-      expect(materializeInput).toMatchObject({ specId: 'default:auth/oauth', policy: 'force' })
+      expect(materializeInput).toMatchObject({
+        specId: 'default:auth/oauth',
+        policy: 'force',
+        schemaName: schema.name(),
+      })
       expect({
         title: 'OAuth',
         description: 'desc',
@@ -995,7 +1670,7 @@ describe('ArchiveChange', () => {
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         changeRepo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -1015,7 +1690,7 @@ describe('ArchiveChange', () => {
       const archiveRepo = makeArchiveRepository()
       const archiveSpy = vi.spyOn(archiveRepo, 'archive')
       const change = makeArchivableChange('my-change')
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([change]),
         makeListWorkspaces(new Map()),
         archiveRepo,
@@ -1074,7 +1749,7 @@ describe('ArchiveChange', () => {
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         repo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         archiveRepo,
@@ -1142,11 +1817,11 @@ describe('ArchiveChange', () => {
           if (input.phase === 'pre') {
             callOrder.push('pnpm test')
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         changeRepo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -1190,13 +1865,14 @@ describe('ArchiveChange', () => {
                   success: false,
                 },
               ],
+              warnings: [],
             }
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -1238,13 +1914,14 @@ describe('ArchiveChange', () => {
                   success: false,
                 },
               ],
+              warnings: [],
             }
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
         makeListWorkspaces(new Map()),
         makeArchiveRepository(),
@@ -1268,11 +1945,11 @@ describe('ArchiveChange', () => {
           if (input.phase === 'pre') {
             callOrder.push('schema-pre', 'project-pre')
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
         makeListWorkspaces(new Map()),
         makeArchiveRepository(),
@@ -1295,11 +1972,11 @@ describe('ArchiveChange', () => {
           if (input.phase === 'post') {
             callOrder.push('schema-post', 'project-post')
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
         makeListWorkspaces(new Map()),
         makeArchiveRepository(),
@@ -1340,13 +2017,14 @@ describe('ArchiveChange', () => {
                   success: false,
                 },
               ],
+              warnings: [],
             }
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
         makeListWorkspaces(new Map()),
         makeArchiveRepository(),
@@ -1386,13 +2064,14 @@ describe('ArchiveChange', () => {
                   success: false,
                 },
               ],
+              warnings: [],
             }
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
         makeListWorkspaces(new Map()),
         makeArchiveRepository(),
@@ -1412,7 +2091,7 @@ describe('ArchiveChange', () => {
     it('does not invoke the hook runner', async () => {
       // RunStepHooks internally skips instruction hooks, so the default
       // stub (which returns success with no hooks executed) is correct.
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
         makeListWorkspaces(new Map()),
         makeArchiveRepository(),
@@ -1458,7 +2137,7 @@ describe('ArchiveChange', () => {
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         changeRepo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -1502,7 +2181,7 @@ describe('ArchiveChange', () => {
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         changeRepo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -1544,13 +2223,14 @@ describe('ArchiveChange', () => {
                   success: false,
                 },
               ],
+              warnings: [],
             }
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
         makeListWorkspaces(new Map()),
         makeArchiveRepository(),
@@ -1571,11 +2251,11 @@ describe('ArchiveChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
           executeSpy(input)
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
         makeListWorkspaces(new Map()),
         makeArchiveRepository(),
@@ -1598,11 +2278,11 @@ describe('ArchiveChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
           executeSpy(input)
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
         makeListWorkspaces(new Map()),
         makeArchiveRepository(),
@@ -1629,11 +2309,11 @@ describe('ArchiveChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
           executeSpy(input)
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
         makeListWorkspaces(new Map()),
         makeArchiveRepository(),
@@ -1699,7 +2379,7 @@ describe('ArchiveChange', () => {
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         changeRepo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -1755,7 +2435,7 @@ describe('ArchiveChange', () => {
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         changeRepo,
         makeListWorkspaces(
           new Map([
@@ -1820,7 +2500,7 @@ describe('ArchiveChange', () => {
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         changeRepo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -1884,7 +2564,7 @@ describe('ArchiveChange', () => {
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         changeRepo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -1951,7 +2631,7 @@ describe('ArchiveChange', () => {
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         changeRepo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -2015,7 +2695,7 @@ describe('ArchiveChange', () => {
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         changeRepo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -2079,7 +2759,7 @@ describe('ArchiveChange', () => {
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         changeRepo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -2130,7 +2810,7 @@ describe('ArchiveChange', () => {
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         changeRepo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -2183,7 +2863,7 @@ describe('ArchiveChange', () => {
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         changeRepo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -2246,7 +2926,7 @@ describe('ArchiveChange', () => {
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         changeRepo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -2269,7 +2949,7 @@ describe('ArchiveChange', () => {
       const specRepo = makeSpecRepository()
 
       // No change artifact set → effectiveStatus is 'missing'
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([
           makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] }),
         ]),
@@ -2312,7 +2992,7 @@ describe('ArchiveChange', () => {
         }),
       )
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([change]),
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -2344,11 +3024,11 @@ describe('ArchiveChange', () => {
           if (input.phase === 'post') {
             callOrder.push('git commit -m archive')
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
         makeListWorkspaces(new Map()),
         archiveRepo,
@@ -2398,13 +3078,14 @@ describe('ArchiveChange', () => {
                   success: false,
                 },
               ],
+              warnings: [],
             }
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
         makeListWorkspaces(new Map()),
         archiveRepo,
@@ -2427,11 +3108,11 @@ describe('ArchiveChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
           calls.push({ name: input.name, step: input.step, phase: input.phase })
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
         makeListWorkspaces(new Map()),
         makeArchiveRepository(),
@@ -2451,11 +3132,11 @@ describe('ArchiveChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
           calls.push({ name: input.name, step: input.step, phase: input.phase })
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
         makeListWorkspaces(new Map()),
         makeArchiveRepository(),
@@ -2514,13 +3195,14 @@ describe('ArchiveChange', () => {
                   success: false,
                 },
               ],
+              warnings: [],
             }
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
         makeListWorkspaces(new Map()),
         makeArchiveRepository(),
@@ -2572,13 +3254,14 @@ describe('ArchiveChange', () => {
                   success: false,
                 },
               ],
+              warnings: [],
             }
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
         makeListWorkspaces(new Map()),
         archiveRepo,
@@ -2604,11 +3287,11 @@ describe('ArchiveChange', () => {
           if (input.phase === 'pre') {
             stateAtHookTime = repo.store.get('my-change')?.state
           }
-          return { hooks: [], success: true, failedHooks: [] }
+          return { hooks: [], success: true, failedHooks: [], warnings: [] }
         },
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         repo,
         makeListWorkspaces(new Map()),
         makeArchiveRepository(),
@@ -2628,7 +3311,7 @@ describe('ArchiveChange', () => {
       const repo = makeChangeRepository([change])
       const mutateSpy = vi.spyOn(repo, 'mutate')
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         repo,
         makeListWorkspaces(new Map()),
         makeArchiveRepository(),
@@ -2653,7 +3336,7 @@ describe('ArchiveChange', () => {
   })
 
   describe('overlap guard', () => {
-    it('throws SpecOverlapError when other changes target the same specs', async () => {
+    it('throws CheckPredicateFailedError for spec.overlap when other changes target the same specs', async () => {
       const archivable = makeArchivableChange('my-change', {
         specIds: ['default:auth/oauth'],
       })
@@ -2676,7 +3359,7 @@ describe('ArchiveChange', () => {
       })
       const repo = makeChangeRepository([archivable, other])
       const specRepo = makeSpecRepository()
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         repo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -2687,10 +3370,14 @@ describe('ArchiveChange', () => {
         makeMaterializeMetadata(),
       )
 
-      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(SpecOverlapError)
+      await expect(uc.execute({ name: 'my-change' })).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'spec.overlap',
+        checkCode: 'OVERLAP_CONFLICT',
+      })
     })
 
-    it('proceeds when allowOverlap is true despite overlap', async () => {
+    it('proceeds when spec.overlap is bypassed despite overlap', async () => {
       const archivable = makeArchivableChange('my-change', {
         specIds: ['default:auth/oauth'],
       })
@@ -2713,7 +3400,7 @@ describe('ArchiveChange', () => {
       })
       const repo = makeChangeRepository([archivable, other])
       const specRepo = makeSpecRepository()
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         repo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -2724,19 +3411,19 @@ describe('ArchiveChange', () => {
         makeMaterializeMetadata(),
       )
 
-      const result = await uc.execute({ name: 'my-change', allowOverlap: true })
+      const result = await uc.execute({ name: 'my-change', skipChecks: ['spec.overlap'] })
       expect(result.archivedChange).toBeDefined()
       expect(result.invalidatedChanges).toHaveLength(1)
       expect(result.invalidatedChanges[0]!.name).toBe('other-change')
       expect(result.invalidatedChanges[0]!.specIds).toContain('default:auth/oauth')
 
       const invalidated = await repo.get('other-change')
-      expect(invalidated?.state).toBe('designing')
+      expect(invalidated?.state).toBe('drafting')
       const invEvent = invalidated?.history.find((e) => e.type === 'invalidated')
       expect(invEvent?.type === 'invalidated' && invEvent.cause).toBe('spec-overlap-conflict')
     })
 
-    it('invalidates multiple overlapping changes when allowOverlap is true', async () => {
+    it('invalidates multiple overlapping changes when spec.overlap is bypassed', async () => {
       const archivable = makeArchivableChange('my-change', {
         specIds: ['default:auth/oauth'],
       })
@@ -2776,7 +3463,7 @@ describe('ArchiveChange', () => {
       })
       const repo = makeChangeRepository([archivable, other1, other2])
       const specRepo = makeSpecRepository()
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         repo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -2787,20 +3474,20 @@ describe('ArchiveChange', () => {
         makeMaterializeMetadata(),
       )
 
-      const result = await uc.execute({ name: 'my-change', allowOverlap: true })
+      const result = await uc.execute({ name: 'my-change', skipChecks: ['spec.overlap'] })
       expect(result.invalidatedChanges).toHaveLength(2)
       const names = result.invalidatedChanges.map((ic) => ic.name)
       expect(names).toContain('other-one')
       expect(names).toContain('other-two')
     })
 
-    it('returns empty invalidatedChanges when allowOverlap is true but no overlap exists', async () => {
+    it('returns empty invalidatedChanges when spec.overlap is bypassed but no overlap exists', async () => {
       const archivable = makeArchivableChange('my-change', {
         specIds: ['default:auth/oauth'],
       })
       const repo = makeChangeRepository([archivable])
       const specRepo = makeSpecRepository()
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         repo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -2811,7 +3498,7 @@ describe('ArchiveChange', () => {
         makeMaterializeMetadata(),
       )
 
-      const result = await uc.execute({ name: 'my-change', allowOverlap: true })
+      const result = await uc.execute({ name: 'my-change', skipChecks: ['spec.overlap'] })
       expect(result.invalidatedChanges).toHaveLength(0)
     })
 
@@ -2821,7 +3508,7 @@ describe('ArchiveChange', () => {
       })
       const repo = makeChangeRepository([archivable])
       const specRepo = makeSpecRepository()
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         repo,
         makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
@@ -2838,10 +3525,7 @@ describe('ArchiveChange', () => {
   })
 
   describe('readOnly workspace guard', () => {
-    it('throws ReadOnlyWorkspaceError when change contains readOnly specs', async () => {
-      const { ReadOnlyWorkspaceError } =
-        await import('../../../src/domain/errors/read-only-workspace-error.js')
-
+    it('throws CheckPredicateFailedError for workspace.readOnly when change contains readOnly specs', async () => {
       const change = makeArchivableChange('my-change', {
         specIds: ['platform:auth/tokens'],
       })
@@ -2852,7 +3536,7 @@ describe('ArchiveChange', () => {
         artifacts: [makeArtifactType('specs', { scope: 'spec', delta: true })],
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([change]),
         makeListWorkspaces(
           new Map([['platform', readOnlySpecRepo]]),
@@ -2866,7 +3550,11 @@ describe('ArchiveChange', () => {
         makeMaterializeMetadata(),
       )
 
-      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(ReadOnlyWorkspaceError)
+      await expect(uc.execute({ name: 'my-change' })).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'workspace.readOnly',
+        checkCode: 'READ_ONLY_WORKSPACE',
+      })
     })
   })
 
@@ -2875,7 +3563,7 @@ describe('ArchiveChange', () => {
       const change = makeArchivableChange('my-change')
       change.trackImplementationFile('packages/core/src/change.ts', 'open')
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([change]),
         makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
         makeArchiveRepository(),
@@ -2886,12 +3574,38 @@ describe('ArchiveChange', () => {
         makeMaterializeMetadata(),
       )
 
-      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(
-        ArchiveImplementationStateError,
-      )
+      await expect(uc.execute({ name: 'my-change' })).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'impl.filesResolved',
+        checkCode: 'IMPLEMENTATION_STATE',
+      })
     })
 
-    it('fails when implementation links target specs outside scope without allowOutOfScope', async () => {
+    it('still fails open tracked files when impl.linksInScope is bypassed', async () => {
+      const change = makeArchivableChange('my-change')
+      change.trackImplementationFile('packages/core/src/change.ts', 'open')
+
+      const uc = newArchiveChange(
+        makeChangeRepository([change]),
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeMaterializeMetadata(),
+      )
+
+      await expect(
+        uc.execute({ name: 'my-change', skipChecks: ['impl.linksInScope'] }),
+      ).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'impl.filesResolved',
+        checkCode: 'IMPLEMENTATION_STATE',
+      })
+    })
+
+    it('fails when implementation links target specs outside scope without bypassing impl.linksInScope', async () => {
       const change = makeArchivableChange('my-change', {
         specIds: ['default:auth/oauth'],
       })
@@ -2902,7 +3616,7 @@ describe('ArchiveChange', () => {
         fileLinkExplicit: true,
       })
 
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([change]),
         makeListWorkspaces(
           new Map([
@@ -2916,6 +3630,8 @@ describe('ArchiveChange', () => {
               }),
             ],
           ]),
+          new Map(),
+          new Map([['default', '/project']]),
         ),
         makeArchiveRepository(),
         makeRunStepHooks(),
@@ -2928,12 +3644,14 @@ describe('ArchiveChange', () => {
         '/project',
       )
 
-      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(
-        ArchiveImplementationStateError,
-      )
+      await expect(uc.execute({ name: 'my-change' })).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'impl.linksInScope',
+        checkCode: 'IMPLEMENTATION_STATE',
+      })
     })
 
-    it('publishes out-of-scope implementation sidecars when allowOutOfScope is true', async () => {
+    it('publishes out-of-scope implementation sidecars when impl.linksInScope is bypassed', async () => {
       const change = makeArchivableChange('my-change', {
         specIds: ['default:auth/oauth'],
       })
@@ -2950,7 +3668,7 @@ describe('ArchiveChange', () => {
           makeSpec({ workspace: 'default', name: 'auth/shared', filenames: ['spec.md'] }),
         ],
       })
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([change]),
         makeListWorkspaces(
           new Map([['default', specRepo]]),
@@ -2968,13 +3686,61 @@ describe('ArchiveChange', () => {
         '/project',
       )
 
-      await uc.execute({ name: 'my-change', allowOutOfScope: true })
+      await uc.execute({ name: 'my-change', skipChecks: ['impl.linksInScope'] })
 
       const savedSpecLock = specRepo.saved.get('auth/shared/spec-lock.json')
       expect(savedSpecLock).toBeDefined()
       expect(JSON.parse(savedSpecLock ?? '{}')).toMatchObject({
         implementation: [{ file: 'default:auth/shared/spec.md' }],
       })
+    })
+
+    it('Excluded path is ignored during sidecar materialization', async () => {
+      const change = makeArchivableChange('my-change', {
+        specIds: ['default:auth/oauth'],
+      })
+      change.trackImplementationFile('node_modules/pkg/index.js', 'resolved')
+      change.trackImplementationFile('src/keep.ts', 'resolved')
+      change.addImplementationLink({
+        specId: 'default:auth/oauth',
+        file: 'node_modules/pkg/index.js',
+        fileLinkExplicit: true,
+      })
+      change.addImplementationLink({
+        specId: 'default:auth/oauth',
+        file: 'src/keep.ts',
+        fileLinkExplicit: true,
+      })
+
+      const specRepo = makeSpecRepository({
+        specs: [makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] })],
+      })
+      const uc = newArchiveChange(
+        makeChangeRepository([change]),
+        makeListWorkspaces(
+          new Map([['default', specRepo]]),
+          new Map(),
+          new Map([['default', '/project']]),
+          { excludePaths: ['node_modules'] },
+        ),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeMaterializeMetadata(),
+        new Map(),
+        [],
+        '/project',
+      )
+
+      await uc.execute({ name: 'my-change' })
+
+      const savedSpecLock = specRepo.saved.get('auth/oauth/spec-lock.json')
+      expect(savedSpecLock).toBeDefined()
+      expect(JSON.parse(savedSpecLock ?? '{}').implementation).toEqual([
+        { file: 'default:src/keep.ts' },
+      ])
     })
 
     it('discards out-of-scope implementation links for nonexistent specs without creating orphan sidecars', async () => {
@@ -2991,7 +3757,7 @@ describe('ArchiveChange', () => {
       const specRepo = makeSpecRepository({
         specs: [makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] })],
       })
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([change]),
         makeListWorkspaces(
           new Map([['default', specRepo]]),
@@ -3009,7 +3775,7 @@ describe('ArchiveChange', () => {
         '/project',
       )
 
-      await uc.execute({ name: 'my-change', allowOutOfScope: true })
+      await uc.execute({ name: 'my-change', skipChecks: ['impl.linksInScope'] })
       expect(specRepo.saved.has('core/archive-list-entry/spec-lock.json')).toBe(false)
     })
 
@@ -3027,7 +3793,7 @@ describe('ArchiveChange', () => {
       const specRepo = makeSpecRepository({
         specs: [],
       })
-      const uc = new ArchiveChange(
+      const uc = newArchiveChange(
         makeChangeRepository([change]),
         makeListWorkspaces(
           new Map([['default', specRepo]]),
@@ -3047,6 +3813,1338 @@ describe('ArchiveChange', () => {
 
       await uc.execute({ name: 'my-change' })
       expect(specRepo.saved.has('auth/brand-new-spec/spec-lock.json')).toBe(false)
+    })
+  })
+
+  describe('reconciled archive preflight', () => {
+    const baseline: ValidityFingerprint = {
+      version: 1,
+      artifacts: { version: 1, algorithm: 'artifact-pre-hash-v1', files: {} },
+      implementation: {
+        version: 1,
+        hashAlgorithm: 'sha256',
+        textNormalization: 'text-v1',
+        binaryNormalization: 'bytes-v1',
+        files: {},
+      },
+    }
+    const openVerdict: ChangeValidityVerdict = {
+      artifactReviewRequired: false,
+      affectedArtifacts: [],
+      projectionChanges: [],
+      specApproval: 'valid',
+      signoff: 'valid',
+      verification: 'valid',
+      blockers: [],
+      recovery: null,
+    }
+
+    function resultFor(change: Change, verdict: ChangeValidityVerdict = openVerdict) {
+      return {
+        change,
+        verdict,
+        projectionChanges: [],
+        affectedArtifacts: [],
+        automaticReturn: verdict.recovery,
+        changed: false,
+      }
+    }
+
+    it('does not archive when preflight recovery leaves a non-archivable state', async () => {
+      const current = makeArchivableChange('my-change')
+      const recovered = makeChange('my-change', { specIds: ['default:auth/oauth'] })
+      recovered.transition('designing', testActor)
+      const repo = makeChangeRepository([current])
+      const archive = makeArchiveRepository()
+      const archiveSpy = vi.spyOn(archive, 'archive')
+      let calls = 0
+      const reconcile = {
+        execute: async () => {
+          calls += 1
+          repo.store.set('my-change', recovered)
+          return resultFor(recovered, {
+            ...openVerdict,
+            recovery: { cause: 'spec-approval', from: 'archivable', to: 'designing' },
+          })
+        },
+      } as unknown as ReconcileChangeValidity
+      const uc = newArchiveChange(
+        repo,
+        makeListWorkspaces(new Map()),
+        archive,
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeMaterializeMetadata(),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        reconcile,
+      )
+
+      const caught = (await uc
+        .execute({ name: 'my-change' })
+        .catch((e: unknown) => e)) as ReconciledOperationBlockedError
+      expect(caught).toBeInstanceOf(ReconciledOperationBlockedError)
+      expect(caught.code).toBe('RECONCILED_OPERATION_BLOCKED')
+      expect(caught.operation).toBe('archive')
+      expect(caught.state).toBe('designing')
+      expect(caught.automaticReturn).toEqual({
+        cause: 'spec-approval',
+        from: 'archivable',
+        to: 'designing',
+      })
+      // Design artifacts are complete in this schema, so the ordinary rules recommend leaving designing.
+      expect(caught.nextAction).toMatchObject({ targetStep: 'ready', intent: 'design' })
+      expect(calls).toBe(1)
+      expect(archiveSpy).not.toHaveBeenCalled()
+      expect(repo.store.get('my-change')?.state).toBe('designing')
+    })
+
+    it('projects the sign-off action when recovery to done keeps verifying disabled', async () => {
+      const current = makeArchivableChange('my-change')
+      const recovered = makeChange('my-change', { specIds: ['default:auth/oauth'] })
+      for (const state of ['designing', 'ready', 'implementing', 'verifying', 'done'] as const) {
+        recovered.transition(state, testActor)
+      }
+      const repo = makeChangeRepository([current])
+      const archive = makeArchiveRepository()
+      const reconcile = {
+        execute: async () => {
+          repo.store.set('my-change', recovered)
+          return resultFor(recovered, {
+            ...openVerdict,
+            signoff: 'stale',
+            verification: 'not-required',
+            recovery: { cause: 'signoff', from: 'archivable', to: 'done' },
+          })
+        },
+      } as unknown as ReconcileChangeValidity
+      const uc = newArchiveChange(
+        repo,
+        makeListWorkspaces(new Map()),
+        archive,
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema([], [makeWorkflowStep('verifying', { disabled: true })])),
+        makeMaterializeMetadata(),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        reconcile,
+        undefined,
+        TRANSITION_BINDINGS,
+        { spec: false, signoff: true },
+      )
+
+      const caught = (await uc
+        .execute({ name: 'my-change' })
+        .catch((e: unknown) => e)) as ReconciledOperationBlockedError
+      expect(caught).toBeInstanceOf(ReconciledOperationBlockedError)
+      expect(caught.state).toBe('done')
+      expect(caught.nextAction.intent).not.toBe('verify')
+      expect(caught.nextAction.action).toEqual({ kind: 'approve-signoff' })
+    })
+
+    it('does not transition to archiving when post-hook verification blocks', async () => {
+      const change = makeArchivableChange('my-change')
+      const repo = makeChangeRepository([change])
+      const archive = makeArchiveRepository()
+      const archiveSpy = vi.spyOn(archive, 'archive')
+      const mutateSpy = vi.spyOn(repo, 'mutate')
+      const batchSnapshot = {
+        detectOrphans: vi.fn(),
+        snapshot: vi.fn(),
+        recordCreatedFile: vi.fn(),
+        restoreBatch: vi.fn(),
+        cleanup: vi.fn(),
+      } as unknown as ArchiveBatchSnapshotPort
+      let calls = 0
+      const reconcile = {
+        execute: async () => {
+          calls += 1
+          if (calls === 1) return resultFor(change)
+          return resultFor(change, {
+            ...openVerdict,
+            verification: 'stale',
+            blockers: [{ code: 'VERIFICATION_STALE', message: 'Verification evidence is stale' }],
+          })
+        },
+      } as unknown as ReconcileChangeValidity
+      const uc = newArchiveChange(
+        repo,
+        makeListWorkspaces(new Map()),
+        archive,
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeMaterializeMetadata(),
+        undefined,
+        undefined,
+        undefined,
+        batchSnapshot,
+        undefined,
+        reconcile,
+      )
+
+      await expect(uc.execute({ name: 'my-change' })).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'verification.current',
+        action: { kind: 'start-verification' },
+      })
+      expect(calls).toBe(2)
+      expect(archiveSpy).not.toHaveBeenCalled()
+      expect(mutateSpy).not.toHaveBeenCalled()
+      expect(batchSnapshot.detectOrphans).not.toHaveBeenCalled()
+      expect(batchSnapshot.snapshot).not.toHaveBeenCalled()
+      expect(repo.store.get('my-change')?.state).toBe('archivable')
+    })
+
+    it('builds the archive plan from implementation links accepted after hooks', async () => {
+      const change = makeArchivableChange('my-change', {
+        specIds: ['default:auth/oauth'],
+      })
+      const repo = makeChangeRepository([change])
+      const specRepo = makeSpecRepository({
+        specs: [makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] })],
+      })
+      let calls = 0
+      const reconcile = {
+        execute: async () => {
+          calls += 1
+          if (calls === 2) {
+            change.trackImplementationFile('src/accepted.ts', 'resolved')
+            change.addImplementationLink({
+              specId: 'default:auth/oauth',
+              file: 'src/accepted.ts',
+              fileLinkExplicit: true,
+            })
+          }
+          return resultFor(change)
+        },
+      } as unknown as ReconcileChangeValidity
+      const uc = newArchiveChange(
+        repo,
+        makeListWorkspaces(
+          new Map([['default', specRepo]]),
+          new Map(),
+          new Map([['default', '/project']]),
+        ),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeMaterializeMetadata(),
+        new Map(),
+        [],
+        '/project',
+        undefined,
+        undefined,
+        reconcile,
+      )
+
+      await uc.execute({ name: 'my-change' })
+
+      expect(calls).toBeGreaterThanOrEqual(2)
+      expect(JSON.parse(specRepo.saved.get('auth/oauth/spec-lock.json') ?? '{}')).toMatchObject({
+        implementation: [{ file: 'default:src/accepted.ts' }],
+      })
+    })
+
+    it('does not archive when post-hook spec approval is absent', async () => {
+      const change = makeArchivableChange('my-change')
+      const repo = makeChangeRepository([change])
+      const archive = makeArchiveRepository()
+      const archiveSpy = vi.spyOn(archive, 'archive')
+      let calls = 0
+      const reconcile = {
+        execute: async () => {
+          calls += 1
+          if (calls === 1) return resultFor(change)
+          return resultFor(change, {
+            ...openVerdict,
+            specApproval: 'absent',
+            blockers: [{ code: 'APPROVAL_REQUIRED', message: 'Spec approval is required' }],
+          })
+        },
+      } as unknown as ReconcileChangeValidity
+      const uc = newArchiveChange(
+        repo,
+        makeListWorkspaces(new Map()),
+        archive,
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeMaterializeMetadata(),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        reconcile,
+      )
+
+      await expect(uc.execute({ name: 'my-change' })).rejects.toBeInstanceOf(
+        InvalidStateTransitionError,
+      )
+      expect(archiveSpy).not.toHaveBeenCalled()
+      expect(repo.store.get('my-change')?.state).toBe('archivable')
+    })
+
+    it('does not archive when post-hook links fall outside scope', async () => {
+      const current = makeArchivableChange('my-change')
+      const drifted = makeArchivableChange('my-change')
+      drifted.addImplementationLink({
+        specId: 'default:other/spec',
+        file: 'src/outside.ts',
+        fileLinkExplicit: true,
+      })
+      const repo = makeChangeRepository([current])
+      const archive = makeArchiveRepository()
+      const archiveSpy = vi.spyOn(archive, 'archive')
+      let calls = 0
+      const reconcile = {
+        execute: async () => {
+          calls += 1
+          if (calls === 1) return resultFor(current)
+          repo.store.set('my-change', drifted)
+          return resultFor(drifted)
+        },
+      } as unknown as ReconcileChangeValidity
+      const uc = newArchiveChange(
+        repo,
+        makeListWorkspaces(new Map()),
+        archive,
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeMaterializeMetadata(),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        reconcile,
+      )
+
+      await expect(uc.execute({ name: 'my-change' })).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'impl.linksInScope',
+      })
+      expect(archiveSpy).not.toHaveBeenCalled()
+      expect(repo.store.get('my-change')?.state).toBe('archivable')
+    })
+
+    it('reconciles overlapping peers with a spec-overlap-conflict intent', async () => {
+      const archivable = makeArchivableChange('my-change', {
+        specIds: ['default:auth/oauth'],
+      })
+      const other = new Change({
+        name: 'other-change',
+        createdAt: new Date(),
+        specIds: ['default:auth/oauth'],
+        schemaName: 'test-schema',
+        schemaVersion: 1,
+        history: [
+          {
+            type: 'created',
+            at: new Date(),
+            by: testActor,
+            specIds: ['default:auth/oauth'],
+            schemaName: 'test-schema',
+            schemaVersion: 1,
+          },
+        ],
+      })
+      const specs = new ChangeArtifact({ type: 'specs' })
+      specs.setFile(
+        new ArtifactFile({
+          key: 'default:auth/oauth',
+          filename: 'spec.md',
+          status: 'complete',
+        }),
+      )
+      other.setArtifact(specs)
+      const repo = makeChangeRepository([archivable, other])
+      const intents: ReconcileChangeValidityInput[] = []
+      const reconcile = {
+        execute: async (input: ReconcileChangeValidityInput) => {
+          intents.push(input)
+          const loaded = repo.store.get(input.name)
+          if (loaded === undefined) throw new Error(`missing ${input.name}`)
+          return resultFor(loaded)
+        },
+      } as unknown as ReconcileChangeValidity
+      const mutateSpy = vi.spyOn(repo, 'mutate')
+      const uc = newArchiveChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeMaterializeMetadata(),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        reconcile,
+      )
+
+      const result = await uc.execute({ name: 'my-change', skipChecks: ['spec.overlap'] })
+
+      expect(result.invalidatedChanges).toEqual([
+        { name: 'other-change', specIds: ['default:auth/oauth'] },
+      ])
+      const overlap = intents.find((input) => input.name === 'other-change')
+      expect(overlap?.intent).toEqual({
+        type: 'spec-overlap-conflict',
+        reason:
+          "Invalidated because change 'my-change' was archived with overlapping specs: default:auth/oauth",
+        targets: [
+          {
+            artifactId: 'specs',
+            fileKey: 'default:auth/oauth',
+            filename: 'spec.md',
+            origin: 'direct',
+          },
+        ],
+      })
+      expect(mutateSpy.mock.calls.some((call) => call[0] === 'other-change')).toBe(false)
+      expect(
+        repo.store.get('other-change')?.history.some((event) => event.type === 'invalidated'),
+      ).toBe(false)
+    })
+
+    it('applies each overlapping peer policy and enabled gate through reconciliation', async () => {
+      const specId = 'default:auth/oauth'
+      const archivable = makeArchivableChange('my-change', { specIds: [specId] })
+      const makePeer = (name: string, workflow: 'preserve' | 'redesign') => {
+        const peer = makeChange(name, { specIds: [specId] })
+        peer.transition('designing', testActor)
+        peer.transition('ready', testActor)
+        peer.transition('implementing', testActor)
+        peer.invalidationPolicy = { artifacts: 'surgical', workflow }
+        const specs = new ChangeArtifact({ type: 'specs' })
+        specs.setFile(
+          new ArtifactFile({
+            key: specId,
+            filename: 'spec.md',
+            status: 'complete',
+          }),
+        )
+        peer.setArtifact(specs)
+        return peer
+      }
+      const preserved = makePeer('preserve-peer', 'preserve')
+      const redesigned = makePeer('redesign-peer', 'redesign')
+      const gated = makePeer('gated-peer', 'preserve')
+      gated.recordSpecApproval(
+        'approved scope',
+        {
+          version: 1,
+          specIds: [specId],
+          artifacts: { version: 1, algorithm: 'artifact-pre-hash-v1', files: {} },
+        },
+        testActor,
+      )
+      const repo = makeChangeRepository([archivable, preserved, redesigned, gated])
+      repo.artifact = async (_change, filename) => new SpecArtifact(filename, '# Peer spec')
+      const schemaProvider = makeSchemaProvider(
+        makeSchema([makeArtifactType('specs', { scope: 'spec' })]),
+      )
+      const makeReconciler = (specGate: boolean) =>
+        new ReconcileChangeValidity({
+          changes: repo,
+          resolveChangeSchema: new ResolveChangeSchema(schemaProvider),
+          actor: makeActorResolver(),
+          refreshImplementationTracking: {
+            execute: async () => ({ implementationTracking: null as never }),
+          } as never,
+          fingerprint: new ValidityFingerprintService({
+            changes: repo,
+            hasher: makeContentHasher(),
+            binaryHasher: new NodeBinaryContentHasher(),
+            schemaProvider,
+          }),
+          approvals: { spec: specGate, signoff: false },
+        })
+      const ungated = makeReconciler(false)
+      const specGated = makeReconciler(true)
+      const peerResults = new Map<string, Awaited<ReturnType<ReconcileChangeValidity['execute']>>>()
+      const reconcile = {
+        execute: async (input: ReconcileChangeValidityInput) => {
+          if (input.name === archivable.name) return resultFor(archivable)
+          const result = await (input.name === gated.name ? specGated : ungated).execute(input)
+          peerResults.set(input.name, result)
+          return result
+        },
+      } as unknown as ReconcileChangeValidity
+      const specRepo = makeSpecRepository({
+        specs: [makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] })],
+      })
+      const uc = newArchiveChange(
+        repo,
+        makeListWorkspaces(new Map([['default', specRepo]])),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        schemaProvider,
+        makeMaterializeMetadata(),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        reconcile,
+      )
+
+      const result = await uc.execute({ name: archivable.name, skipChecks: ['spec.overlap'] })
+
+      expect(result.invalidatedChanges.map((entry) => entry.name).sort()).toEqual([
+        'gated-peer',
+        'preserve-peer',
+        'redesign-peer',
+      ])
+      expect(repo.store.get(preserved.name)?.state).toBe('implementing')
+      expect(peerResults.get(preserved.name)?.automaticReturn).toBeNull()
+      expect(peerResults.get(preserved.name)?.verdict.blockers).toEqual(
+        expect.arrayContaining([expect.objectContaining({ code: 'ARTIFACT_DRIFT' })]),
+      )
+      expect(repo.store.get(redesigned.name)?.state).toBe('designing')
+      expect(peerResults.get(redesigned.name)?.automaticReturn).toEqual({
+        cause: 'workflow-redesign',
+        from: 'implementing',
+        to: 'designing',
+      })
+      expect(repo.store.get(gated.name)?.state).toBe('designing')
+      expect(peerResults.get(gated.name)?.automaticReturn).toEqual({
+        cause: 'spec-approval',
+        from: 'implementing',
+        to: 'designing',
+      })
+      expect(repo.store.get(gated.name)?.specApproval?.status).toBe('stale')
+    })
+
+    it('archives the loaded change without a repository migrate or rewrite', async () => {
+      const change = makeArchivableChange('my-change')
+      change.startVerification(baseline, testActor)
+      const completed = change.completeVerification(testActor)
+      const historyBefore = change.history.length
+      const repo = makeChangeRepository([change])
+      const archive = makeArchiveRepository()
+      const archiveSpy = vi.spyOn(archive, 'archive')
+      const saveArtifact = vi.spyOn(repo, 'saveArtifact')
+      const create = vi.spyOn(repo, 'create')
+      const reconcile = {
+        execute: async () => resultFor(change),
+      } as unknown as ReconcileChangeValidity
+      const uc = newArchiveChange(
+        repo,
+        makeListWorkspaces(new Map()),
+        archive,
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeMaterializeMetadata(),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        reconcile,
+      )
+
+      await uc.execute({ name: 'my-change' })
+
+      expect(saveArtifact).not.toHaveBeenCalled()
+      expect(create).not.toHaveBeenCalled()
+      expect(archiveSpy).toHaveBeenCalledTimes(1)
+      const archived = archiveSpy.mock.calls[0]?.[0]
+      expect(archived?.state).toBe('archiving')
+      expect(archived?.verification.completed?.id).toBe(completed.id)
+      expect(archived?.verification.completed?.status).toBe('valid')
+      expect(
+        archived?.history.filter((event) => event.type === 'verification-completed'),
+      ).toHaveLength(1)
+      expect(archived?.history.length).toBe(historyBefore + 1)
+      expect(archived?.history[archived.history.length - 1]).toMatchObject({
+        type: 'transitioned',
+        to: 'archiving',
+      })
+    })
+
+    it('blocks archive when a task artifact that is not named tasks.md still has open items', async () => {
+      const change = makeArchivableChange('my-change')
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'checklist',
+          files: new Map([
+            [
+              'checklist',
+              new ArtifactFile({
+                key: 'checklist',
+                filename: 'checklist.md',
+                status: 'complete',
+              }),
+            ],
+          ]),
+        }),
+      )
+      const schema = makeSchema({
+        artifacts: [
+          makeArtifactType('checklist', {
+            hasTasks: true,
+            taskCompletionCheck: {
+              incompletePattern: '^\\s*-\\s+\\[ \\]',
+              completePattern: '^\\s*-\\s+\\[x\\]',
+            },
+          }),
+        ],
+        workflow: [
+          {
+            step: 'archiving',
+            requires: ['checklist'],
+            requiresTaskCompletion: ['checklist'],
+            hooks: { pre: [], post: [] },
+          },
+        ],
+      })
+      const repo = makeChangeRepository([change])
+      vi.spyOn(repo, 'artifact').mockResolvedValue(
+        new SpecArtifact('checklist.md', '- [ ] still open\n'),
+      )
+      const archive = makeArchiveRepository()
+      const archiveSpy = vi.spyOn(archive, 'archive')
+      const uc = newArchiveChange(
+        repo,
+        makeListWorkspaces(new Map()),
+        archive,
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(schema),
+        makeMaterializeMetadata(),
+      )
+
+      await expect(uc.execute({ name: 'my-change' })).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'workflow.taskCompletion',
+        checkCode: 'INCOMPLETE_TASKS',
+        details: expect.objectContaining({ artifactId: 'checklist', incomplete: 1 }),
+      })
+      expect(archiveSpy).not.toHaveBeenCalled()
+      expect(repo.store.get('my-change')?.state).toBe('archivable')
+    })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// archiveChecks and skipChecks (schema-declared archive checks, generic bypass)
+// ---------------------------------------------------------------------------
+
+describe('ArchiveChange — effective archive bindings and skipChecks', () => {
+  function pluginBinding(
+    id: string,
+    opts: { skippable?: boolean; outcome?: 'pass' | 'fail'; code?: string; noCode?: boolean } = {},
+  ): CheckBinding {
+    return {
+      check: {
+        id,
+        label: 'Scanning plugin',
+        kind: 'predicate',
+        execute: async () =>
+          opts.outcome === 'fail' && opts.noCode === true
+            ? ({
+                id,
+                label: 'Scanning plugin',
+                kind: 'predicate',
+                outcome: 'fail',
+                message: 'no code given',
+              } as const)
+            : opts.outcome === 'fail'
+              ? failResult(
+                  id,
+                  opts.code ?? 'SECURITY_FINDINGS',
+                  '2 findings',
+                  { count: 2 },
+                  'predicate',
+                  'Scanning plugin',
+                  { kind: '@acme.fix-it', guidance: 'fix-it' },
+                )
+              : passResult(id, 'predicate', 'Scanning plugin'),
+      },
+      applicability: [{ scope: 'archive' }],
+      skippable: opts.skippable ?? false,
+      allowBindingOverride: true,
+      allowConfigOverride: true,
+      allowDisable: true,
+    }
+  }
+
+  function peer(name: string, specIds: string[]): Change {
+    return new Change({
+      name,
+      createdAt: new Date(),
+      specIds,
+      schemaName: 'test-schema',
+      schemaVersion: 1,
+      history: [
+        {
+          type: 'created',
+          at: new Date(),
+          by: testActor,
+          specIds,
+          schemaName: 'test-schema',
+          schemaVersion: 1,
+        },
+      ],
+    })
+  }
+
+  function archivingSchema(archiveChecks?: readonly Record<string, unknown>[]) {
+    return makeSchema({
+      workflow: [
+        makeWorkflowStep('archiving', {
+          ...(archiveChecks !== undefined ? { archiveChecks: archiveChecks as never } : {}),
+        }),
+      ],
+    })
+  }
+
+  function setup(
+    opts: {
+      changes?: Change[]
+      schema?: ReturnType<typeof makeSchema>
+      extraBindings?: readonly CheckBinding[]
+      registry?: CheckRegistry
+      ownership?: Map<string, 'owned' | 'shared' | 'readOnly'>
+      repoOwnership?: 'owned' | 'shared' | 'readOnly'
+      workspace?: string
+    } = {},
+  ) {
+    const workspace = opts.workspace ?? 'default'
+    const changes = opts.changes ?? [makeArchivableChange('my-change')]
+    const repo = makeChangeRepository(changes)
+    const specRepo = makeSpecRepository(opts.repoOwnership)
+    const listWorkspaces = makeListWorkspaces(new Map([[workspace, specRepo]]), opts.ownership)
+    const parsers = makeParsers()
+    const schemaProvider = makeSchemaProvider(opts.schema ?? makeSchema())
+    const archiveBindings =
+      opts.extraBindings === undefined
+        ? undefined
+        : [
+            ...makeArchiveBindings({ changes: repo, listWorkspaces, parsers, schemaProvider }),
+            ...opts.extraBindings,
+          ]
+    const uc = newArchiveChange(
+      repo,
+      listWorkspaces,
+      makeArchiveRepository(),
+      makeRunStepHooks(),
+      makeActorResolver(),
+      parsers,
+      schemaProvider,
+      makeMaterializeMetadata(),
+      new Map(),
+      [],
+      process.cwd(),
+      undefined,
+      archiveBindings,
+      undefined,
+      opts.registry ?? new CheckRegistry(),
+    )
+    return { uc, repo }
+  }
+
+  describe('skip validation', () => {
+    it('rejects an unregistered id before anything runs and leaves the change archivable', async () => {
+      const { uc, repo } = setup()
+      await expect(uc.execute({ name: 'my-change', skipChecks: ['nope.check'] })).rejects.toThrow(
+        UnknownCheckError,
+      )
+      expect((await repo.get('my-change'))?.state).toBe('archivable')
+    })
+
+    it('treats ids as case-sensitive', async () => {
+      const { uc } = setup()
+      await expect(uc.execute({ name: 'my-change', skipChecks: ['Spec.Overlap'] })).rejects.toThrow(
+        UnknownCheckError,
+      )
+    })
+
+    it('rejects hook checks and points to skipHookPhases', async () => {
+      const { uc } = setup()
+      await expect(uc.execute({ name: 'my-change', skipChecks: ['hook.pre'] })).rejects.toThrow(
+        /skipHookPhases/,
+      )
+    })
+
+    it('rejects locked and non-skippable built-in checks', async () => {
+      for (const id of [
+        'workspace.readOnly',
+        'impl.filesResolved',
+        'deps.consistent',
+        'verification.current',
+        'schema.nameMatch',
+      ]) {
+        const { uc } = setup()
+        await expect(uc.execute({ name: 'my-change', skipChecks: [id] }), id).rejects.toThrow(
+          CheckNotSkippableError,
+        )
+      }
+    })
+
+    it('accepts a registered id that has no archive binding', async () => {
+      const { uc } = setup()
+      const result = await uc.execute({ name: 'my-change', skipChecks: ['approval.spec'] })
+      expect(result.archivedChange).toBeDefined()
+    })
+
+    it('accepts an id the schema disabled', async () => {
+      const { uc } = setup({
+        schema: archivingSchema([{ id: 'impl.linksInScope', disabled: true }]),
+      })
+      const result = await uc.execute({ name: 'my-change', skipChecks: ['impl.linksInScope'] })
+      expect(result.archivedChange).toBeDefined()
+    })
+
+    it('collapses duplicates and treats an empty list like omitted', async () => {
+      const first = setup()
+      expect(
+        (
+          await first.uc.execute({
+            name: 'my-change',
+            skipChecks: ['spec.overlap', 'spec.overlap'],
+          })
+        ).archivedChange,
+      ).toBeDefined()
+      const second = setup()
+      expect(
+        (await second.uc.execute({ name: 'my-change', skipChecks: [] })).archivedChange,
+      ).toBeDefined()
+    })
+
+    it('rejects the whole request when one id is invalid', async () => {
+      const { uc, repo } = setup({
+        changes: [makeArchivableChange('my-change'), peer('other-change', ['default:auth/oauth'])],
+      })
+      await expect(
+        uc.execute({ name: 'my-change', skipChecks: ['spec.overlap', 'nope.check'] }),
+      ).rejects.toThrow(UnknownCheckError)
+      expect((await repo.get('other-change'))?.state).toBe('drafting')
+      expect((await repo.get('my-change'))?.state).toBe('archivable')
+    })
+
+    it('reports the state error before validating skip ids', async () => {
+      const designing = makeChange('my-change', { specIds: ['default:auth/oauth'] })
+      const { uc } = setup({ changes: [designing] })
+      await expect(uc.execute({ name: 'my-change', skipChecks: ['nope.check'] })).rejects.toThrow(
+        InvalidStateTransitionError,
+      )
+    })
+
+    it('reports schema identity mismatch before validating skip ids', async () => {
+      const { uc } = setup({
+        changes: [makeArchivableChange('my-change', { schemaName: 'other-schema' })],
+      })
+      await expect(uc.execute({ name: 'my-change', skipChecks: ['nope.check'] })).rejects.toThrow(
+        SchemaProviderIdentityMismatchError,
+      )
+    })
+
+    it('bypasses a check that would have passed without error', async () => {
+      const { uc } = setup()
+      const events: CheckProgressEvent[] = []
+      await uc.execute({ name: 'my-change', skipChecks: ['impl.linksInScope'] }, (event) =>
+        events.push(event),
+      )
+      const done = events.find(
+        (event) => event.type === 'check-done' && event.id === 'impl.linksInScope',
+      )
+      expect(done).toMatchObject({ outcome: 'skip' })
+    })
+  })
+
+  describe('spec.overlap through the schema', () => {
+    const overlapping = (): Change[] => [
+      makeArchivableChange('my-change'),
+      peer('other-change', ['default:auth/oauth']),
+    ]
+
+    it('performs no peer scan and no invalidation when the schema disables spec.overlap', async () => {
+      const { uc, repo } = setup({
+        changes: overlapping(),
+        schema: archivingSchema([{ id: 'spec.overlap', disabled: true }]),
+      })
+      const result = await uc.execute({ name: 'my-change' })
+      expect(result.invalidatedChanges).toHaveLength(0)
+      expect((await repo.get('other-change'))?.state).toBe('drafting')
+    })
+
+    it('treats a bypass of a schema-disabled spec.overlap as a no-op', async () => {
+      const { uc } = setup({
+        changes: overlapping(),
+        schema: archivingSchema([{ id: 'spec.overlap', disabled: true }]),
+      })
+      const result = await uc.execute({ name: 'my-change', skipChecks: ['spec.overlap'] })
+      expect(result.invalidatedChanges).toHaveLength(0)
+    })
+
+    it('rejects the bypass when the schema makes spec.overlap non-skippable', async () => {
+      const { uc } = setup({
+        changes: overlapping(),
+        schema: archivingSchema([{ id: 'spec.overlap', skippable: false }]),
+      })
+      await expect(uc.execute({ name: 'my-change', skipChecks: ['spec.overlap'] })).rejects.toThrow(
+        CheckNotSkippableError,
+      )
+    })
+
+    it('marks the overlap error as non-skippable when the schema hardens it', async () => {
+      const { uc } = setup({
+        changes: overlapping(),
+        schema: archivingSchema([{ id: 'spec.overlap', skippable: false }]),
+      })
+      try {
+        await uc.execute({ name: 'my-change' })
+        expect.unreachable()
+      } catch (error) {
+        expect(error).toBeInstanceOf(CheckPredicateFailedError)
+        const overlap = error as CheckPredicateFailedError
+        expect(overlap.checkId).toBe('spec.overlap')
+        expect(overlap.skippable).toBe(false)
+        expect(overlap.message).not.toContain('--skip-checks')
+      }
+    })
+
+    it('marks the overlap error as skippable by default and names the spec and peer without CLI flags', async () => {
+      const { uc } = setup({ changes: overlapping() })
+      try {
+        await uc.execute({ name: 'my-change' })
+        expect.unreachable()
+      } catch (error) {
+        expect(error).toBeInstanceOf(CheckPredicateFailedError)
+        const overlap = error as CheckPredicateFailedError
+        expect(overlap.skippable).toBe(true)
+        expect(overlap.message).toContain('default:auth/oauth')
+        expect(overlap.message).toContain('other-change')
+        expect(overlap.message).not.toContain('--skip-checks')
+        expect(overlap.message).not.toContain('--allow-overlap')
+      }
+    })
+
+    it('does not bypass other failing checks when spec.overlap is bypassed', async () => {
+      const { uc, repo } = setup({
+        changes: [
+          makeArchivableChange('my-change', { specIds: ['platform:auth/tokens'] }),
+          peer('other-change', ['platform:auth/tokens']),
+        ],
+        workspace: 'platform',
+        ownership: new Map([['platform', 'readOnly']]),
+        repoOwnership: 'readOnly',
+        schema: makeSchema({
+          artifacts: [makeArtifactType('specs', { scope: 'spec', delta: true })],
+        }),
+      })
+      await expect(
+        uc.execute({ name: 'my-change', skipChecks: ['spec.overlap'] }),
+      ).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'workspace.readOnly',
+      })
+      expect((await repo.get('other-change'))?.state).toBe('drafting')
+    })
+
+    it('still fails on impl.linksInScope when both spec.overlap and impl.linksInScope fail and only spec.overlap is skipped', async () => {
+      const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
+      change.trackImplementationFile('specs/default/auth/shared/spec.md', 'resolved')
+      change.addImplementationLink({
+        specId: 'default:auth/shared',
+        file: 'specs/default/auth/shared/spec.md',
+        fileLinkExplicit: true,
+      })
+      const repo = makeChangeRepository([change, peer('other-change', ['default:auth/oauth'])])
+      const listWorkspaces = makeListWorkspaces(
+        new Map([
+          [
+            'default',
+            makeSpecRepository({
+              specs: [
+                makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] }),
+                makeSpec({ workspace: 'default', name: 'auth/shared', filenames: ['spec.md'] }),
+              ],
+            }),
+          ],
+        ]),
+        new Map(),
+        new Map([['default', '/project']]),
+      )
+      const uc = newArchiveChange(
+        repo,
+        listWorkspaces,
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeMaterializeMetadata(),
+        new Map(),
+        [],
+        '/project',
+        undefined,
+        undefined,
+        undefined,
+        new CheckRegistry(),
+      )
+      await expect(
+        uc.execute({ name: 'my-change', skipChecks: ['spec.overlap'] }),
+      ).rejects.toMatchObject({
+        name: 'CheckPredicateFailedError',
+        checkId: 'impl.linksInScope',
+      })
+      expect((await repo.get('other-change'))?.state).toBe('drafting')
+    })
+
+    it('applies the same bypass when retrying from archiving', async () => {
+      const archiving = makeArchivableChange('my-change')
+      const at = new Date('2024-01-15T12:00:00Z')
+      const retry = new Change({
+        name: 'my-change',
+        createdAt: at,
+        specIds: ['default:auth/oauth'],
+        schemaName: 'test-schema',
+        schemaVersion: 1,
+        history: [
+          ...archiving.history,
+          { type: 'transitioned', from: 'archivable', to: 'archiving', at, by: testActor },
+        ],
+      })
+      const { uc } = setup({ changes: [retry, peer('other-change', ['default:auth/oauth'])] })
+      const result = await uc.execute({ name: 'my-change', skipChecks: ['spec.overlap'] })
+      expect(result.invalidatedChanges).toHaveLength(1)
+    })
+  })
+
+  describe('plugin and embedded archive checks', () => {
+    it('evaluates a plugin archive check after the built-in predicates', async () => {
+      const { uc } = setup({ extraBindings: [pluginBinding('@sec.scan')] })
+      const events: CheckProgressEvent[] = []
+      await uc.execute({ name: 'my-change' }, (event) => events.push(event))
+      const order = events.filter((e) => e.type === 'check-start').map((e) => e.id)
+      expect(order.indexOf('@sec.scan')).toBeGreaterThan(order.indexOf('impl.linksInScope'))
+      expect(order.indexOf('@sec.scan')).toBeLessThan(order.indexOf('hook.pre'))
+    })
+
+    it('keeps the base order when the schema declares no archiveChecks', async () => {
+      const { uc } = setup()
+      const events: CheckProgressEvent[] = []
+      await uc.execute({ name: 'my-change' }, (event) => events.push(event))
+      const order = events
+        .filter((e) => e.type === 'check-start')
+        .map((e) => e.id)
+        .filter((id, index, all) => all.indexOf(id) === index)
+      expect(order.slice(0, 3)).toEqual(['schema.nameMatch', 'archive.archivable', 'spec.overlap'])
+    })
+
+    it('throws CheckPredicateFailedError for a failing plugin check, carrying id, code and details', async () => {
+      const { uc } = setup({ extraBindings: [pluginBinding('@sec.scan', { outcome: 'fail' })] })
+      try {
+        await uc.execute({ name: 'my-change' })
+        expect.unreachable()
+      } catch (error) {
+        expect(error).toBeInstanceOf(CheckPredicateFailedError)
+        const failure = error as CheckPredicateFailedError
+        expect(failure.checkId).toBe('@sec.scan')
+        expect(failure.label).toBe('Scanning plugin')
+        expect(failure.code).toBe('SECURITY_FINDINGS')
+        expect(failure.action).toEqual({ kind: '@acme.fix-it', guidance: 'fix-it' })
+        expect(failure.details).toMatchObject({ count: 2 })
+        expect(failure.skippable).toBe(false)
+        expect(error).not.toBeInstanceOf(ArchiveImplementationStateError)
+      }
+    })
+
+    it('uses CHECK_FAILED when a failing plugin check provides no code', async () => {
+      const { uc } = setup({
+        extraBindings: [pluginBinding('@sec.scan', { outcome: 'fail', noCode: true })],
+      })
+      try {
+        await uc.execute({ name: 'my-change' })
+        expect.unreachable()
+      } catch (error) {
+        expect(error).toBeInstanceOf(CheckPredicateFailedError)
+        expect((error as CheckPredicateFailedError).code).toBe('CHECK_FAILED')
+      }
+    })
+
+    it('carries the resolved skippability and allows the bypass', async () => {
+      const { uc } = setup({
+        extraBindings: [pluginBinding('@sec.scan', { outcome: 'fail', skippable: true })],
+      })
+      try {
+        await uc.execute({ name: 'my-change' })
+        expect.unreachable()
+      } catch (error) {
+        expect((error as CheckPredicateFailedError).skippable).toBe(true)
+      }
+      const bypassed = await uc.execute({ name: 'my-change', skipChecks: ['@sec.scan'] })
+      expect(bypassed.archivedChange).toBeDefined()
+    })
+
+    it('lets a schema make a plugin check skippable', async () => {
+      const { uc } = setup({
+        extraBindings: [pluginBinding('@sec.scan', { outcome: 'fail' })],
+        schema: archivingSchema([{ id: '@sec.scan', skippable: true }]),
+      })
+      const bypassed = await uc.execute({ name: 'my-change', skipChecks: ['@sec.scan'] })
+      expect(bypassed.archivedChange).toBeDefined()
+    })
+
+    it('lets a schema disable a plugin check', async () => {
+      const { uc } = setup({
+        extraBindings: [pluginBinding('@sec.scan', { outcome: 'fail' })],
+        schema: archivingSchema([{ id: '@sec.scan', disabled: true }]),
+      })
+      const result = await uc.execute({ name: 'my-change' })
+      expect(result.archivedChange).toBeDefined()
+    })
+
+    it('synthesizes a failing embedded check from the schema as non-skippable', async () => {
+      const registry = new CheckRegistry()
+      registry.register('@acme/qa', {
+        id: 'lint',
+        label: 'Linting',
+        execute: async () =>
+          failResult('@acme/qa.lint', 'LINT_FAILED', 'bad', undefined, 'predicate', 'Linting'),
+      })
+      const { uc } = setup({ registry, schema: archivingSchema([{ id: '@acme/qa.lint' }]) })
+      try {
+        await uc.execute({ name: 'my-change' })
+        expect.unreachable()
+      } catch (error) {
+        expect(error).toBeInstanceOf(CheckPredicateFailedError)
+        expect((error as CheckPredicateFailedError).checkId).toBe('@acme/qa.lint')
+        expect((error as CheckPredicateFailedError).skippable).toBe(false)
+      }
+    })
+
+    it('evaluates embedded checks in declaration order after the built-ins', async () => {
+      const registry = new CheckRegistry()
+      for (const [plugin, id] of [
+        ['@acme/a', 'lint'],
+        ['@acme/b', 'scan'],
+      ] as const) {
+        registry.register(plugin, {
+          id,
+          label: id,
+          execute: async () => passResult(`${plugin}.${id}`, 'predicate', id),
+        })
+      }
+      const { uc } = setup({
+        registry,
+        schema: archivingSchema([{ id: '@acme/a.lint' }, { id: '@acme/b.scan' }]),
+      })
+      const events: CheckProgressEvent[] = []
+      await uc.execute({ name: 'my-change' }, (event) => events.push(event))
+      const order = events.filter((e) => e.type === 'check-start').map((e) => e.id)
+      expect(order.indexOf('@acme/a.lint')).toBeLessThan(order.indexOf('@acme/b.scan'))
+      expect(order.indexOf('@acme/a.lint')).toBeGreaterThan(order.indexOf('impl.linksInScope'))
+    })
+  })
+
+  describe('locked checks and constructor contract', () => {
+    it('never mutates the injected base bindings across runs on the same ArchiveChange instance with different schemas', async () => {
+      const schemaDisabledOverlap = makeSchema({
+        name: 'schema-no-overlap',
+        workflow: [
+          makeWorkflowStep('archiving', {
+            archiveChecks: [{ id: 'spec.overlap', disabled: true }] as never,
+          }),
+        ],
+      })
+      const schemaDefault = makeSchema({ name: 'schema-default' })
+      const changeA = makeArchivableChange('change-a', { schemaName: 'schema-no-overlap' })
+      const changeB = makeArchivableChange('change-b', {
+        schemaName: 'schema-default',
+        specIds: ['default:auth/session'],
+      })
+      const repo = makeChangeRepository([changeA, changeB])
+      const listWorkspaces = makeListWorkspaces(new Map([['default', makeSpecRepository()]]))
+      const parsers = makeParsers()
+      const schemaByName = new Map([
+        ['schema-no-overlap', schemaDisabledOverlap],
+        ['schema-default', schemaDefault],
+      ])
+      const multiSchemaProvider = {
+        get: async (name?: string) => schemaByName.get(name ?? 'schema-default') ?? schemaDefault,
+      } as unknown as import('../../../src/application/ports/schema-provider.js').SchemaProvider
+      const baseBindings = makeArchiveBindings({
+        changes: repo,
+        listWorkspaces,
+        parsers,
+        schemaProvider: multiSchemaProvider,
+      })
+      const snapshot = baseBindings.map((b) => ({
+        id: b.check.id,
+        skippable: b.skippable,
+        allowDisable: b.allowDisable,
+      }))
+      const uc = newArchiveChange(
+        repo,
+        listWorkspaces,
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        parsers,
+        multiSchemaProvider,
+        makeMaterializeMetadata(),
+        new Map(),
+        [],
+        process.cwd(),
+        undefined,
+        baseBindings,
+        undefined,
+        new CheckRegistry(),
+      )
+
+      const eventsA: CheckProgressEvent[] = []
+      const resA = await uc.execute({ name: 'change-a' }, (event) => eventsA.push(event))
+      expect(resA.archivedChange).toBeDefined()
+      expect(eventsA.some((e) => e.type === 'check-start' && e.id === 'spec.overlap')).toBe(false)
+
+      const eventsB: CheckProgressEvent[] = []
+      const resB = await uc.execute({ name: 'change-b' }, (event) => eventsB.push(event))
+      expect(resB.archivedChange).toBeDefined()
+      expect(eventsB.some((e) => e.type === 'check-start' && e.id === 'spec.overlap')).toBe(true)
+
+      expect(
+        baseBindings.map((b) => ({
+          id: b.check.id,
+          skippable: b.skippable,
+          allowDisable: b.allowDisable,
+        })),
+      ).toEqual(snapshot)
+    })
+
+    function outOfScopeUc(schema: ReturnType<typeof makeSchema>) {
+      const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
+      change.trackImplementationFile('specs/default/auth/shared/spec.md', 'resolved')
+      change.addImplementationLink({
+        specId: 'default:auth/shared',
+        file: 'specs/default/auth/shared/spec.md',
+        fileLinkExplicit: true,
+      })
+      return newArchiveChange(
+        makeChangeRepository([change]),
+        makeListWorkspaces(
+          new Map([
+            [
+              'default',
+              makeSpecRepository({
+                specs: [
+                  makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] }),
+                  makeSpec({ workspace: 'default', name: 'auth/shared', filenames: ['spec.md'] }),
+                ],
+              }),
+            ],
+          ]),
+          new Map(),
+          new Map([['default', '/project']]),
+        ),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(schema),
+        makeMaterializeMetadata(),
+        new Map(),
+        [],
+        '/project',
+        undefined,
+        undefined,
+        undefined,
+        new CheckRegistry(),
+      )
+    }
+
+    it('rejects the impl.linksInScope bypass when the schema makes it non-skippable', async () => {
+      const uc = outOfScopeUc(archivingSchema([{ id: 'impl.linksInScope', skippable: false }]))
+      await expect(
+        uc.execute({ name: 'my-change', skipChecks: ['impl.linksInScope'] }),
+      ).rejects.toThrow(CheckNotSkippableError)
+    })
+
+    it('does not evaluate impl.linksInScope when the schema disables it', async () => {
+      const uc = outOfScopeUc(archivingSchema([{ id: 'impl.linksInScope', disabled: true }]))
+      const events: CheckProgressEvent[] = []
+      const result = await uc.execute({ name: 'my-change' }, (event) => events.push(event))
+      expect(result.archivedChange).toBeDefined()
+      expect(events.some((e) => e.type === 'check-start' && e.id === 'impl.linksInScope')).toBe(
+        false,
+      )
+    })
+
+    it('rejects a workspace.readOnly skip before any check or hook runs', async () => {
+      const { uc, repo } = setup()
+      const events: CheckProgressEvent[] = []
+      await expect(
+        uc.execute({ name: 'my-change', skipChecks: ['workspace.readOnly'] }, (event) =>
+          events.push(event),
+        ),
+      ).rejects.toThrow(CheckNotSkippableError)
+      expect(events).toHaveLength(0)
+      expect((await repo.get('my-change'))?.state).toBe('archivable')
+    })
+
+    it('rejects bypassing impl.filesResolved', async () => {
+      const { uc } = setup()
+      await expect(
+        uc.execute({ name: 'my-change', skipChecks: ['impl.filesResolved'] }),
+      ).rejects.toThrow(CheckNotSkippableError)
+    })
+
+    it('works without a check registry for ids bound to archive', async () => {
+      const repo = makeChangeRepository([makeArchivableChange('my-change')])
+      const specRepo = makeSpecRepository()
+      const uc = newArchiveChange(
+        repo,
+        makeListWorkspaces(new Map([['default', specRepo]])),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeMaterializeMetadata(),
+      )
+      const result = await uc.execute({ name: 'my-change', skipChecks: ['spec.overlap'] })
+      expect(result.archivedChange).toBeDefined()
+      await expect(
+        newArchiveChange(
+          makeChangeRepository([makeArchivableChange('my-change')]),
+          makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
+          makeArchiveRepository(),
+          makeRunStepHooks(),
+          makeActorResolver(),
+          makeParsers(),
+          makeSchemaProvider(makeSchema()),
+          makeMaterializeMetadata(),
+        ).execute({ name: 'my-change', skipChecks: ['nope.check'] }),
+      ).rejects.toThrow(UnknownCheckError)
     })
   })
 })

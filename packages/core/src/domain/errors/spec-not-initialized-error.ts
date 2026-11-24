@@ -7,7 +7,7 @@ export class SpecNotInitializedError extends SpecdError {
    * @param specId - The spec missing persisted semantic state.
    */
   constructor(readonly specId: string) {
-    super(`Spec "${specId}" has no persisted semantic state — run "specs init" first`)
+    super(`Spec "${specId}" has no persisted semantic state`)
   }
 
   /**

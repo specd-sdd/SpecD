@@ -11,50 +11,50 @@
   ],
   "implementation": [
     {
-      "file": "core:src/domain/value-objects/schema.ts",
-      "symbols": ["Schema", "SchemaCompatIdentity", "parseSchemaCompat"]
+      "file": "core:src/domain/value-objects/workflow-step.ts",
+      "symbols": ["WorkflowStepArchiveCheckDeclaration", "WorkflowStep"]
     },
     {
       "file": "core:src/infrastructure/schema-yaml-parser.ts",
-      "symbols": ["parseSchemaYaml", "parseSchemaCompat"]
+      "symbols": ["parseSchemaYaml"]
     },
     {
-      "file": "core:src/domain/services/build-schema.ts",
-      "symbols": ["buildSchema"]
+      "file": "core:src/domain/services/merge-schema-layers.ts",
+      "symbols": ["mergeSchemaLayers"]
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "YAML schema format: artifacts, workflow, validations, plugins, extends, compat, metadataExtraction, DAG.",
+      "value": "Declarative YAML contract for schema kinds, artifacts, DAG, validation, metadata, workflow hooks, compatibility, and resolution.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:e044813e3c108596131de2c262182876002c46143a1d8bb403086df28ec79e9b",
-          "lastModified": "2026-08-27T00:15:51.008Z"
+          "hash": "sha256:85fb70775c337d1823039cc9a0f631b09178b9c6ad9eedbcee286e3516f9b8c8",
+          "lastModified": "2026-10-22T14:47:46.152Z"
         },
         "verify.md": {
-          "hash": "sha256:d1d1540771ab41b82bc988dc55a7e9521633aa1f94b33f8bbfdd3dff0e1c2bcd",
-          "lastModified": "2026-08-27T00:15:51.008Z"
+          "hash": "sha256:f49cb2a8ceb3b6a6649b1dac92330f56f302e2aba373b0eed8ef1aab81b7e627",
+          "lastModified": "2026-10-22T14:47:46.152Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Schema Format\n## Rules\n### File structure\n- Top-level: `kind` (schema|schema-plugin), `name`, `version`, optional `description`/`extends`/`compat`, `artifacts` (required for schema), optional `crossArtifactValidations`/`workflow`/`metadataExtraction`.\n### Kind / extends / compat\n- `schema`: full. `schema-plugin`: MUST NOT `artifacts`/`workflow`/`extends`/`compat`; MAY `validations`/`deltaValidations`/`preHashCleanup`/`taskCompletionCheck`/`crossArtifactValidations`/`metadataExtraction`.\n- Omit kind → SchemaValidationError. Extends chains root→leaf merge; cycles → SchemaValidationError (by resolved path).\n- `compat`: optional string ref (`@specd/schema-std@1`, `schema-std@1`, `schema-std`) or `{ name, version? }`; omitted version → `1`. `Schema.compat()` → `SchemaCompatIdentity|{undefined}`. `Schema.canonicalSpecSchema()` → compat else parse extends else `{ name, version }`.\n### Array entry identity\n- `id` on hooks, validations, deltaValidations, rules.pre/post, preHashCleanup, crossArtifactValidations, metadataExtraction array entries. Format `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`, 1–64.\n- Hooks globally unique across ALL workflow steps. Others unique within immediate array. Workflow identity = `step`; participant local id = `as`.\n### Artifact definition\n- Required: `id`, `scope` (spec|change), `output`. Optional: `optional` (default false), `hasTasks` (default false; master switch for tasks), `template`, `instruction`, `requires`, `format` (markdown|json|yaml|plaintext; else infer ext), `delta` (spec-only), `deltaInstruction`, `deltaValidations`, `validations`, `metadataExtraction`, `rules.pre/post` (`{id,instruction}` wrap instruction), `preHashCleanup` (`{id,pattern,replacement}` ordered), `taskCompletionCheck`.\n- `delta:true` + `scope:change` → SchemaValidationError. Filename from last literal glob segment or template; else SchemaValidationError.\n- `requires` resolved when status `complete`|`skipped` (`skipped` only optional). `scope:spec` non-optional → expected in every specs dir + change; `scope:change` never synced.\n### artifactDag()\n- Canonical API from `requires` only: `roots`, `childrenOf`, `topologicalOrder`, `descendantsOf`. Cached per Schema. Consumers MUST use `schema.artifactDag()` — no parallel rebuilds. `artifactDagFromChangeArtifacts` tests-only when schema available.\n### Validations / deltaValidations\n- Selector fields (core:selector-model) XOR `path` (JSONPath). Plus `required` (zero-match only), `count` (exactly/min/max/unique.by), `contentMatches`, `children`. deltaValidations same vs delta YAML AST; only when `delta:true`.\n### Cross-artifact validations\n- `id`, `scope`, `participants` (artifact/as/selector/keySelector?/key), `relation` (`kind`: all-equal|subset|superset, `between`, optional `options.ordering` ignore|strict). Same-scope artifacts only. Keys not raw AST.\n### Metadata extraction\n- Field → MetadataExtractorEntry: artifact + extractor (selector, extract, capture, strip, groupBy, transform, fields). Transform via runtime registry. dependsOn: label value + href args. Fail normalize explicitly. Fields: title/description/dependsOn/keywords + rules/constraints/scenarios/context arrays.\n### Workflow / external hooks\n- `step`, optional `requires`, `requiresTaskCompletion` (MUST hasTasks:true), `hooks.pre/post`. External hooks: `id` + `external.type` + `external.config`; unknown type rejected.\n### Schema resolution / load\n- `@scope/name` npm; `#workspace:name`; `#name`/bare → default workspace; path direct. Missing file → null (caller → SchemaNotFoundError). Zod validate; unknown top-level ignored.\n### verify.md / approval\n- WHEN/THEN under `### Requirement:` mirroring spec. Schema verify should `requires: [spec]`. Specs touched by delta need per-spec approval before archive.\n### Templates\n- `template` path relative to schema dir; content plain text, no interpolation; HTML comments preserved.\n### taskCompletionCheck\n- Meaningful only with `hasTasks:true`. Defaults: incomplete `^\\s*-\\s+\\[ \\]`, complete `^\\s*-\\s+\\[[xX]\\]`.\n## Constraints\n- kind required. Plugin MUST NOT artifacts/workflow/extends/compat.\n- artifact.id `/^[a-z][a-z0-9-]*$/`; scope required no default; optional default false.\n- Non-optional depends on optional forbidden; requires acyclic; workflow step unique.\n- deltaValidations only with delta:true. Workflow order = display only (not sequential block).\n- Delta format/selectors/apply → core:delta-format.",
+      "value": "# Schema Format\n\n## Rules\n- Schema requires `kind`, `name`, integer `version`; plugins forbid core workflow/artifact fields. Zod plus semantic validation precede construction.\n- Artifact declares scope/output and optional delta, validations, rules, extraction, cleanup, task completion. `Schema.artifactDag()` is canonical cached DAG.\n- `hasTasks:true` excludes mutable task content from approval/verification fingerprints and drift review propagation, but remains required, validated, counted, completion-gated, archive-checked.\n- Validations use selector or RFC 9535 JSONPath; deltas validate normalized delta AST. Cross-rules compare same-scope collections.\n- Workflow rows configure existing `ChangeState` only; declaration order is display axis, never topology. Hooks use one instruction/run/external variant.\n- Resolve references deterministically; templates load eagerly. `verify.md` mirrors requirements with WHEN/THEN scenarios.\n\n## Constraints\n- Reject invalid/duplicate IDs, unknown requirements, DAG cycles, invalid task/delta settings, duplicate/unknown workflow states.\n- Optional dependency propagates optionality.\n- Delta application remains `core:delta-format` authority.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:e044813e3c108596131de2c262182876002c46143a1d8bb403086df28ec79e9b",
-          "lastModified": "2026-08-27T00:15:51.008Z"
+          "hash": "sha256:85fb70775c337d1823039cc9a0f631b09178b9c6ad9eedbcee286e3516f9b8c8",
+          "lastModified": "2026-10-22T14:47:46.152Z"
         },
         "verify.md": {
-          "hash": "sha256:d1d1540771ab41b82bc988dc55a7e9521633aa1f94b33f8bbfdd3dff0e1c2bcd",
-          "lastModified": "2026-08-27T00:15:51.008Z"
+          "hash": "sha256:f49cb2a8ceb3b6a6649b1dac92330f56f302e2aba373b0eed8ef1aab81b7e627",
+          "lastModified": "2026-10-22T14:47:46.152Z"
         }
       }
     }

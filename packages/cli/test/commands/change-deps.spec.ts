@@ -10,6 +10,7 @@ import {
   mockProcessExit,
   captureStdout,
   captureStderr,
+  makeMockHost,
 } from './helpers.js'
 
 vi.mock('../../src/helpers/cli-context.js', async (importOriginal) => ({
@@ -37,7 +38,9 @@ import { buildCliKernelOptions } from '../../src/helpers/cli-context.js'
 function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
-  vi.mocked(resolveCliContext).mockResolvedValue({ config, configFilePath: null, kernel })
+  vi.mocked(resolveCliContext).mockResolvedValue(
+    makeMockHost({ config, configFilePath: null, kernel }),
+  )
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
@@ -145,6 +148,7 @@ describe('Core-to-CLI dependency output', () => {
         projectRoot: tmpDir,
         configPath: path.join(tmpDir, 'specd.yaml'),
         schemaRef: '@specd/schema-std',
+        plugins: [],
         workspaces: [
           {
             name: 'default',
@@ -168,14 +172,17 @@ describe('Core-to-CLI dependency output', () => {
           archiveAdapter: { adapter: 'fs', config: { path: archivePath } },
         },
         approvals: { spec: false, signoff: false },
+        invalidation: { artifacts: 'downstream', workflow: 'preserve' },
       }
       const kernel = await createKernel(config, buildCliKernelOptions())
       await kernel.changes.create.execute({ name: 'add-auth', specIds: ['auth/login'] })
-      vi.mocked(resolveCliContext).mockResolvedValue({
-        config,
-        configFilePath: config.configPath,
-        kernel,
-      })
+      vi.mocked(resolveCliContext).mockResolvedValue(
+        makeMockHost({
+          config,
+          configFilePath: config.configPath,
+          kernel,
+        }),
+      )
       const stdout = captureStdout()
       mockProcessExit()
 
@@ -782,5 +789,34 @@ describe('Display mode (audit hardening)', () => {
 
     expect(source).not.toContain('parseSpecId')
     expect(source).not.toContain('listWorkspaces')
+  })
+
+  it('renders centralized operation-flags hint when UpdateSpecDeps throws InvalidInputError', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.updateSpecDeps.execute.mockRejectedValue(
+      Object.assign(new Error('set is mutually exclusive with add, remove, and clear'), {
+        specd: true,
+        code: 'INVALID_INPUT',
+      }),
+    )
+
+    const program = makeProgram()
+    registerChangeDeps(program.command('change'))
+    await program
+      .parseAsync([
+        'node',
+        'specd',
+        'change',
+        'deps',
+        'add-auth',
+        'auth/login',
+        '--set',
+        'auth/session',
+      ])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toContain('set is mutually exclusive')
+    expect(stderr()).toContain('--add, --remove, --set, or --clear')
   })
 })

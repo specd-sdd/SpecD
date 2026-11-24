@@ -1,0 +1,161 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    before:
+      type: section
+      matches: '^Requirement: Workflow requires enforcement$'
+  content: |
+    ### Requirement: Canonical pre-transition validity reconciliation
+
+    #### Scenario: Committed recovery survives failed requested transition
+
+    - **GIVEN** fresh reconciliation invalidates required consent and returns the change to `designing`
+    - **WHEN** the original forward transition becomes inapplicable
+    - **THEN** it fails with the committed state, blockers, and next action
+    - **AND** does not undo recovery
+
+    #### Scenario: Recovery failure uses the canonical diagnostic contract
+
+    - **GIVEN** reconciliation changes the lifecycle state before the requested edge is evaluated
+    - **WHEN** the requested transition is no longer applicable
+    - **THEN** the typed failure exposes committed state, automatic return, canonical blockers, and next action
+    - **AND** it is not reduced to an invalid-state message without recovery context
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Spec approval is a check not a pending hop$'
+  content: |
+    Scenarios:
+
+    #### Scenario: Stale approval returns to design instead of parking
+
+    - **GIVEN** required spec approval is stale at `ready`
+    - **WHEN** a forward transition is requested
+    - **THEN** reconciliation commits `designing` recovery and the request fails
+    - **AND** no pending approval state is entered
+
+    #### Scenario: Valid current consent permits normal edge evaluation
+
+    - **WHEN** spec approval is valid for current canonical scope and artifacts
+    - **THEN** approval check passes without rewriting the requested target
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Signoff is a check not a pending hop$'
+  content: |
+    Scenarios:
+
+    #### Scenario: Signoff requires current verification and fingerprints
+
+    - **GIVEN** signoff exists but verification or signed inputs are stale
+    - **WHEN** `done → archivable` is requested
+    - **THEN** the request fails with verification or signoff recovery guidance
+    - **AND** no pending signoff state is entered
+
+    #### Scenario: Disabled signoff predicate skips
+
+    - **WHEN** the signoff gate is disabled for `done → archivable`
+    - **THEN** signoff check skips while other transition checks remain applicable
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Artifact validation clearing on verifying to implementing$'
+  content: |
+    ### Requirement: Verification attempt lifecycle
+
+    #### Scenario: Entering verifying checks readiness only
+
+    - **GIVEN** all implementation files and links are resolved
+    - **WHEN** a real transition enters `verifying`
+    - **THEN** readiness checks pass and the state changes
+    - **AND** no verification attempt or completion is created
+
+    #### Scenario: Exit rejects evidence changed by hooks
+
+    - **GIVEN** completed evidence initially matches
+    - **WHEN** a pre-persist hook changes a fingerprinted input before `verifying → done`
+    - **THEN** fresh `verification.current` evaluation blocks persistence
+    - **AND** recommends renewing verification in the current reconciled state
+
+    #### Scenario: Implementing to verifying deduplicates readiness checks
+
+    - **GIVEN** the hop matches forward-exit and verifying-entry bindings
+    - **WHEN** transition checks execute
+    - **THEN** each implementation readiness check runs once
+
+    #### Scenario: Other implementation boundaries remain guarded
+
+    - **WHEN** a permitted forward hop exits `implementing` without targeting `verifying`, or another state enters `verifying`
+    - **THEN** the applicable implementation readiness checks still execute
+
+    #### Scenario: Missing verification verdict blocks exit
+
+    - **WHEN** `verifying → done` has no canonical verification verdict
+    - **THEN** exit fails closed with typed unavailable-validity guidance
+    - **AND** only an explicit `not-required` verdict may skip the predicate
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Skill-aligned backward hop invalidation$'
+  content: |
+    Scenarios:
+
+    #### Scenario: Backward movement preserves matching verification
+
+    - **GIVEN** completed verification still matches current inputs
+    - **WHEN** the change moves backward below verification
+    - **THEN** verification remains valid
+    - **AND** independently affected signoff follows its recovery rules
+
+    #### Scenario: Changed inputs stale evidence independently
+
+    - **WHEN** a backward transition accompanies actual artifact or implementation drift
+    - **THEN** reconciliation stales only evidence whose fingerprint changed
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Transition to designing from any state$'
+  content: |
+    Scenarios:
+
+    #### Scenario: Explicit redesign applies focused policy
+
+    - **WHEN** a non-drafting change explicitly transitions to `designing`
+    - **THEN** artifact reopening follows the configured artifact policy and required consent is revoked
+    - **AND** unchanged verification is preserved unless its inputs changed
+
+    #### Scenario: Designing self-entry remains validity neutral
+
+    - **WHEN** `designing → designing` is requested
+    - **THEN** no approval revocation, artifact reopening, or `transitioned` event is invented
+
+- op: modified
+  description: 'Match the renamed implementation-only retry requirement and forbid requires-driven clearing'
+  selector:
+    type: section
+    matches: '^Requirement: Artifact validation clearing on verifying to implementing$'
+  rename: 'Requirement: Implementation-only retry from verifying'
+  content: |
+    #### Scenario: Implementation-only retry preserves validated artifacts
+
+    - **GIVEN** a change in `verifying` with validated artifacts and an implementation-only verification failure
+    - **WHEN** `verifying → implementing` executes
+    - **THEN** unchanged artifact and file states remain complete
+    - **AND** `implementing.requires` is not used to clear their validation
+
+    #### Scenario: Artifact or task revision routes to designing
+
+    - **GIVEN** verification discovers that the intended artifacts or task plan must change
+    - **WHEN** the failure is classified
+    - **THEN** the caller routes to `designing`, not through an implementation-only retry

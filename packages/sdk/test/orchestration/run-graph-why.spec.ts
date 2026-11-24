@@ -27,7 +27,12 @@ function makeProvider(explainPath = vi.fn().mockResolvedValue(EXPLANATION)) {
 }
 
 function makeContext(provider: CodeGraphProvider): SdkHostContext {
-  return { kernel: {} as never, createGraphProvider: () => provider }
+  return {
+    kernel: {} as never,
+    createGraphProvider: () => provider,
+    dispose: async () => {},
+    [Symbol.asyncDispose]: async () => {},
+  }
 }
 
 describe('runGraphWhy', () => {

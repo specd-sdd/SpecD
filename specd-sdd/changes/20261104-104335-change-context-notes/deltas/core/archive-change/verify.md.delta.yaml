@@ -1,0 +1,167 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Overlap guard$'
+  content: |
+    Scenarios:
+
+    #### Scenario: Archive blocked when other changes target same specs
+
+    - **GIVEN** a change `alpha` in `archivable` state targeting `core:config`
+    - **AND** another active change `beta` also targets `core:config`
+    - **WHEN** `ArchiveChange.execute({ name: 'alpha' })` is called without bypassing `spec.overlap`
+    - **THEN** `SpecOverlapError` is thrown
+    - **AND** the error message includes `core:config` and `beta`
+    - **AND** no files are modified and no hooks are executed
+
+    #### Scenario: Archive overlap applies each peer policy and records exact affected scope
+
+    - **GIVEN** `alpha` in `archivable` targets `core:config` and `core:kernel`
+    - **AND** active peers `beta` and `gamma` overlap those specs and each has workflow `redesign`
+    - **WHEN** `ArchiveChange.execute({ name: 'alpha', skipChecks: ['spec.overlap'] })` succeeds
+    - **THEN** each peer receives a `spec-overlap-conflict` invalidation through canonical reconciliation and returns to `designing` once
+    - **AND** each audit message names `alpha` and its overlapping spec ID
+    - **AND** `invalidatedChanges` contains `{ name: 'beta', specIds: ['core:config'] }` and `{ name: 'gamma', specIds: ['core:kernel'] }`
+
+    #### Scenario: Archive overlap peer recovery is reconciler-owned and serialized
+
+    - **GIVEN** `alpha` and active `beta` both target `core:config`
+    - **WHEN** archive of `alpha` succeeds with `spec.overlap` bypassed
+    - **THEN** the `spec-overlap-conflict` intent for `beta` is processed inside one serialized `ChangeRepository.mutate('beta', fn)` reconciliation
+    - **AND** artifact review, projection changes, audit event, and any gate-required return are committed atomically
+    - **AND** `ArchiveChange` never calls `beta.invalidate` directly
+
+    #### Scenario: Ungated preserve peer remains in its current phase
+
+    - **GIVEN** an overlapping active peer in `implementing` with workflow `preserve` and no required stale spec consent
+    - **WHEN** another change archives bypassing `spec.overlap`
+    - **THEN** the peer remains in `implementing` with explicit overlap review and a forward-progress blocker
+    - **AND** no unconditional return to `designing` is appended
+
+    #### Scenario: No overlap with the bypass produces empty invalidatedChanges
+
+    - **GIVEN** a change `alpha` in `archivable` state targeting `core:config`
+    - **AND** no other active change targets `core:config`
+    - **WHEN** `ArchiveChange.execute({ name: 'alpha', skipChecks: ['spec.overlap'] })` is called
+    - **THEN** the archive proceeds normally
+    - **AND** `result.invalidatedChanges` is an empty array
+
+    #### Scenario: Overlap check excludes the change being archived
+
+    - **GIVEN** a change `alpha` in `archivable` state targeting `core:config`
+    - **AND** no other active change targets `core:config`
+    - **WHEN** `ArchiveChange.execute({ name: 'alpha' })` is called
+    - **THEN** `alpha` itself does not cause an overlap detection
+    - **AND** the archive proceeds normally
+
+    #### Scenario: Bypassing spec.overlap permits archive and invalidates peers
+
+    - **GIVEN** `alpha` in `archivable` overlaps `beta` on `core:config`
+    - **WHEN** `ArchiveChange.execute({ name: 'alpha', skipChecks: ['spec.overlap'] })` is called
+    - **THEN** the archive proceeds
+    - **AND** `beta` receives a `spec-overlap-conflict` invalidation through canonical reconciliation
+
+    #### Scenario: Schema-disabled spec.overlap performs no scan and no invalidation
+
+    - **GIVEN** the schema declares `archiveChecks: [{ id: spec.overlap, disabled: true }]`
+    - **AND** `alpha` overlaps `beta`
+    - **WHEN** `ArchiveChange.execute({ name: 'alpha' })` is called
+    - **THEN** the archive proceeds without listing peer changes
+    - **AND** `beta` is not invalidated
+
+    #### Scenario: Non-skippable spec.overlap cannot be bypassed
+
+    - **GIVEN** the schema declares `archiveChecks: [{ id: spec.overlap, skippable: false }]`
+    - **AND** `alpha` overlaps `beta`
+    - **WHEN** `ArchiveChange.execute({ name: 'alpha', skipChecks: ['spec.overlap'] })` is called
+    - **THEN** `CheckNotSkippableError` is thrown before any check, hook, or write
+
+    #### Scenario: Bypassing spec.overlap when nothing overlaps
+
+    - **GIVEN** `alpha` in `archivable` has no overlapping active change
+    - **WHEN** `ArchiveChange.execute({ name: 'alpha', skipChecks: ['spec.overlap'] })` is called
+    - **THEN** the archive proceeds normally
+    - **AND** `result.invalidatedChanges` is an empty array
+
+    #### Scenario: Bypassing spec.overlap does not bypass other failing checks
+
+    - **GIVEN** `alpha` overlaps `beta` and also contains a spec from a `readOnly` workspace
+    - **WHEN** `execute({ name: 'alpha', skipChecks: ['spec.overlap'] })` runs
+    - **THEN** `ReadOnlyWorkspaceError` is thrown
+    - **AND** no peer is invalidated and no file is written
+
+    #### Scenario: Retry from archiving applies the same bypass
+
+    - **GIVEN** `alpha` is in `archiving` after a failed commit and overlaps `beta`
+    - **WHEN** `execute({ name: 'alpha', skipChecks: ['spec.overlap'] })` runs
+    - **THEN** the bypass is validated and applied exactly as from `archivable`
+
+    #### Scenario: Overlap error names peers and carries no delivery-specific flag
+
+    - **GIVEN** `alpha` overlaps `beta` on `core:config`
+    - **WHEN** `ArchiveChange.execute({ name: 'alpha' })` is called without bypassing `spec.overlap`
+    - **THEN** `SpecOverlapError` is thrown
+    - **AND** its message names `core:config` and `beta`
+    - **AND** its message contains no `--skip-checks` or `--allow-overlap` text
+    - **AND** `skippable` reflects the resolved `spec.overlap` binding
+
+    #### Scenario: Peer failures do not undo success
+
+    - **GIVEN** three peers overlap and the middle peer update fails
+    - **WHEN** subject archive succeeds then peer processing runs
+    - **THEN** first/last peers update, middle failure is reported and post-archive work continues without rollback
+
+
+    #### Scenario: Failed subject archive leaves peers unchanged
+
+    - **GIVEN** overlap bypass is authorized but publication later fails and is restored
+    - **WHEN** archive returns failure
+    - **THEN** no peer invalidation or overlap note is committed for that failed subject attempt
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Archive note failure and success boundaries
+
+    #### Scenario: Failed commit restores notes and successful archive cleans once
+
+    - **GIVEN** a note matches archive-success and publication succeeds before archive persistence fails
+    - **WHEN** batch restore returns the active change, then a later attempt succeeds
+    - **THEN** the failed attempt retains its original note/audit and its new failure context
+    - **AND** the successful archived snapshot removes matching notes with one audit per note
+    - **AND** post-commit warnings do not resurrect notes
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Result shape$'
+  content: |
+    Scenarios:
+
+    #### Scenario: Successful archive returns result with empty invalidatedChanges
+
+    - **WHEN** `ArchiveChange.execute` completes successfully with no overlap
+    - **THEN** the result includes the `ArchivedChange` record
+    - **AND** `postHookFailures` is empty
+    - **AND** `invalidatedChanges` is empty
+
+    #### Scenario: Result includes invalidated changes after overlap
+
+    - **GIVEN** `ArchiveChange.execute` was called bypassing `spec.overlap`
+    - **AND** two overlapping changes were invalidated
+    - **WHEN** the result is returned
+    - **THEN** `invalidatedChanges` has two entries with `name` and `specIds` for each invalidated change
+
+    #### Scenario: Pre-archive failure throws
+
+    - **WHEN** a pre-archive hook fails
+    - **THEN** `ArchiveChange.execute` throws and does not return a result
+
+    #### Scenario: Peer failures do not undo success
+
+    - **GIVEN** three peers overlap and the middle peer update fails
+    - **WHEN** subject archive succeeds then peer processing runs
+    - **THEN** first/last peers update, middle failure is reported and post-archive work continues without rollback

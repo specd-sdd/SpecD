@@ -7,8 +7,8 @@
 #### Scenario: Exposes named create factory
 
 - **WHEN** plugin package exports are loaded
-- **THEN** a named `create()` export is available
-- **AND** calling `create()` returns an `AgentPlugin`
+- **THEN** `create()` is available
+- **AND** it returns an `AgentPlugin` or a promise of one
 
 #### Scenario: Factory reads manifest for name and version
 
@@ -16,10 +16,28 @@
 - **WHEN** `create()` is called
 - **THEN** the returned plugin has `name === "@specd/plugin-agent-standard"` and `version === "1.0.0"`
 
-#### Scenario: Type is hardcoded
+#### Scenario: No type discriminator
 
 - **WHEN** `create()` is called
-- **THEN** the returned plugin has `type === 'agent'`
+- **THEN** the returned plugin has no `type` property
+
+#### Scenario: Async factory result is awaited
+
+- **GIVEN** `create()` returns a promise
+- **WHEN** the plugin loader resolves the plugin
+- **THEN** the loader awaits the promise and uses the resolved `AgentPlugin`
+
+### Requirement: Manifest and install context
+
+#### Scenario: Manifest declares the agents contribution
+
+- **WHEN** the manifest of the package is read
+- **THEN** `schemaVersion` is `2`, `pluginType` is absent and `contributes.agents` has the id `standard`
+
+#### Scenario: Install receives the context
+
+- **WHEN** `install({ config, options, contributions: ['standard'] })` is called
+- **THEN** the plugin installs using `config` and `options`
 
 ### Requirement: Domain layer
 
@@ -84,21 +102,33 @@
 #### Scenario: Install writes AGENTS.md prompt block
 
 - **WHEN** `StandardAgentPlugin.install()` runs
-- **THEN** `AGENTS.md` contains the `<!-- <specd> -->` base block with standard specd agent instructions
+- **THEN** `AGENTS.md` contains the shared specd base block referencing `standard`
 - **AND** `AGENTS.md` does NOT contain any `<!-- <specd-plugin:standard> -->` marker block
 
-#### Scenario: Uninstall removes AGENTS.md base block
+#### Scenario: Uninstall keeps the shared block while another plugin references it
 
-- **GIVEN** `AGENTS.md` contains `<!-- <specd> -->` and no other plugin markers
+- **GIVEN** `AGENTS.md` contains the shared base block referenced by `standard` and another agent plugin
 - **WHEN** `StandardAgentPlugin.uninstall()` runs
-- **THEN** `<!-- <specd> -->` base block is removed from `AGENTS.md`
+- **THEN** the `standard` reference is removed
+- **AND** the shared base block remains in `AGENTS.md`
 
-#### Scenario: Legacy plugin marker removed on install
+#### Scenario: Uninstall removes the shared block when last reference is dropped
+
+- **GIVEN** `AGENTS.md` contains the shared base block referenced only by `standard`
+- **WHEN** `StandardAgentPlugin.uninstall()` runs
+- **THEN** the base block is removed from `AGENTS.md`
+
+#### Scenario: Filtered uninstall keeps the shared block
+
+- **GIVEN** `AGENTS.md` contains the shared base block referenced by `standard`
+- **WHEN** `StandardAgentPlugin.uninstall()` runs with `options.skills`
+- **THEN** the block remains in `AGENTS.md`
+
+#### Scenario: Legacy plugin marker purged on uninstall
 
 - **GIVEN** `AGENTS.md` contains a legacy `<!-- <specd-plugin:standard> -->` block from a previous install
-- **WHEN** `StandardAgentPlugin.install()` runs
+- **WHEN** `StandardAgentPlugin.uninstall()` runs
 - **THEN** the `<!-- <specd-plugin:standard> -->` block is removed
-- **AND** the `<!-- <specd> -->` base block is present
 
 ### Requirement: allowed-tools configuration
 
@@ -107,6 +137,12 @@
 - **WHEN** the per-skill frontmatter map is inspected
 - **THEN** every skill entry that requires file or command operations has a non-empty `allowed-tools` string
 - **AND** tool strings include at minimum `Read` and `Bash(node *)` where applicable
+- **AND** every `Bash(...)` pattern uses the space style and none uses the colon style
+
+#### Scenario: specd-compliance declares the command tools
+
+- **WHEN** the `specd-compliance` entry is inspected
+- **THEN** its `allowed-tools` contains `Bash(node *)`, `Bash(pnpm *)`, `Bash(git *)` and `Bash(gh *)`
 
 ### Requirement: Project init wizard integration
 
@@ -127,17 +163,83 @@
 #### Scenario: Uninstall removes selected skills when filter is provided
 
 - **GIVEN** a `SpecdConfig` and multiple skills installed under `.agents/skills/`
-- **WHEN** `uninstall(config, { skills: ['specd-design'] })` is executed
+- **WHEN** `uninstall({ config, options: { skills: ['specd-design'] }, contributions })` is executed
 - **THEN** only the selected specd-managed skill directories are removed
-- **AND** the resolved shared location remains when other installed skills may still reference it
+- **AND** the shared folder, the owners marker and the shared files remain
 
 #### Scenario: Uninstall without filter removes only specd-managed skills and shared resources
 
-- **GIVEN** a `SpecdConfig` with specd-managed skills and unrelated user skills installed under `.agents/skills/`
-- **WHEN** `uninstall(config, optionsWithoutSkills)` is executed
-- **THEN** all specd-managed skill directories are removed
-- **AND** the resolved sharedFolder location is removed
+- **GIVEN** specd-managed skills and unrelated user skills are installed under `.agents/skills/`
+- **WHEN** `uninstall({ config, options: {}, contributions: ['standard'] })` is executed
+- **THEN** all specd-managed skill directories are removed, including legacy flat `<skill>.md` files
 - **AND** unrelated user skill directories remain
+- **AND** the shared folder is handled by the owners protocol (see "Shared folder ownership and agent placement")
+
+#### Scenario: Uninstall removes selected agent files from the shared folder
+
+- **GIVEN** agent files `<shared>/a.agent.md` and `<shared>/b.agent.md` and `shared.md` are installed
+- **WHEN** `uninstall` runs with `options.agents: ['a']`
+- **THEN** only `<shared>/a.agent.md` is removed
+- **AND** `shared.md`, `b.agent.md` and `.owners.json` remain
+
+#### Scenario: Filtered uninstall keeps the prompt block and the owners marker
+
+- **GIVEN** the plugin is installed and is an owner of the shared folder
+- **WHEN** `uninstall` runs with `options.skills`
+- **THEN** the `standard` reference in `AGENTS.md` is kept
+- **AND** `.owners.json` and every shared file are unchanged
+
+### Requirement: Shared folder ownership and agent placement
+
+#### Scenario: create rejects a manifest without name or version
+
+- **GIVEN** the resolved `specd-plugin.json` has no non-empty string `name` or `version`
+- **WHEN** `create` is called
+- **THEN** `PluginValidationError` is thrown with the field `specd-plugin.json: name` or `specd-plugin.json: version`
+
+#### Scenario: Install registers the plugin as shared-folder owner
+
+- **WHEN** `install` writes files into the shared folder
+- **THEN** `.owners.json` lists `standard`
+
+#### Scenario: Filtered install also registers the owner
+
+- **WHEN** `install` runs with a `skills` filter and writes a shared file
+- **THEN** `.owners.json` lists `standard`
+
+#### Scenario: Owner registered before the first shared write
+
+- **GIVEN** the first write into the shared folder fails
+- **WHEN** `install` rejects
+- **THEN** `.owners.json` already lists `standard`
+- **AND** a later full uninstall releases the owner and removes the shared folder when it was the last owner
+
+#### Scenario: Other owners keep the shared files
+
+- **GIVEN** `standard` and another agent plugin are owners of the shared folder
+- **WHEN** `standard` is fully uninstalled
+- **THEN** `shared.md` and every `<agent>.agent.md` remain
+- **AND** `.owners.json` lists only the other plugin
+
+#### Scenario: Last owner removes shared files and the empty folder
+
+- **GIVEN** `standard` is the only owner and the folder holds only specd files and the marker
+- **WHEN** `standard` is fully uninstalled
+- **THEN** `shared.md`, the agent files and `.owners.json` are deleted
+- **AND** the shared folder itself no longer exists
+
+#### Scenario: Foreign file keeps the shared folder
+
+- **GIVEN** `standard` is the only owner and the folder also contains `notes.txt`
+- **WHEN** `standard` is fully uninstalled
+- **THEN** the specd shared files and the marker are deleted
+- **AND** `notes.txt` and the folder remain
+
+#### Scenario: Legacy install without marker deletes no shared file
+
+- **GIVEN** a shared folder with `shared.md` and no `.owners.json`
+- **WHEN** `standard` is fully uninstalled
+- **THEN** `shared.md` still exists
 
 ### Requirement: Application layer
 

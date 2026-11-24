@@ -1,19 +1,20 @@
+import { ResolveChangeSchema } from '../services/resolve-change-schema.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
-import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { SpecNotInChangeError } from '../errors/spec-not-in-change-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
-import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
+import {
+  type ArtifactAST,
+  type ArtifactParser,
+  type ArtifactParserRegistry,
+  type DeltaEntry,
+} from '../ports/artifact-parser.js'
 import { DeltaApplicationError } from '../../domain/errors/delta-application-error.js'
 import { type Spec } from '../../domain/entities/spec.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
 import { type ExtractorTransformRegistry } from '../../domain/services/content-extraction.js'
-import {
-  type ActorIdentity,
-  type SpecApprovedEvent,
-  type SignedOffEvent,
-} from '../../domain/entities/change.js'
+import { type SpecApprovedEvent, type SignedOffEvent } from '../../domain/entities/change.js'
 import { type PreHashCleanup } from '../../domain/value-objects/validation-rule.js'
 import { type ArtifactStatus } from '../../domain/value-objects/artifact-status.js'
 import { type MetadataExtractorEntry } from '../../domain/value-objects/metadata-extraction.js'
@@ -24,7 +25,10 @@ import { expectedArtifactFilename } from '../../domain/services/artifact-filenam
 import { evaluateRules } from '../../domain/services/rule-evaluator.js'
 import { evaluateCrossArtifactRule } from '../../domain/services/cross-artifact-rule-evaluator.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
-import { LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
+import {
+  findBlockingParent,
+  evaluateLifecycleVerdict,
+} from '../../domain/services/lifecycle-verdict.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
 import { type ExtractedMetadata } from '../../domain/services/extract-metadata.js'
 import { type SelectorNode } from '../../domain/services/selector-matching.js'
@@ -37,6 +41,8 @@ import {
 } from './_shared/cross-artifact-participant-state.js'
 import { extractMetadataFromSpecArtifacts } from './_shared/extract-metadata-from-spec-artifacts.js'
 import { type ListWorkspaces } from './list-workspaces.js'
+import { type ReconcileChangeValidity } from './reconcile-change-validity.js'
+import { InvalidCompositionFactoryArgumentsError } from '../../domain/errors/invalid-composition-factory-arguments-error.js'
 
 /** Input for the {@link ValidateArtifacts} use case. */
 export interface ValidateArtifactsInput {
@@ -118,11 +124,11 @@ export class ValidateArtifacts {
   private readonly _listWorkspaces: ListWorkspaces
   private readonly _schemaProvider: SchemaProvider
   private readonly _parsers: ArtifactParserRegistry
-  private readonly _actor: ActorResolver
   private readonly _hasher: ContentHasher
   private readonly _extractorTransforms: ExtractorTransformRegistry
   private readonly _workspaceRoutes: readonly SpecWorkspaceRoute[]
-  private readonly _lifecycle: LifecycleEngine
+  private readonly _reconcile: ReconcileChangeValidity
+  private readonly _resolveChangeSchema: ResolveChangeSchema
 
   /**
    * Creates a new `ValidateArtifacts` use case instance.
@@ -131,32 +137,40 @@ export class ValidateArtifacts {
    * @param listWorkspaces - The project orchestrator
    * @param schemaProvider - Provider for the fully-resolved schema
    * @param parsers - Registry of artifact format parsers
-   * @param actor - Resolver for the actor identity
+   * @param _actor - Resolver retained in the public construction contract
    * @param hasher - Content hasher for computing artifact hashes
    * @param extractorTransforms - Shared extractor transform registry
    * @param workspaceRoutes - Workspace routing metadata for cross-workspace resolution
-   * @param lifecycle - Shared lifecycle interpreter
+   * @param reconcile - Canonical reconciler. When supplied, drift and recovery are applied inside the validation mutation and stale evidence is not renewed.
+   * @param resolveChangeSchema - Resolves the change's named schema; defaults to a provider-backed resolver
    */
   constructor(
     changes: ChangeRepository,
     listWorkspaces: ListWorkspaces,
     schemaProvider: SchemaProvider,
     parsers: ArtifactParserRegistry,
-    actor: ActorResolver,
+    _actor: ActorResolver,
     hasher: ContentHasher,
     extractorTransforms: ExtractorTransformRegistry = new Map(),
     workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
-    lifecycle: LifecycleEngine = new LifecycleEngine(Logger.debug.bind(Logger)),
+    reconcile?: ReconcileChangeValidity,
+    resolveChangeSchema?: ResolveChangeSchema,
   ) {
     this._changes = changes
     this._listWorkspaces = listWorkspaces
     this._schemaProvider = schemaProvider
     this._parsers = parsers
-    this._actor = actor
     this._hasher = hasher
     this._extractorTransforms = extractorTransforms
     this._workspaceRoutes = workspaceRoutes
-    this._lifecycle = lifecycle
+    if (reconcile === undefined) {
+      throw new InvalidCompositionFactoryArgumentsError(
+        'ValidateArtifacts',
+        'reconcile is required',
+      )
+    }
+    this._reconcile = reconcile
+    this._resolveChangeSchema = resolveChangeSchema ?? new ResolveChangeSchema(schemaProvider)
   }
 
   /**
@@ -166,12 +180,20 @@ export class ValidateArtifacts {
    * @returns Validation result with passed flag, failures, and warnings
    * @throws {ChangeNotFoundError} If no change with the given name exists
    * @throws {SchemaNotFoundError} If the schema reference cannot be resolved
+   * @throws {SchemaProviderIdentityMismatchError} If the resolved schema provider identity does not match
+   * @throws {InvalidSpecIdError} If `specPath` is invalid
+   * @throws {WorkspaceNotFoundError} If `specPath` names an unknown workspace
+   * @throws {SpecNotInChangeError} If `specPath` is omitted for a spec-scoped artifact or not in `change.specIds`
    */
   async execute(input: ValidateArtifactsInput): Promise<ValidateArtifactsResult> {
     const change = await this._changes.get(input.name)
     if (change === null) throw new ChangeNotFoundError(input.name)
 
-    const schema = await this._schemaProvider.get()
+    const { schema } = await this._resolveChangeSchema.execute({
+      changeName: change.name,
+      schemaName: change.schemaName,
+      schemaVersion: change.schemaVersion,
+    })
 
     const targetArtifactType =
       input.artifactId !== undefined
@@ -209,11 +231,6 @@ export class ValidateArtifacts {
       }
     }
 
-    // --- Schema name guard ---
-    if (schema.name() !== change.schemaName) {
-      throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
-    }
-
     // --- Unknown artifact ID guard ---
     if (input.artifactId !== undefined) {
       const known = schema.artifacts().some((a) => a.id === input.artifactId)
@@ -233,7 +250,6 @@ export class ValidateArtifacts {
       }
     }
 
-    const actor: ActorIdentity = await this._actor.identity()
     const failures: ValidationFailure[] = []
     const warnings: ValidationWarning[] = []
     const files: ValidationFileResult[] = []
@@ -244,7 +260,9 @@ export class ValidateArtifacts {
     }> = []
     const readyParticipants = new Map<string, ReadyArtifactParticipant>()
     const specDependsOnUpdates = new Map<string, readonly string[]>()
-    const lifecycle = this._lifecycle.evaluate(change, schema)
+    const lifecycle = evaluateLifecycleVerdict(change, schema, {
+      checksByTarget: {},
+    })
     const artifactVerdicts = new Map(
       lifecycle.artifacts.map((artifact) => [artifact.type, artifact]),
     )
@@ -274,7 +292,7 @@ export class ValidateArtifacts {
       throw new SpecNotInChangeError('<specPath required>', input.name)
     }
 
-    Logger.debug('ValidateArtifacts projected lifecycle engine dependency state', {
+    Logger.debug('ValidateArtifacts projected evaluateLifecycleVerdict dependency state', {
       change: change.name,
       specPath: input.specPath ?? null,
       artifactId: input.artifactId ?? null,
@@ -303,6 +321,7 @@ export class ValidateArtifacts {
     const driftedFilesByArtifact = new Map<string, Set<string>>()
     if (approval !== undefined || signoff !== undefined) {
       for (const artifactType of schema.artifacts()) {
+        if (artifactType.hasTasks) continue
         const changeArtifact = change.getArtifact(artifactType.id)
         if (
           changeArtifact === null ||
@@ -346,8 +365,8 @@ export class ValidateArtifacts {
       if (blockedDep !== undefined) {
         const blockedByParent =
           blockedDep.status === 'pending-parent-artifact-review'
-            ? (this._lifecycle.findBlockingParent(change, schema, artifactType.id) ??
-              this._lifecycle.findBlockingParent(change, schema, blockedDep.reqId))
+            ? (findBlockingParent(change, schema, artifactType.id) ??
+              findBlockingParent(change, schema, blockedDep.reqId))
             : null
         failures.push({
           artifactId: artifactType.id,
@@ -492,6 +511,19 @@ export class ValidateArtifacts {
                 validationContent = parser.serialize(mergedAST)
                 for (const w of mergedResult.warnings) {
                   warnings.push({ artifactId: artifactType.id, description: w })
+                }
+                const ineffectiveMessage = verifyDeltaOperationsEffective(
+                  parser,
+                  baseAST,
+                  deltaEntries,
+                )
+                if (ineffectiveMessage !== null) {
+                  failures.push({
+                    artifactId: artifactType.id,
+                    description: ineffectiveMessage,
+                    filename: validationFilename,
+                  })
+                  artifactFailed = true
                 }
               }
             } catch (err) {
@@ -724,30 +756,13 @@ export class ValidateArtifacts {
       completedValidations.length > 0 ||
       specDependsOnUpdates.size > 0
     ) {
-      await this._changes.mutate(input.name, (freshChange) => {
-        if (driftedFilesByArtifact.size > 0) {
-          const affectedArtifacts = [...driftedFilesByArtifact.entries()].map(([type, files]) => ({
-            type,
-            files: [...files].sort(),
-          }))
-          freshChange.invalidate(
-            'artifact-drift',
-            actor,
-            `Invalidated because validated artifacts drifted: ${affectedArtifacts
-              .map((artifact) => `${artifact.type} [${artifact.files.join(', ')}]`)
-              .join('; ')}`,
-            affectedArtifacts,
-            schema.artifactDag(),
-          )
-        }
-
+      await this._reconcile.mutate({ name: input.name }, (ctx) => {
         for (const completed of completedValidations) {
-          const artifact = freshChange.getArtifact(completed.artifactId)
+          const artifact = ctx.change.getArtifact(completed.artifactId)
           artifact?.markComplete(completed.fileKey, completed.validatedHash)
         }
-
         for (const [specId, deps] of specDependsOnUpdates) {
-          freshChange.setSpecDependsOn(specId, deps)
+          ctx.change.setSpecDependsOn(specId, deps)
         }
       })
     }
@@ -860,4 +875,40 @@ function resolveArtifactValidationFilename(
     return expectedFilename
   }
   return trackedFile.filename
+}
+
+/**
+ * Verifies in memory that every non-`no-op` delta entry changes the serialized
+ * artifact output relative to the immediately preceding state.
+ *
+ * @param parser - Format parser used to apply entries and serialize intermediate ASTs
+ * @param baseAST - Parsed base artifact AST before applying any delta entry
+ * @param deltaEntries - Ordered list of parsed delta entries
+ * @returns Failure description for the first ineffective entry, or `null` if all entries change output
+ */
+function verifyDeltaOperationsEffective(
+  parser: ArtifactParser,
+  baseAST: ArtifactAST,
+  deltaEntries: readonly DeltaEntry[],
+): string | null {
+  let currentAST = baseAST
+  let previousSerialized = parser.serialize(baseAST)
+
+  for (let i = 0; i < deltaEntries.length; i += 1) {
+    const entry = deltaEntries[i]!
+    if (entry.op === 'no-op') {
+      continue
+    }
+
+    const stepResult = parser.apply(currentAST, [entry])
+    const nextSerialized = parser.serialize(stepResult.ast)
+    if (nextSerialized === previousSerialized) {
+      return `Delta operation #${i + 1} (${entry.op}) produced no change in serialized output`
+    }
+
+    currentAST = stepResult.ast
+    previousSerialized = nextSerialized
+  }
+
+  return null
 }

@@ -8,25 +8,10 @@
     "core:composition",
     "core:storage",
     "core:change-list-entry",
-    "core:change-repository-port"
+    "core:change-repository-port",
+    "core:resolve-change-schema"
   ],
-  "implementation": [
-    {
-      "file": "core:src/infrastructure/fs/path-platform.ts",
-      "symbols": ["isPathInside", "retryOnLock"]
-    },
-    {
-      "file": "core:src/infrastructure/fs/move-dir.ts",
-      "symbols": ["moveDir"]
-    },
-    {
-      "file": "core:src/infrastructure/fs/change-repository.ts",
-      "symbols": ["FsChangeRepository"]
-    },
-    {
-      "file": "core:test/infrastructure/fs/move-dir.spec.ts"
-    }
-  ],
+  "implementation": [],
   "optimizations": {
     "optimizedDescription": {
       "value": "Fs filesystem ChangeRepository: Zod-validated path config, three-bucket FsChangeIndexCache, atomic mutate locks.",

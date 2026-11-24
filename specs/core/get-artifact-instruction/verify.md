@@ -10,14 +10,15 @@
 - **WHEN** `GetArtifactInstruction.execute` is called with `name: "nonexistent"`
 - **THEN** `ChangeNotFoundError` is thrown
 
-### Requirement: Schema name guard
+### Requirement: Sovereign schema resolution
 
-#### Scenario: Schema mismatch throws SchemaMismatchError
+#### Scenario: Resolves sovereign schema when workspace default differs
 
-- **GIVEN** a change created with schema `spec-driven`
-- **AND** `SchemaProvider.get()` returns a schema named `custom-schema`
+- **GIVEN** a change created with schema `custom-schema`
+- **AND** workspace default schema is `spec-driven`
 - **WHEN** `execute` is called
-- **THEN** `SchemaMismatchError` is thrown
+- **THEN** it resolves `custom-schema` via `SchemaProvider.get('custom-schema')`
+- **AND** `SchemaMismatchError` is not thrown
 
 ### Requirement: Artifact resolution
 
@@ -31,7 +32,7 @@
 
 #### Scenario: Full result with rules, instruction, and delta
 
-- **GIVEN** an artifact with `rules.pre: [{ id: "r1", text: "Pre rule" }]`, `instruction: "Write the spec"`, `delta: true`, `deltaInstruction: "Add requirements"`, and `rules.post: [{ id: "r2", text: "Post rule" }]`
+- **GIVEN** an artifact with `rules.pre: [{ id: "r1", instruction: "Pre rule" }]`, `instruction: "Write the spec"`, `delta: true`, `deltaInstruction: "Add requirements"`, and `rules.post: [{ id: "r2", instruction: "Post rule" }]`
 - **WHEN** `GetArtifactInstruction.execute` is called for this artifact
 - **THEN** `rulesPre` is `["Pre rule"]`
 - **AND** `instruction` is `"Write the spec"`
@@ -67,7 +68,7 @@
 
 #### Scenario: Rules-only artifact has null instruction
 
-- **GIVEN** an artifact with `rules.post: [{ id: "r1", text: "Check grammar" }]` but no `instruction` field
+- **GIVEN** an artifact with `rules.post: [{ id: "r1", instruction: "Check grammar" }]` but no `instruction` field
 - **WHEN** `GetArtifactInstruction.execute` is called
 - **THEN** `instruction` is `null`
 - **AND** `rulesPost` is `["Check grammar"]`
@@ -81,25 +82,26 @@
 
 ### Requirement: Ports and constructor
 
-#### Scenario: GetArtifactInstruction is constructed with LifecycleEngine
+#### Scenario: GetArtifactInstruction is constructed without LifecycleEngine
 
-- **WHEN** `GetArtifactInstruction` is assembled
-- **THEN** it receives `LifecycleEngine` together with its repositories, parser registry, schema provider, and template expander
+- **WHEN** `GetArtifactInstruction` is constructed
+- **THEN** it receives repositories, parser registry, schema provider, and template expander
+- **AND** it does not receive `LifecycleEngine`
 
 ### Requirement: Input
 
-#### Scenario: Omitted artifactId uses engine-derived readiness
+#### Scenario: Omitted artifactId uses verdict-derived readiness
 
 - **GIVEN** `proposal` is effectively complete
 - **AND** `specs` is not effectively complete
-- **AND** `LifecycleEngine.nextArtifact` reports `specs` as the first incomplete artifact in `artifactDag().topologicalOrder()` with satisfied dependencies
+- **AND** `evaluateLifecycleVerdict` reports `specs` as the first incomplete artifact in `artifactDag().topologicalOrder()` with satisfied dependencies
 - **WHEN** `GetArtifactInstruction.execute` is called without `artifactId`
 - **THEN** the returned `artifactId` is `specs`
 
-#### Scenario: Omitted artifactId ignores persisted complete when engine reports dependency blockage
+#### Scenario: Omitted artifactId ignores persisted complete when the verdict reports dependency blockage
 
 - **GIVEN** an artifact's persisted state is `complete`
-- **AND** `LifecycleEngine.evaluate` reports its effective status as `pending-parent-artifact-review`
+- **AND** `evaluateLifecycleVerdict` reports its effective status as `pending-parent-artifact-review`
 - **WHEN** `GetArtifactInstruction.execute` is called without `artifactId`
 - **THEN** that artifact is not selected as complete/resolved by auto-resolution
 
@@ -121,6 +123,22 @@
 - `specs: ReadonlyMap<string, SpecRepository>`
 - `schemaProvider: SchemaProvider`
 - `parsers: ArtifactParserRegistry`
-- `templates: TemplateExpander`
-- `lifecycle: LifecycleEngine`
+- `templateExpander: TemplateExpander`
+- **AND** it does not resolve `lifecycle` or `LifecycleEngine`
 - **AND** the factory delegates to canonical `createGetArtifactInstruction(deps)`
+
+### Requirement: Effective status from DAG evaluate
+
+#### Scenario: GetArtifactInstruction uses empty checksByTarget
+
+- **WHEN** `GetArtifactInstruction` needs next artifact or DAG effective status
+- **THEN** it calls `evaluateLifecycleVerdict` with empty `checksByTarget`
+- **AND** it does not run hop predicates
+- **AND** it does not gather a global snapshot bag
+
+#### Scenario: Omitted artifactId uses evaluateLifecycleVerdict nextArtifact
+
+- **GIVEN** a change whose next incomplete artifact is `specs` in DAG topological order
+- **WHEN** `GetArtifactInstruction.execute` is called without `artifactId`
+- **THEN** `evaluateLifecycleVerdict` reports `specs` as `nextArtifact`
+- **AND** the result `artifactId` is `specs`

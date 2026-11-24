@@ -4,6 +4,7 @@ import * as path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { HookResult } from '../../src/domain/value-objects/hook-result.js'
 import { RegistryConflictError } from '../../src/application/errors/registry-conflict-error.js'
+import { InvalidDisposerError } from '../../src/application/errors/invalid-disposer-error.js'
 import { type ArtifactParser } from '../../src/application/ports/artifact-parser.js'
 import { type SpecdConfig } from '../../src/application/specd-config.js'
 import { createKernelBuilder } from '../../src/composition/kernel-builder.js'
@@ -66,6 +67,7 @@ async function makeConfig(): Promise<SpecdConfig> {
       archiveAdapter: { adapter: 'fs', config: { path: archivePath } },
     },
     approvals: { spec: false, signoff: false },
+    invalidation: { artifacts: 'downstream', workflow: 'preserve' },
   }
 }
 
@@ -201,11 +203,130 @@ describe('createKernelBuilder', () => {
     )
   })
 
+  it('forwards additionalDestinations of the base options to the kernel logger', async () => {
+    const config = await makeConfig()
+    const entries: Array<{ level: string; message: string }> = []
+    const onLog = vi.fn((entry: { level: string; message: string }) => {
+      entries.push({ level: entry.level, message: entry.message })
+    })
+
+    const kernel = await createKernelBuilder(config, {
+      additionalDestinations: [{ target: 'callback', level: 'info', format: 'json', onLog }],
+    }).build()
+    try {
+      const { Logger } = await import('../../src/application/logger.js')
+      Logger.info('builder destination probe')
+
+      expect(onLog).toHaveBeenCalled()
+      expect(entries.some((e) => e.message === 'builder destination probe')).toBe(true)
+    } finally {
+      await kernel.dispose()
+    }
+  })
+
   it('does not expose graph-store builder methods on the fluent contract', async () => {
     const config = await makeConfig()
     const builder = createKernelBuilder(config) as unknown as Record<string, unknown>
 
     expect(builder.registerGraphStore).toBeUndefined()
     expect(builder.useGraphStore).toBeUndefined()
+  })
+  it('registerDisposer is chainable', async () => {
+    const config = await makeConfig()
+    const builder = createKernelBuilder(config)
+
+    expect(builder.registerDisposer('a', () => {})).toBe(builder)
+  })
+
+  it('hands registered disposers to the kernel in call order and the builder never runs them', async () => {
+    const config = await makeConfig()
+    const order: string[] = []
+    const kernel = await createKernelBuilder(config)
+      .registerDisposer('a', () => void order.push('a'))
+      .registerDisposer('b', () => void order.push('b'))
+      .build()
+
+    expect(order).toEqual([])
+    await kernel.dispose()
+    expect(order).toEqual(['b', 'a'])
+  })
+
+  it('rejects an empty disposer name', async () => {
+    const builder = createKernelBuilder(await makeConfig())
+
+    expect(() => builder.registerDisposer('', () => {})).toThrow(InvalidDisposerError)
+  })
+
+  it('rejects a non-string disposer name', async () => {
+    const config = await makeConfig()
+    const builder = createKernelBuilder(config)
+
+    expect(() => builder.registerDisposer(42 as never, () => {})).toThrow(InvalidDisposerError)
+  })
+
+  it('rejects a non-callable dispose', async () => {
+    const config = await makeConfig()
+    const builder = createKernelBuilder(config)
+
+    expect(() => builder.registerDisposer('plugins', undefined as never)).toThrow(
+      InvalidDisposerError,
+    )
+  })
+
+  it('rejects a duplicate disposer name and keeps the first registration', async () => {
+    const config = await makeConfig()
+    const first = vi.fn()
+    const second = vi.fn()
+    const builder = createKernelBuilder(config).registerDisposer('plugins', first)
+
+    expect(() => builder.registerDisposer('plugins', second)).toThrow(RegistryConflictError)
+
+    const kernel = await builder.build()
+    await kernel.dispose()
+    expect(first).toHaveBeenCalledTimes(1)
+    expect(second).not.toHaveBeenCalled()
+  })
+
+  it('releases registered disposers in reverse order when build fails', async () => {
+    const config = await makeConfig()
+    const [workspace] = config.workspaces
+    if (workspace === undefined) throw new Error('fixture has no workspace')
+    const broken: SpecdConfig = {
+      ...config,
+      workspaces: [
+        { ...workspace, specsAdapter: { adapter: 'does-not-exist', config: { path: '/nowhere' } } },
+      ],
+    }
+    const order: string[] = []
+
+    await expect(
+      createKernelBuilder(broken)
+        .registerDisposer('a', () => void order.push('a'))
+        .registerDisposer('b', () => void order.push('b'))
+        .build(),
+    ).rejects.toThrow()
+
+    expect(order).toEqual(['b', 'a'])
+  })
+
+  it('disposes a builder-built kernel the same way as an options-built kernel', async () => {
+    const config = await makeConfig()
+    const viaBuilder: string[] = []
+    const viaOptions: string[] = []
+
+    const built = await createKernelBuilder(config)
+      .registerDisposer('a', () => void viaBuilder.push('a'))
+      .registerDisposer('b', () => void viaBuilder.push('b'))
+      .build()
+    const direct = await createKernel(config, {
+      disposers: [
+        { name: 'a', dispose: () => void viaOptions.push('a') },
+        { name: 'b', dispose: () => void viaOptions.push('b') },
+      ],
+    })
+    await built.dispose()
+    await direct.dispose()
+
+    expect(viaBuilder).toEqual(viaOptions)
   })
 })

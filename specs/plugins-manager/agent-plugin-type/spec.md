@@ -2,18 +2,35 @@
 
 ## Purpose
 
-Defines the agent plugin interface that extends `SpecdPlugin` for agent integrations (Claude, Copilot, Codex, etc.).
+Defines the `agents` contribution kind and the agent plugin interface that extends `SpecdPlugin` for agent integrations (Claude, Copilot, Codex, etc.). An agent plugin is a plugin whose manifest declares `contributes.agents`; the `agent` kind handler is owned by this package.
 
 ## Requirements
 
 ### Requirement: AgentPlugin extends SpecdPlugin
 
-`AgentPlugin` MUST extend `SpecdPlugin` with `type: 'agent'` and add:
+`AgentPlugin` MUST extend `SpecdPlugin` and replace the optional install hooks with required, agent-specific ones:
 
-- `install(config: SpecdConfig, options?: AgentInstallOptions): Promise<AgentInstallResult>`
-- `uninstall(config: SpecdConfig, options?: AgentInstallOptions): Promise<void>`
+- `install(context: AgentInstallContext): Promise<AgentInstallResult>`
+- `uninstall(context: AgentInstallContext): Promise<void>`
 
-The `AgentPlugin` SHALL receive the full `SpecdConfig` object to ensure it has access to the project root and any necessary workspace or storage configuration.
+```typescript
+interface AgentInstallContext extends Omit<PluginInstallContext, 'options'> {
+  readonly options?: AgentInstallOptions
+}
+```
+
+`AgentInstallContext.config` is the full `SpecdConfig` so the plugin has access to the project root and any necessary workspace or storage configuration. `contributions` carries the selected `agents` contribution ids.
+
+### Requirement: Agents contribution kind handler
+
+The package MUST export the handler for kind `agents`:
+
+- `blockSchema` validates `contributes.agents` as a map from contribution id to an object (the per-agent block; unknown fields are rejected).
+- The handler has no `activate`: agents are install-time only and are a no-op at runtime.
+- A plugin declaring `contributes.agents` MUST implement `install` and `uninstall` (see `isAgentPlugin`).
+- The handler is built in: the loader and `registerPlugins` always register it first, so the loader accepts the `agents` kind without any host wiring. A host-supplied handler for `agents` is rejected with `DuplicateHandlerKindError`.
+- `blockSchema` keys MUST satisfy the contribution id rule; an invalid id is reported as `PluginValidationError`.
+- Its `validatePlugin(plugin, pluginName)` requires the loaded plugin to satisfy `isAgentPlugin`.
 
 ### Requirement: AgentInstallOptions
 
@@ -56,23 +73,20 @@ interface AgentInstallResult {
 
 ### Requirement: Agent installation and fallback
 
-When installing agents, the plugin SHALL determine the target directory based on the target runtime's conventions (e.g., `.claude/agents/`).
-
-If the target runtime does NOT support specialized agents (i.e., the `agents` capability is missing), the plugin SHALL copy the agent template to the same directory as the shared context file (`shared.md`).
+When installing agents, the plugin SHALL determine the target directory based on the target runtime's conventions (for example `.claude/agents/`), and MUST gate that target on the `capabilities` it was given: when `options.capabilities` does not include `agents` (or the runtime has no specialized agents), the plugin SHALL install the agent template into the same directory as the shared context file (`shared.md`) instead. Plugins whose runtime lists no `agents` capability may do so unconditionally. Which files an install writes to the shared folder is recorded through `skills:shared-folder-owners`.
 
 ### Requirement: isAgentPlugin type guard
 
 The spec MUST export a pure function `isAgentPlugin(value: SpecdPlugin): value is AgentPlugin` that validates:
 
-1. `value.type` is `'agent'`
-2. `value.install` is a function
-3. `value.uninstall` is a function
+1. `value.install` is a function
+2. `value.uninstall` is a function
 
-This type guard lives in the domain layer so that application use cases and infrastructure adapters can import it without creating layer violations.
+Whether a plugin is an agent plugin is determined by its manifest declaring `contributes.agents`, not by a `type` field on the plugin object. This type guard lives in the domain layer so that application use cases and infrastructure adapters can import it without creating layer violations.
 
 ## Constraints
 
-- Agent plugins specialize the base plugin type for agent integrations.
+- Agent plugins specialize the base plugin for agent integrations through the `agents` contribution kind.
 - Install-time capability data MUST be passed separately from template variables.
 - The initial required capability identifiers are `mcp`, `agents`, and `frontmatter`.
 - Agent plugins MUST NOT pass pre-normalized capability objects into `@specd/skills`.
@@ -82,4 +96,4 @@ This type guard lives in the domain layer so that application use cases and infr
 ## Spec Dependencies
 
 - [`core:config`](../../core/core/config/spec.md) — defines SpecdConfig type
-- [`plugin-manager:specd-plugin-type`](../specd-plugin-type/spec.md) — base plugin interface
+- [`plugin-manager:specd-plugin-type`](../specd-plugin-type/spec.md) — base plugin interface, manifest model and kind handler contract

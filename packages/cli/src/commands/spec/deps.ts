@@ -84,7 +84,7 @@ export function registerSpecDeps(parent: Command): void {
         })
         renderDepsResult(result, parseFormat(opts.format))
       } catch (err) {
-        handleError(err, opts.format, { lockRepairHint: true })
+        handleError(err, opts.format, { command: 'specs.deps', lockRepairHint: true })
       }
     })
 
@@ -108,7 +108,7 @@ export function registerSpecDeps(parent: Command): void {
         })
         renderDepsResult(result, parseFormat(opts.format))
       } catch (err) {
-        handleError(err, opts.format, { lockRepairHint: true })
+        handleError(err, opts.format, { command: 'specs.deps', lockRepairHint: true })
       }
     })
 
@@ -136,7 +136,7 @@ export function registerSpecDeps(parent: Command): void {
           `spec ${result.specId} is not initialized — nothing was removed`,
         )
       } catch (err) {
-        handleError(err, opts.format, { lockRepairHint: true })
+        handleError(err, opts.format, { command: 'specs.deps', lockRepairHint: true })
       }
     })
 
@@ -157,7 +157,7 @@ export function registerSpecDeps(parent: Command): void {
         })
         renderDepsResult(result, parseFormat(opts.format))
       } catch (err) {
-        handleError(err, opts.format, { lockRepairHint: true })
+        handleError(err, opts.format, { command: 'specs.deps', lockRepairHint: true })
       }
     })
 
@@ -195,7 +195,7 @@ export function registerSpecDeps(parent: Command): void {
           })
           renderDepsResult(result, parseFormat(opts.format))
         } catch (err) {
-          handleError(err, opts.format, { lockRepairHint: true })
+          handleError(err, opts.format, { command: 'specs.deps', lockRepairHint: true })
         }
       },
     )

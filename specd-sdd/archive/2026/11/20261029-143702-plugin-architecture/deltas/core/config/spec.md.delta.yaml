@@ -1,0 +1,73 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Cascade identity and removal model'
+  content: |
+    Config inheritance MUST use local structural identity rules for removable collections.
+
+    The following identity rules apply in the first version:
+
+    - `context[]` supports an optional `id` field. When present, `id` is the preferred identity key for inherited removal.
+    - `plugins[]` uses `name` as its identity key. Layer entries with the same `name` replace the inherited entry in place; entries with a new `name` are appended in layer order.
+    - keyed object maps such as `workspaces` and `storage` use their object keys as removal targets.
+
+    A later layer removes an inherited plugin entry with `remove: { plugins: [{ name: '@scope/name' }] }`. Removal matches the inherited entry by `name`. A name that is removed and then re-declared by the same layer is appended as a new entry at the end of the list. Only entries inherited from the layers below can be removed: a plugin declared by the same layer is not inherited, so adding and removing one name in a single layer fails. Removing a name that is absent from the inherited list (or when no plugins are inherited) MUST fail with `ConfigValidationError`, like removal of an absent workspace, storage key or context entry. Because each removal consumes the matched entry, listing the same name twice in `remove.plugins` is rejected with `ConfigValidationError` as well.
+
+    The system MUST NOT use arbitrary field-combination matching or AST-wide selector matching for config inheritance removal. Each removable array or map MUST define its own deterministic identity model.
+
+    A discovered layer with `extends: <path>` MUST only attach when that explicit base file is already active in the same chain. This allows files such as `specd.local.experimental.yaml` to remain discoverable by filename while staying inactive unless `specd.experimental.yaml` is already active or is selected explicitly with `--config`.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Plugin declarations'
+  content: |
+    `specd.yaml` MAY include a `plugins` section declaring installed plugins as a flat list. The config loader MUST validate the `plugins` field at load time using the Zod schema — structural errors MUST produce a `ConfigValidationError` before any command runs.
+
+    The validated structure is:
+
+    ```typescript
+    plugins: Array<{
+      name: string // scoped plugin name, "@scope/name"
+      config?: Record<string, unknown>
+      contributions?: string[] // allowlist of contribution ids; absent = all
+    }>
+    ```
+
+    Each plugin entry has `name` (required, matching the scoped plugin name grammar `^@[a-z0-9][a-z0-9_-]*\/[a-z0-9][a-z0-9_-]*$`, which core owns in `domain/plugin-name.ts` and plugin-manager reuses), optional `config` and optional `contributions` (when present it MUST list at least one id; omit the key to select every contribution). A plugin name MUST appear at most once within any single layer: a duplicate inside one layer, including the root layer and an extending layer, MUST be rejected with `ConfigValidationError` before any layer is merged, so a later `remove.plugins` cannot erase it. There is no grouping by plugin type and no `exclude`/`disable` mechanism. The config validation does NOT load plugins: whether `config` satisfies the plugin's schema, or whether an id in `contributions` is declared, is validated by plugin-manager when the plugin is loaded.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Config writer port'
+  content: |
+    `ConfigWriter` is an application-layer port that defines the contract for writing to `specd.yaml`. It complements the read-only `ConfigLoader` with mutation operations for project initialisation and plugin management.
+
+    The port MUST define the following methods:
+
+    - `initProject(options: InitProjectOptions): Promise<InitProjectResult>` — creates a new `specd.yaml` with default content (including `configVersion`)
+    - `addPlugin(configPath: string, name: string, options?: { config?: Record<string, unknown>; contributions?: readonly string[] }): Promise<void>` — adds a plugin entry to `plugins`
+    - `removePlugin(configPath: string, name: string): Promise<void>` — removes a plugin entry from `plugins`
+    - `listPlugins(configPath: string): Promise<Array<{ name: string; config?: Record<string, unknown>; contributions?: string[] }>>` — reads the plugin entries from `plugins`
+
+    `addPlugin` MUST add the entry to the `plugins` list in `specd.yaml`. If the plugin is already present, the method MUST NOT duplicate it. The methods have no notion of plugin type.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Plugin declarations'
+  content: |
+    ### Requirement: Config version
+
+    `specd.yaml` MAY declare a top-level `configVersion` integer. The version introduced together with the flat `plugins` list is `2`. `specd init` MUST write `configVersion: 2`.
+
+    - `configVersion` MUST be a positive integer; `0`, negative, fractional or non-numeric values fail with a `ConfigValidationError` (a schema validation error, or `UnsupportedConfigVersionError`, itself a `ConfigValidationError`, when the value exceeds the supported version).
+    - An absent `configVersion` is accepted when the shape of the file is current.
+    - A `configVersion` greater than the version supported by the running specd MUST fail with `UnsupportedConfigVersionError` (code `UNSUPPORTED_CONFIG_VERSION`) asking to upgrade specd.
+    - A `plugins` value that is an object with an `agents` key (the previous format) MUST fail with `LegacyConfigFormatError` (code `LEGACY_CONFIG_FORMAT`) whose message contains the exact replacement `plugins` list and `configVersion: 2`, instead of a generic schema error. This detection MUST run before strict schema validation and applies only when `plugins` is an object with an `agents` key; any other non-list `plugins` value (for example `plugins: { skills: [] }`) falls through to the generic strict schema error. Detection runs on every cascade layer, including extending layers, and the `configVersion` check runs before the legacy check within a layer.
+    - Across the config cascade, `configVersion` is taken from the root layer, and an absent root `configVersion` means the current version; a different `configVersion` in an extending layer MUST fail validation, while an extending layer that states the current version over a root without one is accepted.
+    - `LegacyConfigFormatError` and `UnsupportedConfigVersionError` extend `ConfigValidationError`.

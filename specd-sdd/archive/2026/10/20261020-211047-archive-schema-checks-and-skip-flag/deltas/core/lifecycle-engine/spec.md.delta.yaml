@@ -1,0 +1,27 @@
+- op: modified
+  selector:
+    type: section
+    matches: ^Requirement:\ Machine\-readable\ blockers$
+  content: |
+    For every condition that prevents a transition or marks an artifact as incomplete, the verdict function MUST provide a structured `Blocker` object containing:
+
+    - `code`: A unique machine-readable identifier.
+    - `message`: A human-readable description.
+    - `isSkippable`: Boolean indicating if the blocker can be bypassed via a CLI flag or configuration.
+    - `bypassFlag`: (Optional) The name of the flag that bypasses this blocker (e.g., `--skip-checks spec.overlap`). Projected bypass flags use the canonical `--skip-checks <checkId>` form; CLI aliases such as `--allow-overlap` and `--allow-out-of-scope` are accepted inputs, not projected values. `isSkippable` and `bypassFlag` SHALL come from the resolved binding of the failing check (from `LifecycleVerdictInput.resolvedBindings` when supplied by the caller, or resolved from `schema` against the built-in binding specifications when omitted); when the resolved binding has `skippable: false`, `isSkippable` MUST be `false` and `bypassFlag` MUST be omitted.
+    - `affectedArtifacts` (optional): Detail identifying the specific artifact IDs and files.
+
+    If a blocker is skippable and the corresponding bypass is active in the verdict input, the function MUST omit that blocker from `blockers` (it MUST NOT remain as a transition blocker). `LifecycleDomainVerdict` has no `warnings` field; active bypass MUST NOT invent a warning channel.
+
+    **Mandatory Blocker Codes:**
+
+    - `INCOMPLETE_ARTIFACT`: A required artifact is not ready (`missing` or `in-progress`). There is no separate `MISSING_ARTIFACT` code.
+    - `ARTIFACT_DRIFT`: An artifact has changed on disk since its last validation (state: `drifted-pending-review`).
+    - `REVIEW_REQUIRED`: An artifact was invalidated or downgraded and requires review (state: `pending-review`).
+    - `PENDING_PARENT_REVIEW`: An artifact is blocked because one of its upstream dependencies requires review.
+    - `INCOMPLETE_TASKS`: An artifact contains unfinished checklist items (e.g., `- [ ]`).
+    - `OVERLAP_CONFLICT`: Live overlap with **other active** changes from archive `spec.overlap` (GetStatus runs those predicates when `state === 'archivable'`). MUST NOT be emitted only because `review.reason` is `'spec-overlap-conflict'` (victim of another archive; that is review + `/specd-design`).
+    - `INVALID_TRANSITION`: The requested target is not in `listWorkflowTransitions(change.state, schema, approvals)` from the current state.
+    - `APPROVAL_REQUIRED`: A bound approval predicate failed (stay in `ready` / `done`).
+
+    For file-level blockers (drift, review, parent review), the `affectedArtifacts` field MUST contain a grouped list identifying the specific artifact IDs and the exact filenames/paths that triggered the blocker.

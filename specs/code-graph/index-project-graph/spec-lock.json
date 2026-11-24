@@ -11,16 +11,10 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/application/use-cases/_shared/compute-graph-fingerprint.ts",
-      "symbols": [
-        "computeGraphFingerprint",
-        "computeWorkspaceFingerprint",
-        "computeRootFingerprint"
-      ]
+      "file": "code-graph:test/application/use-cases/index-project-graph-integration.spec.ts"
     },
     {
-      "file": "code-graph:src/application/use-cases/index-project-graph.ts",
-      "symbols": ["IndexProjectGraph"]
+      "file": "code-graph:test/application/use-cases/index-project-graph.spec.ts"
     }
   ],
   "optimizations": {
@@ -32,29 +26,29 @@
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:81c46f4167af4ad985adfa4c611d9eb02917246cca263fc91e50ad655f1422e7",
-          "lastModified": "2026-11-02T19:27:44.561Z"
+          "hash": "sha256:8e40003e614784b050799987dbcf59a856fd81f12478d5d96c192183033cee35",
+          "lastModified": "2026-08-25T14:41:04.252Z"
         },
         "verify.md": {
-          "hash": "sha256:bc6439586f0924a6a422e1b9b25ae9e2199eed4ab8ebc339bd0511ab805c813e",
-          "lastModified": "2026-11-02T19:27:44.577Z"
+          "hash": "sha256:8082260b39bef9c547f9c60b710dcdae5298ab18f3499809bdafb6ff95e88d4b",
+          "lastModified": "2026-08-25T14:41:04.253Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# IndexProjectGraph\n\n## Rules\n\n- `IndexProjectGraph.execute(input)` builds `IndexOptions` from `projectRoot`, `workspaces`, optional `configuredWorkspaces`, `graphConfig` (per-file size limit + size-exempt patterns kept separate project vs workspace; resolved into effective values by indexer), `codeGraphVersion`, `vcsRoot`, optional `vcsRef`, `onProgress`, `onEvent`, `force`; calls `provider.index()`; returns `IndexResult` unchanged.\n- Effective size limit resolution (single place, including no-`specd.yaml` bootstrap): per workspace `maxFileBytes` = workspace else project else built-in default `262144` (`0` = no limit); `largeFilePaths` = project patterns ∪ workspace patterns each with base directory. Resolved values part of graph fingerprint inputs. No other call site applies default.\n- `force` requests complete logical reindex: clear reusable indexed contents, bypass incremental reuse so every selected input reconsidered. MUST NOT call `CodeGraphProvider.recreate()` or implement physical-storage recovery; provider already open; recoverable open failures handled by SDK lifecycle owner.\n- Input: already-open `provider` + prepared project values. Forward `vcsRoot` and `configuredWorkspaces` unchanged. MUST NOT resolve workspaces, lock, spawn, open, close, directly clear, recreate, or own storage lifecycle. Only force responsibility: forward force intent.\n- `createIndexProjectGraph()` returns stateless `IndexProjectGraph`.\n\n## Constraints\n\n- No provider open/close or index-lock acquisition/release.\n- Per-file parse failures remain `IndexResult.errors`; use case MUST NOT throw them.\n",
+      "value": "# IndexProjectGraph\n\n## Rules\n\n- `IndexProjectGraph.execute(input)` builds `IndexOptions` from `projectRoot`, `workspaces`, `graphConfig`, `codeGraphVersion`, `vcsRoot`, optional `vcsRef`, `onProgress`, and `force`; calls `provider.index()`; returns `IndexResult` unchanged.\n- `force` requests complete logical reindex: provider clears reusable indexed contents and bypasses incremental reuse so every selected input is reconsidered.\n- Input contains already-open `provider` and prepared project values. Forward `vcsRoot` unchanged.\n- MUST NOT resolve workspaces, lock, spawn, open, close, directly clear, recreate, or own storage recovery/lifecycle. SDK lifecycle owner handles recoverable open failures.\n- `createIndexProjectGraph()` returns stateless `IndexProjectGraph`.\n\n## Constraints\n\n- No provider open/close or index-lock acquisition/release.\n- Per-file parse failures remain `IndexResult.errors`; use case does not throw them.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:81c46f4167af4ad985adfa4c611d9eb02917246cca263fc91e50ad655f1422e7",
-          "lastModified": "2026-11-02T19:27:44.561Z"
+          "hash": "sha256:8e40003e614784b050799987dbcf59a856fd81f12478d5d96c192183033cee35",
+          "lastModified": "2026-08-25T14:41:04.252Z"
         },
         "verify.md": {
-          "hash": "sha256:bc6439586f0924a6a422e1b9b25ae9e2199eed4ab8ebc339bd0511ab805c813e",
-          "lastModified": "2026-11-02T19:27:44.577Z"
+          "hash": "sha256:8082260b39bef9c547f9c60b710dcdae5298ab18f3499809bdafb6ff95e88d4b",
+          "lastModified": "2026-08-25T14:41:04.253Z"
         }
       }
     }

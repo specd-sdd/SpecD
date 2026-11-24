@@ -99,10 +99,10 @@ npm install -g @specd/specd
 The change lifecycle progresses through well-defined states:
 
 ```
-drafting → designing → ready → implementing ⇄ verifying → done → archivable
+drafting → designing → ready → implementing ⇄ verifying → done → archivable → archiving
 ```
 
-Optional approval checkpoints can require human sign-off between `ready → implementing` and `done → archivable`.
+Optional approval checkpoints record human consent **in place**: the change stays in `ready` or `done` until `specd changes approve spec` / `approve signoff`, then the same `ready → implementing` / `done → archivable` edge proceeds. From `done` or `archivable` you can hop back to `implementing` or `verifying`.
 
 ## Context compilation
 
@@ -130,7 +130,7 @@ designing → ready → [optional approval] → implementing ⇄ verifying → d
 
 **Verification (mandatory):** after implementation, the agent enters the `verifying` step, where a dedicated verification skill checks the implementation against the relevant specs and may send the change back for revision when drift or contradictions are detected.
 
-**Approval checkpoints (optional):** projects may require a design approval gate before implementation (`ready → implementing`) to review scope, affected specs, and design decisions, and/or an implementation approval gate before archiving (`done → archivable`) to review correctness, catch omissions discovered late, reconsider flawed or incomplete approaches, or reopen the change when the implementation or spec changes need adjustment before specs and deltas are merged. These checkpoints are deterministic workflow gates controlled by project policy.
+**Approval checkpoints (optional):** projects may require a design approval gate before implementation (`ready → implementing`) to review scope, affected specs, and design decisions, and/or an implementation approval gate before archiving (`done → archivable`) to review correctness, catch omissions discovered late, reconsider flawed or incomplete approaches, or reopen the change when the implementation or spec changes need adjustment before specs and deltas are merged. When a gate is on, the change stays in `ready` / `done` until a human records consent; it does not park in a pending state. These checkpoints are deterministic workflow gates controlled by project policy.
 
 This separates verification from governance: verification is always part of the lifecycle, while approvals are an optional control layer.
 

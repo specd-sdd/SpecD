@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ArtifactFile, SKIPPED_SENTINEL } from '../../../src/domain/value-objects/artifact-file.js'
+import { InvalidChangeError } from '../../../src/domain/errors/invalid-change-error.js'
 
 describe('ArtifactFile', () => {
   it('marks a file complete with its validated hash', () => {
@@ -199,5 +200,16 @@ describe('ArtifactFile', () => {
       file.markDriftedPendingReview()
       expect(file.status).toBe('missing')
     })
+  })
+
+  it('rejects persist of pending-parent-artifact-review', () => {
+    expect(
+      () =>
+        new ArtifactFile({
+          key: 'verify',
+          filename: 'verify.md',
+          status: 'pending-parent-artifact-review',
+        }),
+    ).toThrow(InvalidChangeError)
   })
 })

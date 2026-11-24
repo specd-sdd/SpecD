@@ -7,45 +7,54 @@
   "implementation": [
     {
       "file": "core:src/application/ports/config-writer.ts",
-      "symbols": ["ConfigWriter"]
+      "symbols": ["ConfigWriter", "AddPluginOptions"]
     },
     {
       "file": "core:src/infrastructure/fs/config-writer.ts",
       "symbols": ["FsConfigWriter"]
+    },
+    {
+      "file": "core:src/ports.ts"
+    },
+    {
+      "file": "core:test/infrastructure/fs/config-writer.spec.ts"
+    },
+    {
+      "file": "core:test/composition/config-writer.spec.ts"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "ConfigWriter port: initProject, addPlugin, removePlugin, listPlugins for specd.yaml mutation.",
+      "value": "ConfigWriter initializes projects and mutates plugin declarations without coupling application code to filesystem or YAML.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:b78739b2b2dcf3b3192e6d73c9a8bdf3331ab36def0c9480f6f393319d9350ca",
-          "lastModified": "2026-09-29T13:47:41.622Z"
+          "hash": "sha256:468de844969947e53ce2dcabc9e645bd26aef6d9cad4fc6f591020094ecfa434",
+          "lastModified": "2026-10-06T08:24:27.573Z"
         },
         "verify.md": {
-          "hash": "sha256:0a354409f30b5db8a7d2085da4917fac7919a02851fc7fa270b04c6e0f3353b0",
-          "lastModified": "2026-09-29T13:47:41.622Z"
+          "hash": "sha256:baf3625062112450d0fb6a56253bb64c2b344e70d3ce8cf0d14b2a1f3ea0e27a",
+          "lastModified": "2026-10-06T08:24:27.575Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# ConfigWriter\n\n## Rules\n- Interface (not abstract): `initProject`, `addPlugin`, `removePlugin`, `listPlugins`.\n- `initProject(InitProjectOptions)` → `InitProjectResult`. Options: projectRoot, schemaRef, workspaceId, specsPath, force?. Result: configPath, schemaRef, workspaces, metadataCachePath.\n- Behaviour: write specd.yaml (omit storage by default); create specs + `.specd/{changes,drafts,discarded,archive}`; ensure metadata cache; append `/.specd/metadata/` to root .gitignore (default fs layout only); `{configPath}/tmp/.gitignore`; ignore `specd.local.yaml` + `specd.local.*.yaml`.\n- Exists + !force → `AlreadyInitialisedError`; force overwrites.\n- `addPlugin(configPath, type, name, config?)` — no dupes; write config with name. `removePlugin(configPath, type, name)`.\n- Delivery: `createConfigWriter()` from @specd/core only — no FsConfigWriter import. Prefer SpecdConfig snapshot over listPlugins for reads.\n\n## Constraints\n- application/ports/; no fs/yaml at port. AlreadyInitialisedError application-layer. plugins shape: `{ agents: Array<{name, config?}> }`.",
+      "value": "# ConfigWriter\n\n## Rules\n- TypeScript interface `ConfigWriter`, not abstract class: `initProject`, `addPlugin`, `removePlugin`, `listPlugins`.\n- `initProject(InitProjectOptions): Promise<InitProjectResult>`. Options: absolute `projectRoot`, `schemaRef`, `workspaceId`, relative `specsPath`, optional `force`. Result: absolute `configPath`, `schemaRef`, readonly workspaces, project-relative `metadataCachePath`.\n- Initialize `specd.yaml` with schema/default workspace, omitting storage; create specs and `.specd/{changes,drafts,discarded,archive}`; ensure metadata cache. For default fs metadata only, append rooted `/.specd/metadata/` to root `.gitignore`.\n- Create `{configPath}/tmp/.gitignore` idempotently with normative tmp-ignore contents. Add `specd.local.yaml` and `specd.local.*.yaml` ignores idempotently.\n- Existing `specd.yaml` without force throws `AlreadyInitialisedError`; force overwrites.\n- `addPlugin(configPath,type,name,config?)` adds unique `{name,config?}` under `plugins[type]`; `removePlugin` removes named entry; both return `Promise<void>`.\n- `listPlugins(configPath,type?)` returns matching declarations or all categories; missing file/no declarations returns `[]`.\n- Delivery obtains port through `createConfigWriter()` from `@specd/core`; never imports `FsConfigWriter`. Prefer existing `SpecdConfig` snapshot over `listPlugins` for reads.\n- Validate only required configuration; optional plugin config remains absent unless supplied/required.\n\n## Constraints\n- Port lives `application/ports/`; no `node:fs`, yaml, or I/O dependency.\n- `AlreadyInitialisedError` application-layer.\n- Plugin shape: `{ agents: Array<{ name, config? }> }`.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:b78739b2b2dcf3b3192e6d73c9a8bdf3331ab36def0c9480f6f393319d9350ca",
-          "lastModified": "2026-09-29T13:47:41.622Z"
+          "hash": "sha256:468de844969947e53ce2dcabc9e645bd26aef6d9cad4fc6f591020094ecfa434",
+          "lastModified": "2026-10-06T08:24:27.573Z"
         },
         "verify.md": {
-          "hash": "sha256:0a354409f30b5db8a7d2085da4917fac7919a02851fc7fa270b04c6e0f3353b0",
-          "lastModified": "2026-09-29T13:47:41.622Z"
+          "hash": "sha256:baf3625062112450d0fb6a56253bb64c2b344e70d3ce8cf0d14b2a1f3ea0e27a",
+          "lastModified": "2026-10-06T08:24:27.575Z"
         }
       }
     }

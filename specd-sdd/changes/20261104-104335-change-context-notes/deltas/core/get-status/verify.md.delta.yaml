@@ -1,0 +1,116 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Returns lifecycle context$'
+  content: |
+    Scenarios:
+
+    Scenarios:
+
+    #### Scenario: Preserve routes artifact review through the active skill
+
+    - **GIVEN** ungated artifact drift with workflow `preserve`
+    - **WHEN** status projects review and lifecycle context
+    - **THEN** review is required in the current skill and forward progress is blocked
+    - **AND** required stale spec consent instead routes to `designing`
+
+    #### Scenario: Redesign policy routes review to design
+
+    - **GIVEN** non-task drift under workflow `redesign`
+    - **WHEN** lifecycle context is projected
+    - **THEN** canonical nextAction and committed state point to `designing`
+
+    #### Scenario: Notes are not control state
+
+    - **GIVEN** pending review and an explanatory note exist under preserve/redesign variants
+    - **WHEN** the note is removed and status projected
+    - **THEN** blockers and nextAction still follow current validity and review has only required/affectedArtifacts
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Identifies blockers$'
+  content: |
+    Scenarios:
+
+    #### Scenario: Blockers are surfaced from lifecycle interpretation
+
+    - **GIVEN** lifecycle interpretation finds artifact drift or missing required artifacts
+    - **WHEN** `execute()` is called
+    - **THEN** the returned `blockers` array contains machine-readable blocker entries describing those conditions
+
+    #### Scenario: Incomplete tasks produce INCOMPLETE_TASKS
+
+    - **GIVEN** a change in `implementing` with incomplete gated tasks
+    - **WHEN** `GetStatus.execute()` identifies blockers
+    - **THEN** a blocker with code `INCOMPLETE_TASKS` is present
+
+    #### Scenario: Open-file IMPLEMENTATION_STATE has no out-of-scope bypass
+
+    - **GIVEN** a failed `impl.filesResolved` check with code `IMPLEMENTATION_STATE`
+    - **WHEN** `GetStatus` merges blockers from checks
+    - **THEN** the blocker carries no `bypassFlag` and is not skippable
+
+    #### Scenario: Links-in-scope IMPLEMENTATION_STATE keeps out-of-scope bypass
+
+    - **GIVEN** a failed `impl.linksInScope` check with code `IMPLEMENTATION_STATE`
+    - **WHEN** `GetStatus` merges blockers from checks
+    - **THEN** the blocker is skippable with `bypassFlag` `--skip-checks impl.linksInScope`
+
+    #### Scenario: Schema-declared skippability drives the bypass flag
+
+    - **GIVEN** a schema that declares a Category C check with `skippable: true` on the evaluated step, overriding a non-skippable code default that permits overrides
+    - **WHEN** that check fails and `GetStatus` merges blockers
+    - **THEN** the blocker is skippable with `bypassFlag` `--skip-checks <checkId>`
+
+    #### Scenario: Invalidation overlap is review not OVERLAP_CONFLICT blocker
+
+    - **GIVEN** current pending-review artifacts and a persisted peer-overlap note
+    - **AND** the change is not in `archivable`
+    - **WHEN** `GetStatus.execute()` identifies blockers
+    - **THEN** `blockers` does not include code `OVERLAP_CONFLICT`
+    - **AND** note text explains the archived overlap without review.message
+    - **AND** `nextAction.command` is `/specd-design`
+
+    #### Scenario: Archivable status runs archive predicates
+
+    - **GIVEN** a change in `archivable` whose specs overlap another active change
+    - **WHEN** `GetStatus.execute()` is called
+    - **THEN** `spec.overlap.execute` fails
+    - **AND** `blockers` includes skippable `OVERLAP_CONFLICT` with `bypassFlag` `--skip-checks spec.overlap`
+
+    #### Scenario: Archivable live overlap does not advertise Ready to archive
+
+    - **GIVEN** a change in `archivable` with a public `OVERLAP_CONFLICT` blocker
+    - **WHEN** `GetStatus.execute()` projects `nextAction`
+    - **THEN** `nextAction.command` is `/specd-archive`
+    - **AND** `nextAction.targetStep` is `archivable`
+    - **AND** `nextAction.reason` is not `Ready to archive`
+    - **AND** `nextAction.reason` names overlap and `--skip-checks spec.overlap`
+
+    #### Scenario: CountTasks memo is per evaluation pass
+
+    - **GIVEN** a long-lived `createWorkflowTaskCompletion` instance
+    - **WHEN** `GetStatus.execute()` runs twice with different task file contents
+    - **THEN** each execute counts tasks afresh
+    - **AND** the check instance does not reuse a previous CountTasks result
+
+    #### Scenario: Notes are not control state
+
+    - **GIVEN** pending review and an explanatory note exist under preserve/redesign variants
+    - **WHEN** the note is removed and status projected
+    - **THEN** blockers and nextAction still follow current validity and review has only required/affectedArtifacts
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Notes on every inspection branch
+
+    #### Scenario: Text projection never leaks full management detail
+
+    - **GIVEN** notes contain UUID, time, actor ID and cleanup policy
+    - **WHEN** normal, unchanged, draft and schema-unavailable status branches render
+    - **THEN** public notes contain only text on every readable branch and notes are not reconstructed from audit

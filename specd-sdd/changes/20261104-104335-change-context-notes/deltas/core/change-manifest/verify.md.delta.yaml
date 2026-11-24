@@ -1,0 +1,14 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Current note snapshot and actor IDs
+
+    #### Scenario: Legacy and current manifest round trips
+
+    - **GIVEN** one old manifest lacks notes/actor IDs and another contains multiline notes, anyOf and v1 actors
+    - **WHEN** both load/save through active and archive paths
+    - **THEN** old missing notes read empty without event backfill and current values survive
+    - **AND** new actor IDs are not stripped by Zod and previous audit records are not rewritten

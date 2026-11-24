@@ -7,22 +7,73 @@
 #### Scenario: Has install and uninstall
 
 - **GIVEN** a valid `SpecdConfig` is provided
-- **WHEN** `install(config, options)` or `uninstall(config, options)` is called
+- **WHEN** `install(context)` or `uninstall(context)` is called with `context.config` and `context.options`
 - **THEN** the plugin executes the requested operation using the provided configuration
+
+#### Scenario: Selected contributions are passed
+
+- **GIVEN** `specd.yaml` selects only the agent contribution `claude`
+- **WHEN** the plugin is installed
+- **THEN** `context.contributions` is `['claude']`
+
+### Requirement: Agents contribution kind handler
+
+#### Scenario: Agents block validated
+
+- **GIVEN** a manifest with `contributes.agents.claude` set to `{}`
+- **WHEN** the plugin is loaded
+- **THEN** the block is accepted
+
+#### Scenario: Unknown field rejected
+
+- **GIVEN** `contributes.agents.claude` contains an unknown field
+- **WHEN** the plugin is loaded
+- **THEN** loading fails with `PluginValidationError`
+
+#### Scenario: No runtime activation
+
+- **GIVEN** an agent plugin is configured
+- **WHEN** a host registers plugins at runtime
+- **THEN** nothing is registered on the kernel builder for the `agents` kind
+- **AND** `init` is still called on the plugin
+
+#### Scenario: Built-in handler needs no host wiring
+
+- **GIVEN** a loader or `registerPlugins` created without any handlers
+- **WHEN** a plugin declaring `contributes.agents` is loaded
+- **THEN** loading succeeds
+
+#### Scenario: Invalid id key rejected
+
+- **GIVEN** `contributes.agents` has the key `Bad.Id`
+- **WHEN** the plugin is loaded
+- **THEN** `PluginValidationError` is thrown
+
+#### Scenario: Declaring agents without install or uninstall rejected
+
+- **GIVEN** a manifest declaring `agents` and a plugin without `uninstall`
+- **WHEN** the plugin is loaded
+- **THEN** `PluginValidationError` naming the plugin is thrown
 
 ### Requirement: isAgentPlugin type guard
 
 #### Scenario: Rejects plugin without install method
 
-- **GIVEN** a SpecdPlugin with `type: 'agent'` but no `install` method
+- **GIVEN** a SpecdPlugin with no `install` method
 - **WHEN** `isAgentPlugin` is called
 - **THEN** it returns `false`
 
-#### Scenario: Rejects plugin with wrong type
+#### Scenario: Rejects plugin without uninstall method
 
-- **GIVEN** a SpecdPlugin with `install` and `uninstall` methods but `type` is not `'agent'`
+- **GIVEN** a SpecdPlugin with `install` but no `uninstall`
 - **WHEN** `isAgentPlugin` is called
 - **THEN** it returns `false`
+
+#### Scenario: Accepts plugin with install and uninstall
+
+- **GIVEN** a SpecdPlugin with `install` and `uninstall` functions
+- **WHEN** `isAgentPlugin` is called
+- **THEN** it returns `true`
 
 ### Requirement: AgentInstallOptions
 
@@ -68,12 +119,12 @@
 
 #### Scenario: Agent installed in agents directory
 
-- **GIVEN** a runtime supports `agents`
-- **WHEN** an agent is installed
-- **THEN** it is placed in the designated `agents/` directory of the coding agent
+- **GIVEN** `capabilities` includes `agents`
+- **WHEN** the plugin installs an agent
+- **THEN** the agent file is written to the runtime's agents directory
 
 #### Scenario: Agent fallback to shared directory
 
-- **GIVEN** a runtime DOES NOT support `agents`
-- **WHEN** an agent is installed
-- **THEN** it is copied to the same directory as `shared.md`
+- **GIVEN** `capabilities` does not include `agents`
+- **WHEN** the plugin installs an agent
+- **THEN** the agent file is written next to `shared.md` and not to the agents directory

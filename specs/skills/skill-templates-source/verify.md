@@ -240,6 +240,159 @@
 - **THEN** they assert the exact commands and output fields
 - **AND** keyword-only assertions are insufficient
 
+### Requirement: In-place approval gates in workflow templates
+
+#### Scenario: Verify skill does not route to pending-signoff
+
+- **WHEN** `packages/skills/templates/skills/specd-verify/SKILL.md.tpl` is inspected
+- **THEN** with signoff on it tells the user to `approve signoff` while remaining in `done`
+- **AND** it does not mention `pending-signoff` or a `change transition` into it
+
+#### Scenario: Implement skill does not hop implementing while spec gate blocks
+
+- **WHEN** `packages/skills/templates/skills/specd-implement/SKILL.md.tpl` is inspected
+- **THEN** it does not unconditionally `transition implementing` from `ready`
+- **AND** it stops for human `approve spec` when the spec gate is on and no approval is recorded
+
+#### Scenario: Shared approvals copy is stay-in-state not reaches-pending
+
+- **WHEN** `packages/skills/templates/shared/shared.md.tpl` is inspected
+- **THEN** it still forbids the agent from running `changes approve`
+- **AND** it describes the wait as staying in `ready` or `done`
+- **AND** it does not teach that a change “reaches” `pending-spec-approval` as the happy-path wait
+
+#### Scenario: Shared hook list does not walk pending as happy-path intermediates
+
+- **WHEN** hook “states you pass through” guidance is inspected
+- **THEN** pending parking states are not listed as normal intermediates
+- **AND** drain from an already-pending change MAY still name those step ids
+
+#### Scenario: New-skill routing table treats pending as drain only
+
+- **WHEN** `packages/skills/templates/skills/specd-new/SKILL.md.tpl` `targetStep` table is inspected
+- **THEN** `pending-spec-approval` and `pending-signoff` rows are drain-only
+- **AND** they are not presented as the default wait for new work
+- **AND** they suggest the matching `approve` command while consent is missing and follow `nextAction` once it is recorded
+
+#### Scenario: Design skill stays in ready for spec gate
+
+- **WHEN** `packages/skills/templates/skills/specd-design/SKILL.md.tpl` is inspected
+- **THEN** with `approvals.spec` on it stays in `ready` and stops for human `approve spec`
+- **AND** it does not mention a `change transition` into `pending-spec-approval`
+
+#### Scenario: specd entry skill does not teach signoff
+
+- **WHEN** `packages/skills/templates/skills/specd/SKILL.md.tpl` is inspected
+- **THEN** it describes itself as a router that does not execute lifecycle phases
+- **AND** it does not mention signoff, `approve signoff`, or `pending-signoff`
+
+#### Scenario: specd-archive mentions in-place gates
+
+- **WHEN** `specd-archive/SKILL.md.tpl` is inspected
+- **THEN** it requires `archivable` or `archiving` and points signoff wait at `/specd-verify` in `done`
+- **AND** it does not mention `pending-signoff` or a `change transition` into it
+
+#### Scenario: Implement skill accepts pending-spec-approval after consent
+
+- **WHEN** `packages/skills/templates/skills/specd-implement/SKILL.md.tpl` state gate is inspected
+- **THEN** `pending-spec-approval` is accepted next to `spec-approved` as a drain entry state
+- **AND** with spec consent recorded it transitions to `implementing`
+- **AND** without consent it stops and redirects to human `approve spec` without transitioning
+
+#### Scenario: Shared template documents command null with guidance
+
+- **WHEN** `packages/skills/templates/shared/shared.md.tpl` `nextAction` documentation is inspected
+- **THEN** the "Next Action engine" section lists `targetStep`, `actionType`, `reason`, `intent`, `action`, `command`, and `guidance`
+- **AND** it states that an action without a command mapping yields `command: null` plus `guidance`, and that agents follow the guidance and never invent a command
+- **AND** a template contract test asserts these terms in the rendered shared template content
+
+### Requirement: Reconciled invalidation protocol in lifecycle templates
+
+#### Scenario: Generated skills teach the same verification ownership
+
+- **WHEN** source templates are built and synchronized
+- **THEN** shared, verify, compliance, and lifecycle copies describe standalone and delegated attempt ownership consistently
+- **AND** none instruct transitions or status to create successful evidence
+
+#### Scenario: Compliance without active change remains report-only
+
+- **WHEN** compliance runs in all, diff, PR, or single-spec mode without a concrete active change
+- **THEN** the generated instructions produce reports without verification start or complete commands
+
+#### Scenario: Template tests execute every delegated decision branch
+
+- **WHEN** template contract tests simulate delegated compliance
+- **THEN** status, project context, scope discovery, dependency expansion, spec-preview reads, report directory, and filename all select change-scoped behavior
+- **AND** the test verifies attempt ownership behavior rather than only matching command phrases
+
+### Requirement: Overlap invalidation vs live archive overlap in templates
+
+#### Scenario: Design implement verify and new do not list OVERLAP_CONFLICT as a typical blocker
+
+- **WHEN** `specd-design`, `specd-implement`, `specd-verify`, and `specd-new` templates are inspected
+- **THEN** they do not list `OVERLAP_CONFLICT` among typical status blockers
+- **AND** they do not teach `--skip-checks spec.overlap` (or `--allow-overlap`) as the response to `review.reason: spec-overlap-conflict`
+
+#### Scenario: Archive skill reserves OVERLAP_CONFLICT for live overlap
+
+- **WHEN** `specd-archive/SKILL.md.tpl` is inspected
+- **THEN** it MAY list `OVERLAP_CONFLICT` as a typical blocker
+- **AND** `--skip-checks spec.overlap` is only for live archive overlap, not invalidation review
+
+#### Scenario: Archive skill teaches the canonical check bypass
+
+- **WHEN** `specd-archive/SKILL.md.tpl` is inspected
+- **THEN** it teaches `--skip-checks <checkId>` as the canonical bypass, using the id shown by `specd changes status`
+- **AND** it presents `--allow-overlap` and `--allow-out-of-scope` only as aliases of `--skip-checks spec.overlap` and `--skip-checks impl.linksInScope`
+
+#### Scenario: Archive skill does not suggest bypassing a blocker without a flag
+
+- **WHEN** `specd-archive/SKILL.md.tpl` is inspected
+- **THEN** it tells the agent that a blocker whose status shows no bypass flag cannot be skipped
+- **AND** it names `workspace.readOnly`, `impl.filesResolved`, and `deps.consistent` as checks that are never bypassable on archive
+
+### Requirement: Implementation tracking in verify and implement templates
+
+#### Scenario: Shared documents implementation tracking commands
+
+- **WHEN** `packages/skills/templates/shared/shared.md.tpl` is inspected
+- **THEN** it documents `changes implementation list`, `resolve`, and `ignore`
+- **AND** it distinguishes resolve (in-scope) from ignore (not this change’s surface)
+- **AND** `add` prefers top-level symbols that realize the spec and forbids catch-all / variable links
+
+#### Scenario: Verify skill drains open files instead of bouncing to implement
+
+- **WHEN** `packages/skills/templates/skills/specd-verify/SKILL.md.tpl` is inspected
+- **THEN** it tells the agent to drain open tracked files when `IMPLEMENTATION_STATE` blocks `transition verifying`
+- **AND** it does not instruct redirecting to `/specd-implement` solely for open files
+- **AND** it points at `shared.md` rather than duplicating the command cookbook
+
+#### Scenario: Implement skill does not recommend verify while files are open
+
+- **WHEN** `packages/skills/templates/skills/specd-implement/SKILL.md.tpl` is inspected
+- **THEN** it requires zero open tracked files before telling the user to run `/specd-verify`
+- **AND** it uses `implementation list` (or equivalent) as that gate
+- **AND** it prefers top-level `--symbol` links that actually implement the spec (not variables or catch-all dumps)
+
+### Requirement: Archive skill skips only pre hooks
+
+#### Scenario: Archive uses --skip-hooks pre not all
+
+- **WHEN** `packages/skills/templates/skills/specd-archive/SKILL.md.tpl` is inspected
+- **THEN** `changes archive` examples use `--skip-hooks pre`
+- **AND** they do not use `--skip-hooks all`
+- **AND** after archive the skill does not call `run-hooks archiving --phase post`
+- **AND** it still fetches post `hook-instruction`
+
+### Requirement: Design skill review scope without review file lists
+
+#### Scenario: Design skill does not treat review header as a file list
+
+- **WHEN** `packages/skills/templates/skills/specd-design/SKILL.md.tpl` is inspected
+- **THEN** it does not say artifacts are listed under `review:`
+- **AND** it still uses `review: required: yes` as the review-mode trigger
+- **AND** first review scope is `artifacts (details):` and/or structured `affectedArtifacts`
+
 ### Requirement: Fast-track workflow template
 
 #### Scenario: Template renders literal scaffolding and verbatim design directives
@@ -287,3 +440,16 @@
 
 - **WHEN** the user has not explicitly invoked `/specd-fasttrack`
 - **THEN** the workflow directs work to normal specd lifecycle skills
+
+### Requirement: Fast-track Step 2 confirmation and dependents terminology
+
+#### Scenario: Step 2 pauses before formal artifacts
+
+- **WHEN** a rendered fast-track workflow reaches Step 2
+- **THEN** it asks the user to choose the next mode and stops before formal artifact creation
+
+#### Scenario: Blast-radius guidance names dependents
+
+- **WHEN** the template directs a graph impact search
+- **THEN** it uses `--direction dependents`
+- **AND** it does not call the search downstream

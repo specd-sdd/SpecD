@@ -8,21 +8,9 @@ Every spec workflow begins with a named change, so the system needs a single ent
 
 ### Requirement: Input contract
 
-`CreateChange.execute` SHALL accept a `CreateChangeInput` with the following fields:
+`CreateChange.execute` SHALL accept the existing name, description, spec IDs, optional paired schema override, and overlap-check fields, plus optional structured `invalidation` with `artifacts: none | surgical | downstream | global` and `workflow: preserve | redesign`.
 
-- `name` (string, required) — unique slug name for the change (kebab-case)
-- `description` (string, optional) — free-text description of the change's purpose
-- `specIds` (readonly string\[], required) — spec paths being created or modified; each entry is one whole spec ID, validated and normalized per "Spec ID validation"
-- `schemaName` (string, optional) — explicit schema name override
-- `schemaVersion` (number, optional) — explicit schema version override
-- `invalidationPolicy` (optional) — initial invalidation policy for the new change
-- `includeOverlapCheck` (boolean, optional) — when `true` and `specIds` is non-empty, run overlap detection after persistence and include the report on the result
-
-When `schemaName` and `schemaVersion` are both absent, the use case MUST resolve the project's active schema via `GetActiveSchema.execute()` (project mode) and derive `schemaName` and `schemaVersion` from the returned `Schema`.
-
-When both `schemaName` and `schemaVersion` are provided, the use case MUST use them directly without calling `GetActiveSchema`.
-
-Providing only one of `schemaName` or `schemaVersion` MUST be rejected before persistence (the use case throws a validation error).
+Each entry of `specIds` is one whole spec ID, validated and normalized per "Spec ID validation". When the schema override pair (`schemaName` and `schemaVersion`) is absent, the active schema is resolved through `GetActiveSchema`; supplying only one schema field MUST be rejected before persistence. The use case receives already resolved project policy defaults from its composition boundary and MUST NOT parse legacy config aliases itself.
 
 ### Requirement: Spec ID validation
 
@@ -56,18 +44,11 @@ When `includeOverlapCheck` is absent or `false`, or when `specIds` is empty, the
 
 ### Requirement: Initial invalidation policy
 
-CreateChange.execute SHALL accept the project-level default invalidation policy as input and persist it on the newly created change.
+`CreateChange` SHALL persist the effective structured invalidation policy in a new v2 manifest. Explicit input wins; otherwise the resolved project default is used. When neither supplies a value, the new-change default is `{ artifacts: downstream, workflow: preserve }`.
 
-The persisted initial value MUST be one of:
+Before persistence, the use case MUST reject any invalid `invalidation.artifacts` value (allowed: `none`, `surgical`, `downstream`, `global`) or `invalidation.workflow` value (allowed: `preserve`, `redesign`) with `InvalidInputError`, quoting the full original value and listing the allowed values, and it MUST create nothing. The check lives in the use case so that every delivery mechanism (CLI, MCP, SDK) enforces it; a host's type cast is not validation.
 
-- `none`
-- `surgical`
-- `downstream`
-- `global`
-
-Before persistence the use case MUST reject any other value with `InvalidInputError`, quoting the full original value and listing the allowed values, and it MUST create nothing. The check lives in the use case so that every delivery mechanism (CLI, MCP, SDK) enforces it; a host's type cast is not validation.
-
-This value becomes the change's default invalidation policy until a later EditChange operation overrides it.
+The created change MUST NOT persist the legacy scalar `invalidationPolicy`. The policy becomes the change-local default for later reconciliation and may be changed through `EditChange` without retroactively inventing drift or recovery.
 
 ### Requirement: Name uniqueness enforcement
 
@@ -98,10 +79,8 @@ When `CreateChange.execute` is called with spec IDs that already exist in a conf
 
 Seeding rules:
 
-- If the repository exposes persisted dependency state for the spec via `readPersistedDependsOn(spec)`, that value MUST be used.
-- Otherwise, if canonical `metadata.json.dependsOn` exists for the spec, that value MUST be used as the legacy fallback even when the persisted metadata file is stale.
-- Otherwise, the seeded value is an empty array.
-- Specs that do not yet exist in the repository do not require a seeded dependency entry at creation time.
+- If the spec's repository returns persisted state through `readPersistedState(spec)` (the `spec-lock.json` state), its `dependsOn` MUST be used. No fallback to `metadata.json.dependsOn` exists.
+- If the workspace is unknown, the spec does not exist in its repository, or the repository has no persisted state for it, no `specDependsOn` entry is seeded at creation time.
 
 This ensures a change created against existing specs starts from the current persisted dependency snapshot without depending on raw sidecar filenames or generic artifact reads.
 
@@ -117,27 +96,15 @@ The return type is `{ change: Change; changePath: string; overlapReport?: Overla
 
 ### Requirement: Dependencies
 
-`CreateChange` depends on the following ports and use cases injected via constructor:
+`CreateChange` SHALL receive `ChangeRepository`, `ListWorkspaces`, `ActorResolver`, `GetActiveSchema`, optional `DetectOverlap`, and a resolved structured `defaultInvalidation` policy through its constructor/dependency object. The workspace orchestrator supplies spec existence and persisted dependency views; schema resolution and optional overlap detection retain their existing use-case ownership.
 
-- `ChangeRepository` — for existence checks, persistence, and scaffolding
-- `ListWorkspaces` — orchestrated workspace map for spec existence checks and persisted dependency seeding
-- `ActorResolver` — for resolving the current actor identity
-- `GetActiveSchema` — for resolving the project's active schema when `schemaName` / `schemaVersion` are not provided on input
-- `DetectOverlap` — for optional post-create overlap detection when `includeOverlapCheck` is `true`
+Explicit `execute` input policy takes precedence over the injected default. If neither exists, the native `{ artifacts: downstream, workflow: preserve }` default applies. No application or CLI caller may silently substitute the native default when config-based composition supplied a different project default.
 
 ### Requirement: Config-based factory delegates through resolveCreateChangeDeps
 
-The config-based `createCreateChange(config, options?)` form MUST derive `CreateChangeDeps` through `resolveCreateChangeDeps(resolver)` and then delegate to canonical `createCreateChange(deps)`.
+The config-based `createCreateChange(config, options?)` form MUST obtain `CreateChangeDeps` through `resolveCreateChangeDeps(resolver)` and delegate to canonical `createCreateChange(deps)`. The resolver MUST supply `changes`, `listWorkspaces`, `actor`, `getActiveSchema`, optional `detectOverlap`, and the effective project `defaultInvalidation` derived from the resolved configuration, including legacy alias adaptation.
 
-`resolveCreateChangeDeps(resolver)` MUST resolve:
-
-- `changes: ChangeRepository`
-- `listWorkspaces: ListWorkspaces`
-- `actor: ActorResolver`
-- `getActiveSchema: GetActiveSchema`
-- `detectOverlap: DetectOverlap`
-
-The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+`Kernel.changes.create` MUST use the same resolver path. With omitted input policy, config-based factory and kernel creation MUST persist the project default rather than falling back to the native default. Explicit input policy still wins. The factory MUST NOT rebuild filesystem wiring or depend on CLI preprocessing to satisfy this behavior.
 
 ## Constraints
 

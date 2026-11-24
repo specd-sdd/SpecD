@@ -1,0 +1,39 @@
+- op: modified
+  description: 'Legacy parking state records consent and stays'
+  selector:
+    type: section
+    matches: 'Scenario: Enabled gate allows execute with name and reason'
+  content: |
+    - **GIVEN** `ApproveSpec` is constructed with `approvals.spec: true`
+    - **GIVEN** the change is in `pending-spec-approval` state
+    - **WHEN** `execute({ name, reason })` is called
+    - **THEN** a valid spec approval is recorded
+    - **AND** the change remains in `pending-spec-approval`
+
+- op: added
+  description: 'Eligible states are read from the approval.spec bindings'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Approval recording and state transition'
+  content: |
+    #### Scenario: Eligible states come from the check bindings
+
+    - **GIVEN** `approval.spec` is bound as a transition source from `ready`, `pending-spec-approval`, and `spec-approved`
+    - **WHEN** `ApproveSpec` decides whether the current state accepts consent
+    - **THEN** the decision uses the binding `from` states of `approval.spec`
+    - **AND** a change in any other state fails with `InvalidStateTransitionError`
+
+    #### Scenario: Consent in a parking state never transitions
+
+    - **GIVEN** a historic change in `spec-approved` with no recorded approval and an eligible artifact fingerprint
+    - **WHEN** approval is recorded
+    - **THEN** the approval is recorded
+    - **AND** no `transitioned` event is appended and the state is still `spec-approved`
+
+    #### Scenario: Stale consent in a parking state is recovered before it is renewed
+
+    - **GIVEN** a historic change in `spec-approved` with a stale approval
+    - **WHEN** `ApproveSpec` runs
+    - **THEN** the reconciler first commits the return to `designing`
+    - **AND** the request fails with `InvalidStateTransitionError` until the change is back in `ready`

@@ -10,7 +10,7 @@
 
 `FsChangeRepository` SHALL accept:
 
-1. `context: ChangeRepositoryConfig` containing workspace metadata (`workspace`, `ownership`, `isExternal`, `configPath`), core runtime callbacks (`activeSchema`, `resolveArtifactTypes`, `resolveSpecExists`), and external paths (`draftsPath`, `discardedPath`).
+1. `context: ChangeRepositoryConfig` containing workspace metadata (`workspace`, `ownership`, `isExternal`, `configPath`), core runtime callbacks (`resolveArtifactTypes`, `resolveSpecExists`), and external paths (`draftsPath`, `discardedPath`).
 2. `config: FsChangeRepositoryConfig` containing filesystem configuration options (`path`) for the active changes storage.
 
 It MUST validate the `config` parameter using a Zod schema to ensure that only configuration properties originating from `specd.yaml` for this storage are validated, and that no runtime dependencies, external paths, or workspace context properties are included in the configuration schema.
@@ -92,6 +92,14 @@ After an internal manifest write (`create` or the helper used by `mutate` / `mut
 
 After the successful internal manifest write inside `mutate` or `mutateDraft`, `FsChangeRepository` MUST re-enter the same load/reconcile path used by `get` / `_manifestToChange` (with artifact types resolved when available) for the change's post-write storage bucket. If that path marks the in-memory manifest as needing persistence (including `artifact-drift` invalidation), the repository MUST persist again before releasing the change lock and MUST return that reconciled `Change` as `.change` in `{ result, change }`.
 
+### Requirement: Artifact types come from the change's own schema
+
+The `resolveArtifactTypes` runtime callback in `ChangeRepositoryConfig` SHALL accept the change being loaded or saved (at least its recorded `schemaName`) and SHALL return the artifact types of that change's sovereign schema, resolved through `ResolveChangeSchema`. Every load, save, and post-write reconcile path (`get`, `_manifestToChange`, `mutate`, `mutateDraft`, `create`) that synchronizes a change's artifact map SHALL use the artifact types of that change's recorded schema.
+
+The repository and its composition MUST NOT resolve artifact types from the workspace default schema (`config.schemaRef`) for an existing change. When the change's schema cannot be resolved, the repository SHALL NOT rewrite the change's artifact map from any other schema; it SHALL skip artifact synchronization for that load and leave the persisted artifact map unchanged.
+
+The repository MUST NOT compare a change's recorded schema version with the workspace default or emit a warning about such a difference; version advisories belong exclusively to `ResolveChangeSchema`.
+
 ### Requirement: saveArtifact requires mutate window and does not touch Change
 
 `FsChangeRepository.saveArtifact` MUST verify the change name is present in the repository's active or draft mutation-in-progress tracking sets. If not, it MUST reject without writing.
@@ -116,3 +124,4 @@ A directory move that fails with `EPERM` or `EXDEV` MUST fall back to copy. A re
 - [`core:storage`](../storage/spec.md) — fs-cache layout, tmp gitignore, and index wire shapes
 - [`core:change-list-entry`](../change-list-entry/spec.md) — list entry projection shapes
 - [`core:change-repository-port`](../change-repository-port/spec.md) — list/count/reindex port contract
+- [`core:resolve-change-schema`](../resolve-change-schema/spec.md) — sovereign change schema lookup, identity integrity, and version advisory

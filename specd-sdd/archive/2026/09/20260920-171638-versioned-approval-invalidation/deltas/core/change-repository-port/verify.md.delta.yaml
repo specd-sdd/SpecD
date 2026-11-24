@@ -1,0 +1,80 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Auto-invalidation on get when artifact files drift$'
+  rename: 'Requirement: Hydration reports fresh file facts without deciding validity'
+  content: |
+    Scenarios:
+
+    #### Scenario: Plain hydration has no validity side effects
+
+    - **GIVEN** external artifact or implementation content differs from persisted evidence
+    - **WHEN** the repository loads the change without reconciliation
+    - **THEN** it exposes fresh file facts without invalidating projections or changing lifecycle state
+
+    #### Scenario: Missing implementation input is reported as a fact
+
+    - **WHEN** a confirmed implementation path cannot be read during hydration
+    - **THEN** the missing input is exposed explicitly and never omitted from later validity evaluation
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: mutate serializes persisted change updates$'
+  content: |
+    ### Requirement: Version-aware atomic reconciliation persistence
+
+    #### Scenario: Reconciliation commits one coherent v2 mutation
+
+    - **GIVEN** a supported legacy change whose fresh inputs invalidate approval evidence
+    - **WHEN** an application operation reconciles it through `mutate`
+    - **THEN** projection changes, audit events, policy, and required recovery are persisted atomically as v2
+    - **AND** a later failed operation does not undo that recovery
+
+    #### Scenario: Future manifest is rejected before hydration
+
+    - **WHEN** the repository reads a manifest with a newer unsupported version
+    - **THEN** it raises the typed manifest-version error without adapting or rewriting it
+
+- op: modified
+  description: 'A callback file write yields fresh returned facts but no repository-owned validity write'
+  selector:
+    type: section
+    matches: '^Scenario: Post-save reconcile detects disk drift from saveArtifact inside callback$'
+  rename: 'Scenario: Post-save hydration exposes disk drift without an automatic validity commit'
+  content: |
+    - **GIVEN** a validated complete artifact file with a stored `validatedHash`
+    - **AND** the `mutate` callback calls `saveArtifact` with different content without materializing validity
+    - **WHEN** `mutate` completes
+    - **THEN** returned `.change` exposes the fresh drift classification
+    - **AND** the persisted manifest contains no new approval invalidation, recovery, or drift event from repository hydration alone
+    - **AND** an explicit application reconciliation can subsequently materialize the drift exactly once
+
+- op: modified
+  description: 'Name the returned aggregate as post-save hydrated, not implicitly reconciled'
+  selector:
+    type: section
+    matches: '^Scenario: mutate returns result and post-reconcile change$'
+  rename: 'Scenario: mutate returns result and post-save hydrated change'
+  content: |
+    - **GIVEN** `fn` returns `"ok"`
+    - **WHEN** `mutate(name, fn)` completes successfully
+    - **THEN** the result is `{ result: "ok", change }`
+    - **AND** `change` is the post-save hydrated aggregate, not necessarily the callback object
+    - **AND** its fresh physical classification does not imply persisted validity recovery
+
+- op: modified
+  description: 'Clarify drafted result is reloaded without validity side effects'
+  selector:
+    type: section
+    matches: '^Scenario: mutateDraft returns result and post-reconcile change$'
+  rename: 'Scenario: mutateDraft returns result and post-save hydrated change'
+  content: |
+    - **GIVEN** `fn` returns `undefined`
+    - **WHEN** `mutateDraft(name, fn)` completes after a restore transition
+    - **THEN** the result is `{ result: undefined, change }` loaded from the destination bucket
+    - **AND** the reload appends no new validity or lifecycle event

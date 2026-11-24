@@ -8,40 +8,62 @@ Once a change has completed its full lifecycle, its spec modifications need to b
 
 ### Requirement: Ports and constructor
 
-`ArchiveChange` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `ArchiveRepository`, `RunStepHooks`, `ActorResolver`, `ArtifactParserRegistry`, `ExtractorTransformRegistry`, `SchemaProvider`, `RegenerateSpecMetadata`, and `SpecWorkspaceRoute[]`.
+`ArchiveChange` receives at construction time: `ChangeRepository`, `ListWorkspaces`, `ArchiveRepository`, `archiveBindings` (`readonly CheckBinding[]`, the base bindings), `ActorResolver`, `ArtifactParserRegistry`, `SchemaProvider`, `MaterializeSpecMetadata`, `ExtractorTransformRegistry`, `SpecWorkspaceRoute[]`, project root, `ArchiveBatchSnapshotPort`, `ContentHasher`, `ReconcileChangeValidity`, an optional `ResolveChangeSchema`, an optional `CheckRegistry`, optional `transitionBindings` (`readonly CheckBinding[]`), and optional baked `approvals` (`{ spec, signoff }`) as the last parameters.
 
 ```typescript
 class ArchiveChange {
   constructor(
     changes: ChangeRepository,
-    specs: ReadonlyMap<string, SpecRepository>,
+    listWorkspaces: ListWorkspaces,
     archive: ArchiveRepository,
-    runStepHooks: RunStepHooks,
+    archiveBindings: readonly CheckBinding[],
     actor: ActorResolver,
     parsers: ArtifactParserRegistry,
-    extractorTransforms: ExtractorTransformRegistry,
     schemaProvider: SchemaProvider,
-    regenerateMetadata: RegenerateSpecMetadata,
-    workspaceRoutes: readonly SpecWorkspaceRoute[],
+    materializeMetadata: MaterializeSpecMetadata,
+    extractorTransforms?: ExtractorTransformRegistry,
+    workspaceRoutes?: readonly SpecWorkspaceRoute[],
+    projectRoot?: string,
+    batchSnapshot?: ArchiveBatchSnapshotPort,
+    hasher: ContentHasher | undefined,
+    reconcile: ReconcileChangeValidity,
+    resolveChangeSchema?: ResolveChangeSchema,
+    checkRegistry?: CheckRegistry,
+    transitionBindings?: readonly CheckBinding[],
+    approvals?: { readonly spec: boolean; readonly signoff: boolean },
   )
 }
 ```
 
-Hook execution is delegated to `RunStepHooks` — `ArchiveChange` does not receive `HookRunner` or `projectWorkflowHooks` directly.
+It MUST NOT take `RunStepHooks`. Hook `run:` I/O is inside `createHookPre` / `createHookPost` on the injected binding table. `ArchiveChange` does not receive `HookRunner` or `projectWorkflowHooks` directly.
 
-`SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.
+`transitionBindings` and `approvals` are used to evaluate the forward checks of the committed state when building committed-recovery guidance. `transitionBindings` defaults to the empty list when omitted, in which case no forward check is evaluated and guidance carries only lifecycle intent; composition always supplies the real application bindings. `approvals` defaults to both gates off.
 
-`specs` is keyed by workspace name. A change may touch specs in multiple workspaces (e.g. `default` and `billing`); `ArchiveChange` looks up the `SpecRepository` for each spec ID's workspace before reading the base spec or writing the merged result. The bootstrap layer constructs and passes all workspace repositories.
+`SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). All are injected at kernel composition time, not passed per invocation.
 
-`ArtifactParserRegistry` is a map from format name (`'markdown'`, `'json'`, `'yaml'`, `'plaintext'`) to the corresponding `ArtifactParser` adapter. `ArchiveChange` uses it to look up the correct adapter when applying delta files to base artifacts. The bootstrap layer constructs it and injects it here — `ArchiveChange` does not instantiate parsers directly.
+Workspace lookup uses `ListWorkspaces`, not a `ReadonlyMap` of `SpecRepository` on the use case. A change may touch specs in multiple workspaces; `ArchiveChange` looks up the `SpecRepository` for each spec ID's workspace before reading the base spec or writing the merged result.
 
-`ExtractorTransformRegistry` is the shared runtime registry for metadata extraction transforms. `ArchiveChange` uses it during the pre-publication metadata-consistency pass that runs `extractMetadata(...)` over the prepared merged artifact content before canonical publication, and when resolving initial dependencies for a lock-less spec via the shared `resolveInitialPersistedDependsOn()` service (also used by `InitializePersistedSpecState`).
+`ArtifactParserRegistry` is a map from format name (`'markdown'`, `'json'`, `'yaml'`, `'plaintext'`) to the corresponding `ArtifactParser` adapter. `ArchiveChange` uses it to look up the correct adapter when applying delta files to base artifacts. The bootstrap layer constructs it and injects it here - `ArchiveChange` does not instantiate parsers directly.
 
-`SpecWorkspaceRoute[]` provides the workspace-routing metadata needed to build transform contexts for extraction operations that resolve spec references across workspace boundaries. `ArchiveChange` receives those routes at construction time so its pre-publication extraction pass uses the same routing model as other metadata-extraction callers.
+`ExtractorTransformRegistry` is the shared runtime registry for metadata extraction transforms. `ArchiveChange` uses it during the pre-publication metadata-consistency pass that runs `extractMetadata(...)` over the prepared merged artifact content before canonical publication.
+
+`ContentHasher` is injected so lock-less on-disk initial `dependsOn` resolution can call `resolveInitialPersistedDependsOn()`. That service is invoked only when there is no `spec-lock.json`, the spec already exists in canonical storage, and `change.specDependsOn` has no snapshot for that spec. New specs (`SpecRepository.get` returns null) MUST NOT call the service - there is no canonical artifact to read. `explicitDependsOn` MUST NOT be used as a passthrough for the publication plan - when `change.specDependsOn` is present it is applied directly.
+
+Merge extraction is the `deps.consistent` guard against the sealed set. It MUST NOT replace a lock or an on-disk `resolveInitialPersistedDependsOn()` result. For a brand-new spec with no publication-plan snapshot, merge-extract IS the initial sealed set (or `[]` when extract yields nothing). Cached `metadata.json` MUST NOT be a fallback source for the sealed set.
+
+`SpecWorkspaceRoute[]` provides the workspace-routing metadata needed to build transform contexts for extraction operations that resolve spec references across workspace boundaries.
 
 `ChangeRepository` is used both for loading and persisting the change being archived and for listing all active changes during the overlap check.
 
-`RegenerateSpecMetadata` replaces the previous direct `GenerateSpecMetadata` + `SaveSpecMetadata` pair. `ArchiveChange` no longer generates or persists `metadata.json` itself — it delegates forced, post-commit regeneration to `RegenerateSpecMetadata` (see Requirement: Spec metadata generation).
+`MaterializeSpecMetadata` is the post-commit metadata materialization port (see Requirement: Spec metadata generation).
+
+`CheckRegistry` is the registry that composition hands to the use cases. `ArchiveChange` uses it to resolve effective archive bindings (governance defaults and schema-embedded checks) and to validate `skipChecks` (see Requirement: Effective archive bindings and skip validation). It is optional: without it, schema-embedded checks cannot be synthesized and only ids bound to the archive operation are recognized.
+
+### Requirement: Archive bindings not RunStepHooks on the use case
+
+`ArchiveChange` MUST accept injected `archiveBindings` (application `create*` checks from the registry). These are the **base** bindings: the use case MUST NOT execute them directly, but only through the effective bindings it resolves on every run (see Requirement: Effective archive bindings and skip validation). It MUST NOT take `RunStepHooks` as a constructor argument. There is no ctor fallback that builds default bindings from `RunStepHooks`. `RunStepHooks` SHALL be a constructor dep of `createHookPre` / `createHookPost` only (composition registry).
+
+`resolveArchiveChangeDeps` MUST include `archiveBindings`, the executable `checkRegistry`, `transitionBindings` (all from `resolveWorkflowCheckRegistry`), `approvals` (from config), the mandatory `reconcile`, and `resolveChangeSchema`, and MUST NOT list `runStepHooks` on `ArchiveChangeDeps`. `ListWorkspaces` remains the workspace lookup port (not a `ReadonlyMap` of spec repositories on the use case).
 
 ### Requirement: Input
 
@@ -49,11 +71,15 @@ Hook execution is delegated to `RunStepHooks` — `ArchiveChange` does not recei
 
 - `name` — the change name to archive
 - `skipHookPhases` (ReadonlySet<ArchiveHookPhaseSelector>, optional, default empty set) — which archive hook phases to skip. Valid values: `'pre'`, `'post'`, `'all'`. When `'all'` is in the set, all archive hook execution is skipped. When the set is empty (default), both phases execute.
-- `allowOverlap` (boolean, optional, default `false`) — when `true`, the use case skips the overlap check and permits archiving even when other active changes target the same specs
+- `skipChecks` (readonly string\[], optional, default empty) — canonical ids of archive checks to bypass (for example `spec.overlap` or `impl.linksInScope`). Each id MUST be accepted by the validation in Requirement: Effective archive bindings and skip validation.
 
-### Requirement: Schema name guard
+The use case MUST NOT accept ad-hoc bypass booleans such as `allowOverlap` or `allowOutOfScope`. Every bypass is supplied uniformly through `skipChecks`, as in `TransitionChange`; delivery mechanisms (for example CLI flags) translate their own aliases into check ids before calling the use case. Bypassing `impl.linksInScope` MUST NOT bypass `impl.filesResolved`.
 
-After obtaining the schema from `SchemaProvider`, `ArchiveChange` must compare `schema.name()` with `change.schemaName`. If they differ, it must throw `SchemaMismatchError`. This must happen before the archivable guard, any hooks, or file modifications.
+### Requirement: Sovereign schema resolution
+
+`ArchiveChange` MUST obtain the schema for the change through `ResolveChangeSchema`. The change's recorded schema is the sovereign authority governing its artifact types, verification requirement, pre-publication metadata extraction and sidecar consistency checks, and archive hooks. Post-commit `metadata.json` regeneration operates on canonical project specs after the change has been published and is a project-level operation outside this boundary. A different workspace default MUST remain irrelevant. General resolution failures and `SchemaProviderIdentityMismatchError` MUST propagate before archive preflight, hooks, or commit work begins.
+
+The host MUST NOT `list()` / `get()` other active changes before predicates return. Overlap peer loading MAY run after a failed `spec.overlap` check or when `spec.overlap` is bypassed and invalidation is required.
 
 ### Requirement: ArchivedChange construction
 
@@ -61,11 +87,27 @@ The use case MUST call `ArchiveRepository.archive(change, { actor })` to move th
 
 ### Requirement: Archivable guard
 
-After the schema name guard, `ArchiveChange.execute()` MUST verify the change is archivable without yet transitioning lifecycle state.
+After the state guard (which precedes the archive predicates, including `schema.nameMatch`), `ArchiveChange.execute()` MUST evaluate `archive.archivable`: the change is archivable without yet transitioning lifecycle state.
 
-The use case MUST call `change.assertArchivable()` on the loaded change. If the change is not in `archivable` or `archiving` state, it MUST throw `InvalidStateTransitionError` and abort before any hooks, snapshots, or file modifications.
+The use case MUST verify that the reconciled change is in `archivable` or `archiving`: an inline state check after reconciliation, and `change.assertArchivable()` inside the serialized mutation. If the change is not in `archivable` or `archiving` state, it MUST throw `InvalidStateTransitionError` and abort before any hooks, snapshots, or file modifications.
 
 This guard MAY run outside `ChangeRepository.mutate` when no lifecycle mutation is required. When the change is already in `archiving` from a prior failed commit, `assertArchivable()` MUST still pass so a retry can proceed.
+
+Archive is **not** a lifecycle `from → to` evaluation. `approval.signoff` MUST NOT be bound to this operation.
+
+### Requirement: Canonical validity archive preflight
+
+After pre-archive hooks and before permanent writes, `ArchiveChange` SHALL refresh implementation tracking, run the single application reconciler against fresh artifact and implementation files, rerun live predicates and task counting, and only then construct the publication plan, preflight snapshot, spec-lock sidecars, and canonical write batch. The accepted verdict and the publication plan MUST describe the same post-hook snapshot.
+
+The reconciler is a mandatory dependency in every constructor and factory form. Missing explicit dependencies MUST fail through the standard composition-configuration error. `ArchiveChange` MUST NOT call `Change.invalidate` or another legacy mutation path as a fallback.
+
+Archive SHALL fail when required approval is absent, stale, or revoked; verification is required (per `core:change` "Verification requirement follows workflow topology") and is absent, legacy-unknown, or stale; any non-task artifact has unresolved drift or pending review; or a required task artifact is missing, unreadable, structurally invalid, or contains incomplete tasks. When the change schema disables `verifying`, the `verification.current` archive predicate and the post-hook validity re-check SHALL NOT block archive for missing verification evidence.
+
+If reconciliation commits a mandatory return to `designing` or `done`, archive SHALL stop and return a typed application diagnostic containing the committed state, automatic return, canonical blockers, and next action. The next action MUST be projected by `evaluateLifecycle` over the committed state with the same forward-candidate check evaluation used by `TransitionChange` and `InvalidateChange` (never hard-coded in the use case), so a disabled `verifying` step never routes to `verify` and a failing gate check contributes its declared `action`. It MUST NOT reduce recovery to a generic invalid-state error. Missing or stale verification recommends renewing evidence in the current state; it does not force a transition to `verifying`. A failed archive MUST NOT undo committed gate recovery.
+
+After the post-hook reconcile, if the resulting validity still blocks archive, `ArchiveChange` MUST first re-run the archive predicates. A stale or absent verification then surfaces as `CheckPredicateFailedError` for `verification.current` carrying the check-declared `start-verification` action (never a generic invalid-state error). A blocked validity that no failing predicate explains (for example a pending artifact review) MUST throw `InvalidStateTransitionError` from the current state to `archiving`; `ReconciledOperationBlockedError` is reserved for a recovery that reconciliation actually committed.
+
+Task artifacts remain excluded from approval fingerprints, but archive MUST live-count them again so tasks added after approval or verification cannot bypass completion.
 
 ### Requirement: Deferred transition to archiving
 
@@ -82,44 +124,41 @@ Overlap guard, readOnly guard, pre-archive hooks, and preflight MUST complete wh
 
 ### Requirement: ReadOnly workspace guard
 
-After the archivable guard passes and before canonical snapshots or publication, `ArchiveChange` MUST check every spec ID in `change.specIds` against the `SpecRepository` map. For each spec ID, it MUST look up the corresponding `SpecRepository` by workspace name and check `repository.ownership()`.
+After the archivable guard passes and before canonical snapshots or publication, `ArchiveChange` MUST evaluate `workspace.readOnly` with the **same runner** used when entering `ready` (`to = ready`, `from = *`, `along = any`). For each spec ID in `change.specIds`, look up the corresponding `SpecRepository` by workspace name and check `repository.ownership()`.
 
-If any spec belongs to a workspace with `readOnly` ownership, `ArchiveChange` MUST throw `ReadOnlyWorkspaceError` with a message listing all affected specs and their workspaces. The error message format:
+If any spec belongs to a workspace with `readOnly` ownership, `workspace.readOnly` MUST fail and `ArchiveChange` MUST throw `CheckPredicateFailedError` for that check. The check MUST emit every affected spec in `details.specs` (each `{ specId, workspace }`) and a host-neutral `message` listing all affected specs and their workspaces in this format:
 
 ```text
-Cannot archive change "<name>" — it contains specs from readOnly workspaces:
+Change "<name>" contains specs from readOnly workspaces:
 
   - <specId>  →  workspace "<workspace>" (readOnly)
 
-Archiving would write deltas into protected specs.
+Writing deltas into protected specs is not allowed.
 ```
 
-This check MUST occur before any hooks execute or any spec files are written. The change MUST remain in `archivable` when this guard throws.
+This check MUST occur before any hooks execute or any spec files are written. The change MUST remain in `archivable` when this guard throws. Enter-`ready` MUST fail with the same runner so archive is not the first place the operator learns about a readOnly spec.
+
+On operation `archive` the `workspace.readOnly` binding is fully locked: a schema MUST NOT disable it or make it skippable, and any attempt to bypass it through `skipChecks` MUST fail with `CheckNotSkippableError`. It is a security boundary that no declaration or flag can cross.
 
 ### Requirement: Overlap guard
 
-After the archivable guard passes and before pre-archive hooks execute, `ArchiveChange` MUST check for spec overlap with other active changes and handle invalidation when `allowOverlap` is `true`. The change MUST still be in `archivable` during this check.
+After the archivable guard passes and before pre-archive hooks execute, `ArchiveChange` MUST evaluate `spec.overlap` while the subject change remains `archivable`. Overlap is archive-only and MUST NOT become an enter-`ready` predicate.
 
-The check MUST:
+The check MUST list active changes, exclude the change being archived by name, call `detectSpecOverlap` with the remaining changes and subject, and retain only report entries involving the subject. When overlap exists and `spec.overlap` is not bypassed (not in the effective `skipChecks`), the check MUST fail with every retained entry in `details.entries` (each naming the overlapping spec and the peer changes), and `ArchiveChange` MUST throw `CheckPredicateFailedError` for it before any publication. Without overlap, archive proceeds regardless of the bypass.
 
-1. Call `ChangeRepository.list()` to retrieve all active changes
-2. Exclude the change being archived from the list
-3. Call the `detectSpecOverlap` domain service with the remaining changes plus the change being archived
-4. Filter the result to entries where the change being archived participates
+When overlap exists and `spec.overlap` is bypassed (`skipChecks` contains `spec.overlap`), each affected peer MUST receive a `spec-overlap-conflict` reconciliation intent through the single application reconciler. The peer's configured artifact and workflow policies and any mandatory gate recovery determine its persisted review state and lifecycle target; overlap alone MUST NOT unconditionally move every peer to `designing`. Peer invalidation and the resulting audit evidence MUST be committed atomically per peer. `ArchiveChange` MUST NOT call broad `Change.invalidate` directly. Peer invalidation runs immediately after the first predicate pass succeeds, before pre-archive hooks, the post-hook validity re-check and predicate rerun, and publication preflight; if the archive aborts at one of those later stages, the affected peers remain invalidated.
 
-**When `allowOverlap` is `false`:** If the filtered report has overlap, `ArchiveChange` MUST throw `SpecOverlapError` with the overlap entries. The error message MUST list the overlapping spec IDs and the names of the other changes targeting them.
+A schema MAY disable `spec.overlap` or make it non-skippable through `archiveChecks`. When it is disabled the check is not evaluated, no overlap scan runs, and no peer is invalidated. When it is non-skippable, bypassing it MUST fail with `CheckNotSkippableError`.
 
-**When `allowOverlap` is `true`:** If the filtered report has overlap, `ArchiveChange` MUST invalidate each overlapping change as defined in the existing overlap invalidation rules.
-
-If the filtered report has no overlap, the archive proceeds normally regardless of the `allowOverlap` flag.
+The `CheckPredicateFailedError` for `spec.overlap` names each overlapping spec and the peer changes in its `message` and `details.entries`, and exposes `skippable` (whether the resolved `spec.overlap` binding can be bypassed). Its message MUST NOT contain delivery-specific flags: hosts compose their own bypass hint from `skippable`.
 
 ### Requirement: Pre-archive hooks
 
-After the archivable guard passes and while the change is still in `archivable`, when `'all'` and `'pre'` are both absent from `skipHookPhases`, `ArchiveChange` must execute pre-archive hooks by delegating to `RunStepHooks.execute({ name, step: 'archiving', phase: 'pre' })`.
+After archive predicates that must precede effects pass, and while the change is still in `archivable`, `ArchiveChange` MUST execute operation-`archive` **effects** whose binding `phase` is `before-persist` (when `'all'` and `'pre'` are both absent from `skipHookPhases`). Selection MUST use the binding table, not `check.id === 'hook.pre'`. Failure MUST follow each binding’s `onFailure` (`hook.pre` is `abort`).
 
-If any pre-archive `run:` hook fails, `ArchiveChange` must throw `HookFailedError` with the hook command, exit code, and stderr. No lifecycle transition to `archiving`, no canonical snapshots, and no spec files are modified before a failed pre-archive hook.
+If a `before-persist` archive effect with `onFailure = abort` fails, `ArchiveChange` MUST throw `HookFailedError` with the hook command, exit code, and stderr. No lifecycle transition to `archiving`, no canonical snapshots, and no spec files are modified.
 
-When `'all'` or `'pre'` is in `skipHookPhases`, pre-archive hook execution is skipped entirely.
+When `'all'` or `'pre'` is in `skipHookPhases`, those effects are skipped. Skipping hook phases skips effects only, never archive predicates.
 
 ### Requirement: Tracked artifact selection at archive time
 
@@ -212,14 +251,15 @@ When batch restore does not complete successfully, the change MUST remain in `ar
 
 **Pre-commit (`ArchiveChange`):**
 
-- archivable guard pass — change name and current state
 - overlap and readOnly guard outcomes — spec IDs checked; overlap entries or readOnly workspaces when relevant
 - pre-archive hooks — start and completion (step, phase, skipped phases)
 - prepare-plan construction — publication count, stale specs, out-of-scope implementation counts
 - full-batch preflight completion — publication count
-- orphan backup detection — per spec: none found, matching orphan auto-restored, or foreign orphan abort
+- preflight failure — logged with a distinct message for plan preparation versus full-batch preflight and a `phase` field (`plan` or `preflight`); the log carries the failing `specId` and error message and MUST NOT hardcode an error `code` that may not describe the actual failure
+- orphan backup detection — the outcome is logged in every case, per spec: `none-found` (manifest absent), `unreadable` (manifest present but unreadable for another reason such as permissions; the archive aborts with `ArchiveOrphanBackupError` whose message states that the manifest cannot be read, because the orphan state cannot be determined and a valid backup could otherwise be overwritten by the new snapshot), `skipped-unknown-workspace` (the workspace of the spec is unknown), matching orphan auto-restored, foreign orphan abort, or corrupt manifest abort. A manifest whose content is not a JSON object, or that has no string `changeName`, is a corrupt manifest: it aborts with `ArchiveOrphanBackupError` whose `foreignChangeName` is `false` and whose message states that the manifest is corrupt and the abort is logged before the error is thrown; it MUST NOT be classified as a foreign backup and the error message MUST NOT contain `undefined`
 - batch snapshot — start and completion per spec (`specId`, `specDirExisted`, `existingFiles` count)
 - deferred transition to `archiving` — change name and actor identity
+- before-persist effects — start per binding, and completion only when the effect completed without a fatal (fail-fast) failure; a fatal failure MUST NOT be followed by a completion log
 - tracked artifact selection per spec-scoped artifact — direct vs delta-backed
 
 **Commit phase:**
@@ -232,9 +272,11 @@ When batch restore does not complete successfully, the change MUST remain in `ar
 **Recovery phase:**
 
 - commit failure — failure step, `commitStarted`, and error message summary
-- batch restore start and completion — reverse publish order, `restoredSpecIds`, `failedSpecIds`
+- batch restore start, per-spec failure and completion — reverse publish order, `restoredSpecIds`, `failedSpecIds`
 - lifecycle rollback to `archivable` when restore succeeds
 - partial restore — change remains in `archiving`; log lists specs that failed restore
+
+Every log emitted by the batch snapshot adapter for restore start, restore per-spec failure, restore completion, backup cleanup and recorded created files MUST carry the change name. The restore start, per-spec failure and completion logs and the cleanup log take it from the explicit `changeName` argument of `restoreBatch` and `cleanup`; the created-file log takes it from the batch manifest.
 
 **Post-commit:**
 
@@ -268,6 +310,12 @@ For markdown artifacts, the merge output must preserve inline formatting and lis
 
 When the base markdown uses mixed style markers for the same construct (for example both `-` and `*` bullets, or both `*` and `_` for emphasis/strong), archive-time serialization must be deterministic and follow project markdown conventions configured for lint consistency.
 
+### Requirement: Versioned validity evidence preservation
+
+The archived manifest SHALL retain `manifestVersion`, structured invalidation policy, materialized approval and verification projections, artifact and implementation fingerprints with algorithm identifiers, and the complete append-only history. Archive inspection of a legacy manifest is read-only; it MUST NOT rewrite solely to migrate format.
+
+An active legacy change whose verification or required sign-off freshness cannot be proven MUST repeat the relevant operation before archive. Existing archived legacy records remain readable historical evidence and are not retroactively repaired from current files.
+
 ### Requirement: Archive repository call
 
 After all canonical publications succeed, `ArchiveChange` MUST resolve the actor via `ActorResolver.identity()` before calling `archiveRepository.archive()`. If `identity()` throws or cannot provide an actor, the archive MUST fail and batch restore MUST run; there is no anonymous fallback archive path.
@@ -283,7 +331,7 @@ The port's contract requires:
 - `archivedBy` — the git identity of the actor who performed the archive
 - `artifacts` — artifact metadata tracked by the repository
 
-The `FsArchiveRepository` implementation additionally moves the change directory from its current location (`changes/` or `drafts/`) to the archive directory using the configured pattern, then appends an entry to `index.jsonl`. The use case has no knowledge of these implementation details.
+The `FsArchiveRepository` implementation additionally moves the change directory from its current location (`changes/` or `drafts/`) to the archive directory using the configured pattern. Listing uses the fs-cache archive index under `{configPath}/tmp/fs-cache/archive/` (`.specd-index.jsonl`), not a root-local `index.jsonl`. The use case has no knowledge of these implementation details.
 
 ### Requirement: Archive index metadata maintenance
 
@@ -294,11 +342,9 @@ The `ArchiveChange` use case SHALL ensure that the archive index metadata (total
 
 ### Requirement: Post-archive hooks
 
-After `archiveRepository.archive()` succeeds, when `'all'` and `'post'` are both absent from `skipHookPhases`, `ArchiveChange` must execute post-archive hooks by delegating to `RunStepHooks.execute({ name, step: 'archiving', phase: 'post' })`.
+After `archiveRepository.archive()` succeeds, when `'all'` and `'post'` are both absent from `skipHookPhases`, `ArchiveChange` MUST execute operation-`archive` **effects** whose binding `phase` is `after-persist`. Selection MUST use the binding table, not `check.id === 'hook.post'`. Default binding: `onFailure = collect` — append each failed hook command to `postHookFailures` in declaration order; do not roll back the archive.
 
-Post-archive hook failures do not roll back the archive. Every failed hook command must be appended to `postHookFailures` in declaration order.
-
-When `'all'` or `'post'` is in `skipHookPhases`, post-archive hook execution is skipped entirely.
+When `'all'` or `'post'` is in `skipHookPhases`, those effects are skipped.
 
 ### Requirement: Spec metadata generation
 
@@ -314,7 +360,7 @@ For each modified spec, preflight MUST:
 
 Persisted `metadata.json` regeneration MUST occur only after `archiveRepository.archive()` succeeds and after all `.specd-archive-backup/` directories for the batch have been deleted — canonical artifacts and the lock must already be committed.
 
-For each modified spec, `ArchiveChange` MUST then call `RegenerateSpecMetadata.execute({ specId })` (forced policy) against the canonical persisted spec. This performs deterministic generation and guarded cache persistence in one step; `ArchiveChange` does not call `GenerateSpecMetadata` or write the cache itself. A forced cache-persistence failure for a spec is reported, not silently ignored — affected spec paths are reported in `staleMetadataSpecPaths`; failures do not abort the archive.
+For each modified spec, `ArchiveChange` MUST then call `MaterializeSpecMetadata.execute({ specId, policy: 'force', schemaName })` against the canonical persisted spec, where `schemaName` is the archived change's sovereign schema name obtained through `ResolveChangeSchema`. Metadata for the archived change's specs MUST NOT be generated with the workspace default schema. This performs deterministic generation and guarded cache persistence in one step; `ArchiveChange` does not call `GenerateSpecMetadata` or write the cache itself. A forced cache-persistence failure for a spec is reported, not silently ignored — affected spec paths are reported in `staleMetadataSpecPaths`; failures do not abort the archive.
 
 Sidecar consistency failures during preflight remain fatal before publication begins. Post-commit metadata regeneration failures are non-fatal to the archive outcome.
 
@@ -326,17 +372,22 @@ For each modified spec, during preflight, `ArchiveChange`:
 
 1. Reads the aggregate persisted-state snapshot (`readPersistedState`), if any, and captures its revision (`originalHash`) for the concurrency guard.
 2. When a lock already exists, builds the base as `{ kind: 'existing', state: <snapshot> }`.
-3. When no lock exists, resolves the initial dependency set through `resolveInitialPersistedDependsOn()` — preferring a complete dependency value supplied by the archive publication plan when one exists — and builds the base as `{ kind: 'initial', schema: <canonicalSpecSchema()>, dependsOn: <resolved deps> }` where canonical schema identity is derived from `schema.canonicalSpecSchema()` (following the 3-tier fallback `compat` → `extends` → `name@version`).
-4. Calls the shared `applyPersistedSpecStatePatch(base, patch)` helper with the final `dependsOn`, `implementation`, and any confirmed implementation-link changes for this archive attempt as the patch. It does not maintain a second artifact/metadata fallback algorithm for initial dependency resolution.
-5. Copies forward any existing `optimizations` unchanged — archive never authors or clears optimization values. A changed artifact naturally makes the corresponding optimization field stale on the next read; archive does not need to detect that itself.
-6. Passes the complete resulting `PersistedSpecState` to `SpecRepository.publish()` together with the observed `expectedRevision` (`null` when no lock existed).
+3. Determines the **sealed** `dependsOn` for this attempt with this precedence:
+   - If `change.specDependsOn` has an entry for the spec, that publication-plan snapshot is the sealed set. Do not call `resolveInitialPersistedDependsOn()`.
+   - Else if a lock exists, the sealed set is the lock's `dependsOn` (re-archive with no snapshot keeps the sidecar).
+   - Else if `SpecRepository.get` finds the spec on disk, call `resolveInitialPersistedDependsOn()` **without** `explicitDependsOn` and use its result (legacy / never-initialized canonical spec).
+   - Else (new spec, nothing on disk) the sealed set is merge-extract `dependsOn` from the artifacts being published, or `[]` when extract yields nothing. Do not call `resolveInitialPersistedDependsOn()`.
+4. When no lock exists, builds the base as `{ kind: 'initial', schema: <canonicalSpecSchema()>, dependsOn: <sealed set> }` where canonical schema identity is derived from `schema.canonicalSpecSchema()` (following the 3-tier fallback `compat` → `extends` → `name@version`).
+5. Calls the shared `applyPersistedSpecStatePatch(base, patch)` helper with the sealed `dependsOn`, `implementation`, and any confirmed implementation-link changes for this archive attempt as the patch. It MUST NOT use cached `metadata.json` as a fallback. Merge-extract MUST NOT replace a lock or an on-disk `resolveInitialPersistedDependsOn()` result. For a brand-new spec with no plan, merge-extract initializes the lock.
+6. Copies forward any existing `optimizations` unchanged — archive never authors or clears optimization values. A changed artifact naturally makes the corresponding optimization field stale on the next read; archive does not need to detect that itself.
+7. Passes the complete resulting `PersistedSpecState` to `SpecRepository.publish()` together with the observed `expectedRevision` (`null` when no lock existed).
 
 The revision guard MUST cause publication to fail for that spec if the observed persisted-state revision no longer matches at commit time, preventing archive from silently overwriting dependencies, links, or optimizations changed concurrently after preflight.
 
 Sidecar rules:
 
 - `schema` records the schema identity for the persisted spec. For new specs without an existing lock, it is set to `schema.canonicalSpecSchema()`. Once a lock exists for a spec, its `schema` object is immutable through this path — schema reassignment is the explicit, separate `UpdatePersistedSpecSchema` operation.
-- `dependsOn` records the final persisted dependency set for that archive attempt; on later re-archives it is refreshed from the final `change.specDependsOn` value — it is not a set union and it is not preserved as historical baggage.
+- `dependsOn` records the sealed set for that archive attempt; on later re-archives it is replaced when `change.specDependsOn` is present — it is not a set union and it is not preserved as historical baggage.
 - The final sidecar content MUST be determined before canonical publication begins, so publication can stage and publish the merged spec artifacts plus `spec-lock.json` together.
 
 ### Requirement: Result shape
@@ -344,31 +395,78 @@ Sidecar rules:
 `ArchiveChange.execute` must return a result object. The result must include:
 
 - `archivedChange` — the `ArchivedChange` record that was persisted
+- `archiveDirPath` — absolute path to the archive directory where the change was stored
 - `postHookFailures` — array of hook commands that failed post-archive, empty on full success
 - `staleMetadataSpecPaths` — array of spec paths where `metadata.json` generation failed during this archive (e.g. extraction produced no required fields); empty when all metadata was generated successfully
 - `invalidatedChanges` — array of objects describing changes that were invalidated due to spec overlap, each containing:
   - `name` — the invalidated change's name
   - `specIds` — readonly array of overlapping spec IDs that triggered the invalidation
-    Empty when no changes were invalidated (either no overlap existed or `allowOverlap` was `false` and the archive was blocked).
+    Empty when no changes were invalidated (either no overlap existed or `spec.overlap` was not bypassed and the archive was blocked).
 
-`ArchiveChange` throws on pre-archive hook failure or `assertArchivable` failure. Post-archive failures are returned, not thrown.
+`ArchiveChange` throws on pre-archive hook failure or archivable state guard failure. Post-archive failures are returned, not thrown.
 
 ### Requirement: Typed errors for archive failures
 
-`ArchiveChange` MUST NOT throw generic `Error` for validation or state failures. It SHALL use typed `SpecdError` subclasses for the following scenarios:
+`ArchiveChange` MUST NOT throw generic `Error` for validation or state failures. The single exception is a composition-time programming error, not a typed archive failure: sealed `dependsOn` resolution throws `Error('ArchiveChange requires ContentHasher to resolve lock-less on-disk dependsOn')` when no `ContentHasher` was supplied. It SHALL use typed `SpecdError` subclasses for the following scenarios:
 
-- `ArchiveDependencyMismatchError` — when extracted dependencies mismatch persisted ones.
+- `ChangeNotFoundError` — when the change name does not resolve via `ChangeRepository.get`
 - `ArchiveArtifactMissingError` — when a tracked or base artifact is missing.
-- `ArchiveImplementationStateError` — when implementation files are open or out-of-scope sidecar updates are detected.
-- `ArchivePreflightError` — for other preflight validation failures.
+- `ParserNotRegisteredError` — when an artifact format requires a parser that is not registered
+- `ArchiveBatchRestoreError` — when canonical batch restore fails after a partial archive failure
+- `UnknownCheckError` — when `skipChecks` names an id that is neither bound to the archive operation nor registered
+- `CheckNotSkippableError` — when `skipChecks` names a non-skippable binding or an effect check (hooks are governed by `skipHookPhases`)
+- `CheckPredicateFailedError` — when any predicate of an archive-bound check fails, including `schema.nameMatch`, `archive.archivable`, `spec.overlap`, `workspace.readOnly`, `deps.consistent`, `impl.filesResolved`, `impl.linksInScope`, `verification.current`, and plugin or schema-embedded checks. It carries the canonical check id, its label, the failure code (`CHECK_FAILED` when the check gives none), a host-neutral message, the check-declared `action`, the structured `details` defined by the check's per-code contract in [`core:transition-checks`](../transition-checks/spec.md), the attempted `from` / `to`, and `skippable` taken from the resolved binding of that check
+
+`ArchiveChange` MUST NOT select an error class by switching on a check id. `ArchiveDependencyMismatchError` and `SpecOverlapError` are retired. `ArchiveImplementationStateError` and `ReadOnlyWorkspaceError` are no longer produced by archive predicates (those classes remain for non-archive use cases).
 
 Each error MUST follow the [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md) for actionable messaging.
 
+### Requirement: Archive checks share runners and wrap remaining preflight
+
+`ArchiveChange` MUST evaluate the operation-`archive` predicates of the **effective** bindings in registry order (base bindings first, then plugin bindings, then bindings synthesized from the schema's `archiveChecks`), after `protocol` is N/A (archive is not a lifecycle edge). The built-in base predicates are:
+
+- `schema.nameMatch`, `archive.archivable`, `spec.overlap`
+- `workspace.readOnly` and `deps.consistent` — same **runners** as enter-`ready` (`runDepsConsistent`). Archive `deps.consistent` facts for persisted `dependsOn` MUST be the **sealed** set (same precedence as spec-lock persistence). Enter-`ready` facts remain extract vs `change.specDependsOn`.
+- `impl.filesResolved` and `impl.linksInScope` — same runners as exit-`implementing`
+
+Remaining merge/publish preflight (`ArchiveArtifactMissingError`, `ParserNotRegisteredError` and related) SHALL stay **inside** `ArchiveChange` after these predicates allow the operation. MUST NOT register `archive.publication` on the binding table.
+
+After merge extract, `ArchiveChange` MUST re-run `runDepsConsistent` against sidecar `finalDependsOn` (merge-time sealed set). The named `deps.consistent` predicate uses the pre-merge sealed set; the private pass is the merge-time comparison, not a second algorithm.
+
+Extracted vs sealed `dependsOn` mismatch SHALL fail `deps.consistent` and `ArchiveChange` SHALL throw `CheckPredicateFailedError` with every mismatch in `details.mismatches`. The merge-time re-run against sidecar `finalDependsOn` reports through the same error and details; that error MUST carry the attempted `from` / `to` (`from` being the state the archive was requested from, `to` being `archiving`) and `skippable` taken from the resolved `deps.consistent` binding, exactly as the named predicate failure does. Enter-`ready` uses the same runner against the publication-plan snapshot (`change.specDependsOn`). A lock-less on-disk spec with no plan is not a ready-era mismatch: archive seals through `resolveInitialPersistedDependsOn()` and compares extract to that sealed set.
+
+### Requirement: Effective archive bindings and skip validation
+
+`ArchiveChange` MUST resolve its bindings through `resolveEffectiveBindings` (see [`core:transition-checks`](../transition-checks/spec.md)) on every `execute`, after the sovereign schema is resolved and before any archive predicate, hook, or publication runs:
+
+- `baseBindings` are the injected `archiveBindings`
+- `schema` is the change's sovereign schema, whose `archiving` entry may declare `archiveChecks` (see [`core:schema-format`](../schema-format/spec.md))
+- the operation is `archive`, and the `CheckRegistry` is passed so declarations can synthesize bindings for registered checks
+
+Predicates and effects (hooks) MUST execute from the resolved set. The base bindings MUST NOT be mutated, and the resolution result MUST NOT be reused across runs.
+
+**Skip validation.** After the archivable/state guard and before any predicate is evaluated, `ArchiveChange` MUST validate every id in the effective `skipChecks` (the `skipChecks` input) against the resolved bindings, with the same rules as `TransitionChange`. Ids are matched exactly and case-sensitively, and duplicates collapse to one:
+
+- an id that is neither bound to the archive operation nor registered MUST throw `UnknownCheckError`
+- an id that is registered but has no resolved archive binding (for example a check disabled by the schema, or one bound only to transitions) MUST be accepted and has no effect
+- an id whose resolved binding is an effect (`hook.pre`, `hook.post`) MUST throw `CheckNotSkippableError`; hook phases are governed only by `skipHookPhases`
+- an id whose resolved binding is not skippable MUST throw `CheckNotSkippableError`
+
+Validation MUST complete before any predicate is evaluated, any hook runs, or any archive publication write happens; canonical validity reconciliation, which runs earlier and is owned by the reconciler, is not an archive write. A bypass applies only to the ids named: bypassing one failing check MUST NOT bypass another, and any remaining failing predicate still blocks the archive.
+
+**Governance on archive.** The default skippable archive checks are exactly `spec.overlap` and `impl.linksInScope`. The built-in archive bindings `schema.nameMatch`, `archive.archivable`, `workflow.taskCompletion`, `verification.current`, `hook.pre`, `hook.post`, `workspace.readOnly`, `impl.filesResolved`, and `deps.consistent` are locked: a schema MUST NOT disable them, make them skippable, or change their policy. Only `spec.overlap`, `impl.linksInScope`, and plugin checks bound to operation `archive` accept `archiveChecks` declarations.
+
+**Bypass result.** A bypassed check reports `outcome: 'skip'` with the same audit marker as a bypass on `TransitionChange`. The invalidation of overlapping peers (Requirement: Overlap guard) is keyed on `spec.overlap` being bypassed.
+
 ### Requirement: Tracked implementation review guard
 
-Before archive materializes implementation links, `ArchiveChange` MUST verify that no tracked implementation file remains in `open` state.
+Before archive materializes implementation links, `ArchiveChange` MUST evaluate `impl.filesResolved` with the **same runner** used on **forward** exit from `implementing` (`from = implementing`, `to = *`, `along = forward`): no tracked implementation file remains in `open` state.
 
 Files in `resolved` or `ignored` state satisfy this guard. If any tracked implementation file remains `open`, archive MUST fail with repair guidance telling the operator to resolve or ignore the file explicitly.
+
+That runner MUST also fail `implementing → verifying` so archive is not the first failure after leaving implementation **forward**. Redesign (`implementing → designing`) MUST NOT run this check.
+
+On operation `archive` the `impl.filesResolved` binding is fully locked: a schema MUST NOT disable it or make it skippable, and a `skipChecks` entry naming `impl.filesResolved` MUST fail with `CheckNotSkippableError`. A valid archive requires the implementation to be resolved.
 
 ### Requirement: Implementation materialization into spec-lock
 
@@ -382,15 +480,21 @@ Materialization MUST:
 - ignore links whose raw file path falls under the target workspace `graph.excludePaths`
 - discard links that cannot be normalized into a valid `workspace:path`
 - discard implementation links whose target `specId` does not exist in the canonical repository and is not being created in the change, ensuring nonexistent spec IDs never trigger sidecar publication
-- fail archive when a confirmed link points outside the `codeRoot` of the workspace implied by `specId`
+- fail archive when a confirmed link points outside the `codeRoot` of the workspace implied by `specId` or implies an unknown workspace, unless `impl.linksInScope` is bypassed (see below)
+
+The out-of-`codeRoot` failure is the `impl.linksInScope` check on operation `archive`: it MUST be thrown as `CheckPredicateFailedError` whose `skippable` is taken from the resolved archive binding of `impl.linksInScope` (not hardcoded), consistent with every other archive predicate failure.
+
+When `impl.linksInScope` is bypassed through `skipChecks`, such out-of-`codeRoot` and unknown-workspace links MUST be omitted: they are NOT written to the `spec-lock.json` sidecar and they are not an error, so the reported `skippable` on the failure is always actionable. When `impl.linksInScope` is not bypassed, the first such link fails the archive with the `CheckPredicateFailedError` above (`checkId: 'impl.linksInScope'`, code `IMPLEMENTATION_STATE`, `from`/`to` of the archive attempt). The failure MUST occur before any sidecar is persisted.
+
+When the schema disables `impl.linksInScope` through `archiveChecks`, the check is not evaluated and cannot appear in `skipChecks`; such links MUST then be omitted exactly as when the check is bypassed, so that a disabled check never produces a failure that can be neither satisfied nor bypassed.
 
 ### Requirement: Out-of-scope sidecar update guard
 
-Archive-time implementation integrity maintenance MAY discover that preserving a consistent implementation map would require sidecar updates outside the immediately archived spec scope.
+Archive-time implementation integrity maintenance MAY discover that preserving a consistent implementation map would require sidecar updates outside the immediately archived spec scope. That condition SHALL be the `impl.linksInScope` check on operation `archive`, using the **same runner** as exit from `implementing`.
 
-By default, `ArchiveChange` MUST fail when those out-of-scope updates would occur.
+By default, `ArchiveChange` MUST fail when those out-of-scope updates would occur (`CheckPredicateFailedError` for `impl.linksInScope`). Proceeding requires an explicit bypass of `impl.linksInScope`: `skipChecks` containing `impl.linksInScope` (skippable predicate). A schema MAY disable the check or make it non-skippable through `archiveChecks`; when it is non-skippable, the bypass MUST fail with `CheckNotSkippableError`.
 
-Proceeding with those external sidecar updates requires an explicit `--allow-out-of-scope` override.
+The same skippable semantics MUST apply when the runner is evaluated on `from = implementing` if that override is in scope.
 
 ### Requirement: Config-based factory delegates through resolveArchiveChangeDeps
 
@@ -401,29 +505,41 @@ The config-based `createArchiveChange(config, options?)` form MUST derive `Archi
 - `changes: ChangeRepository`
 - `listWorkspaces: ListWorkspaces`
 - `archive: ArchiveRepository`
-- `runStepHooks: RunStepHooks`
+- `archiveBindings` from `resolveWorkflowCheckRegistry`
+- `transitionBindings` from `resolveWorkflowCheckRegistry`
+- `checkRegistry` from `resolveWorkflowCheckRegistry` (the executable registry, when the composition has one)
+- `approvals` from the configured approval gates
+- `reconcile: ReconcileChangeValidity` (mandatory)
+- `resolveChangeSchema: ResolveChangeSchema`
 - `actor: ActorResolver`
 - `parsers: ArtifactParserRegistry`
 - `schemaProvider: SchemaProvider`
-- `regenerateMetadata: RegenerateSpecMetadata`
+- `materializeMetadata: MaterializeSpecMetadata`
 - `extractorTransforms: ExtractorTransformRegistry`
 - `workspaceRoutes: readonly SpecWorkspaceRoute[]`
 - `projectRoot: string`
 - `batchSnapshot: ArchiveBatchSnapshotPort`
+- `contentHasher: ContentHasher`
+
+It MUST NOT resolve `runStepHooks` or `regenerateMetadata` onto `ArchiveChangeDeps`. Hook `run:` I/O lives on `createHookPre` / `createHookPost` in the binding table.
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
 
+### Requirement: Shared fallback batch snapshot lifetime
+
+When archive composition cannot derive explicit workspace layouts, `resolveArchiveBatchSnapshotPort` MUST lazily create one fallback `FsArchiveBatchSnapshot` and reuse it for every snapshot-port method of that composed archive operation. A snapshot, recorded created file, and restore sequence MUST operate on the same fallback manifest so restore removes files created after the snapshot.
+
 ## Constraints
 
-- `change.assertArchivable()` must be called before any hooks, snapshots, or file modifications
+- the archivable state must be verified (inline check after reconciliation, and `change.assertArchivable()` inside the serialized mutation) before any hooks, snapshots, or file modifications
 - ReadOnly workspace guard and overlap guard must run while the change is in `archivable`, before snapshots or lifecycle transition to `archiving`
-- Pre-archive hook failures abort the archive and throw — no lifecycle transition, no snapshots, and no partial canonical writes
+- Pre-archive hook failures abort the archive and throw - no lifecycle transition, no snapshots, and no partial canonical writes
 - Transition to `archiving` must occur only after preflight succeeds and batch snapshots are written, immediately before the first canonical publication
 - Commit-phase failures must run batch restore before returning; lifecycle rollback to `archivable` occurs only after successful batch restore
 - Post-archive hook failures and metadata generation failures are returned or reported; the archive is not rolled back after a successful archive move
 - `ArchiveChange` must not call `change.invalidate()` on the change being archived
-- `ArchiveChange` never constructs `ArchivedChange` directly — it is always returned by `archiveRepository.archive(change, { actor })`
-- Hook execution is delegated to `RunStepHooks` — `ArchiveChange` does not call `HookRunner` directly
+- `ArchiveChange` never constructs `ArchivedChange` directly - it is always returned by `archiveRepository.archive(change, { actor })`
+- Hook execution happens only through the injected hook-check bindings (`createHookPre` / `createHookPost`); `ArchiveChange` takes neither `RunStepHooks` nor `HookRunner`
 
 ## Spec Dependencies
 
@@ -444,7 +560,10 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`default:_global/logging`](../../_global/logging/spec.md)
 - [`core:spec-lock`](../spec-lock/spec.md)
 - [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md)
-- [`core:regenerate-spec-metadata`](../regenerate-spec-metadata/spec.md) — forced post-commit metadata materialization
-- [`core:spec-optimization`](../spec-optimization/spec.md) — optimization records preserved unchanged during publication
-- [`core:initialize-persisted-spec-state`](../initialize-persisted-spec-state/spec.md) — shared `resolveInitialPersistedDependsOn()` service reused for lock-less specs
+- [`core:materialize-spec-metadata`](../materialize-spec-metadata/spec.md) — forced post-commit metadata materialization
+- [`core:spec-optimization`](../spec-optimization/spec.md)
+- [`core:initialize-persisted-spec-state`](../initialize-persisted-spec-state/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)
+- [`core:transition-checks`](../transition-checks/spec.md) — canonical archive predicates and reconciliation
+- [core:resolve-change-schema](../resolve-change-schema/spec.md) — named sovereign lookup, provider identity validation, and same-name version advisory
+- [`core:check-registry`](../check-registry/spec.md) — governance locks and the archive bindings the schema's `archiveChecks` overlay

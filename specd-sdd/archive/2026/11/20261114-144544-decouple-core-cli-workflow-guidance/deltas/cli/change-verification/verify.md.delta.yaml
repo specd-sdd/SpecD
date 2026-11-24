@@ -1,0 +1,39 @@
+- op: added
+  description: 'Presenter scenarios for verification output'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Success and idempotent output'
+  content: |
+    #### Scenario: Next action command comes from the presenter
+
+    - **GIVEN** invalidation returns `nextAction` with `intent: 'verify'`
+    - **WHEN** the command renders text, JSON, or TOON
+    - **THEN** `command` is projected by the CLI guidance presenter
+    - **AND** JSON and TOON also expose `intent` and `action`
+
+    #### Scenario: Verification remediation uses the real change name
+
+    - **GIVEN** change `checkout-retry` with a blocker action `{ kind: 'start-verification', params: { changeName: 'checkout-retry' } }`
+    - **WHEN** the CLI renders the remediation
+    - **THEN** the command contains `checkout-retry`
+    - **AND** no literal `<name>` placeholder is emitted
+
+    #### Scenario: Missing changeName param falls back to guidance
+
+    - **GIVEN** an action `{ kind: 'start-verification', guidance: 'Start a new verification attempt' }` without `params.changeName`
+    - **WHEN** the CLI renders the remediation
+    - **THEN** a blocker's `command` is omitted (never `null`), `nextAction.command` is `null`, and the guidance text is exposed in the separate `guidance` field
+    - **AND** text output shows the guidance line without a command
+
+    #### Scenario: Text output renders blocker remediation
+
+    - **GIVEN** a verification result with a blocker whose action is `{ kind: 'start-verification', params: { changeName: 'checkout-retry' } }`
+    - **WHEN** the CLI renders text output
+    - **THEN** the blocker line is followed by its remediation command containing `checkout-retry`
+
+    #### Scenario: Invalidate blockers use the CLI blocker projection
+
+    - **GIVEN** verification invalidation returns a skippable blocker with `checkId`
+    - **WHEN** the command renders text, JSON, or TOON
+    - **THEN** the blocker carries `label`, `checkId` and `bypassFlag` (and the label appears in text) and no raw `isSkippable`

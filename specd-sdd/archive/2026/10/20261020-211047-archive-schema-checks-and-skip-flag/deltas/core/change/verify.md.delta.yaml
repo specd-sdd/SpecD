@@ -1,0 +1,2 @@
+- op: no-op
+  description: Existing scenarios do not reference the archive bypass input; no verification changes are needed.

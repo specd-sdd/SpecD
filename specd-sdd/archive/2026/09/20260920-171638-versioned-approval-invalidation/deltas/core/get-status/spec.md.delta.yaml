@@ -1,0 +1,109 @@
+- op: added
+  description: 'Reconcile active validity before projecting status'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Optional pre-read implementation tracking refresh$'
+  content: |
+    ### Requirement: Operational status reconciliation
+
+    For an active change, `GetStatus` SHALL first resolve the active schema without mutating the change. If schema resolution fails, it returns the existing actionable read-only status projection with a `SCHEMA_RESOLUTION_FAILED` blocker, disables lifecycle mutation guidance, and performs neither implementation refresh nor validity reconciliation.
+
+    When schema resolution succeeds, `GetStatus` SHALL refresh implementation tracking as configured, then invoke the single application reconciler before constructing its response. Unlike plain repository hydration, status is an operational validity observation and MAY persist newly detected artifact review, stale or revoked projections, audit events, and an automatic lifecycle return.
+
+    Detection and recovery MUST be committed atomically. The response SHALL describe the committed change, never the pre-reconciliation state. Repeating status with unchanged facts MUST NOT append duplicate events or repeat an already completed return. Drafted, archived, and schema-unavailable status paths remain read-only and are not reconciled.
+
+- op: modified
+  description: 'Reflect that active status may inspect fingerprinted file content'
+  selector:
+    type: section
+    matches: '^Purpose$'
+  content: |
+    Users and tooling need a canonical view of lifecycle, artifacts, approvals, verification, and the next valid action. Active status therefore reconciles fresh artifact and linked implementation inputs before projection, while drafted inspection remains read-only.
+
+- op: modified
+  description: 'Do not let manifest revision short-circuit external validity checks'
+  selector:
+    type: section
+    matches: '^Requirement: Revision evaluation for conditional status queries$'
+  content: |
+    `ifModifiedSince` MAY short-circuit expensive response projection only after the active change has completed configured implementation refresh and canonical validity reconciliation. Manifest `updatedAt` alone cannot prove that externally edited artifact or implementation files are unchanged.
+
+    After reconciliation, if the parsed client timestamp is at least the reconciled `change.updatedAt`, `GetStatus` MAY return `unchanged: true`, an empty `artifactStatuses`, and minimal review/blocker guidance while still returning the reconciled change and dependency snapshot. Invalid timestamps or older revisions use the full projection path. Drafted read-only status may use its existing revision optimization because it does not authorize progress.
+
+- op: modified
+  description: 'Refresh implementation facts before conditional projection'
+  selector:
+    type: section
+    matches: '^Requirement: Optional pre-read implementation tracking refresh$'
+  content: |
+    For an active change, `GetStatus` SHALL invoke `RefreshImplementationTracking.execute({ name })` before canonical validity reconciliation unless `refreshImplementationTracking` is explicitly `false`. Conditional `ifModifiedSince` does not skip this freshness step.
+
+    Drafted changes never refresh. `GetStatus` MUST NOT invoke `ImplementationDetector` directly or duplicate merge logic. After refresh and reconciliation it projects implementation state from the newly persisted change.
+
+- op: added
+  description: 'Project independent validity and recovery guidance'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Identifies blockers$'
+  content: |
+    ### Requirement: Approval, verification, and fingerprint status projection
+
+    Status SHALL expose independently:
+
+    - structured artifact and workflow policies
+    - non-task artifact drift and pending-review details
+    - spec-approval and sign-off state as absent, `valid`, `stale`, or `revoked`
+    - completed verification as never completed, legacy unknown, `valid`, or `stale`, separately from the active attempt identity, baseline, and freshness
+    - changed, missing, added, removed, renamed, or unlinked fingerprint inputs and their causes
+    - any automatic return committed during this request
+    - the canonical blockers and next action from the shared validity verdict
+
+    The public result SHALL expose a rich `ValidityStatusProjection` assembled from the reconciled aggregate and canonical verdict. It SHALL NOT expose the evaluator's raw `ChangeValidityVerdict` as a substitute for status. The projection MUST retain active-attempt and completed-evidence fields simultaneously when both exist.
+
+    Required stale spec consent has recovery priority and yields committed `designing` guidance. Required stale sign-off alone returns a later change to `done`; stale verification then recommends verification before renewed sign-off. Verification staleness in `designing`, `ready`, or `implementing` remains context and MUST NOT replace the phase's normal next action. At verification-requiring boundaries, missing or stale completed evidence recommends running the verification skill in the current state. A mismatched active attempt requires explicit start and repeated checks before completion, never a forced exit/re-entry. Status MUST NOT call `CompleteVerification` or treat an active attempt as completed evidence.
+
+    Under ungated `workflow: preserve`, artifact review remains in the current state, but unresolved non-task drift or review still blocks forward progress. Status MUST NOT suggest that structural validation alone renews human approval or verification.
+
+- op: modified
+  description: 'Make review routing reflect preserve and gate precedence'
+  selector:
+    type: section
+    matches: '^Requirement: Returns lifecycle context$'
+  content: |
+    `GetStatus` SHALL derive `ReviewSummary`, lifecycle projections, blockers, and next action from the same canonical validity verdict used by transitions and archive.
+
+    Drifted or pending-review non-task artifacts set `review.required=true`. The route is the current lifecycle skill under `workflow: preserve` unless required stale spec consent or an explicit redesign requires `designing`; under `workflow: redesign` it is `designing`. Unhandled overlap invalidations remain identifiable with human-readable overlap detail, but their recovery follows the same policy and gate precedence rather than a hard-coded route.
+
+    Lifecycle fields and `availableTransitions` SHALL come from check evaluation after reconciliation. Stale verification is reported but does not replace normal guidance before `verifying`; at or after verification it blocks the applicable forward boundary. Drafted status exposes no mutating transitions.
+
+- op: modified
+  description: 'Inject the central reconciler into status composition'
+  selector:
+    type: section
+    matches: '^Requirement: Constructor dependencies$'
+  content: |
+    `GetStatus` SHALL receive the change repository, schema provider, approval-gate configuration, `RefreshImplementationTracking`, the central validity reconciler, and the composed transition/archive checks needed for projection. It imports pure lifecycle projection functions rather than injecting an alternative lifecycle engine or collecting one shared snapshot bag. All construction paths MUST supply the reconciler; absence MUST fail explicitly rather than enable a legacy invalidation fallback.
+
+    The config factory SHALL resolve these through the existing composition resolver and both established factory signatures. `GetStatus` MUST NOT construct filesystem adapters, invoke `ImplementationDetector` directly, or implement a second invalidation path.
+
+    Active resolution uses `get` and may reconcile; draft resolution uses `getDraft` and remains read-only. Discarded changes are out of scope.
+
+- op: modified
+  description: 'Align status constraints with operational reconciliation and read-only failure paths'
+  selector:
+    type: section
+    matches: '^Constraints$'
+  content: |
+    - Active `GetStatus` is an operational observation: after successful schema resolution it MAY persist only the validity effects selected by the single application reconciler. It MUST NOT independently mutate approval, verification, artifact, or lifecycle state. Drafted, archived, and schema-unavailable inspection remains read-only.
+    - Artifact and linked implementation contents MAY be read to establish fresh validity facts. Ordinary artifact-status projection need not load full content except in the matching check execution. Applicable `workflow.taskCompletion` counts MUST be reused from that check; `CountTasks` MUST NOT run a second time for the same projection.
+    - Effective lifecycle and review status MAY be delegated to `evaluateLifecycle` / `projectArtifacts`; the `Change` entity does not own dependency-aware presentation.
+    - Schema-provider resolution failures, including `SchemaNotFoundError`, MUST produce the actionable `SCHEMA_RESOLUTION_FAILED` read-only status without refresh or reconciliation. Once schema resolution succeeds, failures of check execution or reconciliation MUST propagate rather than be swallowed by the schema-failure path.
+    - `changePath` comes from `ChangeRepository.changePath(change)`.

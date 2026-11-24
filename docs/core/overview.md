@@ -73,58 +73,60 @@ Everything exported is a domain type (entity, value object, error, service), an 
 
 **From the domain layer — value objects:**
 
-| Export                | Kind      | Description                                                                    |
-| --------------------- | --------- | ------------------------------------------------------------------------------ |
-| `SpecPath`            | class     | Validated, immutable spec path value object.                                   |
-| `ArtifactType`        | class     | Describes a single artifact type as declared in the schema.                    |
-| `Schema`              | class     | A fully-constructed schema with artifacts, workflow, and extraction.           |
-| `ArtifactFile`        | class     | A spec-scoped artifact file record.                                            |
-| `SpecArtifact`        | class     | A spec-scoped artifact record with metadata.                                   |
-| `HookResult`          | class     | The outcome of a `run:` hook execution.                                        |
-| `ChangeState`         | type      | Union of all valid lifecycle state strings.                                    |
-| `ArtifactStatus`      | type      | `'missing' \| 'in-progress' \| 'complete' \| 'skipped'`                        |
-| `ArtifactScope`       | type      | `'spec' \| 'change'` — whether an artifact lives on the spec or change.        |
-| `ArtifactFormat`      | type      | `'markdown' \| 'json' \| 'yaml' \| 'plaintext'`                                |
-| `ActorIdentity`       | interface | `{ name: string; email: string }` — actor identity.                            |
-| `ChangeEvent`         | type      | Discriminated union of all change history event types.                         |
-| `WorkflowStep`        | type      | A single step entry in the schema workflow. Includes `requiresTaskCompletion`. |
-| `HookEntry`           | type      | A single hook declaration within a workflow step.                              |
-| `ValidationRule`      | type      | A structural validation rule from the schema.                                  |
-| `PreHashCleanup`      | type      | A pre-hash substitution rule from the schema.                                  |
-| `TaskCompletionCheck` | type      | Pattern-based task completion check from the schema.                           |
-| `Selector`            | type      | An AST node selector used in validations and extractors.                       |
-| `Extractor`           | type      | An extraction configuration for metadata derivation.                           |
-| `MetadataExtraction`  | type      | The full metadata extraction block from a schema.                              |
-| `VALID_TRANSITIONS`   | const     | Map of valid transitions per lifecycle state.                                  |
-| `isValidTransition`   | function  | Returns whether a state transition is permitted.                               |
+| Export                | Kind      | Description                                                                                                                             |
+| --------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `SpecPath`            | class     | Validated, immutable spec path value object.                                                                                            |
+| `ArtifactType`        | class     | Describes a single artifact type as declared in the schema.                                                                             |
+| `Schema`              | class     | A fully-constructed schema with artifacts, workflow, and extraction.                                                                    |
+| `ArtifactFile`        | class     | A spec-scoped artifact file record.                                                                                                     |
+| `SpecArtifact`        | class     | A spec-scoped artifact record with metadata.                                                                                            |
+| `HookResult`          | class     | The outcome of a `run:` hook execution.                                                                                                 |
+| `ChangeState`         | type      | Union of all valid lifecycle state strings.                                                                                             |
+| `ArtifactStatus`      | type      | `'missing' \| 'in-progress' \| 'complete' \| 'skipped'`                                                                                 |
+| `ArtifactScope`       | type      | `'spec' \| 'change'` — whether an artifact lives on the spec or change.                                                                 |
+| `ArtifactFormat`      | type      | `'markdown' \| 'json' \| 'yaml' \| 'plaintext'`                                                                                         |
+| `ActorIdentity`       | interface | `{ name: string; email: string }` — actor identity.                                                                                     |
+| `ChangeEvent`         | type      | Discriminated union of all change history event types.                                                                                  |
+| `WorkflowStep`        | type      | A single step entry in the schema workflow. Includes `requiresTaskCompletion`.                                                          |
+| `HookEntry`           | type      | A single hook declaration within a workflow step.                                                                                       |
+| `ValidationRule`      | type      | A structural validation rule from the schema.                                                                                           |
+| `PreHashCleanup`      | type      | A pre-hash substitution rule from the schema.                                                                                           |
+| `TaskCompletionCheck` | type      | Pattern-based task completion check from the schema.                                                                                    |
+| `Selector`            | type      | An AST node selector used in validations and extractors.                                                                                |
+| `Extractor`           | type      | An extraction configuration for metadata derivation.                                                                                    |
+| `MetadataExtraction`  | type      | The full metadata extraction block from a schema.                                                                                       |
+| `VALID_TRANSITIONS`   | const     | Protocol map of valid transitions per lifecycle state (includes drain edges). `availableTransitions` from `GetStatus` is check-derived. |
+| `isValidTransition`   | function  | Returns whether a state transition is permitted.                                                                                        |
 
 **From the domain layer — errors:**
 
-| Export                         | Code                        |
-| ------------------------------ | --------------------------- |
-| `SpecdError`                   | abstract base class         |
-| `InvalidStateTransitionError`  | `INVALID_STATE_TRANSITION`  |
-| `ApprovalRequiredError`        | `APPROVAL_REQUIRED`         |
-| `HookFailedError`              | `HOOK_FAILED`               |
-| `ArtifactConflictError`        | `ARTIFACT_CONFLICT`         |
-| `DeltaApplicationError`        | `DELTA_APPLICATION`         |
-| `InvalidSpecPathError`         | `INVALID_SPEC_PATH`         |
-| `InvalidSpecIdError`           | `INVALID_SPEC_ID`           |
-| `InvalidSpecPatternError`      | `INVALID_SPEC_PATTERN`      |
-| `InvalidSpecLockError`         | `INVALID_SPEC_LOCK`         |
-| `InvalidChangeError`           | `INVALID_CHANGE`            |
-| `ArtifactNotOptionalError`     | `ARTIFACT_NOT_OPTIONAL`     |
-| `SchemaValidationError`        | `SCHEMA_VALIDATION_ERROR`   |
-| `ConfigValidationError`        | `CONFIG_VALIDATION_ERROR`   |
-| `CorruptedManifestError`       | `CORRUPTED_MANIFEST`        |
-| `MetadataValidationError`      | `METADATA_VALIDATION_ERROR` |
-| `DependsOnOverwriteError`      | `DEPENDS_ON_OVERWRITE`      |
-| `HookNotFoundError`            | `HOOK_NOT_FOUND`            |
-| `StepNotValidError`            | `STEP_NOT_VALID`            |
-| `PathTraversalError`           | `PATH_TRAVERSAL`            |
-| `UnsupportedPatternError`      | `UNSUPPORTED_PATTERN_ERROR` |
-| `MissingDefaultWorkspaceError` | `MISSING_DEFAULT_WORKSPACE` |
-| `ArtifactParseError`           | `ARTIFACT_PARSE_ERROR`      |
+| Export                            | Code                                                  |
+| --------------------------------- | ----------------------------------------------------- |
+| `SpecdError`                      | abstract base class                                   |
+| `InvalidStateTransitionError`     | `INVALID_STATE_TRANSITION`                            |
+| `CheckPredicateFailedError`       | the check's own `checkCode` (`CHECK_FAILED` fallback) |
+| `ApprovalRequiredError`           | `APPROVAL_REQUIRED`                                   |
+| `HookFailedError`                 | `HOOK_FAILED`                                         |
+| `ArtifactConflictError`           | `ARTIFACT_CONFLICT`                                   |
+| `DeltaApplicationError`           | `DELTA_APPLICATION`                                   |
+| `InvalidSpecPathError`            | `INVALID_SPEC_PATH`                                   |
+| `InvalidSpecIdError`              | `INVALID_SPEC_ID`                                     |
+| `InvalidSpecPatternError`         | `INVALID_SPEC_PATTERN`                                |
+| `InvalidSpecLockError`            | `INVALID_SPEC_LOCK`                                   |
+| `InvalidChangeError`              | `INVALID_CHANGE`                                      |
+| `ArtifactNotOptionalError`        | `ARTIFACT_NOT_OPTIONAL`                               |
+| `SchemaValidationError`           | `SCHEMA_VALIDATION_ERROR`                             |
+| `ConfigValidationError`           | `CONFIG_VALIDATION_ERROR`                             |
+| `CorruptedManifestError`          | `CORRUPTED_MANIFEST`                                  |
+| `UnsupportedManifestVersionError` | `UNSUPPORTED_MANIFEST_VERSION`                        |
+| `MetadataValidationError`         | `METADATA_VALIDATION_ERROR`                           |
+| `DependsOnOverwriteError`         | `DEPENDS_ON_OVERWRITE`                                |
+| `HookNotFoundError`               | `HOOK_NOT_FOUND`                                      |
+| `StepNotValidError`               | `STEP_NOT_VALID`                                      |
+| `PathTraversalError`              | `PATH_TRAVERSAL`                                      |
+| `UnsupportedPatternError`         | `UNSUPPORTED_PATTERN_ERROR`                           |
+| `MissingDefaultWorkspaceError`    | `MISSING_DEFAULT_WORKSPACE`                           |
+| `ArtifactParseError`              | `ARTIFACT_PARSE_ERROR`                                |
 
 **From the domain layer — services:**
 
@@ -252,6 +254,24 @@ Everything exported is a domain type (entity, value object, error, service), an 
 
 `createKernelBuilder` and `KernelBuilder` are exported from `@specd/core/extensions`, not from the root `@specd/core` barrel.
 
+### Kernel disposal
+
+`Kernel` is `AsyncDisposable`: `kernel.dispose()` (aliased by `kernel[Symbol.asyncDispose]`) runs the cleanup work registered through `KernelOptions.disposers`, or `KernelBuilder.registerDisposer(name, dispose)` when using the builder. A disposer is a named, opaque action (`KernelDisposer`) that registers cleanup for a resource that exists before the kernel, for example something a host initialised while composing it.
+
+- Disposers run in **reverse registration order**, one at a time.
+- One failing disposer does not stop the others; after all have run, `dispose()` rejects with an `AggregateError` whose `errors` are `DisposerFailedError` entries (one per failure, in execution order).
+- Each disposer is bounded by a fixed 5000 ms timeout; a hanging disposer is abandoned with a logged warning and does not count as a failure.
+- `dispose()` is idempotent: repeated and concurrent calls share one promise and each disposer runs once. After the first call the behaviour of other kernel members is unspecified.
+- If `createKernel` (or `build()`) fails, the supplied disposers are released in reverse order before the original error propagates.
+
+```typescript
+const kernel = await createKernelBuilder(config)
+  .registerDisposer('plugins', async () => session.close())
+  .build()
+
+await kernel.dispose() // or: await using kernel = await createKernel(config)
+```
+
 **From the composition layer — repository and schema factories:**
 
 | Export                      | Kind      | Description                                                                        |
@@ -283,36 +303,40 @@ These functions expose the canonical standalone composition contract:
 
 Use them when you need only one or two use cases without constructing a full `Kernel`.
 
-| Export                         | Description                                                              |
-| ------------------------------ | ------------------------------------------------------------------------ |
-| `createCreateChange`           | Wires `CreateChange` from explicit deps or from `SpecdConfig`.           |
-| `createGetStatus`              | Wires `GetStatus` from explicit deps or from `SpecdConfig`.              |
-| `createTransitionChange`       | Wires `TransitionChange` from explicit deps or from `SpecdConfig`.       |
-| `createDraftChange`            | Wires `DraftChange` from explicit deps or from `SpecdConfig`.            |
-| `createRestoreChange`          | Wires `RestoreChange` from explicit deps or from `SpecdConfig`.          |
-| `createDiscardChange`          | Wires `DiscardChange` from explicit deps or from `SpecdConfig`.          |
-| `createApproveSpec`            | Wires `ApproveSpec` from explicit deps or from `SpecdConfig`.            |
-| `createApproveSignoff`         | Wires `ApproveSignoff` from explicit deps or from `SpecdConfig`.         |
-| `createArchiveChange`          | Wires `ArchiveChange` from explicit deps or from `SpecdConfig`.          |
-| `createValidateArtifacts`      | Wires `ValidateArtifacts` from explicit deps or from `SpecdConfig`.      |
-| `createCompileContext`         | Wires `CompileContext` from explicit deps or from `SpecdConfig`.         |
-| `createListChanges`            | Wires `ListChanges` from explicit deps or from `SpecdConfig`.            |
-| `createListDrafts`             | Wires `ListDrafts` from explicit deps or from `SpecdConfig`.             |
-| `createListDiscarded`          | Wires `ListDiscarded` from explicit deps or from `SpecdConfig`.          |
-| `createListArchived`           | Wires `ListArchived` from explicit deps or from `SpecdConfig`.           |
-| `createGetArchivedChange`      | Wires `GetArchivedChange` from explicit deps or from `SpecdConfig`.      |
-| `createEditChange`             | Wires `EditChange` from explicit deps or from `SpecdConfig`.             |
-| `createSkipArtifact`           | Wires `SkipArtifact` from explicit deps or from `SpecdConfig`.           |
-| `createListSpecs`              | Wires `ListSpecs` from explicit deps or from `SpecdConfig`.              |
-| `createGetSpec`                | Wires `GetSpec` from explicit deps or from `SpecdConfig`.                |
-| `createSaveSpecMetadata`       | Wires `SaveSpecMetadata` from explicit deps or from `SpecdConfig`.       |
-| `createInvalidateSpecMetadata` | Wires `InvalidateSpecMetadata` from explicit deps or from `SpecdConfig`. |
-| `createGetActiveSchema`        | Wires `GetActiveSchema` from explicit deps or from `SpecdConfig`.        |
-| `createValidateSpecs`          | Wires `ValidateSpecs` to the fs.                                         |
-| `createGetSpecContext`         | Wires `GetSpecContext` to the fs.                                        |
-| `createConfigWriter`           | Filesystem-backed `ConfigWriter` for yaml mutations.                     |
-| `createGetProjectContext`      | Wires `GetProjectContext` to the fs.                                     |
-| `createGetProjectSummary`      | Wires `GetProjectSummary` to the fs.                                     |
+| Export                          | Description                                                               |
+| ------------------------------- | ------------------------------------------------------------------------- |
+| `createCreateChange`            | Wires `CreateChange` from explicit deps or from `SpecdConfig`.            |
+| `createGetStatus`               | Wires `GetStatus` from explicit deps or from `SpecdConfig`.               |
+| `createTransitionChange`        | Wires `TransitionChange` from explicit deps or from `SpecdConfig`.        |
+| `createDraftChange`             | Wires `DraftChange` from explicit deps or from `SpecdConfig`.             |
+| `createRestoreChange`           | Wires `RestoreChange` from explicit deps or from `SpecdConfig`.           |
+| `createDiscardChange`           | Wires `DiscardChange` from explicit deps or from `SpecdConfig`.           |
+| `createApproveSpec`             | Wires `ApproveSpec` from explicit deps or from `SpecdConfig`.             |
+| `createApproveSignoff`          | Wires `ApproveSignoff` from explicit deps or from `SpecdConfig`.          |
+| `createArchiveChange`           | Wires `ArchiveChange` from explicit deps or from `SpecdConfig`.           |
+| `createValidateArtifacts`       | Wires `ValidateArtifacts` from explicit deps or from `SpecdConfig`.       |
+| `createCompileContext`          | Wires `CompileContext` from explicit deps or from `SpecdConfig`.          |
+| `createListChanges`             | Wires `ListChanges` from explicit deps or from `SpecdConfig`.             |
+| `createListDrafts`              | Wires `ListDrafts` from explicit deps or from `SpecdConfig`.              |
+| `createListDiscarded`           | Wires `ListDiscarded` from explicit deps or from `SpecdConfig`.           |
+| `createListArchived`            | Wires `ListArchived` from explicit deps or from `SpecdConfig`.            |
+| `createGetArchivedChange`       | Wires `GetArchivedChange` from explicit deps or from `SpecdConfig`.       |
+| `createEditChange`              | Wires `EditChange` from explicit deps or from `SpecdConfig`.              |
+| `createReconcileChangeValidity` | Wires `ReconcileChangeValidity` from explicit deps or from `SpecdConfig`. |
+| `createStartVerification`       | Wires `StartVerification` from explicit deps or from `SpecdConfig`.       |
+| `createCompleteVerification`    | Wires `CompleteVerification` from explicit deps or from `SpecdConfig`.    |
+| `createInvalidateVerification`  | Wires `InvalidateVerification` from explicit deps or from `SpecdConfig`.  |
+| `createSkipArtifact`            | Wires `SkipArtifact` from explicit deps or from `SpecdConfig`.            |
+| `createListSpecs`               | Wires `ListSpecs` from explicit deps or from `SpecdConfig`.               |
+| `createGetSpec`                 | Wires `GetSpec` from explicit deps or from `SpecdConfig`.                 |
+| `createSaveSpecMetadata`        | Wires `SaveSpecMetadata` from explicit deps or from `SpecdConfig`.        |
+| `createInvalidateSpecMetadata`  | Wires `InvalidateSpecMetadata` from explicit deps or from `SpecdConfig`.  |
+| `createGetActiveSchema`         | Wires `GetActiveSchema` from explicit deps or from `SpecdConfig`.         |
+| `createValidateSpecs`           | Wires `ValidateSpecs` to the fs.                                          |
+| `createGetSpecContext`          | Wires `GetSpecContext` to the fs.                                         |
+| `createConfigWriter`            | Filesystem-backed `ConfigWriter` for yaml mutations.                      |
+| `createGetProjectContext`       | Wires `GetProjectContext` to the fs.                                      |
+| `createGetProjectSummary`       | Wires `GetProjectSummary` to the fs.                                      |
 
 ## Where to go next
 

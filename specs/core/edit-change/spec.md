@@ -14,7 +14,7 @@ As a change evolves, its spec scope often needs to grow or shrink — but modify
 - `addSpecIds` (optional, string array) — spec IDs to add to the change's `specIds`; each entry is one whole spec ID, validated and normalized per "Spec ID validation"
 - `removeSpecIds` (optional, string array) — spec IDs to remove from the change's `specIds`; each entry is one whole spec ID and is never split
 - `description` (optional, string) — new description for the change
-- `invalidationPolicy` (optional, string) — new invalidation policy for the change, see "Invalidation policy edits"
+- `invalidation` (optional, `{ artifacts?, workflow? }`) — partial update of the change's invalidation policy: a provided dimension replaces only that dimension, see "Invalidation policy edits"
 
 ### Requirement: Spec ID validation
 
@@ -30,13 +30,11 @@ After normalizing `addSpecIds` and before any mutation, the use case MUST check 
 
 ### Requirement: Invalidation policy edits
 
-EditChange.execute SHALL accept an optional `invalidationPolicy` field that updates the change's persisted invalidation policy.
+`EditChange.execute` SHALL accept an optional structured `invalidation` update whose `artifacts` value is `none | surgical | downstream | global` and whose `workflow` value is `preserve | redesign`.
 
-Allowed values are `none`, `surgical`, `downstream`, and `global`. Before any mutation the use case MUST reject any other value with `InvalidInputError`, quoting the full original value and listing the allowed values, and it MUST persist nothing. The check lives in the use case so that every delivery mechanism (CLI, MCP, SDK) enforces it; a host's type cast is not validation.
+Before any mutation the use case MUST reject any other value for `invalidation.artifacts` (allowed: `none`, `surgical`, `downstream`, `global`) or `invalidation.workflow` (allowed: `preserve`, `redesign`) with `InvalidInputError`, quoting the full original value and listing the allowed values, and it MUST persist nothing. The check lives in the use case so that every delivery mechanism (CLI, MCP, SDK) enforces it; a host's type cast is not validation.
 
-Updating only `invalidationPolicy` is a persistence-worthy change even when specIds and description remain unchanged.
-
-Changing `invalidationPolicy` SHALL NOT itself invent drift or rewrite artifact/file canonical states. It updates the policy used by later invalidation operations.
+Updating either dimension is persistence-worthy even when scope and description are unchanged. It changes the default used by later reconciliation but MUST NOT invent drift, reopen files, restore validity, or move lifecycle state by itself. The v2 manifest SHALL persist only the structured shape.
 
 ### Requirement: Change lookup
 
@@ -62,6 +60,10 @@ When both `removeSpecIds` and `addSpecIds` are provided, removals MUST be applie
 
 If any spec ID in `removeSpecIds` is not present in the change's current `specIds`, the use case MUST throw `SpecNotInChangeError` for that spec ID. Removal is atomic per ID — the first missing ID aborts the entire operation.
 
+### Requirement: Host-neutral SpecNotInChangeError
+
+When `EditChange` throws `SpecNotInChangeError` (`SPEC_NOT_IN_CHANGE`), the error `message` MUST state that the spec is not in the change's `specIds` in host-neutral terms without embedding CLI commands such as `specd specs show`. The error MUST expose `specId` and `changeName` as structured metadata properties.
+
 ### Requirement: Addition is idempotent
 
 If a spec ID in `addSpecIds` already exists in the change's `specIds` (after removals), it MUST be silently skipped — no duplicate is added and no error is thrown.
@@ -73,10 +75,9 @@ When `EditChange.execute` effectively adds a spec ID that was not already presen
 Seeding rules:
 
 - Seeding applies only to spec IDs newly entering the change scope.
-- If the repository exposes persisted dependency state for the spec via `readPersistedDependsOn(spec)`, that value MUST be used.
-- Otherwise, if canonical `metadata.json.dependsOn` exists for the spec, that value MUST be used as the legacy fallback even when the persisted metadata file is stale.
-- Otherwise, the seeded value is an empty array.
 - If the spec already has an entry in `change.specDependsOn`, `EditChange` MUST NOT overwrite it just because the scope was edited again later.
+- Otherwise the seeded value is the `dependsOn` of the spec's persisted state, read through the spec repository's `readPersistedState(spec)` (the `spec-lock.json` state). No fallback to `metadata.json.dependsOn` exists.
+- If the workspace is unknown, the spec does not exist in its repository, or the repository has no persisted state for it, the seeded value is an empty array.
 
 This seeding establishes the baseline dependency snapshot for the change so later artifact validation and archive do not start from an empty dependency set for existing specs.
 
@@ -86,11 +87,11 @@ If the resulting `specIds` list is identical (same length, same order) to the ch
 
 ### Requirement: Approval invalidation on effective change
 
-When the resulting `specIds` differ from the current set, the use case MUST resolve the current actor identity, then update the change inside `ChangeRepository.mutate(name, fn)`.
+When `specIds` effectively change, `EditChange` SHALL run the scope update and central validity reconciliation within one serialized repository mutation. The reconciler compares the fresh post-edit canonical scope with the scope-aware spec-approval fingerprint, reports explicit `spec-added` and `spec-removed` differences, and determines affected artifact review, approval and verification staleness or revocation, and required recovery while retaining all prior audit events. Reordering or normalization that leaves the canonical spec set unchanged MUST NOT stale approval.
 
-Inside the mutation callback, the use case MUST call `change.updateSpecIds(specIds, actor, artifactDag)` on the fresh persisted `Change`, where `artifactDag` is built from the active schema. This is the operation that invalidates active approvals and appends the corresponding history events for a spec-scope change.
+A required spec approval made stale by scope change SHALL cause an immediate return to `designing` from any state after `ready`, even when `invalidation.workflow` is `preserve`. In `ready` no return is requested: `approval.spec` blocks leaving `ready` and consent is renewed there, so the change stays in `ready` with the approval reported stale. Without a required spec gate, `preserve` retains the current lifecycle state but unresolved non-task artifact review blocks forward progress. Sign-off and verification are invalidated only when their independently fingerprinted input set changes.
 
-The repository MUST persist the updated change before `EditChange.execute` returns an `invalidated: true` result.
+`EditChange` MUST NOT independently append recovery transitions or delete approval history. The repository persists the reconciled result before returning.
 
 ### Requirement: Directory cleanup on removal
 
@@ -110,23 +111,17 @@ is silently skipped.
 
 ### Requirement: Implementation tracking refresh on spec change
 
-When `specIds` effectively change (`invalidated: true`), if an optional `refreshImplementationTracking` dependency is provided, `EditChange` MUST invoke `refreshImplementationTracking.execute({ name })` to immediately sweep dangling implementation links referencing removed specs.
+When the canonical `specIds` set actually changes (`scopeChanged: true`), `EditChange` MUST invoke an available `RefreshImplementationTracking.execute({ name })` after the scope mutation to sweep links to removed specs. This refresh MUST NOT depend on `invalidated` or `validityChanged`: an ungated preserve edit may change scope without changing an existing approval projection.
 
 ### Requirement: Output contract
 
-`EditChange.execute` MUST return an `EditChangeResult` with:
-
-- `change` — the `Change` entity (updated or unchanged)
-- `invalidated` — `true` if approvals were invalidated, `false` otherwise
+`EditChange.execute` SHALL return the reconciled change, `scopeChanged`, whether validity actually changed, the effective structured policy, projection status changes, affected artifact files, canonical blockers, next action, and any automatic lifecycle return. Description-only, canonical no-op scope, and policy-only edits report no invented invalidation. A legacy compatibility field named `invalidated`, if retained temporarily, SHALL reflect actual validity change rather than scope change and SHALL be deprecated.
 
 ### Requirement: Dependencies
 
-`EditChange` depends on the following ports injected via constructor:
+`EditChange` SHALL receive `ChangeRepository`, `ListWorkspaces`, `ActorResolver`, `SchemaProvider`, the central validity reconciler, and an optional `RefreshImplementationTracking` through constructor dependencies. The application obtains workspace-specific `SpecRepository` views through `ListWorkspaces`; callers MUST NOT supply a separate `ReadonlyMap<string, SpecRepository>` as a competing source of workspace truth. The actor is resolved only when a persistence-worthy edit occurs, and the same decorated identity is used by the edit and reconciliation audit events.
 
-- `ChangeRepository` — for loading, persisting, scaffolding, and unscaffolding changes
-- `ActorResolver` — for resolving the current actor identity
-- `ListWorkspaces` — the project's workspaces with their spec repositories and ownership; used to validate and normalize spec IDs, to reject `readOnly` workspaces, for the `specExists` check during scaffolding, and for reading persisted dependency state when seeding `change.specDependsOn`
-- `SchemaProvider` — for the schema compatibility guardrail and artifact DAG
+The config-based factory SHALL resolve these dependencies through `CompositionResolver`. Direct-dependency and config-based forms MUST have equivalent behavior.
 
 ### Requirement: Config-based factory delegates through resolveEditChangeDeps
 
@@ -138,9 +133,30 @@ The config-based `createEditChange(config, options?)` form MUST derive `EditChan
 - `listWorkspaces: ListWorkspaces`
 - `actor: ActorResolver`
 - `schemaProvider: SchemaProvider`
-- `refreshImplementationTracking?: RefreshImplementationTracking`
+- `resolveChangeSchema: ResolveChangeSchema`
+- `refreshImplementationTracking: RefreshImplementationTracking`
+- `reconcile: ReconcileChangeValidity`
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
+### Requirement: Schema compatibility guardrail
+
+When `addSpecIds` is provided, the system MUST verify that every new spec is compatible with the Change's sovereign schema (resolved through `ResolveChangeSchema`). For every added spec:
+
+1. If the spec has no persisted semantic state (uninitialized) or its persisted state lacks a schema definition, the spec is compatible: it has no schema identity of its own and adopts the Change's schema. The workspace default or project global schema (`GetActiveSchema`) MUST NOT be consulted.
+2. Otherwise, it extracts the spec's persisted schema identity (`name` and `version`).
+
+A spec with a persisted schema identity is considered compatible if its schema name matches the Change's schema name, or if the Change's schema explicitly declares a `compat` property matching the spec's schema name.
+
+If any added spec is found to be incompatible, the use case MUST throw an `IncompatibleSchemaError` and abort the edit operation without mutating the change.
+
+### Requirement: Sovereign schema resolution
+
+After loading the target change, `EditChange` MUST resolve its direct schema-dependent compatibility decision through `ResolveChangeSchema` rather than through the workspace default schema.
+
+`EditChange` MUST resolve that sovereign schema once before mutation when validating added-spec compatibility. Inside the serialized repository mutation it MUST update the fresh persisted change with `replaceSpecIds()` and delegate artifact-DAG and validity synchronization to the canonical reconciler through `ctx.reconcileAfter()`. It MUST NOT call `updateSpecIds()` or perform a second direct schema lookup for synchronization, because the reconciler owns that decision against the fresh persisted change.
+
+A workspace default that differs from `change.schemaName` MUST NOT affect compatibility results, artifact topology, or invalidation. A compatibility schema-resolution error MUST abort before mutation, and a reconciliation error MUST prevent persistence of a partial scope edit.
 
 ## Constraints
 
@@ -154,16 +170,7 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:change`](../change/spec.md)
 - [`core:composition`](../composition/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)
+- [`core:list-workspaces`](../list-workspaces/spec.md) — workspace-owned repository views used by edit orchestration
+- [core:resolve-change-schema](../resolve-change-schema/spec.md) — named sovereign lookup, provider identity validation, and same-name version advisory
 - [`core:spec-id-format`](../spec-id-format/spec.md) — spec ID validation and normalization of the input IDs
 - [`core:workspace`](../workspace/spec.md) — workspace ownership (`readOnly` rejection) and workspace names
-
-### Requirement: Schema compatibility guardrail
-
-When `addSpecIds` is provided, the system MUST verify that every new spec is compatible with the Change's schema. For every added spec:
-
-1. If the spec has no persisted semantic state (uninitialized) or its persisted state lacks a schema definition, the system assumes it uses the project's active global schema (`GetActiveSchema`).
-2. Otherwise, it extracts the spec's persisted schema identity (`name` and `version`).
-
-A spec is considered compatible if its schema name matches the Change's schema name, or if the Change's schema explicitly declares a `compat` property matching the spec's schema name.
-
-If any added spec is found to be incompatible, the use case MUST throw an `IncompatibleSchemaError` and abort the edit operation without mutating the change.

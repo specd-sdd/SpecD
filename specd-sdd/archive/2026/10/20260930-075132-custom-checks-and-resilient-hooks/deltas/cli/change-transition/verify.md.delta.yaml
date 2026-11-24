@@ -1,0 +1,36 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    #### Scenario: CLI accepts --skip-checks with comma-separated list
+    - **GIVEN** a user invoking `specd change transition ready --skip-checks impl.linksInScope,spec.overlap`
+    - **WHEN** parsing command options
+    - **THEN** `TransitionChangeInput.skipChecks` receives `['impl.linksInScope', 'spec.overlap']`
+
+    #### Scenario: CLI translates legacy --allow-out-of-scope to skipChecks
+    - **GIVEN** a user invoking `specd change transition ready --allow-out-of-scope`
+    - **WHEN** parsing command options
+    - **THEN** `TransitionChangeInput.skipChecks` includes `'impl.linksInScope'`
+
+    #### Scenario: CLI translates legacy --allow-overlap to skipChecks
+    - **GIVEN** a user invoking `specd change transition archivable --allow-overlap`
+    - **WHEN** parsing command options
+    - **THEN** `TransitionChangeInput.skipChecks` includes `'spec.overlap'`
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Invalid transition error'
+  content: |
+    #### Scenario: CheckPredicateFailedError renders Repair Guide with command and bypass
+    - **GIVEN** a failed skippable check `@security.code-scan` with command `'pnpm audit:fix'`
+    - **WHEN** the command exits with failure
+    - **THEN** the CLI Repair Guide renders the check label and error code
+    - **AND** displays `command: pnpm audit:fix`
+    - **AND** displays `bypass: Retry with --skip-checks @security.code-scan if an exception is granted`
+
+    #### Scenario: Mandatory check failure does not offer bypass in Repair Guide
+    - **GIVEN** a failed mandatory check `protocol.edge`
+    - **WHEN** the command renders the Repair Guide
+    - **THEN** no `bypass:` line is printed

@@ -1,4 +1,5 @@
 export { ContentHasher } from './application/ports/content-hasher.js'
+export { BinaryContentHasher } from './application/ports/binary-content-hasher.js'
 export { Repository, type RepositoryConfig } from './application/ports/repository.js'
 export {
   SpecRepository,
@@ -57,6 +58,8 @@ export {
   type LoggerPort,
 } from './application/ports/logger.port.js'
 export {
+  type AddPluginOptions,
+  type ConfigDeclaredPlugin,
   type ConfigWriter,
   type InitProjectOptions,
   type InitProjectResult,

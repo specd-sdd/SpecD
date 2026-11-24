@@ -1,0 +1,21 @@
+releases:
+  default:_global/error-handling-conventions: minor
+  core:generate-metadata: patch
+  core:invalidate-change: patch
+  core:update-spec-deps: patch
+  core:transition-change: patch
+  core:draft-change: patch
+  core:discard-change: patch
+  core:transition-checks: patch
+  core:edit-change: patch
+  core:validate-artifacts: patch
+  core:preview-spec: patch
+  cli:entrypoint: minor
+  cli:spec-generate-metadata: patch
+  cli:spec-validate: patch
+  cli:change-invalidate: patch
+  cli:change-transition: patch
+  cli:change-draft: patch
+  cli:change-discard: patch
+  cli:change-archive: patch
+  cli:change-deps: patch

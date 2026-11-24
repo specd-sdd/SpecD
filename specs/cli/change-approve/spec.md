@@ -18,6 +18,8 @@ specd change approve signoff <name> --reason <text> [--format text|json|toon]
 - `--reason <text>` — required; a human-readable explanation for the approval decision
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
+The `--help` JSON output schema MUST list every field of the structured success and failure records, including the `approval` evidence block, `state`, and `nextAction.intent`, `nextAction.action`, and `nextAction.guidance` alongside `command`. The failure error payload additions (`state`, `blockers`, `nextAction`) live under the error `metadata` object, and the help text MUST say so rather than describing them as top-level payload fields. Blocker entries MUST list `code`, `message`, `label`, `checkId`, `details`, `action`, and `bypassFlag`, and the `nextAction` shape MUST list `command`, `intent`, `action`, `guidance`, `actionType`, and `reason`. Text failure output MUST print a `guidance:` line for a next action without a command mapping. Text failure output MUST print the `error:` line first and then the `state:`, blocker and next-action lines; blockers MUST print with their label in the same form as status (`! <CODE> — <label>: <message>`). Enriching a failure with `state`, `blockers` and `nextAction` metadata is best effort: assigning them onto an error whose properties are read-only (getter-only) MUST NOT throw and MUST NOT mask the original error.
+
 ### Requirement: Delegates gate state to kernel
 
 The CLI MUST NOT pass `approvalsSpec` or `approvalsSignoff` to `ApproveSpec.execute` or `ApproveSignoff.execute`.
@@ -28,26 +30,23 @@ The CLI MUST invoke `kernel.changes.approveSpec` and `kernel.changes.approveSign
 
 ### Requirement: Artifact hash computation
 
-The CLI MUST NOT compute artifact hashes. Hash computation is owned by `ApproveSpec` and `ApproveSignoff` internally from on-disk artifact content using schema-defined pre-hash cleanup rules.
+The command MUST NOT compute fingerprints itself. It SHALL delegate spec approval to `ApproveSpec` and sign-off to `ApproveSignoff`, which reconcile fresh inputs and create the canonical artifact and implementation fingerprints.
 
-The user never supplies artifact hashes.
+Spec approval is available only in reconciled `ready` after required artifact validation with no non-task drift or pending review. Sign-off is available only in reconciled `done` with valid verification evidence.
 
 ### Requirement: Approve spec behaviour
 
-`approve spec` invokes `ApproveSpec`. It is only valid when the change is in `pending-spec-approval` state. On success, the change transitions to `spec-approved`.
+`approve spec` invokes `ApproveSpec`. It is valid when the change is in a binding `from` state for `approval.spec` (`ready`, plus the legacy parking states `pending-spec-approval` and `spec-approved`). On success the change stays in its current state with the consent recorded; the success output (text and JSON) MUST include a `state:` line / `state` field with that unchanged current state and MUST NOT print a transition, and from a legacy parking state the user continues with a normal transition to `implementing`. Help text MUST use bound-`from` language, with `ready` as the current example.
 
 ### Requirement: Approve signoff behaviour
 
-`approve signoff` invokes `ApproveSignoff`. It is only valid when the change is in `pending-signoff` state. On success, the change transitions to `signed-off`.
+`approve signoff` invokes `ApproveSignoff`. It is valid when the change is in a binding `from` state for `approval.signoff` (`done`, plus the legacy parking states `pending-signoff` and `signed-off`). On success the change stays in its current state with the consent recorded; the success output (text and JSON) MUST include a `state:` line / `state` field with that unchanged current state and MUST NOT print a transition, and from a legacy parking state the user continues with a normal transition to `archivable`. Help text MUST use bound-`from` language, with `done` as the current example.
 
 ### Requirement: Output on success
 
-On success, output depends on `--format`:
+Success output SHALL identify the approved gate, resulting materialized status `valid`, approver, decision time, and summarized fingerprint scope. Sign-off output SHALL distinguish an observed empty implementation map from legacy missing evidence and show the normalization algorithm without printing file contents.
 
-- `text` (default): prints to stdout:
-- `json` or `toon`: outputs the following to stdout (encoded in the respective format):
-
-where `<gate>` is `spec` or `signoff`.
+If pre-approval reconciliation commits recovery or reveals a blocker, the command SHALL render the returned state, reasons, and next action and MUST NOT report approval success.
 
 ### Requirement: Error cases
 
@@ -70,4 +69,5 @@ specd change approve signoff add-oauth-login --reason "implementation verified"
 ## Spec Dependencies
 
 - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:change`](../../core/change/spec.md) — approval gates, spec-approved and signed-off states
+- [`core:change`](../../core/change/spec.md) — approval records consumed by transition checks
+- [`core:transition-checks`](../../core/transition-checks/spec.md) — approval.spec / approval.signoff

@@ -48,7 +48,7 @@ JSON/TOON output schema:
             output({ result: 'ok', name }, fmt)
           }
         } catch (err) {
-          handleError(err, opts.format)
+          handleError(err, opts.format, { command: 'change.draft' })
         }
       },
     )

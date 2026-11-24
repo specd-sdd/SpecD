@@ -1,12 +1,13 @@
 import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/change-state.js'
+import { isWorkflowStepEnabled } from '../../domain/services/workflow-topology.js'
 import { StepNotValidError } from '../../domain/errors/step-not-valid-error.js'
 import { HookNotFoundError } from '../../domain/errors/hook-not-found-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type ArchiveRepository } from '../ports/archive-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
+import { ResolveChangeSchema } from '../services/resolve-change-schema.js'
 import { type TemplateExpander } from '../template-expander.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
-import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 
 /** Valid `ChangeState` values for step validation. */
 const CHANGE_STATES = Object.keys(VALID_TRANSITIONS) as ChangeState[]
@@ -35,6 +36,7 @@ export class GetHookInstructions {
   private readonly _archive: ArchiveRepository
   private readonly _schemaProvider: SchemaProvider
   private readonly _templates: TemplateExpander
+  private readonly _resolveChangeSchema: ResolveChangeSchema
 
   /**
    * Creates a new `GetHookInstructions` use case.
@@ -43,17 +45,20 @@ export class GetHookInstructions {
    * @param archive - Repository for loading archived changes (fallback for post-archive instructions)
    * @param schemaProvider - Provider for the fully-resolved schema
    * @param templates - Template expander for variable substitution
+   * @param resolveChangeSchema - Shared change schema resolver
    */
   constructor(
     changes: ChangeRepository,
     archive: ArchiveRepository,
     schemaProvider: SchemaProvider,
     templates: TemplateExpander,
+    resolveChangeSchema?: ResolveChangeSchema,
   ) {
     this._changes = changes
     this._archive = archive
     this._schemaProvider = schemaProvider
     this._templates = templates
+    this._resolveChangeSchema = resolveChangeSchema ?? new ResolveChangeSchema(schemaProvider)
   }
 
   /**
@@ -68,6 +73,7 @@ export class GetHookInstructions {
     // Fallback to archive for post-archive instructions
     let contextVars: { change: { name: string; path: string; archivedName?: string } }
     let schemaName: string
+    let schemaVersion: number
 
     if (change === null) {
       if (input.step === 'archiving' && input.phase === 'post') {
@@ -75,6 +81,7 @@ export class GetHookInstructions {
         if (archived === null) throw new ChangeNotFoundError(input.name)
 
         schemaName = archived.schemaName
+        schemaVersion = archived.schemaVersion
         contextVars = {
           change: {
             name: archived.name,
@@ -87,23 +94,24 @@ export class GetHookInstructions {
       }
     } else {
       schemaName = change.schemaName
+      schemaVersion = change.schemaVersion
       contextVars = {
         change: { name: change.name, path: this._changes.changePath(change) },
       }
     }
 
-    const schema = await this._schemaProvider.get()
-
-    if (schema.name() !== schemaName) {
-      throw new SchemaMismatchError(input.name, schemaName, schema.name())
-    }
+    const { schema } = await this._resolveChangeSchema.execute({
+      changeName: input.name,
+      schemaName,
+      schemaVersion,
+    })
 
     if (!(CHANGE_STATES as string[]).includes(input.step)) {
       throw new StepNotValidError(input.step)
     }
 
     const workflowStep = schema.workflowStep(input.step)
-    if (workflowStep === null) {
+    if (workflowStep === null || !isWorkflowStepEnabled(input.step as ChangeState, schema)) {
       return { phase: input.phase, instructions: [] }
     }
 

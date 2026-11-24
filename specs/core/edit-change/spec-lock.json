@@ -7,17 +7,46 @@
     "core:change",
     "core:composition",
     "core:composition-resolver",
+    "core:list-workspaces",
+    "core:resolve-change-schema",
     "core:spec-id-format",
     "core:workspace"
   ],
-  "implementation": [
-    {
-      "file": "core:src/application/use-cases/edit-change.ts",
-      "symbols": ["EditChange"]
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Edit change specs, description, and invalidation policy atomically; unscaffold removed specs only.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:9d093b731c1203079d21e5285a4966cb4db3cde689cb29dbb92218e58140626a",
+          "lastModified": "2026-10-20T14:34:10.160Z"
+        },
+        "verify.md": {
+          "hash": "sha256:5b3c8e5381a9595819733eab0c140f7a1c8c1d169f7d6b095238604c3268552a",
+          "lastModified": "2026-10-20T14:34:10.161Z"
+        }
+      }
     },
-    {
-      "file": "core:src/application/use-cases/_shared/assert-invalidation-policy.ts",
-      "symbols": ["assertInvalidationPolicy"]
+    "optimizedContext": {
+      "value": "# EditChange\n## Rules\n- Remove then add spec IDs; description/policy changes persist when effective.\n- Spec-ID change uses `mutate`, records actor/history, invalidates approvals, seeds new dependencies.\n- Unscaffold removed spec paths after mutation; no-op makes no persistence.\n## Constraints\n- Workspaces derived from spec IDs.\n- Never validate spec IDs against filesystem.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:9d093b731c1203079d21e5285a4966cb4db3cde689cb29dbb92218e58140626a",
+          "lastModified": "2026-10-20T14:34:10.160Z"
+        },
+        "verify.md": {
+          "hash": "sha256:5b3c8e5381a9595819733eab0c140f7a1c8c1d169f7d6b095238604c3268552a",
+          "lastModified": "2026-10-20T14:34:10.161Z"
+        }
+      }
     }
-  ]
+  }
 }

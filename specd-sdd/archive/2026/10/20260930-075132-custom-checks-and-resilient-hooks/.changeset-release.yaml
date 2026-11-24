@@ -1,0 +1,10 @@
+releases:
+  core:check-registry: minor
+  core:transition-checks: minor
+  core:transition-change: minor
+  core:workflow-model: minor
+  core:hook-execution-model: minor
+  core:build-schema: minor
+  cli:change-transition: minor
+  core:kernel: minor
+  core:config-loader: minor

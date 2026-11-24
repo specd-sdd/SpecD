@@ -1,4 +1,5 @@
 import { type Command } from 'commander'
+import { formatSchemaAdvisories, resolveChangeSchemaForCli } from '../../helpers/change-schema.js'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
@@ -50,22 +51,18 @@ JSON/TOON output schema:
             ? kernel.changes.repo.changePath(change)
             : (lifecycle?.changePath ?? '')
 
-        // Resolve schema for delta info
-        let schemaArtifacts: ReadonlyMap<string, { delta: boolean; output: string }> = new Map()
-        try {
-          const result = await kernel.specs.getActiveSchema.execute()
-          if (result.raw) throw new Error('Unexpected raw result')
-          schemaArtifacts = new Map(
-            result.schema
-              .artifacts()
-              .map((a: { id: string; delta: boolean; output: string }) => [
-                a.id,
-                { delta: a.delta, output: a.output },
-              ]),
-          )
-        } catch {
-          // If schema resolution fails, skip delta entries
-        }
+        // Resolve schema for delta info. Resolution failures and identity mismatches
+        // propagate to handleError (exit 3): the DAG must never silently degrade into
+        // rows without delta entries.
+        const { schema, warnings: schemaWarnings } = await resolveChangeSchemaForCli(kernel, name)
+        const schemaArtifacts: ReadonlyMap<string, { delta: boolean; output: string }> = new Map(
+          schema
+            .artifacts()
+            .map((a: { id: string; delta: boolean; output: string }) => [
+              a.id,
+              { delta: a.delta, output: a.output },
+            ]),
+        )
 
         /** Shape of a single artifact row for display. */
         type ArtifactRow = {
@@ -171,12 +168,15 @@ JSON/TOON output schema:
               (r.hasDrift ? '  [drift]' : ''),
           )
           output(lines.join('\n'), 'text')
+          const advisoryBlock = formatSchemaAdvisories(schemaWarnings)
+          if (advisoryBlock !== null) output(advisoryBlock, 'text')
         } else {
           output(
             {
               name,
               changeDir,
               artifacts: artifactRows,
+              ...(schemaWarnings.length > 0 ? { schemaWarnings } : {}),
             },
             fmt,
           )

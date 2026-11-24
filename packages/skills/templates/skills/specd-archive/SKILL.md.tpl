@@ -5,8 +5,10 @@
 ## What this does
 
 Reviews deltas and archives the change. Archiving merges deltas into project specs
-and is irreversible. The change MUST already be in `archivable` state — the signoff
-gate is handled by `/specd-verify`, not by this skill.
+and is irreversible. The change MUST already be in `archivable` or `archiving`
+state (`archiving` is a retry after a failed archive commit). If signoff
+is on, `/specd-verify` waits in `done` for human `approve signoff`. This skill
+does not own that wait.
 
 ## Steps
 
@@ -22,9 +24,40 @@ specd changes status <name> --format text
 
 Identify any high-visibility blockers from the **blockers:** section (e.g. `ARTIFACT_DRIFT`,
 `OVERLAP_CONFLICT`, `REVIEW_REQUIRED`) and inform the user. Follow the **next action:**
-command recommendation.
+command recommendation. `OVERLAP_CONFLICT` means live overlap with other active
+changes; bypass it only for that case, with the flag status shows under the blocker
+(`--skip-checks spec.overlap`). A blocker whose status shows no `bypass:` flag
+cannot be skipped. If `review.reason` is `spec-overlap-conflict`, run
+`/specd-design` — never bypass it.
 
 Extract the `path:` field from the "lifecycle:" section.
+
+### Schema-aware lifecycle routing
+
+Read a fresh structured status projection before any archive entry or hook:
+
+```bash
+specd changes status <name> --format toon
+```
+
+Treat `nextAction.command` as the preferred default recommendation and select a target
+only from `lifecycle.availableTransitions`. When explicitly invoked, map `/specd-archive`
+to its advertised archive target (`archiving` or `archivable`): if another lifecycle skill
+is recommended, report that recommendation but continue toward the mapped target if it is
+present in `lifecycle.availableTransitions`. If the target is absent from `availableTransitions`,
+stop before running any hooks and report the blockers along with the recommended command.
+Do not assume a canonical predecessor sequence. Refresh before acting; if the structured
+routing fields are missing, malformed, stale, or do not advertise the intended target,
+stop with the diagnostic text status. Hooks run only for the actual selected hop, never
+for bypassed intermediate states.
+
+Routed blocks (`<!-- route: target -->` … `<!-- /route -->`) use placeholders instead of
+fixed state names: `<target>` is the lifecycle step selected from a fresh
+`lifecycle.availableTransitions` (this skill's intended target when advertised,
+otherwise `nextAction.targetStep`) and `<source>` is the change's current `state`.
+Run `run-hooks` / `hook-instruction` only for the source (`--phase post`) and the
+selected target (`--phase pre`) of an actual hop, and never substitute a fixed state
+sequence.
 
 If the status output shows `review: required: yes`, tell the user:
 
@@ -32,7 +65,7 @@ If the status output shows `review: required: yes`, tell the user:
 
 **Stop — do not continue.**
 
-If state is not `archivable`, this is the wrong skill.
+If state is not `archivable` or `archiving`, this is the wrong skill.
 Redirect based on the **next action:** `target` recommendation.
 
 **Stop — do not continue.**
@@ -60,10 +93,12 @@ summary specs, evaluate and load any that are relevant (see `shared.md` — "Pro
 
 ### 4. Pre-archive hooks
 
+<!-- route: target -->
 ```bash
-specd changes run-hooks <name> archiving --phase pre
-specd changes hook-instruction <name> archiving --phase pre --format text
+specd changes run-hooks <name> <target> --phase pre
+specd changes hook-instruction <name> <target> --phase pre --format text
 ```
+<!-- /route -->
 
 Follow guidance — review deltas to ensure specs match what was built.
 
@@ -130,39 +165,86 @@ resolved or ignored.
 - Tracked files in `open` state block archive — resolve or ignore them first
 - Links targeting files outside the spec's workspace `codeRoot` block archive
 - Links targeting specs outside the change scope block archive unless explicitly
-  overridden with `--allow-out-of-scope`
+  bypassed with `--skip-checks impl.linksInScope`
+
+### 4b. Live preflight after hooks
+
+Hooks can change files and links. Reload canonical status before archiving.
+Core reconciles again, including overlap peers. Do not hand-invalidate those
+peers or edit their manifests.
+
+```bash
+specd changes status <name> --format text
+```
+
+Do not archive until that post-hook status passes live facts:
+
+- required live tasks are complete (`hasTasks` artifacts stay outside
+  fingerprints, and incomplete tasks still block)
+- required artifacts are current
+- implementation tracking is resolved
+- required verification is current, not missing, stale, or unknown
+- enabled spec and sign-off gates are satisfied
+
+Do not bypass tasks, artifacts, implementation, verification, or gates. If
+verification is missing or stale, stay on the explicit in-place cycle:
+`/specd-verify` or `specd changes verification start <name>`, then complete
+only after the repeated work succeeds. There is no restart-verification flag.
+Verification staleness does not move lifecycle state by itself. A stale
+sign-off after `done` returns to `done`; stale spec consent returns to
+`designing` via `/specd-design`.
+
+`workflow: preserve` keeps artifact review in phase. `workflow: redesign` with
+unresolved non-task drift returns to `designing`. `artifacts: none` waives
+reopening, not freshness.
 
 ### 5. Archive
 
+`--skip-hooks pre` only. Pre `run:` / `instruction:` already ran in step 4.
+Post `run:` hooks MUST run inside `changes archive` after persist so they cannot
+be skipped if the agent forgets a later `run-hooks` call.
+
 ```bash
-specd changes archive <name> --skip-hooks all --format toon
+specd changes archive <name> --skip-hooks pre --format toon
 ```
 
-If the command fails with a `SpecOverlapError` (spec overlap detected), other active
+If the command fails with `OVERLAP_CONFLICT` (spec overlap detected), other active
 changes target the same specs as this change. When this happens:
 
 1. Show the user the overlapping specs and the other changes involved.
 2. Explain the risk.
 3. Ask the user whether to proceed or abort.
 
-If the user confirms, re-run the command with `--allow-overlap`:
+If the user confirms, re-run the command with the bypass shown by status
+(`--skip-checks <checkId>`):
 
 ```bash
-specd changes archive <name> --skip-hooks all --allow-overlap --format toon
+specd changes archive <name> --skip-hooks pre --skip-checks spec.overlap --format toon
 ```
+
+Only checks that status shows a `bypass:` flag for can be skipped. `workspace.readOnly`,
+`impl.filesResolved`, `deps.consistent`, `verification.current`, and the schema,
+archivable, and task-completion checks are never bypassable on archive. If the
+failure shows no bypass, fix the cause instead of retrying. `--allow-overlap` and
+`--allow-out-of-scope` exist only as aliases of `--skip-checks spec.overlap` and
+`--skip-checks impl.linksInScope`.
 
 If the command fails because implementation sidecar maintenance would update specs outside the change scope, stop and surface the affected specs to the user. Only retry after explicit confirmation with:
 
 ```bash
-specd changes archive <name> --skip-hooks all --allow-out-of-scope --format toon
+specd changes archive <name> --skip-hooks pre --skip-checks impl.linksInScope --format toon
 ```
 
-### 6. Post-archive hooks
+### 6. Post-archive instructions
 
+Post `run:` hooks already ran inside `changes archive` (after persist). Do **not**
+call `run-hooks <name> <source> --phase post` — that would run them twice.
+
+<!-- route: target -->
 ```bash
-specd changes run-hooks <name> archiving --phase post
-specd changes hook-instruction <name> archiving --phase post --format text
+specd changes hook-instruction <name> <source> --phase post --format text
 ```
+<!-- /route -->
 
 Follow guidance.
 
@@ -212,9 +294,11 @@ Follow the recommended repair command based on the target recommendation.
 If during the pre-archive review you discover that the artifacts need revision, stop and explain.
 If the user agrees:
 
+<!-- route: target -->
 ```bash
-specd changes transition <name> designing --skip-hooks all
+specd changes transition <name> <target> --skip-hooks all
 ```
+<!-- /route -->
 
 > Specs need revision before archiving. Run `/specd-design <name>` to update them.
 

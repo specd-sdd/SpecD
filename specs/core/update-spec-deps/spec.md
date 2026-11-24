@@ -73,10 +73,10 @@ Inside the mutation callback, the repository supplies the fresh persisted `Chang
 
 `UpdateSpecDeps` MUST NOT throw generic `Error` for validation or lookup failures. It SHALL use typed `SpecdError` subclasses (or general core validation errors) for the following scenarios:
 
-- Flag validation (mutually exclusive flags, missing flags).
+- Input operation validation (mutually exclusive `set`/`clear`/`add`/`remove`, missing operation). Error messages MUST reference host-neutral input field names (`set`, `add`, `remove`, `clear`) and MUST NOT embed CLI flag prefixes (`--set`, `--add`, `--remove`, `--clear`).
 - Dependency lookup failures (dependency not found).
 
-Each error MUST follow the [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md) for actionable messaging.
+Each error MUST follow the [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md) for actionable messaging and host-neutrality.
 
 ### Requirement: Config-based factory delegates through resolveUpdateSpecDepsDeps
 

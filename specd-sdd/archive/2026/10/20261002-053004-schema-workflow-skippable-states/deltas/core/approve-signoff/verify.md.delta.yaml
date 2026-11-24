@@ -1,0 +1,38 @@
+- op: modified
+  description: Verify sovereign schema resolution in approve-signoff gate guard
+  selector:
+    type: section
+    matches: 'Requirement: Approval gate baked at construction'
+  content: |
+    #### Scenario: Factory passes config.approvals
+
+    - **WHEN** `createApproveSignoff(config)` constructs the use case
+    - **THEN** the instance receives `config.approvals` as its baked gate configuration
+
+    #### Scenario: Enabled gate allows execute with name and reason
+
+    - **GIVEN** `ApproveSignoff` is constructed with `approvals.signoff: true`
+    - **GIVEN** the change is in `pending-signoff` state
+    - **WHEN** `execute({ name, reason })` is called
+    - **THEN** the change transitions to `signed-off`
+
+    #### Scenario: Sovereign schema resolution in gate guard
+
+    - **GIVEN** `ApproveSignoff` is constructed with `approvals.signoff: true`
+    - **GIVEN** the active schema name differs from the change `schemaName`
+    - **WHEN** `execute({ name, reason })` is called
+    - **THEN** it resolves the schema via `SchemaProvider.get(change.schemaName)` without throwing `SchemaMismatchError`
+- op: added
+  description: Signoff verification eligibility follows topology
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Signoff recording and state transition'
+  content: |
+    #### Scenario: Signoff without verification when verifying is disabled
+
+    - **GIVEN** a change in `done` whose schema disables `verifying`
+    - **AND** no verification evidence exists
+    - **WHEN** `ApproveSignoff.execute` runs with a valid reason
+    - **THEN** sign-off is recorded
+    - **AND** no `VerificationNotFoundError` or other verification eligibility error is thrown

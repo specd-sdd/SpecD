@@ -581,7 +581,7 @@ preHashCleanup:
 
 ### taskCompletionCheck
 
-`taskCompletionCheck` declares how to detect incomplete task items in this artifact's content. SpecD uses it to gate the `implementing → verifying` lifecycle transition: the transition is blocked while any item matching `incompletePattern` exists in any artifact listed in the `implementing` step's `requires`.
+`taskCompletionCheck` declares how to detect incomplete task items in this artifact's content. SpecD uses it in the `workflow.taskCompletion` check on the **target** workflow step (typically `verifying`): the transition is blocked while any item matching `incompletePattern` exists in any artifact listed in that step's `requiresTaskCompletion`. It is **not** gated by the `implementing` step's `requires`.
 
 | Field               | Type           | Default                            | Description                      |
 | ------------------- | -------------- | ---------------------------------- | -------------------------------- |
@@ -694,15 +694,86 @@ selector:
 
 ## workflow
 
-`workflow` defines the named lifecycle phases of a change and what artifact conditions gate each one. The order of entries is the intended display order for tooling; it does not enforce sequential blocking between steps — each step is independently gated by its own `requires`.
+`workflow` declares extras and topology policy for existing Change lifecycle states. Omitted canonical states default to enabled and mandatory. The active pipeline is always in canonical order (`drafting, designing, ready, implementing, verifying, done, archivable, archiving`); the order of `workflow` rows carries no meaning and rows declared out of order are normalized silently. Direction classification, legal transitions, and recommendations all consume that same authoritative pipeline.
 
 ### Step fields
 
-| Field      | Type                  | Required | Description                                                                     |
-| ---------- | --------------------- | -------- | ------------------------------------------------------------------------------- |
-| `step`     | string                | yes      | Step name identifying a phase of the change lifecycle.                          |
-| `requires` | array of artifact IDs | no       | Artifacts that must be `complete` (or `skipped`) before this step is available. |
-| `hooks`    | object                | no       | `pre` and/or `post` arrays of hook entries for this step's boundaries.          |
+| Field                    | Type                  | Required | Description                                                                                                                                  |
+| ------------------------ | --------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `step`                   | string                | yes      | Lookup key: existing lifecycle state name (`designing`, `implementing`, …).                                                                  |
+| `optional`               | boolean               | no       | When `true`, the step is skippable in the topology if step-skip checks pass. Defaults to `false`.                                            |
+| `disabled`               | boolean               | no       | When `true`, the step is omitted from the active pipeline and cannot be entered. Defaults to `false`.                                        |
+| `requires`               | array of artifact IDs | no       | Artifacts that must be `complete` (or `skipped`) before this step is available.                                                              |
+| `requiresTaskCompletion` | array of artifact IDs | no       | Artifacts whose `taskCompletionCheck` must pass before **this** step is entered.                                                             |
+| `hooks`                  | object                | no       | `pre` and/or `post` arrays of hook entries for this step's boundaries.                                                                       |
+| `checks`                 | array                 | no       | Check declarations evaluated when entering this step (`id`, `from`, `along`, `onFailure`, `skippable`, `disabled`, `config`).                |
+| `skipChecks`             | array                 | no       | Check declarations evaluated when this optional step is bypassed (`id`, `onFailure`, `skippable`, `disabled`, `config`).                     |
+| `archiveChecks`          | array                 | no       | Check declarations for the archive operation. **Only valid on `step: archiving`** (`id`, `skippable`, `disabled`, `config`; no `onFailure`). |
+
+### Workflow topology rules
+
+The workflow-topology functions (`resolveWorkflowPipeline`, `listWorkflowTransitions`, `isWorkflowTransitionLegal`, `listBypassedWorkflowSteps`, `nextWorkflowStep`) enforce graph invariants over `workflow` definitions:
+
+1. **Bedrock State Immutability**: Canonical bedrock states (`drafting`, `designing`, `done`, `archivable`, `archiving`) are permanently active and CANNOT be disabled (`disabled: true`) or marked optional (`optional: true`). Declaring `disabled: true` or `optional: true` on any bedrock state fails with `SchemaValidationError`.
+2. **Approval Anchor Protection**:
+   - If `approvals.spec` is enabled in project configuration, `ready` CANNOT be disabled.
+   - `done` is unconditional bedrock and CANNOT be disabled or made optional regardless of signoff configuration. Signoff is an evaluation-time check on `done -> archivable`, which skips when signoff is off without bypassing `done`.
+3. **Forward connectivity by construction**: Bedrock states cannot be disabled and disabled steps are removed from the canonical pipeline, so a forward path from `designing` to `archivable` always exists (disabling `ready`, `implementing`, and `verifying` together is valid). There is no reachability error.
+4. **Skippable Steps & Bypass Checks**:
+   - When intermediate steps are marked `optional: true` (or `disabled: true`), changes can jump directly over them (e.g., `ready → verifying` or `implementing → archivable`).
+   - For every bypassed active step, step-skip checks registered for `{ scope: 'step-skip', step }` are evaluated (for example, `workflow.tasksEmpty` verifies that tasks are empty or completed before skipping `implementing`).
+   - Hooks for bypassed intermediate steps are strictly suppressed (only source post-hooks and target pre-hooks fire).
+   - An optional step with an empty effective skip-check set is bypassable unconditionally. With one or more effective bindings, every binding must pass. The effective set includes registry bindings plus schema `skipChecks`.
+   - Core recommends the furthest passing shortcut across consecutive optional steps, falls back to entering the closest optional step when a bypass predicate fails, and preserves explicit entry as an alternative. Skills consume this recommendation rather than selecting a route.
+
+### Archive operation checks
+
+`archiveChecks` tunes the checks that run when a change is archived (`specd changes archive`). It is the third check surface of a workflow row, independent of `checks` (evaluated when entering the step) and `skipChecks` (evaluated when bypassing an optional step). Checks declared in the `archiving` row's `checks` apply to entering `archiving`, never to the archive operation.
+
+```yaml
+workflow:
+  - step: archiving
+    archiveChecks:
+      # Tune a core check: never archive over a live overlap
+      - id: spec.overlap
+        skippable: false
+      # Disable a core check this project does not need
+      - id: impl.linksInScope
+        disabled: true
+      # Embed a check registered by a host or plugin, and configure it
+      - id: '@security.code-scan'
+        skippable: true
+        config:
+          minSeverity: critical # deep-merged over the plugin's defaultConfig
+```
+
+Each declaration accepts only `id` (required), `skippable`, `disabled`, and `config`. Any other key, including `onFailure`, is rejected with a schema validation error: archive predicate failures have no abort/collect distinction, so the field would do nothing. `archiveChecks` is valid only on the `archiving` row; on any other row the schema fails to build. The same project override works from `specd.yaml`:
+
+```yaml
+schemaOverrides:
+  append:
+    workflow:
+      - step: archiving
+        archiveChecks:
+          - id: '@security.code-scan'
+            config:
+              minSeverity: medium
+```
+
+Declaring the same `id` twice in one array, or in two schema layers, is an error. Declaring it in `checks` and in `archiveChecks` of the `archiving` row is allowed: they are different coordinates.
+
+What a schema can change on archive is governed by the check registry locks:
+
+| Check                                                                                                                | Skippable by default | Schema may disable | Schema may set `skippable` | Schema may set `config` |
+| -------------------------------------------------------------------------------------------------------------------- | -------------------- | ------------------ | -------------------------- | ----------------------- |
+| `spec.overlap`, `impl.linksInScope`                                                                                  | yes                  | yes                | yes                        | yes                     |
+| `workspace.readOnly`, `impl.filesResolved`, `deps.consistent`                                                        | no                   | **no**             | **no**                     | **no**                  |
+| `schema.nameMatch`, `archive.archivable`, `workflow.taskCompletion`, `verification.current`, `hook.pre`, `hook.post` | no                   | no                 | no                         | no                      |
+| Plugin check bound to `{ scope: 'archive' }`                                                                         | per its binding      | per its governance | per its governance         | per its governance      |
+
+`workspace.readOnly` is a security boundary, and unresolved implementation or inconsistent dependencies would produce an invalid archive, so those three checks cannot be relaxed on archive by any schema or flag. Repeating a locked check with its existing values (for example `skippable: false` on `workspace.readOnly`) is accepted. Declaring a check that no archive binding serves is _embedding_ and requires the check to allow schema embedding (`approval.spec`, for example, does not). Violations raise `CheckDisableForbiddenError`, `CheckBindingOverrideForbiddenError`, `CheckConfigOverrideForbiddenError`, or `CheckEmbeddingForbiddenError` when the schema is built. `@specd/schema-std` declares no `archiveChecks`.
+
+At archive time a check can be bypassed with `specd changes archive <name> --skip-checks <id>` only when its resolved binding is skippable. See the [CLI reference](../cli/cli-reference.md) and the [custom checks guide](../core/custom-checks.md).
 
 ### Hook entries
 
@@ -720,6 +791,8 @@ Explicit external hooks are part of the workflow model, not ad hoc shell escapes
 
 - **`pre` hook failure** — if a `run:` or `external:` hook fails, the step is aborted. The agent should offer to fix the problem before retrying.
 - **`post` hook failure** — the step has already completed; it is not rolled back. After each failing executable hook, the user is prompted to continue with the remaining hooks or stop.
+
+Source `post` `run:` hooks execute only when the transition is classified as `along = forward` (progress along `workflow[]`). Pre `run:` hooks for the target step run regardless of `along` (including redesign into `designing`).
 
 ### Template variables in `run:` hooks
 

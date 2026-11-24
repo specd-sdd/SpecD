@@ -36,7 +36,7 @@ All are injected at kernel composition time, not passed per invocation.
 
 `PreviewSpec` MUST validate and normalize `specId` with `parseSpecId` and the configured workspaces (see `core:spec-id-format`) before any other work, failing with `InvalidSpecIdError` for an invalid ID and `WorkspaceNotFoundError` for an unknown workspace, quoting the full original value.
 
-The public contract of `execute` (its `@throws` documentation) MUST list `InvalidSpecIdError` and `WorkspaceNotFoundError` alongside `ChangeNotFoundError`, `SchemaMismatchError`, and `SpecNotInChangeError`.
+The public contract of `execute` (its `@throws` documentation) MUST list `InvalidSpecIdError` and `WorkspaceNotFoundError` alongside `ChangeNotFoundError`, `SchemaProviderIdentityMismatchError`, and `SpecNotInChangeError`.
 
 It MUST then verify that the normalized `specId` is present in `change.specIds`. If it is not, it MUST throw a `SpecNotInChangeError` (or equivalent) — previewing a spec that the change does not target is not valid.
 
@@ -141,11 +141,15 @@ If delta application fails for an artifact file (e.g. selector resolution failur
 
 If diff generation fails through the dedicated `DiffGenerationError`, `PreviewSpec` MUST also avoid throwing. It treats that case as a warning-producing partial result rather than as a failed preview.
 
-The preview MUST always succeed — partial results are acceptable, total failure is not.
+Once the change and its sovereign schema are resolved, the preview MUST always succeed for content-level failures — partial results are acceptable, total failure is not. This guarantee does not cover preconditions: change lookup failures, sovereign schema resolution failures, and `SchemaProviderIdentityMismatchError` MUST propagate as errors, because no trustworthy artifact model exists to preview against.
 
-### Requirement: Schema name guard
+### Requirement: Host-neutral SpecNotInChangeError
 
-After obtaining the schema from `SchemaProvider`, `PreviewSpec` MUST compare `schema.name()` with `change.schemaName`. If they differ, it MUST throw `SchemaMismatchError`.
+When `PreviewSpec` throws `SpecNotInChangeError` (`SPEC_NOT_IN_CHANGE`), the error `message` MUST be host-neutral without embedding CLI commands such as `specd specs show`, and the error MUST expose `specId` and `changeName` metadata properties.
+
+### Requirement: Sovereign schema resolution
+
+`PreviewSpec` MUST obtain the change's sovereign schema through `ResolveChangeSchema`. The change's recorded schema is the sovereign authority defining artifact parser registry lookups, delta formats, and templates. A different workspace default MUST remain irrelevant; provider identity mismatch MUST propagate as `SchemaProviderIdentityMismatchError`.
 
 ### Requirement: Config-based factory delegates through resolvePreviewSpecDeps
 
@@ -177,4 +181,5 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:file-reader-port`](../file-reader-port/spec.md) — preview-oriented workflows consume preview content as read-only text
 - [`core:composition-resolver`](../composition-resolver/spec.md) — config-based factory wiring resolves `PreviewSpec` dependencies through shared composition
 - [`core:diff-generator`](../diff-generator/spec.md) — unified diff generation is delegated to this internal capability
+- [core:resolve-change-schema](../resolve-change-schema/spec.md) — named sovereign lookup, provider identity validation, and same-name version advisory
 - [`core:spec-id-format`](../spec-id-format/spec.md) — spec ID validation and normalization of `specId`

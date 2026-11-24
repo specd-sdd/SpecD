@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'The standalone guide package contract already defines the canonical target structure; package integration only.'

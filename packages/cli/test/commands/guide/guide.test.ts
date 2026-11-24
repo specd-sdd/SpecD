@@ -87,10 +87,10 @@ describe('CLI guide command', () => {
       }
       expect(data.topics).toHaveLength(5)
       expect(data.pagination).toMatchObject({ page: 2, pageSize: 5, returned: 5 })
-      expect(data.pagination['total']).toBe(22)
+      expect(data.pagination['total']).toBe(23)
       expect(data.pagination['totalPages']).toBe(5)
       expect(data.collections).toEqual([
-        { collection: 'guide', total: 22, firstPage: 1, lastPage: 5 },
+        { collection: 'guide', total: 23, firstPage: 1, lastPage: 5 },
       ])
       expect(data.topics.every((t) => t.page === 2)).toBe(true)
       // Every entry declares its kind, so the caller does not infer it from the path.
@@ -102,7 +102,7 @@ describe('CLI guide command', () => {
       const pagedProgram = makeProgram()
       registerGuideCommand(pagedProgram)
       await pagedProgram.parseAsync(['guide', '--page-size', '5'], { from: 'user' })
-      expect(paged()).toContain('page 1 of 5 · 5 of 22 topics')
+      expect(paged()).toContain('page 1 of 5 · 5 of 23 topics')
 
       const single = captureStdout()
       const singleProgram = makeProgram()
@@ -149,9 +149,9 @@ describe('CLI guide command', () => {
         topics: Array<Record<string, unknown>>
       }
       expect(data.collections).toEqual([
-        { collection: 'guide', total: 22, firstPage: 1, lastPage: 6 },
+        { collection: 'guide', total: 23, firstPage: 1, lastPage: 6 },
       ])
-      expect(data.pagination).toMatchObject({ page: 1, pageSize: 4, returned: 4, total: 22 })
+      expect(data.pagination).toMatchObject({ page: 1, pageSize: 4, returned: 4, total: 23 })
       expect(data.topics).toHaveLength(4)
 
       const first = data.topics[0]!
@@ -177,7 +177,7 @@ describe('CLI guide command', () => {
       expect(out).toContain('PAGE')
       expect(out).toContain('SCOPE')
       expect(out).toContain('read: specd guide <topic>')
-      expect(out).toContain('page 1 of 6 · 4 of 22 topics')
+      expect(out).toContain('page 1 of 6 · 4 of 23 topics')
       // No per-row read command column.
       expect(out).not.toContain('READ')
     })
@@ -465,8 +465,8 @@ describe('CLI guide command', () => {
       })
 
       const out = getStdout()
-      // Section 4 starts at line 49
-      expect(out).toMatch(/^\s*49 \| ## States explained/m)
+      // Section 4 starts at line 47 in the bundled workflow guide.
+      expect(out).toMatch(/^\s*47 \| ## States explained/m)
     })
   })
 

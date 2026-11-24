@@ -3,11 +3,15 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["cli:entrypoint", "sdk:host-context", "sdk:composition"],
+  "dependsOn": ["cli:entrypoint", "sdk:host-context", "sdk:composition", "core:kernel"],
   "implementation": [
     {
       "file": "cli:src/helpers/cli-context.ts",
       "symbols": ["resolveCliContext"]
+    },
+    {
+      "file": "cli:src/graph-index-task.ts",
+      "symbols": ["runGraphIndexTask"]
     },
     {
       "file": "cli:test/helpers/cli-context.spec.ts"

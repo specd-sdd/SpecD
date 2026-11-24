@@ -1,0 +1,44 @@
+- op: removed
+  description: Replace renamed requirement section
+  selector:
+    type: section
+    matches: 'Requirement:\ Schema\ name\ guard'
+- op: added
+  description: Verify sovereign schema resolution when workspace default differs
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement:\ Change\ lookup'
+  content: |
+    ### Requirement: Sovereign schema resolution
+
+    #### Scenario: Resolves sovereign schema when workspace default differs
+
+    - **GIVEN** a change created with schema `custom-workflow`
+    - **AND** the workspace default schema is `@specd/schema-std`
+    - **WHEN** `execute` is called
+    - **THEN** hooks defined in `custom-workflow` are resolved and executed
+    - **AND** `SchemaMismatchError` is not thrown
+
+- op: added
+  description: Disabled step has no runnable hooks
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Step resolution'
+  content: |
+    #### Scenario: Disabled step returns no hooks in either phase
+
+    - **GIVEN** a change whose schema declares `verifying: { disabled: true }` with `run:` hooks in both `pre` and `post`
+    - **WHEN** `RunStepHooks.execute({ name, step: 'verifying', phase })` is called for `pre` and for `post`
+    - **THEN** each call returns `{ hooks: [], success: true, failedHooks: [] }`
+    - **AND** the `HookRunner` and external runners are never invoked
+
+    #### Scenario: --only cannot run a hook on a disabled step
+
+    - **GIVEN** the same disabled `verifying` step
+    - **WHEN** `RunStepHooks.execute({ name, step: 'verifying', phase: 'pre', only: '<hookId>' })` names one of its hooks
+    - **THEN** the result is empty and successful and no hook executes

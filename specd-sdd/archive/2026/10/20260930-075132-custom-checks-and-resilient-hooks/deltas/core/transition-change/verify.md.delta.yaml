@@ -1,0 +1,54 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Input contract'
+  content: |
+    #### Scenario: Input accepts skipChecks array
+    - **GIVEN** a transition execution request
+    - **WHEN** passing `TransitionChangeInput` with `skipChecks: ['impl.linksInScope', 'spec.overlap']`
+    - **THEN** the orchestrator receives the bypass list without legacy boolean flags
+
+    #### Scenario: Legacy boolean flags omitted from input
+    - **WHEN** inspecting `TransitionChangeInput` type contract
+    - **THEN** `allowOutOfScope` and `allowOverlap` are not present on the input interface
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Canonical pre-transition validity reconciliation'
+  content: |
+    #### Scenario: Unauthorized bypass of mandatory check throws CheckNotSkippableError
+    - **GIVEN** a mandatory check `protocol.edge` with `skippable: false`
+    - **WHEN** attempting transition with `skipChecks: ['protocol.edge']`
+    - **THEN** it throws `CheckNotSkippableError` and state remains unchanged
+
+    #### Scenario: Bypassing hook effect check with skipChecks throws CheckNotSkippableError
+    - **GIVEN** an effect check `hook.pre`
+    - **WHEN** attempting transition with `skipChecks: ['hook.pre']`
+    - **THEN** it throws `CheckNotSkippableError` enforcing that effects must be skipped via `skipHookPhases`
+
+    #### Scenario: Authorized bypass of skippable check succeeds
+    - **GIVEN** a skippable check `impl.linksInScope` with out-of-scope files present
+    - **WHEN** attempting transition with `skipChecks: ['impl.linksInScope']`
+    - **THEN** `impl.linksInScope` is bypassed and the transition succeeds
+
+    #### Scenario: Disabled step check is omitted from execution
+    - **GIVEN** a step schema declaring a custom check with `disabled: true` (where `allowDisable !== false`)
+    - **WHEN** executing transition to that step
+    - **THEN** the check is omitted from predicate evaluation and does not block the transition
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Shared runner errors propagate on transition'
+  content: |
+    #### Scenario: Failed predicate check throws unified CheckPredicateFailedError
+    - **GIVEN** an active check returning `outcome: 'fail'` with code `'SPEC_OVERLAP'`
+    - **WHEN** `TransitionChange.execute` evaluates transition preflight
+    - **THEN** it throws `CheckPredicateFailedError` containing the check's `checkId`, `label`, `code`, `message`, and `command`
+    - **AND** legacy error classes like `ArchiveImplementationStateError` are not thrown
+
+    #### Scenario: Multiple failed checks with collect policy populate details
+    - **GIVEN** multiple checks failing under `onFailure: 'collect'`
+    - **WHEN** transition preflight completes
+    - **THEN** `CheckPredicateFailedError` contains structured diagnostic details for all failed checks

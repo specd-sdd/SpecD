@@ -186,8 +186,15 @@
 
 #### Scenario: Artifact with dependency chain
 
-- **WHEN** artifact B declares `requires: [a]` and artifact A is `in-progress`
-- **THEN** `Change.effectiveStatus('b')` must return `in-progress`
+- **WHEN** artifact B declares `requires: [a]`, artifact A is `in-progress`, and B is `complete`
+- **THEN** `projectArtifacts` effective status for `b` is `in-progress`
+- **AND** there is no `Change.effectiveStatus()` method
+
+#### Scenario: Artifact blocked by parent pending review
+
+- **WHEN** artifact B declares `requires: [a]`, artifact A is `pending-review`, and B is `complete`
+- **THEN** `projectArtifacts` effective status for `b` is `pending-parent-artifact-review`
+- **AND** there is no `Change.effectiveStatus()` method
 
 #### Scenario: Circular dependency in artifact graph
 
@@ -306,6 +313,15 @@
 - **WHEN** `SchemaRegistry.resolve()` materializes the artifact type
 - **THEN** its default `completePattern` is `^\s*-\s+\[[xX]\]`
 - **AND** that pattern matches both `[x]` and `[X]` markdown task markers
+
+### Requirement: Task artifact validity semantics
+
+#### Scenario: Marker controls operational semantics
+
+- **GIVEN** an artifact has an arbitrary ID and declares `hasTasks: true`
+- **WHEN** validity and archive are evaluated
+- **THEN** its content is excluded from fingerprints and automatic drift propagation
+- **AND** missing structure or incomplete live tasks still block applicable operations
 
 ### Requirement: Delta validation rules
 
@@ -471,28 +487,6 @@
 - **WHEN** `ValidateArtifacts` evaluates the rule
 - **THEN** `ValidateArtifacts` records a warning for that section
 
-### Requirement: Per-spec approval
-
-#### Scenario: New spec requires approval
-
-- **WHEN** a delta creates a new spec via an `added` operation
-- **THEN** that spec ID must be approved before archiving
-
-#### Scenario: Modified spec requires approval
-
-- **WHEN** a delta modifies or removes nodes in an existing spec
-- **THEN** that spec ID must be approved before archiving
-
-#### Scenario: All specs approved
-
-- **WHEN** every spec ID touched by the change has been approved
-- **THEN** `specd archive` proceeds without an approval error
-
-#### Scenario: Partially approved
-
-- **WHEN** at least one touched spec ID has not been approved
-- **THEN** `specd archive` must refuse and report which spec IDs are pending approval
-
 ### Requirement: preHashCleanup
 
 #### Scenario: Substitution applied before hashing
@@ -593,15 +587,16 @@
 #### Scenario: Step with unsatisfied prerequisites
 
 - **WHEN** a step's `requires` lists an artifact that is not `complete`
-- **THEN** `CompileContext` must report that the step is blocked
+- **THEN** hop availability for that target is reported by `GetStatus` / `evaluateLifecycle` as blocked
+- **AND** `CompileContext` MUST NOT evaluate that availability
 
 #### Scenario: Step blocked when required artifact deleted mid-lifecycle
 
 - **GIVEN** a workflow step `implementing` with `requires: [proposal, specs, verify, design, tasks]`
 - **AND** a change where `design` artifact has been deleted (status reverts to `missing`)
-- **WHEN** `CompileContext` evaluates step availability for `implementing`
-- **THEN** `stepAvailable` is `false`
-- **AND** `blockingArtifacts` includes `"design"`
+- **WHEN** hop availability for `implementing` is evaluated
+- **THEN** the hop is not in `availableTransitions`
+- **AND** `CompileContext` MUST NOT report `stepAvailable`
 
 #### Scenario: Hook entries require id
 
@@ -614,6 +609,111 @@
 - **AND** artifact `proposal` has `hasTasks: false`
 - **WHEN** the schema is resolved
 - **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
+
+#### Scenario: Omitted workflow step is not a deleted lifecycle state
+
+- **GIVEN** a schema whose `workflow[]` omits `implementing`
+- **WHEN** the schema is resolved
+- **THEN** `implementing` remains a valid Change lifecycle state
+- **AND** `workflow[]` still only attaches extras to listed `step` names
+
+#### Scenario: Unknown workflow step is rejected at schema build
+
+- **GIVEN** a schema whose `workflow[]` includes `step: reviewing`
+- **WHEN** `buildSchema` runs
+- **THEN** it throws `SchemaValidationError`
+- **AND** the unknown name does not become an axis slot
+
+#### Scenario: archiveChecks accepted on the archiving entry
+
+- **GIVEN** a `workflow` entry `step: archiving` with `archiveChecks: [{ id: spec.overlap, skippable: false }]`
+- **WHEN** the schema is parsed
+- **THEN** the declaration is kept with its `id` and `skippable`
+
+#### Scenario: archiveChecks rejected on any other step
+
+- **GIVEN** a `workflow` entry `step: implementing` with `archiveChecks: [{ id: spec.overlap }]`
+- **WHEN** the schema is built
+- **THEN** `SchemaValidationError` is thrown naming `implementing`
+
+#### Scenario: onFailure is rejected in archiveChecks
+
+- **GIVEN** `archiveChecks: [{ id: spec.overlap, onFailure: collect }]`
+- **WHEN** the schema is parsed
+- **THEN** `SchemaValidationError` is thrown
+- **AND** the key is not silently stripped
+
+#### Scenario: Unknown keys are rejected in archiveChecks
+
+- **GIVEN** `archiveChecks: [{ id: spec.overlap, from: ready }]`
+- **WHEN** the schema is parsed
+- **THEN** `SchemaValidationError` is thrown
+
+#### Scenario: Declarations are identified by id when layering
+
+- **GIVEN** `schemaOverrides.append.workflow` adds an `archiving` entry with `archiveChecks: [{ id: '@security.code-scan', config: { minSeverity: medium } }]`
+- **AND** the base schema already declares `archiveChecks` for another id
+- **WHEN** the layers are merged
+- **THEN** both declarations are present
+
+#### Scenario: checks on the archiving entry do not become archiveChecks
+
+- **GIVEN** an `archiving` entry with `checks: [{ id: deps.consistent }]` and no `archiveChecks`
+- **WHEN** the schema is parsed
+- **THEN** `archiveChecks` is absent and the `checks` declaration stays a transition-into-`archiving` declaration
+
+#### Scenario: Standard schema declares no archiveChecks
+
+- **WHEN** `@specd/schema-std` is loaded
+- **THEN** its `archiving` entry has no `archiveChecks`
+
+#### Scenario: checks, skipChecks, optional and disabled are accepted workflow options
+
+- **GIVEN** an entry using `optional`, `disabled`, `checks` and `skipChecks` with their documented fields
+- **WHEN** the schema is parsed
+- **THEN** each option is accepted without error
+
+#### Scenario: archiveChecks must be an array
+
+- **GIVEN** `archiveChecks: { id: spec.overlap }`
+- **WHEN** the schema is parsed
+- **THEN** `SchemaValidationError` is thrown
+
+#### Scenario: Declaration without id is rejected
+
+- **GIVEN** `archiveChecks: [{ skippable: true }]`
+- **WHEN** the schema is parsed
+- **THEN** `SchemaValidationError` is thrown
+
+#### Scenario: Wrongly typed fields are rejected
+
+- **GIVEN** `archiveChecks: [{ id: spec.overlap, skippable: "yes" }]`, or `disabled: 1`, or `config: [1]`
+- **WHEN** the schema is parsed
+- **THEN** each declaration throws `SchemaValidationError`
+
+#### Scenario: Empty archiveChecks equals omitted
+
+- **GIVEN** an `archiving` entry with `archiveChecks: []`
+- **WHEN** the schema is built
+- **THEN** it behaves exactly like an entry without `archiveChecks`
+
+#### Scenario: Same id introduced by two layers is rejected
+
+- **GIVEN** the base schema declares `archiveChecks` for `@security.code-scan` and `schemaOverrides.append.workflow` declares it again
+- **WHEN** the layers are merged
+- **THEN** `SchemaValidationError` is thrown, as for `checks` and `skipChecks`
+
+#### Scenario: Override adds archiveChecks to an entry that has none
+
+- **GIVEN** the base `archiving` entry has no `archiveChecks`
+- **WHEN** `schemaOverrides.append.workflow` adds `archiveChecks` for `step: archiving`
+- **THEN** the merged entry contains them and keeps its hooks and other options
+
+#### Scenario: A plugin schema layer can declare archiveChecks
+
+- **GIVEN** a schema plugin that adds an `archiving` entry with `archiveChecks`
+- **WHEN** the plugin layer is applied
+- **THEN** the declarations are present in the final schema
 
 ### Requirement: Explicit external hook entries
 
@@ -639,10 +739,12 @@
 - **WHEN** the plugin is resolved
 - **THEN** it loads successfully
 
-#### Scenario: Plugin with metadataExtraction is rejected
+#### Scenario: Plugin cannot declare metadata extraction
 
-- **WHEN** a schema-plugin declares `metadataExtraction`
-- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
+- **GIVEN** a schema plugin declares `metadataExtraction`
+- **WHEN** its schema is parsed
+- **THEN** parsing rejects the plugin declaration
+- **AND** transforms and resolved schema layers remain the supported plugin extension points
 
 ### Requirement: Schema resolution
 

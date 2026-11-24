@@ -169,11 +169,13 @@ This change is non-breaking and backwards-compatible with existing changes and s
 ### Automated Tests
 
 1. **Monorepo unit and integration tests**:
+
    ```bash
    pnpm test
    ```
 
    - Covers core schema parsing, DAG topological resolution, validation rules, and CLI execution.
+
 2. **Monorepo typecheck**:
    ```bash
    pnpm typecheck
@@ -183,6 +185,7 @@ This change is non-breaking and backwards-compatible with existing changes and s
    pnpm lint
    ```
 4. **Spec validation across the entire workspace**:
+
    ```bash
    node packages/cli/dist/index.js specs validate
    ```
@@ -192,12 +195,15 @@ This change is non-breaking and backwards-compatible with existing changes and s
 ### Manual / E2E Verification
 
 1. **Validate change artifacts within the change directory**:
+
    ```bash
    node packages/cli/dist/index.js changes validate init-schema-std-and-metapackage-specs --format text
    ```
 
    - Assert all artifacts pass without errors.
+
 2. **Check change status**:
+
    ```bash
    node packages/cli/dist/index.js changes status init-schema-std-and-metapackage-specs --format text
    ```

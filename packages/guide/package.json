@@ -10,6 +10,9 @@
     "generated/"
   ],
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "dependencies": {
     "minisearch": "^7.1.2"
   },

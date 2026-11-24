@@ -6,91 +6,52 @@
   "dependsOn": ["code-graph:sqlite-graph-store"],
   "implementation": [
     {
-      "file": "code-graph:src/domain/value-objects/graph-index-worker-types.ts",
-      "symbols": [
-        "GraphIndexFailureCause",
-        "GraphIndexWorkerDiagnostics",
-        "GraphIndexWorkerEvent",
-        "GraphIndexTaskAnnouncer"
-      ]
+      "file": "code-graph:src/infrastructure/isolated-index-worker/supervisor.ts",
+      "symbols": ["runIsolatedGraphIndexWithRuntime"]
     },
     {
       "file": "code-graph:src/domain/errors/isolated-graph-index-errors.ts",
-      "symbols": [
-        "GraphIndexWorkerError",
-        "GraphIndexWorkerStartError",
-        "GraphIndexTaskContractError",
-        "GraphIndexTaskExecutionError",
-        "GraphIndexWorkerProtocolError",
-        "GraphIndexWorkerExitError",
-        "GraphIndexWorkerSignalError",
-        "GraphIndexProgressHandlerError"
-      ]
+      "symbols": ["GraphIndexWorkerStartError"]
     },
     {
-      "file": "code-graph:src/domain/errors/index.ts"
+      "file": "code-graph:test/infrastructure/isolated-index-worker/signals.spec.ts"
     },
     {
-      "file": "code-graph:src/infrastructure/isolated-index-worker/protocol.ts",
-      "symbols": ["GRAPH_INDEX_PROTOCOL", "isChildMessage", "ACTIVITY_ITEM_MAX_CHARS"]
-    },
-    {
-      "file": "code-graph:src/application/ports/isolated-graph-index-runner.ts",
-      "symbols": ["GraphIndexTask", "RunIsolatedGraphIndexInput"]
-    },
-    {
-      "file": "code-graph:src/infrastructure/isolated-index-worker/isolated-index-worker-child.ts"
-    },
-    {
-      "file": "code-graph:src/infrastructure/isolated-index-worker/output-tail.ts",
-      "symbols": ["OutputTail"]
-    },
-    {
-      "file": "code-graph:src/infrastructure/isolated-index-worker/classify-failure.ts",
-      "symbols": ["classifyWorkerFailure"]
-    },
-    {
-      "file": "code-graph:src/infrastructure/isolated-index-worker/supervisor.ts"
-    },
-    {
-      "file": "code-graph:src/public.ts"
-    },
-    {
-      "file": "code-graph:src/index.ts"
+      "file": "code-graph:test/infrastructure/isolated-index-worker/supervisor.spec.ts"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Runs trusted graph-index tasks in a lock-owning child with validated IPC, crash containment, typed failures, and deterministic cleanup.",
+      "value": "Run trusted graph indexing in lock-owning child process with validated IPC, signal-safe lease cleanup, crash containment, and typed failures.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:41e5434c0b9d7af8c5ddb5579c0ad46abd1f7afc5938c485e015a335c1044ad2",
-          "lastModified": "2026-11-02T19:27:44.652Z"
+          "hash": "sha256:b89375482f863820d4d924aa094c6c24acf6f638545deec0f82718f26cb243dd",
+          "lastModified": "2026-09-28T11:19:59.064Z"
         },
         "verify.md": {
-          "hash": "sha256:72a37ed44db6033e941ae65a84c93d22511f9492ba0c816bcf4afa8a394101f2",
-          "lastModified": "2026-11-02T19:27:44.654Z"
+          "hash": "sha256:3010452f5eb6d5a1015fd304fd457500d57dfc819144c930b4ebb0167a6f6d58",
+          "lastModified": "2026-09-28T11:19:59.066Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Isolated Index Worker\n\n## Rules\n\n- Public `runIsolatedGraphIndex` accepts storage root, trusted installed task-module URL/absolute path, JSON-serializable input, optional progress callback; resolves JSON-serializable result. No rendering, CLI-format interpretation, host exit-state mutation, or `process.exit()`.\n- Acquire shared storage-root index lock before fork. Same-root concurrency fails typed busy before second child. Supervisor owns lease through child lifetime; releases exactly once after success, task failure, creation/IPC/send failure, invalid/duplicate terminal IPC, early/non-zero/signal exit, native crash.\n- Startup failure bounded without `exit`: detach owned listeners, tear down IPC, best-effort terminate, release once, reject typed startup failure. Lock helpers/tokens remain internal.\n- Lock acquisition delegates stale-owner recovery to shared helper from `code-graph:staleness-detection`; supervisor only consumes acquired/typed-busy result; implements no PID recovery.\n- Lease-holding process releases on process exit; also Windows `SIGBREAK` and delivered `SIGTERM`. Missing `SIGTERM` delivery MUST NOT leave lease after exit.\n- Production uses `node:child_process.fork` with package-shipped worker. Child contains task, parsers, native provider/store work; native crash MUST NOT terminate host. Worker threads/in-process NOT production isolation modes.\n- Success requires terminal result, task cleanup, then exit code 0; post-result crash/signal remains failure. Cleanup fixes lifecycle faults without `process.exit()`.\n- Worker imports exactly host-selected trusted module. Async task entrypoint receives JSON input, progress emitter, activity announcer (item + optional mandatory flag). Reject missing/non-callable entrypoint or non-serializable input/progress/result as typed task/protocol failure. Task-module selection NOT end-user CLI arg.\n- Tagged versioned IPC: progress, activity, one successful terminal, one task-reported failure, malformed/unsupported, exit without terminal. Version MUST change when message types/fields change; mismatch → protocol failure. At most one terminal; duplicate/late → protocol failure, no second settle/release.\n- Forward valid progress to optional host callback in arrival order without rendering/lossy transform. No CLI-specific text/JSON/TOON for progress/result.\n- Typed failures: busy; fork/IPC startup; invalid task module/contract; task-reported; malformed/unsupported/late/duplicate IPC; non-zero/early exit; signal termination. Post-start failures carry closed `cause`: `start-failed` | `task-contract` | `task-error` | `protocol` | `cancelled` | `native-crash` | `resource-limit` | `exited`. Diagnostics include last activity + stdout/stderr tails. Extend `SpecdCodeGraphError`; stable upper-snake-case codes.\n- Capture child stdout/stderr: bounded ≤16 KiB/stream UTF-8 tails; release at end; NEVER write to host streams or forward as progress/events; only in failure diagnostics.\n- Activity/silence watchdog (supervisor): rate-limit activity ≤4/s except mandatory; on 10s silence emit `worker-silent` (repeat ≤once/further 10s). MUST NOT terminate child. Throwing event/`onWarning`/string-warning receiver → typed `GraphIndexProgressHandlerError` after child terminate; release lease.\n- Optional `onEvent` kinds: `activity`, `worker-silent`, `stale-lock-recovered` (also text via `onWarning`). Arrival order; omit MUST NOT change execution.\n- Child runtime: GC request available via fork exec arg; preserve ESM entrypoint args; MUST NOT strip host runtime args.\n- Active child: install parent `SIGINT`/`SIGTERM` forwarders; remove only installed handlers after terminate; wait, release lock, report signal-derived failure; MUST NOT exit/re-signal host.\n- Child receives code-graph-owned indication supervisor holds index lock; provider indexing inside child MUST avoid reacquire. NOT public token; scoped to forked child env.\n- Emit stable ESM worker under published `dist/`; resolve relative to installed module location. Built verification: forced project index → terminal result, cleanup, exit 0.\n- Cleanup idempotent before promise settles; no leftover lock/child/IPC; detach only installed listeners.\n\n## Constraints\n\n- Only child process provides native-crash containment.\n- MUST NOT depend on `@specd/sdk`, `@specd/cli`, Commander, or delivery output formatter.\n- Inputs, progress, results, IPC payloads JSON-serializable and runtime-validated at process boundary.\n- Direct lock helpers and raw IPC DTOs remain internal.\n- No queueing, lock waiting, automatic retry, scheduled/background indexing. No local stale-lock/PID recovery (delegates to `code-graph:staleness-detection` helper).\n",
+      "value": "# Isolated Index Worker\n## Rules\n- Public `runIsolatedGraphIndex` accepts storage root, trusted installed task-module URL/absolute path, JSON-serializable input, optional progress callback; resolves serializable result. Never renders, interprets CLI formats, mutates host exit state, or calls `process.exit()`.\n- Acquire shared root-scoped index lock before fork; same-root concurrency fails typed busy before second child. Supervisor owns lease for full child lifetime and releases exactly once after success, task failure, creation/IPC/send failure, invalid/duplicate terminal IPC, early/non-zero/signal exit, or native crash.\n- Startup failure is bounded even without `exit`: detach owned listeners, tear down IPC, best-effort terminate, release once, reject typed startup failure. Lock acquire/release/path/assertion internals; callers never handle tokens.\n- Production uses `node:child_process.fork` with package-shipped worker containing task, parsers, native provider/store work. Child native crash cannot terminate host. Success requires terminal result, task cleanup, then exit 0; post-result crash/signal remains failure. No `process.exit()` masking. Tests may inject launcher/protocol seam; no production worker-thread/in-process mode.\n- Worker imports exactly host-selected trusted module; async entrypoint receives serializable input + progress emitter, returns one serializable result or throws once. Missing/non-callable entrypoint or non-serializable input/progress/result => typed task/protocol failure. Module choice never end-user CLI input; not untrusted-code sandbox.\n- Runtime-validated tagged IPC: zero-or-more progress then exactly one terminal result/failure. Malformed/unsupported/late/duplicate/missing terminal => protocol failure. Never double-settle, signal, or release. Raw envelopes/bootstrap commands internal.\n- Forward valid progress unchanged and ordered; callback absence changes nothing. Child/supervisor emit no CLI text/JSON/TOON presentation; hosts render.\n- Typed `SpecdCodeGraphError` subclasses with stable upper-snake-case codes distinguish busy, fork/IPC startup, invalid module/contract, task failure, malformed/unsupported/late/duplicate IPC, abnormal/early exit, signal termination; actionable messages and structured exit/signal details, no stderr parsing.\n- During activity install parent `SIGINT`/`SIGTERM` handlers, forward same signal, await child, clean, reject typed signal failure. Remove only installed handlers; never exit/re-signal host.\n- Lease-holding process releases on process exit; on Windows also `SIGBREAK`; retain `SIGTERM` release where delivered. Missing `SIGTERM` delivery cannot leave lease after process exit.\n- Child receives internal code-graph-owned indication supervisor owns lock; provider skips reacquisition only for matching child/root. No public caller token or unrelated root/process bypass.\n- Build stable ESM worker under published `dist/`; resolve relative to installed package. Verify public supervisor forks publish-shaped worker/task; built integration forces project index, receives terminal result, finishes cleanup, exits 0.\n- Listener removal, child cleanup, IPC teardown, lock release idempotent and complete before promise settlement. Remove only owned listeners; leave no lock file/live child/open IPC.\n## Constraints\n- Child process mandatory for native-crash containment.\n- No queueing, waiting, retry, stale-lock PID recovery, scheduling, background indexing.\n- No `@specd/sdk`, `@specd/cli`, Commander, delivery formatter dependency.\n- Inputs/progress/results/IPC JSON-serializable and runtime-validated at boundary.\n- Direct lock helpers/raw IPC DTOs internal.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:41e5434c0b9d7af8c5ddb5579c0ad46abd1f7afc5938c485e015a335c1044ad2",
-          "lastModified": "2026-11-02T19:27:44.652Z"
+          "hash": "sha256:b89375482f863820d4d924aa094c6c24acf6f638545deec0f82718f26cb243dd",
+          "lastModified": "2026-09-28T11:19:59.064Z"
         },
         "verify.md": {
-          "hash": "sha256:72a37ed44db6033e941ae65a84c93d22511f9492ba0c816bcf4afa8a394101f2",
-          "lastModified": "2026-11-02T19:27:44.654Z"
+          "hash": "sha256:3010452f5eb6d5a1015fd304fd457500d57dfc819144c930b4ebb0167a6f6d58",
+          "lastModified": "2026-09-28T11:19:59.066Z"
         }
       }
     }

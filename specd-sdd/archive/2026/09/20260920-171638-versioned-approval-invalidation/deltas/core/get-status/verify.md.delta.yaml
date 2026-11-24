@@ -1,0 +1,168 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Optional pre-read implementation tracking refresh$'
+  content: |
+    ### Requirement: Operational status reconciliation
+
+    #### Scenario: Active status persists detected recovery once
+
+    - **GIVEN** external drift invalidates required spec consent
+    - **WHEN** active status is requested twice
+    - **THEN** the first request atomically persists staleness and design recovery
+    - **AND** the second reports the committed state without duplicate events
+
+    #### Scenario: Schema resolution failure is reachable and read only
+
+    - **GIVEN** the real schema provider fails before active refresh
+    - **WHEN** status is requested
+    - **THEN** it returns `SCHEMA_RESOLUTION_FAILED` with non-mutating guidance
+    - **AND** neither implementation refresh nor reconciliation is invoked
+    - **AND** the manifest and history remain byte-for-byte unchanged
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Revision evaluation for conditional status queries$'
+  content: |
+    Scenarios:
+
+    #### Scenario: Matching manifest timestamp does not hide external drift
+
+    - **GIVEN** `ifModifiedSince` matches the manifest but a linked file changed externally
+    - **WHEN** active status is requested
+    - **THEN** refresh and reconciliation run before any unchanged response decision
+
+    #### Scenario: Draft status may retain read-only timestamp shortcut
+
+    - **WHEN** conditional status targets a draft with an unchanged revision
+    - **THEN** it may return the existing read-only unchanged projection without reconciliation
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Optional pre-read implementation tracking refresh$'
+  content: |
+    Scenarios:
+
+    #### Scenario: Refresh is configurable only for active status
+
+    - **WHEN** active status runs with refresh enabled
+    - **THEN** it delegates to `RefreshImplementationTracking` before reconciliation
+    - **AND** drafted status never refreshes or mutates
+
+    #### Scenario: Explicit refresh false is honored
+
+    - **WHEN** active status disables implementation refresh
+    - **THEN** it skips `RefreshImplementationTracking` but still performs configured validity reconciliation
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Identifies blockers$'
+  content: |
+    ### Requirement: Approval, verification, and fingerprint status projection
+
+    #### Scenario: Attempt and completed evidence are distinct
+
+    - **GIVEN** a stale completed verification and a newer unfinished attempt
+    - **WHEN** status is rendered
+    - **THEN** both records and their freshness are shown separately
+    - **AND** the attempt is not presented as successful evidence
+
+    #### Scenario: Required boundary recommends in-place verification
+
+    - **GIVEN** current verification is missing at `verifying`
+    - **WHEN** status determines the next action
+    - **THEN** it recommends the verification skill in the current state
+    - **AND** does not require a lifecycle self-transition or rollback
+
+    #### Scenario: Status exposes the rich projection contract
+
+    - **GIVEN** a completed record and a newer active attempt coexist
+    - **WHEN** `GetStatus` returns validity
+    - **THEN** the public value is `ValidityStatusProjection` assembled from verdict and committed aggregate
+    - **AND** neither record is lost by returning the raw evaluator verdict
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Returns lifecycle context$'
+  content: |
+    Scenarios:
+
+    #### Scenario: Preserve routes artifact review through the active skill
+
+    - **GIVEN** ungated artifact drift with workflow `preserve`
+    - **WHEN** status projects review and lifecycle context
+    - **THEN** review is required in the current skill and forward progress is blocked
+    - **AND** required stale spec consent instead routes to `designing`
+
+    #### Scenario: Redesign policy routes review to design
+
+    - **GIVEN** non-task drift under workflow `redesign`
+    - **WHEN** lifecycle context is projected
+    - **THEN** review route and committed state point to `designing`
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Constructor dependencies$'
+  content: |
+    Scenarios:
+
+    #### Scenario: Composition resolves one reconciliation path
+
+    - **WHEN** either supported `GetStatus` factory signature is used
+    - **THEN** it resolves refresh, reconciliation, repository, schema, gates, and checks through standard composition
+    - **AND** does not construct adapters or a second invalidation path
+
+    #### Scenario: Draft composition remains read only
+
+    - **WHEN** status resolves a drafted change
+    - **THEN** it uses the draft view without reconciliation or active mutation ports
+
+    #### Scenario: Missing reconciler fails instead of falling back
+
+    - **WHEN** direct dependencies omit the mandatory reconciler
+    - **THEN** status construction or execution fails explicitly
+    - **AND** no legacy `Change.invalidate` mutation occurs
+
+- op: modified
+  description: 'Make review routing dependent on non-task status, workflow policy, and gate recovery'
+  selector:
+    type: section
+    matches: '^Scenario: review.required becomes true when any file is pending review$'
+  rename: 'Scenario: Non-task pending review routes by policy and gate priority'
+  content: |
+    - **GIVEN** a non-task file is in `pending-review` with no required stale spec consent
+    - **WHEN** active status reconciles the change
+    - **THEN** `review.required` is `true` with reason `artifact-review-required`
+    - **AND** workflow `preserve` retains the current-phase review route and blocks forward progress
+    - **AND** workflow `redesign` routes to committed `designing`
+    - **AND** required stale spec consent routes to `designing` regardless of preserve
+
+- op: added
+  description: 'Exclude operational task edits from automatic artifact review'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Returns the change and its artifact statuses$'
+    after:
+      type: section
+      matches: '^Scenario: Non-task pending review routes by policy and gate priority$'
+  content: |
+    #### Scenario: Task-only content change does not open artifact review
+
+    - **GIVEN** only an artifact marked `hasTasks: true` changed after validation
+    - **WHEN** active status reconciles artifact validity
+    - **THEN** it does not mark non-task artifact review required solely from that change
+    - **AND** live task completion remains a separate blocker where applicable

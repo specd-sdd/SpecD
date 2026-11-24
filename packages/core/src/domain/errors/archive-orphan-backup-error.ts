@@ -1,6 +1,17 @@
 import { SpecdError } from './specd-error.js'
 
-/** Thrown when a leftover archive backup directory blocks a new archive attempt. */
+/**
+ * Thrown when a leftover archive backup directory blocks a new archive attempt.
+ *
+ * Cases:
+ * - Foreign backup: the manifest names a different change (`foreignChangeName` is `true`,
+ *   `changeName` is the foreign change); the backup is left untouched.
+ * - Recovered backup: the manifest names the current change; canonical files were restored
+ *   from it and the backup removed, and the archive must be retried after review.
+ * - Corrupt or unreadable manifest: the manifest is not valid or cannot be read for a reason
+ *   other than absence (`foreignChangeName` is `false`, `changeName` is the current change);
+ *   the backup and canonical files are left untouched.
+ */
 export class ArchiveOrphanBackupError extends SpecdError {
   private readonly _specId: string
   private readonly _changeName: string

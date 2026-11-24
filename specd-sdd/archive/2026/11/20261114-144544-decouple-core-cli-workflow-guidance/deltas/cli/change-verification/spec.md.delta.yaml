@@ -1,0 +1,11 @@
+- op: modified
+  description: 'Invalidation output renders the next action and verification remediation through the presenter'
+  selector:
+    type: section
+    matches: 'Requirement: Success and idempotent output'
+  content: |
+    Text output SHALL state whether verification was newly invalidated or was already stale, identify the retained completed-verification record, and show any sign-off consequence, committed recovery state, blockers, and canonical next action.
+
+    JSON and TOON SHALL expose the equivalent typed result, including `invalidated`, verification status, persisted reason, current state, blockers, automatic return when present, and next action. Text SHALL identify the same persisted reason. On an idempotent repeat with a different requested reason, every format reports the original retained invalidation reason rather than echoing the unused new input. Output MUST NOT reveal source contents or misrepresent invalidation as a new verification attempt.
+
+    The next action and blocker remediation come from Core as host-neutral `intent` and check-declared `action` (`start-verification`, `refresh-status`). The CLI SHALL project the displayed `command` through the centralized CLI guidance presenter, resolving verification actions with the real change name and never emitting a literal `<name>` placeholder; when `params.changeName` is missing, the action has no command mapping: a blocker's `command` is then omitted (never `null`), `nextAction.command` is `null`, and the action's host-neutral guidance is exposed in a separate `guidance` field (never in `command`). Text output SHALL render each blocker's remediation (command or guidance line) under the blocker. JSON and TOON keep `nextAction.command` for compatibility and additionally expose `intent`, `action`, and `guidance` when applicable. Each JSON and TOON blocker object mirrors its text remediation with `action`, a presenter-projected `command` (omitted from the object when the action has no command mapping, never `null`), and `guidance` when applicable. Blockers of invalidate results MUST be projected through the same CLI blocker projection as status and invalidate (`label`, `checkId`, `bypassFlag`, `action`), in text, JSON and TOON, and raw `isSkippable` MUST NOT be emitted. Start and complete results carry no `nextAction`.

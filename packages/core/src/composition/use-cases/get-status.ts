@@ -1,17 +1,18 @@
 import { type ChangeRepository } from '../../application/ports/change-repository.js'
 import { type SchemaProvider } from '../../application/ports/schema-provider.js'
+import { type ResolveChangeSchema } from '../../application/services/resolve-change-schema.js'
 import { GetStatus } from '../../application/use-cases/get-status.js'
-import { CountTasks } from '../../application/use-cases/count-tasks.js'
-import { createCountTasks, resolveCountTasksDeps } from './count-tasks.js'
 import { type RefreshImplementationTracking } from '../../application/use-cases/refresh-implementation-tracking.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
-import { type LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
+import { type CheckBinding } from '../../domain/services/transition-checks.js'
+import { type CheckRegistry } from '../../domain/services/check-registry.js'
 import {
   createCompositionResolver,
   type CompositionResolver,
   type CompositionResolutionOptions,
 } from '../composition-resolver.js'
 import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
+import { resolveWorkflowCheckRegistry } from './workflow-check-registry.js'
 
 /**
  * Explicit dependencies for {@link createGetStatus}.
@@ -21,13 +22,20 @@ export interface GetStatusDeps {
   readonly changes: ChangeRepository
   /** Schema provider used by the use case. */
   readonly schemaProvider: SchemaProvider
+  /** Shared change schema resolver. */
+  readonly resolveChangeSchema?: ResolveChangeSchema
   /** Approval gate configuration used by the use case. */
   readonly approvals: { readonly spec: boolean; readonly signoff: boolean }
   /** Refresh implementation tracking use case used by the use case. */
   readonly refreshImplementationTracking: RefreshImplementationTracking
-  /** Lifecycle engine used by the use case. */
-  readonly lifecycle: LifecycleEngine
-  readonly countTasks: CountTasks
+  /** Composed transition check bindings. */
+  readonly transitionBindings: readonly CheckBinding[]
+  /** Composed archive check bindings. */
+  readonly archiveBindings: readonly CheckBinding[]
+  /** Canonical reconciler. Config resolution always supplies the shared instance. */
+  readonly reconcile: import('../../application/use-cases/reconcile-change-validity.js').ReconcileChangeValidity
+  /** Check registry for open check resolution and governance. */
+  readonly checkRegistry?: CheckRegistry
 }
 
 /**
@@ -37,13 +45,19 @@ export interface GetStatusDeps {
  * @returns The resolved dependencies for `GetStatus`
  */
 export function resolveGetStatusDeps(resolver: CompositionResolver): GetStatusDeps {
+  // Overlap I/O is on archive bindings. GetStatus runs those predicates only when
+  // `state === 'archivable'` (live `OVERLAP_CONFLICT`). Other states use review/hint.
+  const registry = resolveWorkflowCheckRegistry(resolver, { includeOverlapDetection: true })
   return {
     changes: resolver.getChangeRepository(),
     schemaProvider: resolver.getSchemaProvider(),
+    resolveChangeSchema: resolver.getResolveChangeSchema(),
     approvals: resolver.config.approvals,
     refreshImplementationTracking: resolver.getRefreshImplementationTracking(),
-    lifecycle: resolver.getLifecycleEngine(),
-    countTasks: createCountTasks(resolveCountTasksDeps(resolver)),
+    transitionBindings: registry.transitionBindings,
+    archiveBindings: registry.archiveBindings,
+    reconcile: resolver.getReconcileChangeValidity(),
+    ...(registry.checkRegistry !== undefined ? { checkRegistry: registry.checkRegistry } : {}),
   }
 }
 
@@ -100,16 +114,21 @@ function createGetStatusFromNormalized(
       schemaProvider,
       approvals,
       refreshImplementationTracking,
-      lifecycle,
-      countTasks,
+      transitionBindings,
+      archiveBindings,
+      reconcile,
+      checkRegistry,
     } = input.deps
     return new GetStatus(
       changes,
       schemaProvider,
       approvals,
       refreshImplementationTracking,
-      lifecycle,
-      countTasks,
+      transitionBindings,
+      archiveBindings,
+      reconcile,
+      checkRegistry,
+      input.deps.resolveChangeSchema,
     )
   }
 
@@ -129,7 +148,8 @@ function isGetStatusDeps(value: GetStatusDeps | SpecdConfig): value is GetStatus
     'schemaProvider' in value &&
     'approvals' in value &&
     'refreshImplementationTracking' in value &&
-    'lifecycle' in value &&
-    'countTasks' in value
+    'transitionBindings' in value &&
+    'archiveBindings' in value &&
+    'reconcile' in value
   )
 }

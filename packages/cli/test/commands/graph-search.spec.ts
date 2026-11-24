@@ -16,6 +16,14 @@ vi.mock('../../src/commands/graph/with-provider.js', () => ({
   withProvider: vi.fn(),
 }))
 
+vi.mock('../../src/commands/graph/host-context.js', () => ({
+  createGraphHostContext: vi.fn(async (config, kernel) => ({
+    config,
+    kernel,
+    dispose: async () => {},
+  })),
+}))
+
 import { resolveGraphCliContext } from '../../src/commands/graph/resolve-graph-cli-context.js'
 import { withProvider } from '../../src/commands/graph/with-provider.js'
 import { registerGraphSearch } from '../../src/commands/graph/search.js'
@@ -111,6 +119,7 @@ function setup() {
     config,
     configFilePath: '/project/specd.yaml',
     kernel,
+    host: null,
     projectRoot: '/project',
     vcsRoot: '/project',
   })

@@ -3,6 +3,10 @@ export {
   InvalidStateTransitionError,
   type TransitionFailureReason,
 } from './invalid-state-transition-error.js'
+export {
+  HappyPathNextUnavailableError,
+  happyPathNextMessage,
+} from './happy-path-next-unavailable-error.js'
 export { ApprovalRequiredError } from './approval-required-error.js'
 export { InvalidSpecPathError } from './invalid-spec-path-error.js'
 export { InvalidSpecIdError } from './invalid-spec-id-error.js'
@@ -17,6 +21,11 @@ export { ArtifactNotOptionalError } from './artifact-not-optional-error.js'
 export { HookFailedError } from './hook-failed-error.js'
 export { SchemaValidationError } from './schema-validation-error.js'
 export { ConfigValidationError } from './config-validation-error.js'
+export { LegacyConfigFormatError } from './legacy-config-format-error.js'
+export {
+  UnsupportedConfigVersionError,
+  CURRENT_CONFIG_VERSION,
+} from './unsupported-config-version-error.js'
 export { DeltaApplicationError } from './delta-application-error.js'
 export { UnsupportedPatternError } from './unsupported-pattern-error.js'
 export { CorruptedManifestError } from './corrupted-manifest-error.js'
@@ -30,9 +39,7 @@ export { InvalidChangeError } from './invalid-change-error.js'
 export { MissingDefaultWorkspaceError } from './missing-default-workspace-error.js'
 export { StepNotValidError } from './step-not-valid-error.js'
 export { HookNotFoundError } from './hook-not-found-error.js'
-export { SpecOverlapError } from './spec-overlap-error.js'
 export { SpecPublicationError } from './spec-publication-error.js'
-export { ArchiveDependencyMismatchError } from './archive-dependency-mismatch-error.js'
 export { ArchiveArtifactMissingError } from './archive-artifact-missing-error.js'
 export { ArchiveImplementationStateError } from './archive-implementation-state-error.js'
 export {
@@ -52,4 +59,19 @@ export { PersistedSchemaDependencyConflictError } from './persisted-schema-depen
 export { SpecMetadataParseError } from './spec-metadata-parse-error.js'
 export { ImplementationFileNotFoundError } from './implementation-file-not-found-error.js'
 export { ImplementationWorkspaceBoundaryError } from './implementation-workspace-boundary-error.js'
+export { UnsupportedManifestVersionError } from './unsupported-manifest-version-error.js'
+export {
+  InvalidPluginNameError,
+  InvalidCheckIdError,
+  DuplicateCheckError,
+  DuplicateCheckBindingError,
+  InvalidCheckKindError,
+  CheckEmbeddingForbiddenError,
+  CheckBindingOverrideForbiddenError,
+  CheckConfigOverrideForbiddenError,
+  CheckNotSkippableError,
+  CheckDisableForbiddenError,
+  UnknownCheckError,
+} from './check-registry-errors.js'
+export { CheckPredicateFailedError } from './check-predicate-failed-error.js'
 export { IncompatibleSchemaError } from './incompatible-schema-error.js'

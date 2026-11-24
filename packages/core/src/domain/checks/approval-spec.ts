@@ -1,0 +1,84 @@
+import { type Change } from '../entities/change.js'
+import { type ChangeValidityVerdict } from '../services/change-validity.js'
+import {
+  CHECK_LABELS,
+  approveSpecAction,
+  fail,
+  pass,
+  skip,
+  type Check,
+  type CheckExecutionContext,
+  type CheckResult,
+} from '../services/transition-checks.js'
+
+/** Facts for `approval.spec`. */
+export interface ApprovalSpecFacts {
+  readonly specGateEnabled: boolean
+  readonly change: Change
+  readonly validity?: ChangeValidityVerdict
+}
+
+/**
+ * Spec-approval gate. Delivery edges (`ready → implementing` / `ready → verifying`)
+ * are registry bindings, not this runner.
+ *
+ * @param facts - Gate flag and recorded spec approval
+ * @returns Skip, pass, or a failure with `APPROVAL_REQUIRED`, `APPROVAL_STALE`, or `APPROVAL_REVOKED`
+ */
+export function run(facts: ApprovalSpecFacts): CheckResult {
+  if (!facts.specGateEnabled) {
+    return skip('approval.spec')
+  }
+  const status = facts.validity?.specApproval
+  if (
+    status === 'valid' ||
+    (status === undefined && facts.change.activeSpecApproval !== undefined)
+  ) {
+    return pass('approval.spec')
+  }
+  if (status === 'stale' || status === 'revoked') {
+    const revoked = status === 'revoked'
+    return fail(
+      'approval.spec',
+      revoked ? 'APPROVAL_REVOKED' : 'APPROVAL_STALE',
+      revoked ? 'Spec approval is revoked' : 'Spec approval is stale',
+      { gate: 'spec' },
+      undefined,
+      undefined,
+      approveSpecAction(),
+    )
+  }
+  return fail(
+    'approval.spec',
+    'APPROVAL_REQUIRED',
+    'Spec approval is required before leaving ready',
+    { gate: 'spec' },
+    undefined,
+    undefined,
+    approveSpecAction(),
+  )
+}
+
+/**
+ * Domain stub execute. Application `create*` owns I/O.
+ *
+ * @param ctx - Host attempt context
+ * @returns Check result
+ */
+function execute(ctx: CheckExecutionContext): Promise<CheckResult> {
+  return Promise.resolve(
+    run({
+      specGateEnabled: ctx.approvals?.spec ?? false,
+      change: ctx.change,
+      ...(ctx.validity !== undefined ? { validity: ctx.validity } : {}),
+    }),
+  )
+}
+
+/** Reusable `approval.spec` check. Registry bindings decide when it runs. */
+export const approvalSpec: Check = {
+  id: 'approval.spec',
+  label: CHECK_LABELS['approval.spec'],
+  kind: 'predicate',
+  execute,
+}

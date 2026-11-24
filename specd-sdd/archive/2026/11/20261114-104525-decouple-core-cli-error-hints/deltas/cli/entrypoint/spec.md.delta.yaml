@@ -1,0 +1,17 @@
+- op: added
+  description: 'Document centralized command-aware CLI error hint resolution in handleError/cliError'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Structured error output'
+  content: |
+    ### Requirement: Command-aware error hint rendering
+
+    The CLI SHALL maintain a centralized, reusable hint-resolution helper/table that maps `(errorCode, command, metadata)` to an optional command-specific `hint` string (or `undefined` when no hint applies).
+
+    `handleError(err, format, options)` SHALL accept a `command` context identifier in `HandleErrorOptions` (superseding ad-hoc boolean flags while remaining backward-compatible with `lockRepairHint`). When a hint is resolved, `cliError` SHALL print it on a separate line after `error: <message>` on stderr and SHALL emit it as a top-level `hint` field in `json` and `toon` error payloads without mutating `message`.
+
+    Commands with custom error or repair-guide rendering SHALL reuse the same hint-resolution helper rather than duplicating flag/command hint strings.

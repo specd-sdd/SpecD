@@ -24,7 +24,7 @@ afterEach(() => vi.clearAllMocks())
 
 describe('runGraphIndexTask', () => {
   it('reconstructs forced CLI context and indexes once', async () => {
-    const host = {} as never
+    const host = { dispose: vi.fn(async () => {}) } as never
     vi.mocked(openSpecdHost).mockResolvedValue(host)
     vi.mocked(runIndexProjectGraph).mockResolvedValue({ filesIndexed: 1 } as never)
     const output = await runGraphIndexTask(
@@ -37,7 +37,7 @@ describe('runGraphIndexTask', () => {
     )
     expect(openSpecdHost).toHaveBeenCalledWith({
       configPath: '/repo/specd.yaml',
-      options: { kernel: { logger: 'cli' } },
+      options: { kernel: { logger: 'cli' }, plugins: false },
     })
     expect(createBootstrapGraphConfig).not.toHaveBeenCalled()
     expect(createSdkContext).not.toHaveBeenCalled()
@@ -45,8 +45,44 @@ describe('runGraphIndexTask', () => {
     expect(output).toEqual({ filesIndexed: 1 })
   })
 
+  it('disposes the host it opened after a successful run', async () => {
+    const dispose = vi.fn(async () => {})
+    vi.mocked(openSpecdHost).mockResolvedValue({ dispose } as never)
+    vi.mocked(runIndexProjectGraph).mockResolvedValue({ filesIndexed: 1 } as never)
+
+    await runGraphIndexTask(
+      {
+        context: { mode: 'forced', configPath: '/repo/specd.yaml' },
+        index: { force: false },
+      },
+      vi.fn(),
+      vi.fn(),
+    )
+
+    expect(dispose).toHaveBeenCalledTimes(1)
+  })
+
+  it('disposes the host it opened when indexing fails', async () => {
+    const dispose = vi.fn(async () => {})
+    vi.mocked(openSpecdHost).mockResolvedValue({ dispose } as never)
+    vi.mocked(runIndexProjectGraph).mockRejectedValue(new Error('index failed'))
+
+    await expect(
+      runGraphIndexTask(
+        {
+          context: { mode: 'forced', configPath: '/repo/specd.yaml' },
+          index: { force: false },
+        },
+        vi.fn(),
+        vi.fn(),
+      ),
+    ).rejects.toThrow('index failed')
+
+    expect(dispose).toHaveBeenCalledTimes(1)
+  })
+
   it('reconstructs discovered CLI context from its parent start directory', async () => {
-    const host = {} as never
+    const host = { dispose: vi.fn(async () => {}) } as never
     vi.mocked(openSpecdHost).mockResolvedValue(host)
     vi.mocked(runIndexProjectGraph).mockResolvedValue({ filesIndexed: 1 } as never)
     await runGraphIndexTask(
@@ -60,7 +96,7 @@ describe('runGraphIndexTask', () => {
     expect(openSpecdHost).toHaveBeenCalledTimes(1)
     expect(openSpecdHost).toHaveBeenCalledWith({
       startDir: '/repo/packages/app',
-      options: { kernel: { logger: 'cli' } },
+      options: { kernel: { logger: 'cli' }, plugins: false },
     })
     expect(createSdkContext).not.toHaveBeenCalled()
     expect(runIndexProjectGraph).toHaveBeenCalledTimes(1)
@@ -86,7 +122,7 @@ describe('runGraphIndexTask', () => {
 
   it('reconstructs bootstrap context and forwards options/progress unchanged', async () => {
     const config = {} as never
-    const host = {} as never
+    const host = { dispose: vi.fn(async () => {}) } as never
     const emit = vi.fn()
     vi.mocked(createBootstrapGraphConfig).mockReturnValue(config)
     vi.mocked(createSdkContext).mockResolvedValue(host)
@@ -104,6 +140,10 @@ describe('runGraphIndexTask', () => {
       vcsRoot: '/repo/.git',
     })
     expect(openSpecdHost).not.toHaveBeenCalled()
+    expect(createSdkContext).toHaveBeenCalledWith(config, {
+      kernel: { logger: 'cli' },
+      plugins: false,
+    })
     expect(runIndexProjectGraph).toHaveBeenCalledWith(
       host,
       expect.objectContaining({
@@ -118,7 +158,7 @@ describe('runGraphIndexTask', () => {
   })
 
   it('routes file-activity events below 32768 bytes to announce with mandatory: false', async () => {
-    const host = {} as never
+    const host = { dispose: vi.fn(async () => {}) } as never
     const emit = vi.fn()
     const announce = vi.fn()
     vi.mocked(createBootstrapGraphConfig).mockReturnValue({} as never)
@@ -148,7 +188,7 @@ describe('runGraphIndexTask', () => {
   })
 
   it('routes file-activity events at or above 32768 bytes to announce with mandatory: true', async () => {
-    const host = {} as never
+    const host = { dispose: vi.fn(async () => {}) } as never
     const emit = vi.fn()
     const announce = vi.fn()
     vi.mocked(createBootstrapGraphConfig).mockReturnValue({} as never)
@@ -178,7 +218,7 @@ describe('runGraphIndexTask', () => {
   })
 
   it('routes non-activity events to emitProgress({ event }) and ensures JSON serializability', async () => {
-    const host = {} as never
+    const host = { dispose: vi.fn(async () => {}) } as never
     const emit = vi.fn()
     const announce = vi.fn()
     vi.mocked(createBootstrapGraphConfig).mockReturnValue({} as never)

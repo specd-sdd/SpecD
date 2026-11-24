@@ -6,8 +6,15 @@
   "dependsOn": ["core:config", "plugin-manager:specd-plugin-type"],
   "implementation": [
     {
-      "file": "plugin-manager:src/domain/types/agent-plugin.ts",
-      "symbols": ["AgentInstallOptions"]
+      "file": "plugin-manager:src/domain/handlers/agents-handler.ts",
+      "symbols": ["agentsContributionHandler"]
+    },
+    {
+      "file": "plugin-manager:test/domain/agents-handler.spec.ts"
+    },
+    {
+      "file": "plugin-manager:src/domain/services/resolve-contributions.ts",
+      "symbols": ["installContextContributions"]
     }
   ],
   "optimizations": {

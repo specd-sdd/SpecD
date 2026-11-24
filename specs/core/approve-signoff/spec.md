@@ -2,7 +2,7 @@
 
 ## Purpose
 
-After implementation, a final human signoff is needed to confirm the change is ready for archival, with artifact hashes captured to detect any post-signoff modifications. The `ApproveSignoff` use case records a signoff on a change and transitions it to the `signed-off` state, enforcing that the gate is enabled, computing artifact hashes using schema-defined pre-hash cleanup rules, and persisting the updated change. It is the only path through the signoff gate in the change lifecycle.
+Human signoff MUST record consent on a change that stays in the state where it was requested (`done` when the signoff gate is on, or a legacy parking state of a historic manifest). This use case hashes in-scope artifacts, appends a signoff history event, and MUST NOT transition the change on any path. The gate on leaving the state is enforced by the bound `approval.signoff` check.
 
 ## Requirements
 
@@ -12,9 +12,8 @@ The gate guard sequence is:
 
 1. If `approvals.signoff` is `false` (baked at construction), throw `ApprovalGateDisabledError` with gate `'signoff'`. No repository access occurs.
 2. Load the change by name from the `ChangeRepository`. If no change exists, throw `ChangeNotFoundError`.
-3. Resolve the current actor identity via `ActorResolver`.
-4. Obtain the active schema from `SchemaProvider`. If the schema cannot be resolved, `get()` throws `SchemaNotFoundError` or `SchemaValidationError` — the use case does not catch these.
-5. Compare `schema.name()` with `change.schemaName`. If they differ, throw `SchemaMismatchError`.
+3. Obtain the change's sovereign schema through `ResolveChangeSchema`. General resolution failures and `SchemaProviderIdentityMismatchError` propagate before the actor is resolved and before consent is recorded.
+4. Resolve the current actor identity via `ActorResolver`.
 
 ### Requirement: Change lookup
 
@@ -22,33 +21,31 @@ The use case MUST load the change by name from the `ChangeRepository`. If no cha
 
 ### Requirement: Artifact hash computation
 
-Before recording the signoff, the use case MUST compute a content hash for every file across all artifacts in the change. For each artifact, it iterates over the artifact's `files` map. For each file:
+Before sign-off, the use case SHALL refresh implementation tracking and link resolution, then delegate validity application to the central reconciler. It SHALL reuse the current non-task artifact fingerprint and compute an implementation fingerprint from all confirmed in-scope implementation links.
 
-1. Skip files with status `missing` or `skipped`.
-2. Load the file content from the repository via `ChangeRepository.artifact(change, file.filename)`.
-3. If the file cannot be loaded (returns `null`), skip it silently.
-4. Resolve the active schema from the `SchemaRegistry` using the configured schema reference and workspace schema paths.
-5. If the schema resolves, build a cleanup map of artifact-type to pre-hash cleanup rules; if it does not resolve, use an empty cleanup map.
-6. Apply the matching cleanup rules (by artifact type) to the content, then hash the cleaned content via the `ContentHasher`.
-
-The result is a `Record<string, string>` mapping `type:key` hash keys to hash strings (e.g. `"proposal:proposal"`, `"specs:default:auth/login"`), where `type` is the artifact type ID and `key` is the file key within the artifact.
+The implementation fingerprint SHALL deduplicate project-relative paths, sort them deterministically, and hash each complete file. Symbol ranges do not narrow signed content. Text uses the persisted `text-v1` normalization algorithm; binary files are hashed byte-for-byte. Added, removed, renamed, or unlinked paths alter the fingerprint. Missing or unreadable linked files fail sign-off. An observed empty file map is valid and differs from legacy missing evidence.
 
 ### Requirement: Signoff recording and state transition
 
-The use case MUST resolve the current actor identity via the `ActorResolver`, then:
+Sign-off MAY be granted or renewed only while the reconciled change is in a state from which the `approval.signoff` check is bound as a transition source, read from the check registry bindings (`boundFromStates('approval.signoff')`; today `done` and the legacy parking states `pending-signoff` and `signed-off`). The use case MUST NOT hardcode those state names. It additionally requires no unresolved non-task artifact review and, when verification is required for the change (see `core:change` "Verification requirement follows workflow topology"), valid verification evidence. When the change schema disables `verifying`, `ApproveSignoff` SHALL NOT require or fingerprint-compare verification evidence, and any evidence it reads SHALL have no effect on eligibility, and SHALL NOT raise verification eligibility errors. `ApproveSignoff` MUST NOT transition the change in any of those states: a change in a legacy parking state records consent and stays there. Stale or revoked consent is recovered by reconciliation before the request is evaluated, also in a legacy parking state (a stale sign-off returns the change to `done`), so renewal is recorded in the recovered state. A request from any other state fails with `InvalidStateTransitionError` whose `from` is the current state; its `to` names the nominal state the consent applies to and is informational only (it is not derived from the bindings and does not imply a transition).
 
-1. Call `change.recordSignoff(reason, artifactHashes, actor)` to append a `signed-off` history event.
-2. Call `change.transition('signed-off', actor)` to advance the lifecycle state.
+On success `ApproveSignoff` SHALL append the `signed-off` audit event and persist a current sign-off projection with status `valid`, actor, reason, timestamp, artifact fingerprint, implementation fingerprint, and both algorithm identifiers. Prior sign-off and invalidation events remain unchanged.
 
-The `Change` entity enforces that the transition from the current state to `signed-off` is valid. If the change is not in `pending-signoff` state, the entity throws an `InvalidStateTransitionError`.
+Actor name and email SHALL continue to be resolved through the existing approval actor decorator and its privacy/fallback rules. One logical sign-off operation MUST resolve exactly one decorated `ActorIdentity` value and reuse it for reconciliation consequences, the materialized projection, and every appended event. Direct-dependency factory forms MUST NOT permit the use case and reconciler to observe different actor resolvers.
+
+If required sign-off is stale while the change is beyond `done`, reconciliation SHALL first return it to `done`. If verification is required and stale, verification recovery must complete before sign-off can be renewed.
+
+When verification is required, eligibility failures SHALL remain semantically distinct: never-completed evidence raises the typed not-found error; an active attempt without completion raises the typed in-progress error; stale or legacy-unknown evidence raises `VerificationStaleError`, whose `message` describes the stale evidence in host-neutral terms (no CLI command or slash command) and which exposes the change name as the structured `changeName` property so delivery hosts can render the recovery (re-run verification) in their own syntax; and a current record that does not match a supplied expected fingerprint raises fingerprint mismatch. Stale evidence MUST NOT be reported as `VerificationNotFoundError`.
+
+### Requirement: Canonical pre-signoff reconciliation
+
+`ApproveSignoff` MUST use the single application reconciler for validity detection, invalidation, and automatic recovery. It MUST NOT independently stale a projection or choose a return target. If fresh facts make sign-off inapplicable, it persists the canonical reconciliation and reports that blocker instead of approving a later snapshot.
 
 ### Requirement: Persistence and return value
 
-After computing artifact hashes, the use case MUST record the signoff and lifecycle transition through `ChangeRepository.mutate(name, fn)`.
+After the disabled-gate fast failure and implementation-tracking refresh, `ApproveSignoff` SHALL run reconciliation, fingerprinting, and sign-off through one serialized repository mutation. The valid sign-off MUST refer to the same fresh artifact and implementation snapshot that passed eligibility checks.
 
-Inside the mutation callback, the repository supplies the fresh persisted `Change` for `name`; the use case records the signoff on that instance, transitions it to `signed-off`, and returns the updated change. This ensures the signoff event, artifact hashes, and lifecycle transition are persisted atomically with respect to other mutations of the same change.
-
-`ApproveSignoff.execute` returns the updated `Change` entity produced by that serialized mutation.
+If reconciliation makes sign-off inapplicable, it persists any invalidity and recovery, records no sign-off, and then throws `InvalidStateTransitionError` whose `from` is the reconciled state (its `to` is the informational nominal state `done`); it does not throw `ReconciledOperationBlockedError`. A change in a legacy parking state is never moved by this use case. The result is the post-mutation reconciled `Change`.
 
 ### Requirement: Input contract
 
@@ -73,17 +70,9 @@ The constructor MUST receive `approvals: ApprovalGates`. `createApproveSignoff(c
 
 ### Requirement: Config-based factory delegates through resolveApproveSignoffDeps
 
-The config-based `createApproveSignoff(config, options?)` form MUST derive `ApproveSignoffDeps` through `resolveApproveSignoffDeps(resolver)` and then delegate to canonical `createApproveSignoff(deps)`.
+The public factory SHALL retain canonical `createApproveSignoff(deps: ApproveSignoffDeps)` and convenience `createApproveSignoff(config, options?)`. The config form uses `normalizeCompositionFactoryArgs`, resolves dependencies with `resolveApproveSignoffDeps(resolver)`, and delegates to the canonical form; options with the deps overload use the standard invalid-factory-arguments error.
 
-`resolveApproveSignoffDeps(resolver)` MUST resolve:
-
-- `changes: ChangeRepository`
-- `actor: ActorResolver`
-- `schemaProvider: SchemaProvider`
-- `hasher: ContentHasher`
-- `approvals: ApprovalGates`
-
-The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+Dependencies SHALL include the change repository, actor resolver, schema provider, shared fingerprint service or hasher, approval gates, implementation-tracking refresh/link resolution, and the central validity reconciler. Composition MUST reuse shared resolver wiring and MUST NOT duplicate filesystem construction or initialize a whole kernel for one use case.
 
 ## Constraints
 
@@ -99,3 +88,5 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:composition`](../composition/spec.md)
 - [`core:kernel`](../kernel/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)
+- [`core:transition-checks`](../transition-checks/spec.md) — `from` states for `approval.signoff` come from check registry bindings
+- [core:resolve-change-schema](../resolve-change-schema/spec.md) — named sovereign lookup, provider identity validation, and same-name version advisory

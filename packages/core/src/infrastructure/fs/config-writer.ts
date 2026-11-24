@@ -1,18 +1,30 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
-import { z } from 'zod'
-import { stringify as yamlStringify, parseDocument } from 'yaml'
+import { stringify as yamlStringify, parseDocument, isMap } from 'yaml'
 import type { Document } from 'yaml'
+import type { ZodError } from 'zod'
 import {
+  type AddPluginOptions,
+  type ConfigDeclaredPlugin,
   type ConfigWriter,
   type InitProjectOptions,
   type InitProjectResult,
 } from '../../application/ports/config-writer.js'
+import { CURRENT_CONFIG_VERSION } from '../../domain/errors/unsupported-config-version-error.js'
 import { AlreadyInitialisedError } from '../../application/errors/already-initialised-error.js'
+import { PluginsZodSchema } from '../../application/ports/config-schema.js'
 import { ConfigValidationError } from '../../domain/errors/config-validation-error.js'
+import { isPluginName } from '../../domain/plugin-name.js'
+import { assertCurrentConfigFormat } from './config-loader.js'
 import { ensureTmpGitignore } from './ensure-tmp-gitignore.js'
 import { isEnoent } from './is-enoent.js'
 import { writeFileAtomic } from './write-atomic.js'
+
+/** Default project-relative storage root created by `initProject`. */
+const DEFAULT_SPECD_DIR = '.specd'
+
+/** Default project-relative metadata cache directory (`<specd dir>/metadata`). */
+const DEFAULT_METADATA_CACHE_PATH = `${DEFAULT_SPECD_DIR}/metadata`
 
 /**
  * Filesystem implementation of {@link ConfigWriter}.
@@ -45,6 +57,7 @@ export class FsConfigWriter implements ConfigWriter {
       : `${options.specsPath}/`
 
     const configDoc = {
+      configVersion: CURRENT_CONFIG_VERSION,
       schema: options.schemaRef,
       workspaces: {
         [options.workspaceId]: {
@@ -64,13 +77,17 @@ export class FsConfigWriter implements ConfigWriter {
     await writeFileAtomic(configPath, yamlContent)
 
     // Create storage directories
-    const storageBase = path.join(options.projectRoot, '.specd')
-    await ensureTmpGitignore(storageBase)
+    // The freshly written config declares no overrides, so the resolved paths are the defaults.
+    const metadataCachePath = DEFAULT_METADATA_CACHE_PATH
+    const storageBase = path.join(options.projectRoot, DEFAULT_SPECD_DIR)
+    const configDir = path.join(storageBase, 'config')
+    const metadataDir = path.join(options.projectRoot, metadataCachePath)
+    await ensureTmpGitignore(configDir)
     await fs.mkdir(path.join(storageBase, 'changes'), { recursive: true })
     await fs.mkdir(path.join(storageBase, 'drafts'), { recursive: true })
     await fs.mkdir(path.join(storageBase, 'discarded'), { recursive: true })
     await fs.mkdir(path.join(storageBase, 'archive'), { recursive: true })
-    await fs.mkdir(path.join(storageBase, 'metadata'), { recursive: true })
+    await fs.mkdir(metadataDir, { recursive: true })
 
     // Create workspace specs directory
     await fs.mkdir(path.join(options.projectRoot, options.specsPath), { recursive: true })
@@ -80,162 +97,268 @@ export class FsConfigWriter implements ConfigWriter {
     await appendGitignoreEntries(gitignorePath, [
       'specd.local.yaml',
       'specd.local.*.yaml',
-      '/.specd/metadata/',
+      `/${metadataCachePath}/`,
     ])
 
     return {
       configPath,
       schemaRef: options.schemaRef,
       workspaces: [options.workspaceId],
-      metadataCachePath: '.specd/metadata',
+      metadataCachePath,
     }
   }
 
   /**
-   * Adds or updates a plugin declaration under `plugins.<type>`.
+   * Merges a plugin declaration into the flat `plugins` list.
    *
    * @param configPath - Absolute path to the `specd.yaml` to update
-   * @param type - Plugin type key
-   * @param name - Plugin package name
-   * @param config - Optional plugin-specific config
+   * @param name - Scoped plugin package name
+   * @param options - Optional config and contribution allowlist
+   * @throws {ConfigValidationError} When `name` is not a scoped package name, `contributions` is empty, or the file is missing, invalid or not a mapping
    */
-  async addPlugin(
-    configPath: string,
-    type: string,
-    name: string,
-    config?: Record<string, unknown>,
-  ): Promise<void> {
-    const content = await fs.readFile(configPath, 'utf8')
-    let doc: Document
-    try {
-      doc = parseDocument(content)
-    } catch (err) {
-      throw new ConfigValidationError(configPath, `invalid YAML: ${(err as Error).message}`)
+  async addPlugin(configPath: string, name: string, options?: AddPluginOptions): Promise<void> {
+    if (!isPluginName(name)) {
+      throw new ConfigValidationError(
+        configPath,
+        `plugin name '${name}' must be a scoped package name`,
+      )
     }
-
-    const raw = (doc.toJSON() ?? {}) as Record<string, unknown>
-    const plugins = parsePlugins(raw['plugins'])
-    const bucket = plugins[type] ?? []
-    const existingIndex = bucket.findIndex((plugin) => plugin.name === name)
-
-    if (existingIndex >= 0) {
-      bucket[existingIndex] = config === undefined ? bucket[existingIndex]! : { name, config }
-    } else {
-      bucket.push(config === undefined ? { name } : { name, config })
+    if (options?.contributions !== undefined && options.contributions.length === 0) {
+      throw new ConfigValidationError(
+        configPath,
+        'contributions cannot be empty; omit the option to select every contribution',
+      )
     }
-
-    plugins[type] = bucket
+    const doc = await readConfigDocument(configPath)
+    if (!isMap(doc.contents)) {
+      throw new ConfigValidationError(
+        configPath,
+        'config file has no root mapping (empty, comment-only or null document); a plugin cannot be added to a project without schema and workspaces',
+      )
+    }
+    const raw = readMappingRoot(doc, configPath)
+    const plugins = requireMutablePlugins(raw, configPath)
+    const existingIndex = plugins.findIndex((plugin) => plugin.name === name)
+    const existing = existingIndex >= 0 ? plugins[existingIndex] : undefined
+    const next = mergePluginEntry(name, existing, options)
+    if (existingIndex >= 0) plugins[existingIndex] = next
+    else plugins.push(next)
     doc.set('plugins', plugins)
-
     await writeFileAtomic(configPath, doc.toString())
   }
 
   /**
-   * Removes a plugin declaration from `plugins.<type>` by name.
+   * Removes a plugin declaration from the flat `plugins` list by name.
    *
    * @param configPath - Absolute path to the `specd.yaml` to update
-   * @param type - Plugin type key
-   * @param name - Plugin package name
+   * @param name - Scoped plugin package name
    */
-  async removePlugin(configPath: string, type: string, name: string): Promise<void> {
-    const content = await fs.readFile(configPath, 'utf8')
-    let doc: Document
-    try {
-      doc = parseDocument(content)
-    } catch (err) {
-      throw new ConfigValidationError(configPath, `invalid YAML: ${(err as Error).message}`)
-    }
-
-    const raw = (doc.toJSON() ?? {}) as Record<string, unknown>
-    const plugins = parsePlugins(raw['plugins'])
-    const bucket = plugins[type] ?? []
-    plugins[type] = bucket.filter((plugin) => plugin.name !== name)
-    doc.set('plugins', plugins)
-
+  async removePlugin(configPath: string, name: string): Promise<void> {
+    const doc = await readConfigDocument(configPath)
+    const raw = readMappingRoot(doc, configPath)
+    if (raw['plugins'] === undefined) return
+    const plugins = requireMutablePlugins(raw, configPath)
+    if (!plugins.some((plugin) => plugin.name === name)) return
+    doc.set(
+      'plugins',
+      plugins.filter((plugin) => plugin.name !== name),
+    )
     await writeFileAtomic(configPath, doc.toString())
   }
 
   /**
-   * Lists plugin declarations from `plugins`, optionally filtered by type.
+   * Lists plugin declarations from the flat `plugins` list.
    *
    * @param configPath - Absolute path to the `specd.yaml` to read
-   * @param type - Optional plugin type filter
-   * @returns Plugin declarations.
+   * @returns Plugin declarations, or an empty list when the file or `plugins` key is missing
+   * @throws {LegacyConfigFormatError} When `plugins` is the removed object shape
+   * @throws {ConfigValidationError} When the file or `plugins` value is invalid
    */
-  async listPlugins(
-    configPath: string,
-    type?: string,
-  ): Promise<Array<{ name: string; config?: Record<string, unknown> }>> {
+  async listPlugins(configPath: string): Promise<ConfigDeclaredPlugin[]> {
     let content: string
     try {
       content = await fs.readFile(configPath, 'utf8')
     } catch (err) {
       if (isEnoent(err)) return []
-      throw err
+      throw unreadableConfigError(configPath, err)
     }
 
-    let doc: Document
-    try {
-      doc = parseDocument(content)
-    } catch {
-      return []
-    }
+    const doc = parseConfigDocument(configPath, content)
 
-    const raw = (doc.toJSON() ?? {}) as Record<string, unknown>
-    const plugins = parsePlugins(raw['plugins'])
-    if (type !== undefined) {
-      return plugins[type] ?? []
+    const raw = readMappingRoot(doc, configPath)
+    if (raw['plugins'] === undefined) return []
+    assertCurrentConfigFormat(raw, configPath)
+    const result = PluginsZodSchema.safeParse(raw['plugins'])
+    if (!result.success) {
+      throw new ConfigValidationError(configPath, describePluginsIssue(result.error))
     }
-    return Object.values(plugins).flat()
+    return mapPluginEntries(result.data)
   }
 }
 
-// ---- Plugins YAML validation ----
-
 /**
- * Single plugin declaration in `plugins.<type>`.
- */
-const pluginSchema = z.object({
-  name: z.string(),
-  config: z.record(z.unknown()).optional(),
-})
-
-/**
- * Validates the `plugins` key from `specd.yaml`.
- */
-const pluginsSchema = z.record(z.array(pluginSchema))
-
-/**
- * Normalized plugin entry persisted under `plugins.<type>`.
- */
-interface PluginEntry {
-  /** Plugin package name. */
-  readonly name: string
-  /** Optional plugin configuration payload. */
-  readonly config?: Record<string, unknown>
-}
-
-/**
- * Parses a raw `plugins` value from a YAML document, returning `{}` if invalid.
+ * Describes the first problem found in an invalid `plugins` value, naming its real cause.
  *
- * @param raw - The raw value from the YAML document
- * @returns A valid plugins record, or `{}` on validation failure
+ * @param error - The Zod error from {@link PluginsZodSchema}
+ * @returns A message stating duplicate names, invalid names, unknown keys, empty contributions or the generic shape
  */
-function parsePlugins(raw: unknown): Record<string, PluginEntry[]> {
-  const result = pluginsSchema.safeParse(raw)
-  if (!result.success) {
-    return {}
+function describePluginsIssue(error: ZodError): string {
+  const issue = error.issues[0]
+  const shape = '`plugins` must be a flat list of { name, config?, contributions? }'
+  if (issue === undefined) return shape
+  const where = issue.path.length > 0 ? ` (at plugins.${issue.path.join('.')})` : ''
+  if (issue.code === 'custom') return `${issue.message}${where}`
+  if (issue.code === 'unrecognized_keys') {
+    return `unknown key(s) ${issue.keys.map((k) => `'${k}'`).join(', ')} in a plugin entry${where}; allowed keys are name, config, contributions`
   }
-  return Object.fromEntries(
-    Object.entries(result.data).map(([type, entries]) => [
-      type,
-      entries.map((entry) =>
-        entry.config === undefined
-          ? { name: entry.name }
-          : { name: entry.name, config: entry.config },
-      ),
-    ]),
+  if (issue.path.at(-1) === 'name' && issue.code === 'invalid_string') {
+    return `invalid plugin name; it must be a scoped package name like @scope/name${where}`
+  }
+  if (issue.path.at(-1) === 'contributions' && issue.code === 'too_small') {
+    return `contributions cannot be empty; omit the option to select every contribution${where}`
+  }
+  return `${shape}: ${issue.message}${where}`
+}
+
+/**
+ * Wraps a filesystem read failure (for example a directory path) as a validation error.
+ *
+ * @param configPath - Path that could not be read
+ * @param err - The underlying filesystem error
+ * @returns A {@link ConfigValidationError} describing the failure
+ */
+function unreadableConfigError(configPath: string, err: unknown): ConfigValidationError {
+  return new ConfigValidationError(
+    configPath,
+    `cannot read config file: ${err instanceof Error ? err.message : String(err)}`,
   )
+}
+
+/**
+ * Returns the root of a parsed config document as a mapping.
+ *
+ * @param doc - Parsed YAML document
+ * @param configPath - Path used in error messages
+ * @returns The root mapping, or an empty object for an empty document
+ * @throws {ConfigValidationError} When the root is a scalar or a sequence
+ */
+function readMappingRoot(doc: Document, configPath: string): Record<string, unknown> {
+  const rawRoot: unknown = doc.toJSON() ?? {}
+  if (typeof rawRoot !== 'object' || rawRoot === null || Array.isArray(rawRoot)) {
+    throw new ConfigValidationError(configPath, 'config root must be a mapping')
+  }
+  return rawRoot as Record<string, unknown>
+}
+
+/**
+ * Reads a config document, rejecting invalid YAML.
+ *
+ * @param configPath - Absolute path to the config file
+ * @returns The parsed YAML document
+ * @throws {ConfigValidationError} When the file is missing or the YAML is invalid
+ */
+async function readConfigDocument(configPath: string): Promise<Document> {
+  let content: string
+  try {
+    content = await fs.readFile(configPath, 'utf8')
+  } catch (err) {
+    if (isEnoent(err)) {
+      throw new ConfigValidationError(configPath, 'config file not found')
+    }
+    throw unreadableConfigError(configPath, err)
+  }
+  return parseConfigDocument(configPath, content)
+}
+
+/**
+ * Parses YAML and surfaces `yaml` parse errors as {@link ConfigValidationError}.
+ *
+ * @param configPath - Absolute path of the file being read
+ * @param content - Raw YAML text
+ * @returns The parsed document
+ * @throws {ConfigValidationError} When the YAML is invalid
+ */
+function parseConfigDocument(configPath: string, content: string): Document {
+  let doc: Document
+  try {
+    doc = parseDocument(content)
+  } catch (err) {
+    throw new ConfigValidationError(configPath, `invalid YAML: ${(err as Error).message}`)
+  }
+  if (doc.errors.length > 0) {
+    const message = doc.errors[0]?.message ?? 'parse error'
+    throw new ConfigValidationError(configPath, `invalid YAML: ${message}`)
+  }
+  return doc
+}
+
+/**
+ * Builds the entry written for `name`, preserving fields the caller did not set.
+ *
+ * @param name - Plugin package name
+ * @param existing - Current entry with the same name, when present
+ * @param options - Fields supplied by this call
+ * @returns The entry to persist
+ */
+function mergePluginEntry(
+  name: string,
+  existing: ConfigDeclaredPlugin | undefined,
+  options: AddPluginOptions | undefined,
+): ConfigDeclaredPlugin {
+  // An explicit `undefined` is a type error; at runtime `??` treats it as omitted.
+  const config = options?.config ?? existing?.config
+  const contributions = options?.contributions ?? existing?.contributions
+  return {
+    name,
+    ...(config !== undefined ? { config } : {}),
+    ...(contributions !== undefined ? { contributions: [...contributions] } : {}),
+  }
+}
+
+/**
+ * Reads `plugins` for a mutation.
+ *
+ * An absent key is an empty list. A legacy `plugins.agents` object or any other
+ * value that is not a valid flat list is rejected so the file is not rewritten.
+ *
+ * @param raw - Parsed config document
+ * @param configPath - Absolute path of the file being updated
+ * @returns The current plugin entries
+ * @throws {LegacyConfigFormatError} When `plugins` is the removed object shape
+ * @throws {ConfigValidationError} When `plugins` is present but not a valid flat list
+ */
+function requireMutablePlugins(
+  raw: Record<string, unknown>,
+  configPath: string,
+): ConfigDeclaredPlugin[] {
+  assertCurrentConfigFormat(raw, configPath)
+  const plugins = raw['plugins']
+  if (plugins === undefined) return []
+  const result = PluginsZodSchema.safeParse(plugins)
+  if (!result.success) {
+    throw new ConfigValidationError(configPath, describePluginsIssue(result.error))
+  }
+  return mapPluginEntries(result.data)
+}
+
+/**
+ * Copies parsed plugin entries into the writer model.
+ *
+ * @param entries - Entries accepted by {@link PluginsZodSchema}
+ * @returns Writer entries with optional fields omitted when absent
+ */
+function mapPluginEntries(
+  entries: ReadonlyArray<{
+    name: string
+    config?: Record<string, unknown> | undefined
+    contributions?: string[] | undefined
+  }>,
+): ConfigDeclaredPlugin[] {
+  return entries.map((entry) => ({
+    name: entry.name,
+    ...(entry.config !== undefined ? { config: entry.config } : {}),
+    ...(entry.contributions !== undefined ? { contributions: entry.contributions } : {}),
+  }))
 }
 
 // ---- Helpers ----

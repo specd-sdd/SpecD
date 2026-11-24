@@ -1,0 +1,104 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Output format'
+  content: |
+    In `text` mode (default), the command prints the resolved config as structured key-value output:
+
+    ```
+    projectRoot:  <absolute-path>
+    specdPath:    <absolute-path>
+    schemaRef:    <schema-ref>
+    approvals:    spec=<true|false>  signoff=<true|false>
+
+    workspaces:
+      <name>  <ownership>  [type: <adapter-type>]  config: <serialized-config>
+      ...
+
+    storage:
+      changes:   [type: <adapter-type>]  config: <serialized-config>
+      drafts:    [type: <adapter-type>]  config: <serialized-config>
+      discarded: [type: <adapter-type>]  config: <serialized-config>
+      archive:   [type: <adapter-type>]  config: <serialized-config>
+    ```
+
+    Optional fields are shown only when present in the config:
+
+    ```
+    storage:
+      pattern: <archive-pattern>
+
+    context:
+      file: <path>
+      instruction: <text>
+      ...
+
+    contextIncludeSpecs: <pattern>, <pattern>, ...
+    contextExcludeSpecs: <pattern>, <pattern>, ...
+    llmOptimizedContext: <true|false>
+    schemaPlugins: <ref>, <ref>, ...
+
+    plugins:
+      <name>  (present) [contributions: <id>, <id>]
+      ...
+
+    schemaOverrides: (present)
+    ```
+
+    The `plugins` section lists the flat `plugins` list; the `contributions` suffix is shown only for entries with an allowlist, separated from the `(present)` marker by a single space.
+
+    The text view is intentionally summarized. It shows the resolved workspace and storage paths used by humans for diagnosis, but it does not expand the full adapter-binding structure.
+
+    In `json` or `toon` mode, the command MUST serialize the `SpecdConfig` object directly — no manual field selection. The output is the config as-is, encoded in the respective format. This ensures that new fields added to `SpecdConfig`, including named adapter bindings such as `specsAdapter`, `schemasAdapter`, `changesAdapter`, `draftsAdapter`, `discardedAdapter`, and `archiveAdapter`, appear automatically without CLI changes. Optional fields that are `undefined` are omitted by the serializer.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Examples'
+  content: |
+    ```
+    $ specd config show
+    projectRoot:  /home/user/project
+    specdPath:    /home/user/project/.specd
+    schemaRef:    @specd/schema-std
+    approvals:    spec=false  signoff=false
+
+    workspaces:
+      default   owned   [type: fs]  config: {"path":"/home/user/project/specs"}
+
+    storage:
+      changes:   [type: fs]  config: {"path":"/home/user/project/.specd/changes"}
+      drafts:    [type: fs]  config: {"path":"/home/user/project/.specd/drafts"}
+      discarded: [type: fs]  config: {"path":"/home/user/project/.specd/discarded"}
+      archive:   [type: fs]  config: {"path":"/home/user/project/.specd/archive"}
+
+    contextIncludeSpecs: default:*
+    llmOptimizedContext: true
+
+    plugins:
+      @specd/plugin-agent-claude  (present)
+
+    schemaOverrides: (present)
+    ```
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Output format'
+  content: |
+    ### Requirement: Help text
+
+    The `--help` text of `specd config show` MUST document the JSON/TOON output shape from the current `SpecdConfig` fields (generated from, or kept in sync with, the `SpecdConfig` type). It MUST NOT describe a key at a level where `SpecdConfig` does not define it (for example a project-level field listed inside a workspace), and it MUST document every key of the workspace, storage and context-entry shapes. A test MUST compare the documented key lists with the keys of `SpecdConfig` so that drift fails the build.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Error cases'
+  content: |
+    If the config cannot be loaded (discovery failure or parse error), exits per the entrypoint exit code rules. This command is most useful precisely when config loading is suspected to be wrong — errors are printed with enough detail to diagnose the problem.
+
+    The command loads the configuration through the config loader only; it does not bootstrap a host or load any plugin, so a broken configured plugin cannot prevent it from running. Config warnings attached by the loader to the loaded config are printed to stderr by the CLI config-loading helper before the command output.

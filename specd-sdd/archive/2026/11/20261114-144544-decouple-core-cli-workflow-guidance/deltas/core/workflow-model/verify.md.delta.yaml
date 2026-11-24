@@ -1,0 +1,23 @@
+- op: modified
+  description: 'Incomplete tasks reported through the check failure'
+  selector:
+    type: section
+    matches: 'Scenario: Transition blocked when requiresTaskCompletion artifact has incomplete tasks'
+  content: |
+    - **GIVEN** a workflow step with `requires: [verify, tasks]` and `requiresTaskCompletion: [tasks]`
+    - **AND** the `tasks` artifact type declares `taskCompletionCheck.incompletePattern: '^\s*-\s+\[ \]'`
+    - **AND** the tasks file contains `- [ ] implement login`
+    - **WHEN** a transition to that step is attempted
+    - **THEN** `CheckPredicateFailedError` is thrown for `workflow.taskCompletion` with the incomplete count in `details`
+
+- op: modified
+  description: 'Host-neutral wording for default hook path'
+  selector:
+    type: section
+    matches: 'Scenario: TransitionChange auto-runs matching run effects'
+  content: |
+    - **GIVEN** a forward transition with matching `run:` post hooks
+    - **AND** `skipHookPhases` is empty
+    - **WHEN** `TransitionChange` executes
+    - **THEN** those effects run after predicates pass
+    - **AND** the caller is not required to run hook effects manually for the default path

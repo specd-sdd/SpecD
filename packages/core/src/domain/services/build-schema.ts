@@ -1,5 +1,6 @@
 import { Schema, parseSchemaCompat } from '../value-objects/schema.js'
-import { VALID_TRANSITIONS } from '../value-objects/change-state.js'
+import { VALID_TRANSITIONS, type ChangeState } from '../value-objects/change-state.js'
+import { isDrainState } from './workflow-topology.js'
 import {
   ArtifactType,
   type ArtifactScope,
@@ -28,6 +29,17 @@ import {
   type MetadataExtractorEntry,
 } from '../value-objects/metadata-extraction.js'
 import { SchemaValidationError } from '../errors/schema-validation-error.js'
+import {
+  CheckEmbeddingForbiddenError,
+  CheckBindingOverrideForbiddenError,
+  CheckConfigOverrideForbiddenError,
+  CheckDisableForbiddenError,
+  DuplicateCheckBindingError,
+  UnknownCheckError,
+} from '../errors/check-registry-errors.js'
+import { CheckRegistry, type CheckGovernance } from './check-registry.js'
+import { type CheckBinding } from './transition-checks.js'
+import { ARCHIVE_BINDINGS, DOMAIN_CHECKS, TRANSITION_BINDINGS } from './check-bindings.js'
 
 // ---------------------------------------------------------------------------
 // Raw input types (plain interfaces, no Zod dependency)
@@ -631,6 +643,122 @@ function validateArtifactGraph(ref: string, artifacts: readonly ArtifactType[]):
 // Public API
 // ---------------------------------------------------------------------------
 
+/** Keys accepted on an `archiveChecks` declaration. */
+const ARCHIVE_CHECK_KEYS: ReadonlySet<string> = new Set(['id', 'skippable', 'disabled', 'config'])
+
+/**
+ * Validates the shape of one `archiveChecks` declaration. Zod covers a plain
+ * `schema.yaml`, but entries added by schema plugins or `schemaOverrides` reach
+ * `buildSchema` unchecked, so this is the authoritative check.
+ *
+ * @param ref - Schema reference for error messages
+ * @param index - Position of the declaration in the `archiveChecks` array
+ * @param chk - Raw declaration value
+ * @throws {SchemaValidationError} When the declaration is malformed
+ */
+function assertArchiveCheckShape(ref: string, index: number, chk: unknown): void {
+  const where = `workflow step 'archiving': archiveChecks[${index}]`
+  if (typeof chk !== 'object' || chk === null || Array.isArray(chk)) {
+    throw new SchemaValidationError(ref, `${where} must be an object`)
+  }
+  const record = chk as Record<string, unknown>
+  for (const key of Object.keys(record)) {
+    if (!ARCHIVE_CHECK_KEYS.has(key)) {
+      throw new SchemaValidationError(ref, `${where} has unsupported key '${key}'`)
+    }
+  }
+  if (typeof record.id !== 'string' || record.id.length === 0) {
+    throw new SchemaValidationError(ref, `${where} must have a string id`)
+  }
+  for (const flag of ['skippable', 'disabled'] as const) {
+    if (record[flag] !== undefined && typeof record[flag] !== 'boolean') {
+      throw new SchemaValidationError(ref, `${where} '${flag}' must be a boolean`)
+    }
+  }
+  if (
+    record.config !== undefined &&
+    (typeof record.config !== 'object' || record.config === null || Array.isArray(record.config))
+  ) {
+    throw new SchemaValidationError(ref, `${where} 'config' must be an object`)
+  }
+}
+
+/** Declaration fields the governance locks inspect (shared by all check surfaces). */
+interface GovernedDeclaration {
+  /** Canonical check identifier. */
+  readonly id: string
+  /** Failure policy, when the surface supports one. */
+  readonly onFailure?: 'abort' | 'collect' | undefined
+  /** Declared bypass permission. */
+  readonly skippable?: boolean | undefined
+  /** Declared disablement. */
+  readonly disabled?: boolean | undefined
+  /** Declared configuration override. */
+  readonly config?: Readonly<Record<string, unknown>> | undefined
+}
+
+/** Context one declaration is evaluated against by {@link assertDeclarationGovernance}. */
+interface DeclarationGovernanceArgs {
+  /** Declaration being validated. */
+  readonly chk: GovernedDeclaration
+  /** Workflow step that declares it. */
+  readonly stepName: string
+  /** Check-level governance, if registered. */
+  readonly governance: CheckGovernance | undefined
+  /** Code-defined binding serving the same coordinate, if any. */
+  readonly ownBinding: CheckBinding | undefined
+  /** Coordinate description used in policy-lock errors. */
+  readonly coordinate: string
+}
+
+/**
+ * Applies the governance locks to one schema check declaration: placement,
+ * policy (`onFailure` then `skippable`), disablement, and configuration.
+ * Binding-level locks protect only code-defined bindings at their own coordinate.
+ *
+ * @param args - Declaration and the governance context it is evaluated against
+ * @throws {CheckEmbeddingForbiddenError} When the check may not be placed at this coordinate
+ * @throws {CheckBindingOverrideForbiddenError} When `onFailure` or `skippable` is locked
+ * @throws {CheckDisableForbiddenError} When the check cannot be disabled
+ * @throws {CheckConfigOverrideForbiddenError} When configuration is locked
+ */
+function assertDeclarationGovernance(args: DeclarationGovernanceArgs): void {
+  const { chk, stepName, governance, ownBinding, coordinate } = args
+
+  // Placement lock: a check may only be declared by a schema at a coordinate
+  // one of its code-defined bindings serves, unless it allows schema embedding.
+  if (ownBinding === undefined && governance?.allowSchemaEmbedding === false) {
+    throw new CheckEmbeddingForbiddenError(chk.id, stepName)
+  }
+
+  if (
+    ownBinding?.allowBindingOverride === false &&
+    (chk.onFailure !== undefined || chk.skippable !== undefined)
+  ) {
+    if (chk.onFailure !== undefined && chk.onFailure !== ownBinding.onFailure) {
+      throw new CheckBindingOverrideForbiddenError(chk.id, 'onFailure', coordinate)
+    }
+    if (chk.skippable !== undefined && chk.skippable !== ownBinding.skippable) {
+      throw new CheckBindingOverrideForbiddenError(chk.id, 'skippable', coordinate)
+    }
+  }
+
+  if (chk.disabled === true) {
+    if (governance?.allowDisable === false || ownBinding?.allowDisable === false) {
+      throw new CheckDisableForbiddenError(chk.id, stepName)
+    }
+  }
+
+  if (chk.config !== undefined && Object.keys(chk.config).length > 0) {
+    if (governance?.allowConfigOverride === false) {
+      throw new CheckConfigOverrideForbiddenError(chk.id, `workflow step '${stepName}'`)
+    }
+    if (ownBinding && ownBinding.allowConfigOverride === false) {
+      throw new CheckConfigOverrideForbiddenError(chk.id, `workflow step '${stepName}'`)
+    }
+  }
+}
+
 /**
  * Constructs a fully-typed {@link Schema} from validated intermediate data
  * and pre-loaded template contents.
@@ -641,6 +769,7 @@ function validateArtifactGraph(ref: string, artifacts: readonly ArtifactType[]):
  * @param ref - The schema reference for error messages
  * @param data - The validated intermediate data from YAML parsing
  * @param templates - Map from template relative path to file content
+ * @param registry - Optional CheckRegistry used to validate custom checks and governance constraints
  * @returns A fully-constructed Schema instance
  * @throws {@link SchemaValidationError} When semantic validation fails
  */
@@ -648,6 +777,7 @@ export function buildSchema(
   ref: string,
   data: SchemaYamlData,
   templates: ReadonlyMap<string, string>,
+  registry?: CheckRegistry,
 ): Schema {
   const idSet = new Set<string>()
   const idPattern = /^[a-z][a-z0-9-]*$/
@@ -677,7 +807,18 @@ export function buildSchema(
     artifacts.push(buildArtifactType(raw, templateContent))
   }
 
-  const workflow = (data.workflow ?? []) as WorkflowStep[]
+  const BEDROCK_STATES = new Set(['drafting', 'designing', 'done', 'archiving', 'archivable'])
+  const workflow: WorkflowStep[] = (data.workflow ?? []).map((step) => ({
+    step: step.step,
+    optional: step.optional ?? false,
+    disabled: step.disabled ?? false,
+    requires: step.requires ?? [],
+    requiresTaskCompletion: step.requiresTaskCompletion ?? [],
+    hooks: step.hooks ?? { pre: [], post: [] },
+    ...(step.checks !== undefined ? { checks: step.checks } : {}),
+    ...(step.skipChecks !== undefined ? { skipChecks: step.skipChecks } : {}),
+    ...(step.archiveChecks !== undefined ? { archiveChecks: step.archiveChecks } : {}),
+  }))
 
   // Semantic validation: duplicate step names
   const stepSet = new Set<string>()
@@ -695,6 +836,39 @@ export function buildSchema(
       throw new SchemaValidationError(
         ref,
         `workflow step '${step.step}' is not a valid lifecycle state`,
+      )
+    }
+    if (isDrainState(step.step as ChangeState)) {
+      throw new SchemaValidationError(
+        ref,
+        `Workflow step '${step.step}' is a drain-only state and cannot be declared`,
+      )
+    }
+    if (step.disabled === true && BEDROCK_STATES.has(step.step)) {
+      throw new SchemaValidationError(
+        ref,
+        `bedrock lifecycle state '${step.step}' cannot be disabled`,
+      )
+    }
+    if (step.optional === true && BEDROCK_STATES.has(step.step)) {
+      throw new SchemaValidationError(
+        ref,
+        `bedrock lifecycle state '${step.step}' cannot be optional`,
+      )
+    }
+    if (step.disabled === true && step.skipChecks !== undefined && step.skipChecks.length > 0) {
+      throw new SchemaValidationError(ref, `disabled step '${step.step}' cannot declare skipChecks`)
+    }
+    if (step.archiveChecks !== undefined && step.step !== 'archiving') {
+      throw new SchemaValidationError(
+        ref,
+        `workflow step '${step.step}' cannot declare archiveChecks; archiveChecks is only valid on 'archiving'`,
+      )
+    }
+    if (step.archiveChecks !== undefined && !Array.isArray(step.archiveChecks)) {
+      throw new SchemaValidationError(
+        ref,
+        `workflow step '${step.step}': 'archiveChecks' must be an array`,
       )
     }
   }
@@ -722,10 +896,156 @@ export function buildSchema(
     }
   }
 
+  // Semantic validation: hook onFailure property must be 'abort' or 'warn'
+  for (const step of workflow) {
+    const allHooks = [...(step.hooks?.pre ?? []), ...(step.hooks?.post ?? [])]
+    for (const hook of allHooks) {
+      if (hook.type === 'run' || hook.type === 'external') {
+        if (
+          hook.onFailure !== undefined &&
+          hook.onFailure !== 'abort' &&
+          hook.onFailure !== 'warn'
+        ) {
+          throw new SchemaValidationError(
+            ref,
+            `workflow step '${step.step}': hook '${hook.id}' has invalid onFailure '${String(hook.onFailure)}'. Must be 'abort' or 'warn'.`,
+          )
+        }
+      }
+    }
+  }
+
+  // Semantic validation: check declarations and governance locks
+  const activeRegistry =
+    registry ??
+    new CheckRegistry(Object.values(DOMAIN_CHECKS), [...TRANSITION_BINDINGS, ...ARCHIVE_BINDINGS])
+
+  const checkCoordinateSet = new Set<string>()
+  for (const step of workflow) {
+    for (const chk of step.checks ?? []) {
+      if (
+        chk.from !== undefined &&
+        chk.from !== '*' &&
+        !Object.hasOwn(VALID_TRANSITIONS, chk.from)
+      ) {
+        throw new SchemaValidationError(
+          ref,
+          `workflow check '${chk.id}' has invalid from state '${chk.from}'`,
+        )
+      }
+      if (!activeRegistry.has(chk.id)) {
+        throw new UnknownCheckError(chk.id)
+      }
+
+      const along = chk.along ?? 'forward'
+      const coordKey = `${chk.id}::transition::${step.step}::${along}`
+      if (checkCoordinateSet.has(coordKey)) {
+        throw new DuplicateCheckBindingError(
+          chk.id,
+          `scope: transition, to: ${step.step}, along: ${along}`,
+        )
+      }
+      checkCoordinateSet.add(coordKey)
+
+      const governance = activeRegistry.getGovernance(chk.id)
+      const chkFrom = chk.from ?? '*'
+      const matchingBinding = activeRegistry
+        .bindings()
+        .find(
+          (b) =>
+            b.check.id === chk.id &&
+            b.applicability.some(
+              (a) =>
+                a.scope === 'transition' &&
+                (a.to === undefined || a.to === '*' || a.to === step.step) &&
+                (a.along === undefined ||
+                  a.along === '*' ||
+                  a.along === 'any' ||
+                  a.along === along) &&
+                (a.from === undefined || a.from === '*' || a.from === chkFrom),
+            ),
+        )
+
+      assertDeclarationGovernance({
+        chk,
+        stepName: step.step,
+        governance,
+        ownBinding: matchingBinding,
+        coordinate: `scope: transition, to: ${step.step}, along: ${along}`,
+      })
+    }
+
+    for (const chk of step.skipChecks ?? []) {
+      if (!activeRegistry.has(chk.id)) {
+        throw new UnknownCheckError(chk.id)
+      }
+
+      const coordKey = `${chk.id}::step-skip::${step.step}`
+      if (checkCoordinateSet.has(coordKey)) {
+        throw new DuplicateCheckBindingError(chk.id, `scope: step-skip, step: ${step.step}`)
+      }
+      checkCoordinateSet.add(coordKey)
+
+      const governance = activeRegistry.getGovernance(chk.id)
+      const matchingBinding = activeRegistry
+        .bindings()
+        .find(
+          (b) =>
+            b.check.id === chk.id &&
+            b.applicability.some(
+              (a) =>
+                a.scope === 'step-skip' &&
+                (a.step === undefined || a.step === '*' || a.step === step.step),
+            ),
+        )
+
+      assertDeclarationGovernance({
+        chk,
+        stepName: step.step,
+        governance,
+        ownBinding: matchingBinding,
+        coordinate: `scope: step-skip, step: ${step.step}`,
+      })
+    }
+
+    for (const [index, chk] of (step.archiveChecks ?? []).entries()) {
+      assertArchiveCheckShape(ref, index, chk)
+      if (!activeRegistry.has(chk.id)) {
+        throw new UnknownCheckError(chk.id)
+      }
+
+      const coordKey = `${chk.id}::archive`
+      if (checkCoordinateSet.has(coordKey)) {
+        throw new DuplicateCheckBindingError(chk.id, 'scope: archive')
+      }
+      checkCoordinateSet.add(coordKey)
+
+      const matchingBinding = activeRegistry
+        .bindings()
+        .find((b) => b.check.id === chk.id && b.applicability.some((a) => a.scope === 'archive'))
+
+      assertDeclarationGovernance({
+        chk,
+        stepName: step.step,
+        governance: activeRegistry.getGovernance(chk.id),
+        ownBinding: matchingBinding,
+        coordinate: 'scope: archive',
+      })
+    }
+  }
+
   // Semantic validation: requiresTaskCompletion must be subset of requires
   // and reference artifacts with task capability (hasTasks: true)
   const artifactIndex = new Map(artifacts.map((a) => [a.id, a]))
   for (const step of workflow) {
+    for (const id of [...step.requires, ...(step.requiresTaskCompletion ?? [])]) {
+      if (!artifactIndex.has(id)) {
+        throw new SchemaValidationError(
+          ref,
+          `Workflow step '${step.step}' requires unknown artifact '${id}'`,
+        )
+      }
+    }
     for (const id of step.requiresTaskCompletion ?? []) {
       if (!step.requires.includes(id)) {
         throw new SchemaValidationError(

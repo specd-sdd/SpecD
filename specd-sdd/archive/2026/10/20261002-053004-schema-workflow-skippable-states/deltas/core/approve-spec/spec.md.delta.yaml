@@ -1,0 +1,20 @@
+- op: modified
+  description: Resolve sovereign change schema in gate guard without throwing SchemaMismatchError
+  selector:
+    type: section
+    matches: 'Requirement: Gate guard'
+  content: |
+    The gate guard sequence is:
+
+    1. If `approvals.spec` is `false` (baked at construction), throw `ApprovalGateDisabledError` with gate `'spec'`. No repository access occurs.
+    2. Load the change by name from the `ChangeRepository`. If no change exists, throw `ChangeNotFoundError`.
+    3. Obtain the change's sovereign schema through `ResolveChangeSchema`. General resolution failures and `SchemaProviderIdentityMismatchError` propagate before the actor is resolved and before consent is recorded.
+    4. Resolve the current actor identity via `ActorResolver`.
+- op: added
+  description: Declare the shared sovereign change-schema resolution dependency
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [core:resolve-change-schema](../resolve-change-schema/spec.md) — named sovereign lookup, provider identity validation, and same-name version advisory

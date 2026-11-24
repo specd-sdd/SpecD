@@ -12,7 +12,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { type SpecdConfig } from '@specd/core'
+import { DEFAULT_INVALIDATION_POLICY, type SpecdConfig } from '@specd/core'
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>()
@@ -54,6 +54,7 @@ describe('index-lock infrastructure', () => {
         archiveAdapter: { adapter: 'fs', config: {} },
       },
       approvals: { spec: false, signoff: false },
+      invalidation: DEFAULT_INVALIDATION_POLICY,
     }
   })
 

@@ -1,0 +1,29 @@
+- op: modified
+  description: 'Verify nextAction.command projection in change invalidate Reporting'
+  selector:
+    type: section
+    matches: 'Requirement: Reporting'
+  content: |
+    #### Scenario: Preserve output still reports blockers
+
+    - **WHEN** invalidation preserves lifecycle state with unresolved drift
+    - **THEN** output shows both policy dimensions, affected evidence, and the forward blocker
+
+    #### Scenario: Recovery output names committed state
+
+    - **WHEN** core commits gate-driven recovery
+    - **THEN** text, JSON, and TOON render that state, cause, blockers, and next action
+    - **AND** `nextAction.command` is projected from Core's host-neutral `nextAction.intent` via the CLI guidance presenter
+
+    #### Scenario: Structured success preserves the operator reason
+
+    - **WHEN** invalidation succeeds with a human-readable reason
+    - **THEN** JSON and TOON expose that exact value in a named `reason` field
+    - **AND** text output includes it without replacing canonical recovery guidance
+
+    #### Scenario: Blockers are projected and force guidance appears once
+
+    - **GIVEN** invalidation returns a skippable blocker with `checkId`, and a second run is refused with `INVALIDATE_REQUIRES_FORCE`
+    - **WHEN** the command renders JSON and the refusal text
+    - **THEN** the blocker carries `label`, `checkId`, and `bypassFlag` and no raw `isSkippable`
+    - **AND** the `--force` recovery hint appears exactly once, resolved from the hint helper, with no hard-coded `Re-run with --force.` sentence

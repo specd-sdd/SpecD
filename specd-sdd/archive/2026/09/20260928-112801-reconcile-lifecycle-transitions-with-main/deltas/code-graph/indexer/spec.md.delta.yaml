@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'The indexer contract already defines integrated workspace indexing; only merged fixtures and implementation metadata require reconciliation.'

@@ -5,6 +5,10 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**", "build/**"]
     },
+    "@specd/guide#build": {
+      "dependsOn": ["^build", "@specd/sdk#build"],
+      "outputs": ["dist/**", "build/**"]
+    },
     "build:dev": {
       "dependsOn": ["^build:dev"],
       "outputs": ["dist/**", "build/**"]

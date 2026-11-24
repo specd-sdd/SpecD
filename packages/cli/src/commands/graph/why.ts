@@ -150,7 +150,7 @@ JSON/TOON output schema:
       if (opts.config !== undefined && opts.path !== undefined) {
         cliError('--config and --path are mutually exclusive', opts.format, 1)
       }
-      const { config, kernel } = await resolveGraphCliContext({
+      const { config, kernel, host } = await resolveGraphCliContext({
         configPath: opts.config,
         repoPath: opts.path,
       }).catch((err: unknown) =>
@@ -165,7 +165,7 @@ JSON/TOON output schema:
         opts.format,
         async (provider) => {
           await warnGraphStale(provider, config, kernel)
-          const hostContext: SdkHostContext = await createGraphHostContext(config, kernel)
+          const hostContext: SdkHostContext = await createGraphHostContext(config, kernel, host)
           const result = await runGraphWhy(hostContext, { path, provider })
           if (fmt === 'text') {
             output(renderGraphWhyText(result), 'text')
@@ -173,7 +173,7 @@ JSON/TOON output schema:
             output(result, fmt)
           }
         },
-        { kernel },
+        { host },
       )
     })
 }

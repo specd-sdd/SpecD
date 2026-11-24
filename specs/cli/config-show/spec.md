@@ -52,16 +52,21 @@ llmOptimizedContext: <true|false>
 schemaPlugins: <ref>, <ref>, ...
 
 plugins:
-  agents:
-    <name>  (present)
-    ...
+  <name>  (present) [contributions: <id>, <id>]
+  ...
 
 schemaOverrides: (present)
 ```
 
+The `plugins` section lists the flat `plugins` list; the `contributions` suffix is shown only for entries with an allowlist, separated from the `(present)` marker by a single space.
+
 The text view is intentionally summarized. It shows the resolved workspace and storage paths used by humans for diagnosis, but it does not expand the full adapter-binding structure.
 
 In `json` or `toon` mode, the command MUST serialize the `SpecdConfig` object directly — no manual field selection. The output is the config as-is, encoded in the respective format. This ensures that new fields added to `SpecdConfig`, including named adapter bindings such as `specsAdapter`, `schemasAdapter`, `changesAdapter`, `draftsAdapter`, `discardedAdapter`, and `archiveAdapter`, appear automatically without CLI changes. Optional fields that are `undefined` are omitted by the serializer.
+
+### Requirement: Help text
+
+The `--help` text of `specd config show` MUST document the JSON/TOON output shape from the current `SpecdConfig` fields (generated from, or kept in sync with, the `SpecdConfig` type). It MUST NOT describe a key at a level where `SpecdConfig` does not define it (for example a project-level field listed inside a workspace), and it MUST document every key of the workspace, storage and context-entry shapes. A test MUST compare the documented key lists with the keys of `SpecdConfig` so that drift fails the build.
 
 ### Requirement: Sensitive fields
 
@@ -70,6 +75,8 @@ The config contains no sensitive values — all fields are filesystem paths, sch
 ### Requirement: Error cases
 
 If the config cannot be loaded (discovery failure or parse error), exits per the entrypoint exit code rules. This command is most useful precisely when config loading is suspected to be wrong — errors are printed with enough detail to diagnose the problem.
+
+The command loads the configuration through the config loader only; it does not bootstrap a host or load any plugin, so a broken configured plugin cannot prevent it from running. Config warnings attached by the loader to the loaded config are printed to stderr by the CLI config-loading helper before the command output.
 
 ## Constraints
 
@@ -98,8 +105,7 @@ contextIncludeSpecs: default:*
 llmOptimizedContext: true
 
 plugins:
-  agents:
-    @specd/plugin-agent-claude  (present)
+  @specd/plugin-agent-claude  (present)
 
 schemaOverrides: (present)
 ```

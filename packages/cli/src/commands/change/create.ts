@@ -3,6 +3,11 @@ import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { collect } from '../../helpers/collect.js'
+import {
+  parseArtifactPolicyFlag,
+  parseWorkflowPolicyFlag,
+  resolveCreateInvalidationPolicy,
+} from './_invalidation-flags.js'
 
 /**
  * Registers the `change create` subcommand on the given parent command.
@@ -17,8 +22,12 @@ export function registerChangeCreate(parent: Command): void {
     .option('--spec <id>', 'spec path (repeatable)', collect, [] as string[])
     .option('--description <text>', 'change description (informational)')
     .option(
-      '--invalidation-policy <policy>',
-      'set the invalidation policy (none|surgical|downstream|global)',
+      '--artifact-policy <policy>',
+      'artifact invalidation dimension (none|surgical|downstream|global); omitted value comes from config',
+    )
+    .option(
+      '--workflow-policy <policy>',
+      'workflow invalidation dimension (preserve|redesign); omitted value comes from config',
     )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
@@ -35,22 +44,23 @@ JSON/TOON output schema:
         opts: {
           spec: string[]
           description?: string
-          invalidationPolicy?: string
+          artifactPolicy?: string
+          workflowPolicy?: string
           format: string
           config?: string
         },
       ) => {
+        const artifactPolicy = parseArtifactPolicyFlag(opts.artifactPolicy, opts.format)
+        const workflowPolicy = parseWorkflowPolicyFlag(opts.workflowPolicy, opts.format)
         try {
           const { config, kernel } = await resolveCliContext({ configPath: opts.config })
 
-          const invalidationPolicy: string | undefined =
-            opts.invalidationPolicy ?? config.invalidationPolicy
           const { change, changePath, overlapReport } = await kernel.changes.create.execute({
             name,
             ...(opts.description !== undefined ? { description: opts.description } : {}),
             specIds: opts.spec,
             ...(opts.spec.length > 0 ? { includeOverlapCheck: true } : {}),
-            ...(invalidationPolicy !== undefined ? { invalidationPolicy } : {}),
+            invalidation: resolveCreateInvalidationPolicy(config, artifactPolicy, workflowPolicy),
           })
 
           if (overlapReport?.hasOverlap === true) {

@@ -1,0 +1,13 @@
+- op: added
+  description: 'Document CLI-rendered --next and impl.linksInScope bypass hints in change transition'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Next-transition resolution'
+  content: |
+    ### Requirement: CLI-rendered transition error hints
+
+    When `HappyPathNextUnavailableError` (`HAPPY_PATH_NEXT_UNAVAILABLE`) or a skippable `impl.linksInScope` failure is surfaced by `change transition`, the command SHALL use the centralized CLI hint-resolution helper (`change.transition` context) to render `--next` context and `--skip-checks impl.linksInScope` / `--allow-out-of-scope` hints, rather than relying on CLI flags embedded in `@specd/core` messages.

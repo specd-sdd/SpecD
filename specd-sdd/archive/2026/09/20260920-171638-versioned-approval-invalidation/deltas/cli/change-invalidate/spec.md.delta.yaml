@@ -1,0 +1,60 @@
+- op: modified
+  description: 'Expose independent artifact and workflow choices'
+  selector:
+    type: section
+    matches: '^Requirement: Command signature$'
+  content: |
+    ```text
+    specd changes invalidate <name> --reason <text>
+      [--artifact-policy none|surgical|downstream|global]
+      [--workflow-policy preserve|redesign]
+      [--target <artifactId>[@<specId>] ...]
+      [--force]
+      [--format text|json|toon]
+    ```
+
+    Artifact policy values are `none`, `surgical`, `downstream`, and `global`; workflow policy values are `preserve` and `redesign`. Targets are valid only where required by the effective artifact policy. The CLI SHALL map these flags to the structured `InvalidateChange` input and MUST NOT implement recovery locally.
+
+- op: modified
+  description: 'Resolve and display a structured effective policy'
+  selector:
+    type: section
+    matches: '^Requirement: Effective policy resolution$'
+  content: |
+    The CLI SHALL obtain the persisted structured policy and compatibility-adapted project configuration through core. Overrides apply only to this invocation. The CLI MUST NOT interpret the deprecated configuration key independently or silently combine old and new shapes.
+
+- op: modified
+  description: 'Report projection and lifecycle consequences'
+  selector:
+    type: section
+    matches: '^Requirement: Reporting$'
+  content: |
+    Success output SHALL report the recorded `reason`, both effective policy dimensions, affected artifact/file targets, approval or verification status changes, canonical blockers, next action, and any automatic return committed by the reconciler in text, JSON, and TOON. JSON and TOON SHALL expose `reason` as a named field rather than only embedding it in prose. When `--force` is required because valid consent would be revoked, the refusal SHALL render the exact affected gates and Core-selected recovery targets.
+
+    Output MUST NOT claim that `preserve` permits forward progress with drift. It means only that artifact drift itself did not move the current lifecycle state.
+
+- op: modified
+  description: 'Make approval confirmation gate-specific'
+  selector:
+    type: section
+    matches: '^Requirement: Approval guard$'
+  content: |
+    When the requested operation would revoke a currently valid spec approval or sign-off, the command SHALL stop without mutation unless `--force` is present. The warning SHALL identify each affected gate and its canonical recovery target from the Core result; it MUST NOT always promise a return to `designing` or choose a target in CLI code.
+
+    Stale evidence does not require confirmation merely because its historical approval event exists. This guard applies independently of artifact policy, including `none`.
+
+- op: modified
+  description: 'Replace unconditional change-level rollback with structured recovery'
+  selector:
+    type: section
+    matches: '^Requirement: Change-level invalidation$'
+  content: |
+    Once validation and guards pass, the command delegates invalidation and recovery to core. Artifact reopening follows the effective artifact policy; lifecycle movement follows the effective workflow policy and mandatory gate precedence. The CLI MUST NOT always return the change to `designing`.
+
+- op: modified
+  description: 'Clarify none semantics without implying freshness or redesign'
+  selector:
+    type: section
+    matches: '^Requirement: none semantics$'
+  content: |
+    Artifact policy `none` reopens no additional artifact/file state. It does not clear existing drift, waive forward-progress blockers, restore stale evidence, or determine lifecycle recovery. Output SHALL state those facts together with the independently effective workflow policy and any gate-driven return.

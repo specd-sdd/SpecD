@@ -86,15 +86,15 @@
 - **THEN** the lookup step itself does not read, compute, or cache any workspace value
 - **AND** workspace derivation for the `change` namespace is governed entirely by Requirement: HookVariables construction
 
-### Requirement: Schema name guard
+### Requirement: Sovereign schema resolution
 
-#### Scenario: Schema mismatch throws SchemaMismatchError
+#### Scenario: Resolves sovereign schema when workspace default differs
 
-- **GIVEN** a change created with schema `spec-driven`
-- **AND** `SchemaProvider.get()` returns a schema named `custom-schema`
+- **GIVEN** a change created with schema `custom-workflow`
+- **AND** the workspace default schema is `@specd/schema-std`
 - **WHEN** `execute` is called
-- **THEN** `SchemaMismatchError` is thrown
-- **AND** no hooks are executed
+- **THEN** hooks defined in `custom-workflow` are resolved and executed
+- **AND** `SchemaMismatchError` is not thrown
 
 ### Requirement: Step resolution
 
@@ -116,6 +116,19 @@
 - **GIVEN** a schema with workflow steps `[designing, implementing, verifying, archiving]`
 - **WHEN** `RunStepHooks.execute` is called with `step: "ready"` and `phase: "pre"`
 - **THEN** the result is `{ hooks: [], success: true, failedHooks: [] }`
+
+#### Scenario: Disabled step returns no hooks in either phase
+
+- **GIVEN** a change whose schema declares `verifying: { disabled: true }` with `run:` hooks in both `pre` and `post`
+- **WHEN** `RunStepHooks.execute({ name, step: 'verifying', phase })` is called for `pre` and for `post`
+- **THEN** each call returns `{ hooks: [], success: true, failedHooks: [] }`
+- **AND** the `HookRunner` and external runners are never invoked
+
+#### Scenario: --only cannot run a hook on a disabled step
+
+- **GIVEN** the same disabled `verifying` step
+- **WHEN** `RunStepHooks.execute({ name, step: 'verifying', phase: 'pre', only: '<hookId>' })` names one of its hooks
+- **THEN** the result is empty and successful and no hook executes
 
 ### Requirement: Hook collection
 

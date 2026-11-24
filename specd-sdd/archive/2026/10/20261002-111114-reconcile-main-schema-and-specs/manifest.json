@@ -1,0 +1,491 @@
+{
+  "manifestVersion": 2,
+  "name": "reconcile-main-schema-and-specs",
+  "createdAt": "2026-10-02T11:11:14.315Z",
+  "updatedAt": "2026-10-06T10:29:45.965Z",
+  "description": "Reconcile main branch merge conflicts, align spec-locks, and incorporate change root schema resolution",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:change",
+    "core:change-manifest",
+    "core:create-change",
+    "core:edit-change",
+    "core:kernel"
+  ],
+  "specDependsOn": {
+    "core:change": [
+      "core:change-manifest",
+      "core:workflow-model",
+      "core:spec-metadata",
+      "core:spec-id-format",
+      "default:_global/architecture",
+      "core:lifecycle-engine",
+      "default:_global/logging",
+      "core:implementation-detector-port",
+      "core:transition-checks"
+    ],
+    "core:change-manifest": [
+      "core:change",
+      "core:change-layout",
+      "core:storage",
+      "core:spec-metadata",
+      "core:spec-id-format",
+      "core:workspace"
+    ],
+    "core:create-change": [
+      "core:change",
+      "default:_global/architecture",
+      "core:get-active-schema",
+      "core:spec-overlap",
+      "core:composition-resolver"
+    ],
+    "core:edit-change": [
+      "core:change",
+      "core:composition",
+      "core:composition-resolver",
+      "core:list-workspaces"
+    ],
+    "core:kernel": [
+      "default:_global/architecture",
+      "core:composition",
+      "core:create-change",
+      "core:get-status",
+      "core:transition-change",
+      "core:draft-change",
+      "core:restore-change",
+      "core:discard-change",
+      "core:archive-change",
+      "core:validate-artifacts",
+      "core:compile-context",
+      "core:list-changes",
+      "core:list-drafts",
+      "core:list-discarded",
+      "core:edit-change",
+      "core:skip-artifact",
+      "core:update-spec-deps",
+      "core:list-archived",
+      "core:get-archived-change",
+      "core:run-step-hooks",
+      "core:get-hook-instructions",
+      "core:get-artifact-instruction",
+      "core:approve-spec",
+      "core:approve-signoff",
+      "core:list-specs",
+      "core:get-spec",
+      "core:get-active-schema",
+      "core:validate-specs",
+      "core:generate-metadata",
+      "core:materialize-spec-metadata",
+      "core:get-spec-metadata",
+      "core:regenerate-spec-metadata",
+      "core:initialize-persisted-spec-state",
+      "core:get-persisted-spec-schema",
+      "core:update-persisted-spec-schema",
+      "core:get-persisted-spec-deps",
+      "core:update-persisted-spec-deps",
+      "core:get-persisted-spec-implementation",
+      "core:update-persisted-spec-implementation",
+      "core:get-persisted-spec-optimizations",
+      "core:update-persisted-spec-optimizations",
+      "core:get-spec-context",
+      "core:config-writer-port",
+      "core:list-workspaces",
+      "core:get-project-context",
+      "core:get-config",
+      "core:project-metadata",
+      "core:update-project-metadata",
+      "core:resolve-schema",
+      "core:spec-overlap",
+      "core:get-specs-health",
+      "core:count-tasks",
+      "core:check-registry",
+      "core:archive-repository-port",
+      "core:get-draft",
+      "core:get-discarded",
+      "core:invalidate-change",
+      "core:update-implementation-tracking",
+      "core:refresh-implementation-tracking",
+      "core:get-implementation-review",
+      "core:preview-spec",
+      "core:get-spec-outline",
+      "core:validate-schema",
+      "core:resolve-context-specs",
+      "core:get-project-summary",
+      "core:actor-resolver"
+    ]
+  },
+  "invalidation": {
+    "artifacts": "downstream",
+    "workflow": "preserve"
+  },
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:2a7710baebdc6357ab8245f5dc170f1e1e060433670d0570311e6e70d4425946"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:change",
+          "filename": "deltas/core/change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:02b3476f0ea86485e05d908153e705ce86174053f0a7ade45ad770e7541b8c03"
+        },
+        {
+          "key": "core:change-manifest",
+          "filename": "deltas/core/change-manifest/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2533048096110bb7c65258915c360fa0161a80bb1355b50e8d249196abc3c91e"
+        },
+        {
+          "key": "core:create-change",
+          "filename": "deltas/core/create-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b93ffc372efac3ad01159dab2194dbd41b466cc46a4f4b950ab5b8c7b3ed77c6"
+        },
+        {
+          "key": "core:edit-change",
+          "filename": "deltas/core/edit-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ec20a6bcf47445de179bd2a9b84f23478e41b8948d9553a6466f04b8aca0b42f"
+        },
+        {
+          "key": "core:kernel",
+          "filename": "deltas/core/kernel/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d987974ee47ab91ccafaf1f1fd5a9ee20e747ca353a6fa4ac00153350da9d293"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:change",
+          "filename": "deltas/core/change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:289acc1bae0e58dc6edf6ee251e9743646aa542152e18fb9e9e37dc609df2592"
+        },
+        {
+          "key": "core:change-manifest",
+          "filename": "deltas/core/change-manifest/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:24ac7ec80db7334a38de3c6ccc9ee850f5f266f6801d0c26822804be19e54a8a"
+        },
+        {
+          "key": "core:create-change",
+          "filename": "deltas/core/create-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:95cf4fa4a5f61b73391789f049360d0c961f93efe18da9b9ece7ada507f7d7d7"
+        },
+        {
+          "key": "core:edit-change",
+          "filename": "deltas/core/edit-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:80b23a4acbfe9cc2d36c41062f186920e902fd8d29a075922eda69bff6301304"
+        },
+        {
+          "key": "core:kernel",
+          "filename": "deltas/core/kernel/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:398f14db7b8aed72b7597a0d8a8f0d021d2cc69182b19107be4ddc7f2d81f7dd"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:fc41b5e1e87849ea351337fd1c1ff7cc840b4367b3019dfd1da990b749a236c6"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:49ec12b40d7d2a905363b046e6e04eb59347f0b99d2d142a995e35d7fe481c39"
+        }
+      ]
+    }
+  ],
+  "trackedImplementationFiles": [
+    {
+      "file": "AGENTS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "CLAUDE.md",
+      "state": "ignored"
+    }
+  ],
+  "implementationTrackingStartedAt": "2026-10-06T09:16:18.061Z",
+  "verification": {
+    "completed": {
+      "id": "verification-1",
+      "attemptId": "verification-attempt-1",
+      "status": "valid",
+      "completedAt": "2026-10-06T09:20:35.024Z",
+      "completedBy": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "fingerprint": {
+        "version": 1,
+        "artifacts": {
+          "version": 1,
+          "algorithm": "artifact-pre-hash-v1",
+          "files": {
+            "design:design": "sha256:fc41b5e1e87849ea351337fd1c1ff7cc840b4367b3019dfd1da990b749a236c6",
+            "proposal:proposal": "sha256:2a7710baebdc6357ab8245f5dc170f1e1e060433670d0570311e6e70d4425946",
+            "specs:core:change": "sha256:02b3476f0ea86485e05d908153e705ce86174053f0a7ade45ad770e7541b8c03",
+            "specs:core:change-manifest": "sha256:2533048096110bb7c65258915c360fa0161a80bb1355b50e8d249196abc3c91e",
+            "specs:core:create-change": "sha256:b93ffc372efac3ad01159dab2194dbd41b466cc46a4f4b950ab5b8c7b3ed77c6",
+            "specs:core:edit-change": "sha256:ec20a6bcf47445de179bd2a9b84f23478e41b8948d9553a6466f04b8aca0b42f",
+            "specs:core:kernel": "sha256:d987974ee47ab91ccafaf1f1fd5a9ee20e747ca353a6fa4ac00153350da9d293",
+            "verify:core:change": "sha256:289acc1bae0e58dc6edf6ee251e9743646aa542152e18fb9e9e37dc609df2592",
+            "verify:core:change-manifest": "sha256:24ac7ec80db7334a38de3c6ccc9ee850f5f266f6801d0c26822804be19e54a8a",
+            "verify:core:create-change": "sha256:95cf4fa4a5f61b73391789f049360d0c961f93efe18da9b9ece7ada507f7d7d7",
+            "verify:core:edit-change": "sha256:80b23a4acbfe9cc2d36c41062f186920e902fd8d29a075922eda69bff6301304",
+            "verify:core:kernel": "sha256:398f14db7b8aed72b7597a0d8a8f0d021d2cc69182b19107be4ddc7f2d81f7dd"
+          }
+        },
+        "implementation": {
+          "version": 1,
+          "hashAlgorithm": "sha256",
+          "textNormalization": "text-v1",
+          "binaryNormalization": "bytes-v1",
+          "files": {}
+        }
+      }
+    }
+  },
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-10-02T11:11:14.315Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "core:change",
+        "core:change-manifest",
+        "core:create-change",
+        "core:edit-change",
+        "core:kernel"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-10-02T11:11:14.334Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:change"
+        },
+        {
+          "type": "specs",
+          "key": "core:change-manifest"
+        },
+        {
+          "type": "specs",
+          "key": "core:create-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:edit-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:kernel"
+        },
+        {
+          "type": "verify",
+          "key": "core:change"
+        },
+        {
+          "type": "verify",
+          "key": "core:change-manifest"
+        },
+        {
+          "type": "verify",
+          "key": "core:create-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:edit-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:kernel"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-02T11:15:02.205Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-06T08:53:41.096Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-06T09:16:18.061Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-06T09:20:09.068Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "verification-attempt-started",
+      "at": "2026-10-06T09:20:21.040Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-1",
+      "state": "verifying",
+      "fingerprintVersion": 1,
+      "artifactAlgorithm": "artifact-pre-hash-v1",
+      "textNormalization": "text-v1",
+      "binaryNormalization": "bytes-v1"
+    },
+    {
+      "type": "verification-completed",
+      "at": "2026-10-06T09:20:35.024Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "attemptId": "verification-attempt-1",
+      "verificationId": "verification-1"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-06T09:20:48.382Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-06T09:21:02.173Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-10-06T10:29:45.962Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-10-06T10:29:46.145Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

@@ -1,0 +1,373 @@
+- op: modified
+  description: 'Input contract scenarios include next and allowOutOfScope'
+  selector:
+    type: section
+    matches: '^Requirement: Input contract$'
+  content: |
+    ### Requirement: Input contract
+
+    #### Scenario: Input accepts transition controls without approval flags
+
+    - **WHEN** `TransitionChange.execute` is called
+    - **THEN** its input accepts `name`, `to` (`ChangeState` or `'next'`), and optional `skipHookPhases`, `refreshImplementationTrackingBefore`, and `allowOutOfScope`
+    - **AND** its input does not accept `approvalsSpec` or `approvalsSignoff`
+
+    #### Scenario: allowOutOfScope omitted keeps strict impl.linksInScope
+
+    - **GIVEN** a forward exit from `implementing` where `impl.linksInScope` would fail
+    - **WHEN** `execute` is called without `allowOutOfScope` (or with `allowOutOfScope: false`)
+    - **THEN** `impl.linksInScope` is evaluated and not skipped
+    - **AND** the transition fails with `ArchiveImplementationStateError` when the predicate fails
+
+    #### Scenario: Approval gates are fixed at construction
+
+    - **GIVEN** `TransitionChange` is constructed with `approvals: { spec: true, signoff: false }`
+    - **WHEN** `execute` is called with `to: 'implementing'` from `ready`
+    - **THEN** routing uses the constructor-provided `approvals.spec` value
+
+- op: modified
+  description: 'Spec approval check stays in ready'
+  selector:
+    type: section
+    matches: '^Requirement: Approval-gate routing for spec approval$'
+  rename: 'Requirement: Spec approval is a check not a pending hop'
+  content: |
+    ### Requirement: Spec approval is a check not a pending hop
+
+    #### Scenario: Ready to implementing stays in ready when spec approval is missing
+
+    - **GIVEN** a change in `ready` state
+    - **GIVEN** `TransitionChange` is constructed with `approvals.spec: true`
+    - **AND** no spec approval is recorded
+    - **WHEN** `execute` is called with `to: 'implementing'`
+    - **THEN** it throws `InvalidStateTransitionError` with reason `{ type: 'approval-required', gate: 'spec' }`
+    - **AND** the change remains in `ready`
+    - **AND** it does not persist `pending-spec-approval`
+
+    #### Scenario: Ready to implementing is direct when spec approval is inactive
+
+    - **GIVEN** a change in `ready` state
+    - **GIVEN** `TransitionChange` is constructed with `approvals.spec: false`
+    - **WHEN** `execute` is called with `to: 'implementing'`
+    - **THEN** the change transitions to `implementing`
+
+    #### Scenario: Ready to implementing succeeds after spec approval is recorded
+
+    - **GIVEN** a change in `ready` with `approvals.spec: true`
+    - **AND** spec approval is recorded
+    - **WHEN** `execute` is called with `to: 'implementing'`
+    - **THEN** the change transitions to `implementing`
+    - **AND** it does not persist `pending-spec-approval`
+
+- op: modified
+  description: 'Signoff check stays in done'
+  selector:
+    type: section
+    matches: '^Requirement: Approval-gate routing for signoff$'
+  rename: 'Requirement: Signoff is a check not a pending hop'
+  content: |
+    ### Requirement: Signoff is a check not a pending hop
+
+    #### Scenario: Done to archivable stays in done when signoff is missing
+
+    - **GIVEN** a change in `done` state
+    - **GIVEN** `TransitionChange` is constructed with `approvals.signoff: true`
+    - **AND** no signoff is recorded
+    - **WHEN** `execute` is called with `to: 'archivable'`
+    - **THEN** it throws `InvalidStateTransitionError` with reason `{ type: 'approval-required', gate: 'signoff' }`
+    - **AND** the change remains in `done`
+    - **AND** it does not persist `pending-signoff`
+
+    #### Scenario: Done to archivable is direct when signoff is inactive
+
+    - **GIVEN** a change in `done` state
+    - **GIVEN** `TransitionChange` is constructed with `approvals.signoff: false`
+    - **WHEN** `execute` is called with `to: 'archivable'`
+    - **THEN** the change transitions to `archivable`
+
+    #### Scenario: Done to archivable succeeds after signoff is recorded
+
+    - **GIVEN** a change in `done` with `approvals.signoff: true`
+    - **AND** signoff is recorded
+    - **WHEN** `execute` is called with `to: 'archivable'`
+    - **THEN** the change transitions to `archivable`
+    - **AND** it does not persist `pending-signoff`
+
+- op: modified
+  description: 'Pending drain failures do not name a LifecycleEngine class'
+  selector:
+    type: section
+    matches: '^Requirement: Human-approval pending states produce explicit transition failures$'
+  content: |
+    ### Requirement: Human-approval pending states produce explicit transition failures
+
+    #### Scenario: Pending spec approval blocks normal forward transition
+
+    - **GIVEN** a change in `pending-spec-approval` state
+    - **WHEN** `execute` is called with `to: 'spec-approved'`
+    - **THEN** matching predicates / `evaluateLifecycle` identify an approval-required or invalid-transition blocker
+    - **AND** it throws `InvalidStateTransitionError`
+    - **AND** the error reason equals `{ type: 'approval-required', gate: 'spec' }` or `{ type: 'invalid-transition' }`
+
+    #### Scenario: Pending signoff blocks normal forward transition
+
+    - **GIVEN** a change in `pending-signoff` state
+    - **WHEN** `execute` is called with `to: 'signed-off'`
+    - **THEN** matching predicates / `evaluateLifecycle` identify an approval-required or invalid-transition blocker
+    - **AND** it throws `InvalidStateTransitionError`
+    - **AND** the error reason equals `{ type: 'approval-required', gate: 'signoff' }` or `{ type: 'invalid-transition' }`
+
+    #### Scenario: Pending approval still allows redesign
+
+    - **GIVEN** a change in `pending-spec-approval` state
+    - **WHEN** `execute` is called with `to: 'designing'`
+    - **THEN** the change transitions to `designing`
+
+- op: added
+  description: 'Task completion is not a second CountTasks after evaluate'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Task completion check during requires enforcement$'
+    after:
+      type: section
+      matches: '^Scenario: Missing task content does not block a capable artifact$'
+  content: |
+    #### Scenario: Task-completion check owns CountTasks
+
+    - **GIVEN** `GetStatus` already evaluated `workflow.taskCompletion` as fail
+    - **WHEN** `TransitionChange.execute()` targets `verifying`
+    - **THEN** it throws `incomplete-tasks`
+    - **AND** the use case does not invoke `CountTasks` after a green predicate `execute`
+
+- op: added
+  description: 'Requires maps check predicates'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Workflow requires enforcement$'
+    after:
+      type: section
+      matches: '^Scenario: Transition blocked by recursive parent review$'
+  content: |
+    #### Scenario: Requires failure matches predicate evaluation
+
+    - **GIVEN** matching `workflow.requires` already failed for the attempt
+    - **WHEN** `TransitionChange.execute()` runs
+    - **THEN** the thrown `incomplete-artifact` reason identifies the same artifact
+
+- op: added
+  description: 'Skill-aligned hop invalidation'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Artifact validation clearing on verifying to implementing$'
+  content: |
+    ### Requirement: Skill-aligned backward hop invalidation
+
+    #### Scenario: done to implementing invalidates signoff only
+
+    - **GIVEN** a change in `done` with validated artifacts and an active signoff
+    - **WHEN** `execute` is called with `to: 'implementing'`
+    - **THEN** signoff is invalidated
+    - **AND** artifacts are not mass-downgraded
+    - **AND** `implementing.post` is not executed
+
+- op: added
+  description: 'source.post skipped on backward'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Post-hook execution$'
+    after:
+      type: section
+      matches: '^Scenario: skipHookPhases all skips everything$'
+  content: |
+    #### Scenario: source.post skipped on backward hop
+
+    - **GIVEN** a change in `done` with `done.hooks.post` configured
+    - **WHEN** `execute` is called with `to: 'implementing'`
+    - **THEN** those post hooks are not executed
+    - **AND** the transition still persists if predicates pass
+
+- op: added
+  description: 'target.pre still runs on redesign'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Pre-hook execution$'
+    after:
+      type: section
+      matches: '^Scenario: Target pre-hooks run before the state mutation$'
+  content: |
+    #### Scenario: designing pre-hooks run on redesign
+
+    - **GIVEN** a change in `implementing`
+    - **AND** `designing.hooks.pre` is configured
+    - **WHEN** `execute` is called with `to: 'designing'`
+    - **THEN** designing pre-hooks execute
+    - **AND** implementing post-hooks do not
+
+- op: added
+  description: 'Recovery hop skips archiving.post'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Transition from archiving to archivable$'
+    after:
+      type: section
+      matches: '^Scenario: Transition from archiving to designing downgrades artifacts$'
+  content: |
+    #### Scenario: Recovery does not run archiving.post
+
+    - **GIVEN** a change in `archiving` with `archiving.hooks.post` configured
+    - **WHEN** `execute` is called with `to: 'archivable'`
+    - **THEN** those post hooks are not executed
+    - **AND** `archivable` requires are not enforced
+
+- op: modified
+  description: 'Factory injects bindings not RunStepHooks'
+  selector:
+    type: section
+    matches: '^Scenario: TransitionChange depends on LifecycleEngine and RunStepHooks$'
+  rename: 'Scenario: TransitionChange depends on transitionBindings'
+  content: |
+    #### Scenario: TransitionChange depends on transitionBindings
+
+    - **WHEN** `TransitionChange` is constructed
+    - **THEN** it receives `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `RefreshImplementationTracking`, `approvals`, and `transitionBindings`
+    - **AND** it does not receive `LifecycleEngine`, `RunStepHooks`, or `CountTasks` as use-case ports
+    - **AND** it does not default `transitionBindings` to domain stub `TRANSITION_BINDINGS`
+
+- op: modified
+  description: 'Factory resolves transitionBindings not runStepHooks'
+  selector:
+    type: section
+    matches: '^Scenario: createTransitionChange config form derives TransitionChangeDeps through resolveTransitionChangeDeps$'
+  content: |
+    #### Scenario: createTransitionChange config form derives TransitionChangeDeps through resolveTransitionChangeDeps
+
+    - **WHEN** `createTransitionChange(config, options?)` is invoked
+    - **THEN** it creates a composition resolver for that composition session
+    - **AND** it derives `TransitionChangeDeps` through `resolveTransitionChangeDeps(resolver)`
+    - **AND** `resolveTransitionChangeDeps(resolver)` resolves `transitionBindings` from `resolveWorkflowCheckRegistry`
+    - **AND** it does not resolve `runStepHooks` onto the use case
+    - **AND** it does not resolve `lifecycle` or `LifecycleEngine`
+    - **AND** the factory delegates to canonical `createTransitionChange(deps)`
+
+- op: modified
+  description: 'Progress callback uses check bus not hook-start types'
+  selector:
+    type: section
+    matches: '^Scenario: Progress callback receives hook and requires events$'
+  content: |
+    #### Scenario: Progress callback receives hook and requires events
+
+    - **WHEN** `TransitionChange.execute` is called with an `onProgress` callback
+    - **THEN** the callback receives lifecycle progress events such as `requires-check`, `check-start`, `check-done`, and `transitioned`
+    - **AND** it does not require first-class `hook-start` / `hook-done` event types
+
+- op: added
+  description: 'to next is Core happy-path resolution'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Progress callback$'
+  content: |
+    ### Requirement: to next is the happy-path next state
+
+    #### Scenario: next from implementing is verifying
+
+    - **GIVEN** a change in `implementing`
+    - **WHEN** `execute` is called with `to: 'next'`
+    - **THEN** Core resolves the target to `verifying` before predicate evaluation
+
+    #### Scenario: next is rejected from archivable
+
+    - **GIVEN** a change in `archivable`
+    - **WHEN** `execute` is called with `to: 'next'`
+    - **THEN** it throws `HappyPathNextUnavailableError` (a typed `SpecdError`)
+    - **AND** it does not invent an archive execute
+
+- op: added
+  description: 'Shared runner failures propagate typed archive-family errors'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: to next is the happy-path next state$'
+  content: |
+    ### Requirement: Shared runner errors propagate on transition
+
+    #### Scenario: Enter ready readOnly failure throws ReadOnlyWorkspaceError
+
+    - **GIVEN** a change in `designing` with a read-only spec in scope
+    - **WHEN** `execute` is called with `to: 'ready'`
+    - **THEN** `ReadOnlyWorkspaceError` is thrown
+    - **AND** the change remains in `designing`
+
+    #### Scenario: Enter ready deps failure throws ArchiveDependencyMismatchError
+
+    - **GIVEN** a change in `designing` whose publication-plan `dependsOn` disagrees with extracted metadata
+    - **WHEN** `execute` is called with `to: 'ready'`
+    - **THEN** `ArchiveDependencyMismatchError` is thrown
+
+    #### Scenario: Forward exit implementing impl failure throws ArchiveImplementationStateError
+
+    - **GIVEN** a change in `implementing` with an open tracked implementation file
+    - **WHEN** `execute` is called with `to: 'verifying'`
+    - **THEN** `ArchiveImplementationStateError` is thrown
+    - **AND** the change remains in `implementing`
+
+- op: modified
+  description: 'Implementing to designing does not call transition after invalidate'
+  selector:
+    type: section
+    matches: '^Scenario: Transition from implementing to designing invalidates$'
+  content: |
+    #### Scenario: Transition from implementing to designing invalidates
+
+    - **GIVEN** a change in `implementing` state with validated artifacts
+    - **WHEN** `execute` is called with `to: 'designing'`
+    - **THEN** `change.invalidate()` is called with cause `'artifact-review-required'`
+    - **AND** all artifact files are downgraded to `pending-review`
+    - **AND** any active spec approval is cleared
+    - **AND** `change.transition('designing', actor)` is not called
+    - **AND** the change is in `designing` from the invalidate `transitioned` event
+
+- op: modified
+  description: 'Requires scenarios use projectArtifacts not LifecycleEngine'
+  selector:
+    type: section
+    matches: '^Scenario: Unsatisfied requirement throws with structured reason$'
+  content: |
+    #### Scenario: Unsatisfied requirement throws with structured reason
+
+    - **GIVEN** a workflow step with `requires: [specs, tasks]`
+    - **AND** `projectArtifacts` reports `specs` with effective status `in-progress`
+    - **WHEN** `execute` is called
+    - **THEN** `InvalidStateTransitionError` is thrown with reason `incomplete-artifact` and blocking artifact `specs`
+
+- op: modified
+  description: 'Recursive parent review uses projectArtifacts'
+  selector:
+    type: section
+    matches: '^Scenario: Transition blocked by recursive parent review$'
+  content: |
+    #### Scenario: Transition blocked by recursive parent review
+
+    - **GIVEN** a workflow step requires artifact `design`
+    - **AND** `projectArtifacts` reports `design` as `pending-parent-artifact-review`
+    - **AND** the detailed blocker context includes `blockedBy: { artifactId: 'specs', status: 'pending-review' }`
+    - **WHEN** `execute` is called
+    - **THEN** it throws `InvalidStateTransitionError`
+    - **AND** the error reason includes `status: 'pending-parent-artifact-review'`
+    - **AND** it includes `blockedBy: { artifactId: 'specs', status: 'pending-review' }`

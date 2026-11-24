@@ -1,0 +1,23 @@
+- op: added
+  description: Verify task discovery against the input change's sovereign schema
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Sovereign schema resolution
+
+    #### Scenario: Counts tasks declared only by the change schema
+
+    - **GIVEN** a change whose `schemaName` is `custom-workflow`
+    - **AND** the custom schema and workspace default declare different task artifacts or patterns
+    - **WHEN** `CountTasks.execute({ change })` runs
+    - **THEN** it calls `SchemaProvider.get('custom-workflow')`
+    - **AND** reports counts derived exclusively from the custom schema declarations
+
+    #### Scenario: Sovereign schema failure does not return fallback counts
+
+    - **GIVEN** resolving the schema recorded on the change fails
+    - **WHEN** task counting is requested
+    - **THEN** the error propagates
+    - **AND** no counts based on the workspace default are returned

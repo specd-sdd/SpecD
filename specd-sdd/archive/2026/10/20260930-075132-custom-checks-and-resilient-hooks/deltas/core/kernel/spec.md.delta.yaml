@@ -1,0 +1,58 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: KernelOptions supports additive registries'
+  content: |
+    `KernelOptions` and `CompositionRegistryInput` MUST accept arrays of additive registry items:
+    - `schemas`: Array of `PluginSchemaDistribution` objects.
+    - `tasks`: Array of `PluginTaskDistribution` objects.
+    - `checks`: Array of `PluginCheckRegistration` objects.
+
+    Each `PluginCheckRegistration` entry MUST provide:
+    - `pluginName`: Mandatory non-empty string.
+    - `check`: The `CustomCheckDefinition` implementation.
+    - `defaultConfig`: Optional check-level baseline configuration.
+    - `allowConfigOverride`: Optional boolean lock governing schema overrides.
+    - `allowBindingOverride`: Optional boolean lock governing step embedding.
+    - `allowDisable`: Optional boolean lock governing step disablement.
+    - `defaultBindings`: Optional array of `CheckBindingSpec` associations.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: KernelOptions supports additive registries'
+  content: |
+    ### Requirement: Check Registration and KernelBuilder Extension
+
+    The kernel composition layer MUST wire built-in checks and external plugin registrations into a unified `CheckRegistry`:
+    - The fluent `KernelBuilder` interface in `@specd/core/extensions` MUST expose:
+      ```typescript
+      registerCheck(
+        pluginName: string,
+        check: CustomCheckDefinition,
+        defaultBindings?: readonly CheckBindingSpec[],
+        options?: {
+          readonly defaultConfig?: Readonly<Record<string, unknown>>
+          readonly allowConfigOverride?: boolean
+          readonly allowBindingOverride?: boolean
+          readonly allowDisable?: boolean
+        },
+      ): this
+      ```
+    - The builder MUST delegate check registration to the underlying `CheckRegistry`, ensuring strict `@pluginName.id` namespacing and setting `kind: 'predicate'`.
+    - The resulting `Kernel` instance MUST expose the active check registry view under `kernel.registry.checks` for observability and tooling.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+    after:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [`core:check-registry`](../check-registry/spec.md) — Dynamic check catalog, namespacing, and governance.

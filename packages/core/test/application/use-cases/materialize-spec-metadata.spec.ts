@@ -137,4 +137,136 @@ describe('PersistSpecMetadata', () => {
       }),
     ).rejects.toThrow(/metadata/i)
   })
+  it('forwards schemaName to every generation call on force and if-needed paths', async () => {
+    const spec = makeSpec({ name: 'auth/login', filenames: ['spec.md'] })
+    const repo = makeSpecRepository({
+      specs: [spec],
+      artifacts: { 'auth/login/spec.md': '# Auth' },
+    })
+    const metadata = sampleMetadata()
+    const generate = {
+      execute: vi.fn(async (_input: Record<string, unknown>) => ({
+        metadata,
+        sourceState: metadata.provenance,
+      })),
+    }
+    const useCase = new MaterializeSpecMetadata(
+      new Map([['default', repo]]),
+      generate as never,
+      makeContentHasher(),
+    )
+
+    await useCase.execute({
+      specId: 'default:auth/login',
+      policy: 'force',
+      schemaName: 'change-schema',
+    })
+    expect(generate.execute).toHaveBeenCalled()
+    for (const call of generate.execute.mock.calls) {
+      expect(call[0]).toMatchObject({ schemaName: 'change-schema' })
+    }
+
+    generate.execute.mockClear()
+    await useCase.execute({
+      specId: 'default:auth/login',
+      policy: 'if-needed',
+      schemaName: 'change-schema',
+    })
+    expect(generate.execute).toHaveBeenCalled()
+    for (const call of generate.execute.mock.calls) {
+      expect(call[0]).toMatchObject({ schemaName: 'change-schema' })
+    }
+  })
+
+  it('omits schemaName when none is given', async () => {
+    const spec = makeSpec({ name: 'auth/login', filenames: ['spec.md'] })
+    const repo = makeSpecRepository({
+      specs: [spec],
+      artifacts: { 'auth/login/spec.md': '# Auth' },
+    })
+    const metadata = sampleMetadata()
+    const generate = {
+      execute: vi.fn(async (_input: Record<string, unknown>) => ({
+        metadata,
+        sourceState: metadata.provenance,
+      })),
+    }
+    const useCase = new MaterializeSpecMetadata(
+      new Map([['default', repo]]),
+      generate as never,
+      makeContentHasher(),
+    )
+
+    await useCase.execute({ specId: 'default:auth/login', policy: 'force' })
+
+    for (const call of generate.execute.mock.calls) {
+      expect(call[0]).not.toHaveProperty('schemaName')
+    }
+  })
+
+  it('reuses fresh persisted metadata for if-needed when generation uses the same schemaName', async () => {
+    const spec = makeSpec({ name: 'auth/login', filenames: ['spec.md'] })
+    const repo = makeSpecRepository({
+      specs: [spec],
+      artifacts: { 'auth/login/spec.md': '# Auth' },
+    })
+    const metadata = sampleMetadata()
+    await repo.writeMetadataSnapshot(spec, metadata, { expectedRevision: null })
+    const generate = {
+      execute: vi.fn(async (_input: Record<string, unknown>) => ({
+        metadata,
+        sourceState: metadata.provenance,
+      })),
+    }
+    const useCase = new MaterializeSpecMetadata(
+      new Map([['default', repo]]),
+      generate as never,
+      makeContentHasher(),
+    )
+
+    const result = await useCase.execute({
+      specId: 'default:auth/login',
+      policy: 'if-needed',
+      schemaName: 'custom-workflow',
+    })
+
+    expect(result.source).toBe('persisted')
+    expect(result.regenerated).toBe(false)
+    expect(generate.execute).toHaveBeenCalledTimes(1)
+    expect(generate.execute.mock.calls[0]?.[0]).toMatchObject({ schemaName: 'custom-workflow' })
+  })
+
+  it('regenerates when the persisted metadata was produced under a different schema', async () => {
+    const spec = makeSpec({ name: 'auth/login', filenames: ['spec.md'] })
+    const repo = makeSpecRepository({
+      specs: [spec],
+      artifacts: { 'auth/login/spec.md': '# Auth' },
+    })
+    const persisted = sampleMetadata()
+    await repo.writeMetadataSnapshot(spec, persisted, { expectedRevision: null })
+    const regenerated = sampleMetadata({
+      title: 'Under custom-workflow',
+      provenance: { ...persisted.provenance!, schema: { name: 'custom-workflow', version: 1 } },
+    })
+    const generate = {
+      execute: vi.fn(async (_input: Record<string, unknown>) => ({
+        metadata: regenerated,
+        sourceState: regenerated.provenance,
+      })),
+    }
+    const useCase = new MaterializeSpecMetadata(
+      new Map([['default', repo]]),
+      generate as never,
+      makeContentHasher(),
+    )
+
+    const result = await useCase.execute({
+      specId: 'default:auth/login',
+      policy: 'if-needed',
+      schemaName: 'custom-workflow',
+    })
+
+    expect(result.source).toBe('generated')
+    expect(result.metadata.title).toBe('Under custom-workflow')
+  })
 })

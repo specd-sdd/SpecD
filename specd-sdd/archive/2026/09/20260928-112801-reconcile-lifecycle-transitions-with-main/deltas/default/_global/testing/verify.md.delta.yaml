@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing cross-platform verification scenarios remain valid.'

@@ -10,6 +10,9 @@
     "url": "https://github.com/specd-sdd/SpecD.git"
   },
   "homepage": "https://getspecd.dev",
+  "engines": {
+    "node": ">=22"
+  },
   "dependencies": {
     "@specd/cli": "workspace:*",
     "@specd/code-graph": "workspace:*",

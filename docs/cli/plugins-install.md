@@ -5,11 +5,12 @@
 ## Command
 
 ```bash
-specd plugins install <plugin> [<plugin>...]
+specd plugins install <plugin> [<plugin>...] [--contributions <id>[,<id>...]]
 ```
 
 Options:
 
+- `--contributions <ids>` comma-separated contribution ids to install (one plugin only). An empty value, or one made only of commas and blanks, is rejected with exit code `1` before anything is loaded, installed or written.
 - `--format <text|json|toon>` output format (default: `text`)
 - `--config <path>` explicit `specd.yaml` path
 
@@ -20,7 +21,7 @@ Options:
 - For non-declared plugins:
   - Loads plugin runtime through plugin manager.
   - Runs install use case.
-  - Persists declaration via `ConfigWriter.addPlugin()` under `plugins.agents`.
+  - Persists the declaration in the flat `plugins` list. `--contributions` is allowed only when installing one plugin.
 - Continues after per-plugin failures.
 - Exits with code `1` if at least one plugin fails.
 
@@ -28,7 +29,7 @@ For agent plugins that install skills (`@specd/plugin-agent-codex`, `@specd/plug
 `@specd/plugin-agent-copilot`, `@specd/plugin-agent-opencode`):
 
 - Skill-local files are installed under the agent root at `<agent-skills-dir>/<skill-name>/`.
-- Files marked as shared are installed once under `<agent-skills-dir>/_specd-shared/`.
+- Files marked as shared are installed once under the shared folder (default `<configPath>/skills/shared`, i.e. `.specd/config/skills/shared`). Each plugin registers itself in `<shared>/.owners.json` before it writes its first shared file, so an install that fails midway can still be uninstalled cleanly (see [Plugins](../guide/plugins.md)).
 - Shared markdown files are written as-is (no skill frontmatter injection).
 
 ## Output

@@ -67,6 +67,12 @@ calls the explicit load method.
 
 Prefer `readonly` arrays and properties on domain value objects and entities where mutation is not required. Use `as const` for literal configuration objects.
 
+### Requirement: Node.js engine floor
+
+Every published package (every workspace package whose `package.json` has `"private": false`) SHALL declare `engines.node` with the same value, `>=22`. The value MUST match the Node.js version installed by the CI workflow, so that the supported floor is the tested one. Private packages (for example documentation sites) MAY omit it.
+
+Raising or lowering the floor is a breaking-change decision and MUST be applied to every published package in the same change.
+
 ## Constraints
 
 - `strict: true` must be set in every package's `tsconfig.json` via `tsconfig.base.json`

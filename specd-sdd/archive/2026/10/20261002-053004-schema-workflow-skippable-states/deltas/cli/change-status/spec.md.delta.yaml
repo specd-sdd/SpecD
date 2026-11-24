@@ -1,0 +1,86 @@
+- op: modified
+  description: Project ordered workflow pipeline and bypass transitions
+  selector:
+    type: section
+    matches: 'Requirement: Lifecycle projections come from GetStatus checks'
+  content: |
+    Displayed `validTransitions`, `availableTransitions`, `nextAction`, and repair-oriented blockers MUST be the check-derived projections from `GetStatus`. The CLI MUST NOT filter the protocol graph locally in a way that reintroduces a list execute would reject (for example advertising `verifying` while tasks are incomplete, or recommending `/specd-implement` when `verifying` is allowed).
+
+    The command SHALL project the ordered workflow pipeline from `GetStatus`:
+    - Show the pipeline in canonical lifecycle order as projected by Core, regardless of the order in which schema rows are declared.
+    - Annotate optional steps with `[optional]` in text output, and expose the `optional` flag on each structured `availableSteps` entry; the `--help` JSON/TOON schema SHALL document that field.
+    - Exclude steps marked `disabled: true` (Core omits them; the CLI MUST NOT re-add them).
+    - Display shortcut and bypass paths in `availableTransitions` when step-skip checks allow bypassing intermediate optional steps.
+
+    The artifact DAG rendered by the command (text `artifacts (DAG)` and structured `schema.artifactDag` / `artifactDag`) SHALL come from the change's sovereign schema, resolved through `ResolveChangeSchema` (directly or through `GetStatus`). The command MUST NOT render a change's DAG from the workspace default schema. When the change's schema cannot be resolved, the DAG SHALL be omitted and the `SCHEMA_RESOLUTION_FAILED` or `SCHEMA_IDENTITY_MISMATCH` blocker from `GetStatus` SHALL be shown.
+
+- op: modified
+  description: Add lifecycle-engine to spec dependencies
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`cli:entrypoint`](../entrypoint/spec.md) — output conventions
+    - [`core:change`](../../core/change/spec.md) — change state model
+    - [`core:get-status`](../../core/get-status/spec.md) — lifecycle status projection
+    - [`sdk:build-implementation-review`](../../sdk/build-implementation-review/spec.md) — shared implementation resolution projection
+    - [`core:transition-checks`](../../core/transition-checks/spec.md) — check-derived projections and gerund labels
+    - [`core:lifecycle-engine`](../../core/lifecycle-engine/spec.md) — lifecycle evaluation and verdict projection
+- op: added
+  description: Declare the shared sovereign change-schema resolution dependency
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [`core:resolve-change-schema`](../../core/resolve-change-schema/spec.md) — sovereign change schema for the artifact DAG
+
+- op: modified
+  description: Version drift is a structured advisory from GetStatus, not a CLI-computed stderr warning
+  selector:
+    type: section
+    matches: 'Requirement: Schema version warning'
+  content: |
+    Schema version drift SHALL be reported only through the advisories `GetStatus` returns in `schemaWarnings`, which come from `ResolveChangeSchema` comparing the change's recorded schema version with the resolved same-name schema. A different workspace default schema is not drift and MUST NOT produce a warning.
+
+    In text mode, when `schemaWarnings` is non-empty, the command SHALL render a `warnings:` section on stdout with one line per advisory in the form `! <code>: <message>` (for example `! SCHEMA_VERSION_DRIFT: …`). In `json` / `toon` mode the result SHALL include `schemaWarnings` as an array of `{ code, changeName, schemaName, recordedVersion, resolvedVersion, message }`; the array is empty when there is no drift.
+
+    The command MUST NOT print a schema-mismatch warning to stderr and MUST NOT compute drift itself by comparing the change against the workspace default. It still exits with code 0 when advisories are present. When the change's schema cannot be resolved, no version advisory is shown; the resolution blocker from `GetStatus` is shown instead.
+
+- op: modified
+  description: DAG derivation uses the change's resolved schema
+  selector:
+    type: section
+    matches: 'Requirement: Schema-derived fields'
+  content: |
+    When the change uses any schema (not just schema-std), the JSON output MUST include a nested schema object with derived fields:
+
+    ```
+    schema:
+      name: "..."
+      version: 1
+      artifactDag:
+        - id: "..."
+          scope: "change|spec"
+          optional: true|false
+          requires: ["..."]
+          children: ["..."]
+          hasTasks: true|false
+          output: "..."
+    ```
+
+    `artifactDag` entries MUST be emitted in `schema.artifactDag().topologicalOrder()`.
+
+    For each entry, `requires` comes from the schema artifact definition and `children` MUST be `schema.artifactDag().childrenOf(id)` — the CLI MUST NOT derive children with local `requires.includes(id)` filters.
+
+    `hasTasks` is true when the artifact has `hasTasks: true` explicitly or has a `taskCompletionCheck` declaration.
+
+    Text-mode `artifacts (DAG):` tree rendering MUST use the same roots (`artifactDag().roots()`) and child ordering (`childrenOf`) as structured output.
+
+    Text-mode DAG node labels MUST use each artifact's **display status** from `GetStatus` (for example `complete-with-drift`), not raw `effectiveStatus`, so drift is visible without reading the details section.
+
+    When the DAG has convergent edges (one artifact required by multiple parents), the text tree MUST render each artifact type id **at most once**. Dependents reached again via another branch MUST NOT repeat the full subtree; the renderer MAY omit duplicate child expansion or annotate with a short reference (for example `└── (see <id> above)`).
+
+    The `Schema` instance used for DAG derivation SHALL be the change's schema resolved through `ResolveChangeSchema` (the kernel's shared resolver). Structured and text DAG derivation MUST use `schema.artifactDag()` (cached) rather than rebuilding `ArtifactDag.from` on a detached artifact list, so ordering matches every other consumer.
+
+    This allows design/implement skills to replace `schema show` calls.

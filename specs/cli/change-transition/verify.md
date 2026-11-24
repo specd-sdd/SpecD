@@ -4,23 +4,39 @@
 
 ### Requirement: Command signature
 
-#### Scenario: Missing arguments
+#### Scenario: CLI accepts --skip-checks with comma-separated list
 
-- **WHEN** `specd change transition my-change` is run without the target state
-- **THEN** the command exits with code 1 and prints a usage error to stderr
+- **GIVEN** a user invoking `specd change transition ready --skip-checks impl.linksInScope,spec.overlap`
+- **WHEN** parsing command options
+- **THEN** `TransitionChangeInput.skipChecks` receives `['impl.linksInScope', 'spec.overlap']`
 
-#### Scenario: Next flag resolves a transition target without a positional step
+#### Scenario: CLI translates legacy --allow-out-of-scope to skipChecks
 
-- **GIVEN** the change is in `drafting` state
-- **WHEN** `specd change transition my-change --next` is run
-- **THEN** the command resolves `designing` as the target state
-- **AND** executes the normal transition flow
+- **GIVEN** a user invoking `specd change transition ready --allow-out-of-scope`
+- **WHEN** parsing command options
+- **THEN** `TransitionChangeInput.skipChecks` includes `'impl.linksInScope'`
 
-#### Scenario: Next flag cannot be combined with an explicit step
+#### Scenario: CLI translates legacy --allow-overlap to skipChecks
 
-- **WHEN** `specd change transition my-change designing --next` is run
-- **THEN** the command exits with code 1
-- **AND** stderr contains an `error:` message explaining that `<step>` and `--next` are mutually exclusive
+- **GIVEN** a user invoking `specd change transition archivable --allow-overlap`
+- **WHEN** parsing command options
+- **THEN** `TransitionChangeInput.skipChecks` includes `'spec.overlap'`
+
+#### Scenario: Missing step and --next is a usage error
+
+- **WHEN** `specd change transition my-change` is run without `<step>` and without `--next`
+- **THEN** the command exits with code 1 and prints `either <step> or --next is required`
+- **AND** `TransitionChange.execute` is not called
+
+#### Scenario: Step and --next together is a usage error
+
+- **WHEN** `specd change transition my-change implementing --next` is run
+- **THEN** the command exits with code 1 and prints `<step> and --next are mutually exclusive`
+
+#### Scenario: Change name is required
+
+- **WHEN** `specd change transition` is run with no arguments
+- **THEN** the command fails with a missing-argument usage error
 
 ### Requirement: Next-transition resolution
 
@@ -30,26 +46,44 @@
 - **WHEN** `specd change transition my-change --next` is run
 - **THEN** the command requests transition to `ready`
 
-#### Scenario: Next flag honors approval routing from ready
+#### Scenario: Next flag from ready requests implementing and stays in ready when spec gate on
 
 - **GIVEN** `approvals.spec: true` and the change is in `ready` state
+- **AND** no spec approval is recorded
 - **WHEN** `specd change transition my-change --next` is run
 - **THEN** the command resolves `implementing` as the logical next target
-- **AND** the change transitions to `pending-spec-approval`
+- **AND** the change remains in `ready`
+- **AND** it does not persist `pending-spec-approval`
+
+#### Scenario: Next flag skips disabled step
+
+- **GIVEN** a schema where `verifying` is `disabled: true`
+- **AND** the change is in `implementing`
+- **WHEN** `specd change transition my-change --next` is run
+- **THEN** the command resolves `done` as the next active target
+- **AND** transitions directly without visiting `verifying`
+
+#### Scenario: Next flag enters the closest enabled optional step
+
+- **GIVEN** a schema where `implementing` is `optional: true`
+- **AND** its effective `step-skip` checks pass or the effective set is empty
+- **AND** the change is in `ready`
+- **WHEN** `specd change transition my-change --next` is run
+- **THEN** Core resolves `implementing` as the closest enabled target
+- **AND** the command does not bypass `implementing`
+- **AND** an optional shortcut is available only by passing the explicit target advertised by `GetStatus.nextAction`
 
 #### Scenario: Next flag fails in pending spec approval state
 
-- **GIVEN** the change is in `pending-spec-approval` state
+- **GIVEN** the change is in `pending-spec-approval` state with the spec gate on and no approval
 - **WHEN** `specd change transition my-change --next` is run
-- **THEN** the command exits with code 1
-- **AND** stderr contains an `error:` message explaining that the change is waiting for human spec approval
+- **THEN** the command targets `implementing`, exits with code 1, and stderr explains that spec approval is required
 
 #### Scenario: Next flag fails in pending signoff state
 
-- **GIVEN** the change is in `pending-signoff` state
+- **GIVEN** the change is in `pending-signoff` state with the signoff gate on and no signoff
 - **WHEN** `specd change transition my-change --next` is run
-- **THEN** the command exits with code 1
-- **AND** stderr contains an `error:` message explaining that the change is waiting for human signoff
+- **THEN** the command targets `archivable`, exits with code 1, and stderr explains that signoff is required
 
 #### Scenario: Next flag fails in archivable state
 
@@ -57,6 +91,74 @@
 - **WHEN** `specd change transition my-change --next` is run
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message explaining that archiving is not a lifecycle transition
+
+#### Scenario: Next flag from signed-off maps to archivable
+
+- **GIVEN** the change is in `signed-off` state
+- **WHEN** `specd change transition my-change --next` is run
+- **THEN** the CLI passes `to: 'next'` to `TransitionChange`
+- **AND** Core resolves `archivable` as the target state
+
+#### Scenario: CLI does not keep a from-to next table
+
+- **WHEN** `--next` is used
+- **THEN** the CLI does not resolve the target via a local from→to switch
+- **AND** `TransitionChange.execute` receives `to: 'next'`
+
+#### Scenario: Shared presentation with run-hooks is not the same JSON stream
+
+- **WHEN** `change transition` emits structured progress
+- **THEN** records use `stream: "change-transition"`
+- **AND** they do not use `stream: "hook-progress"`
+
+### Requirement: Validity-aware transition guidance
+
+#### Scenario: Exit check failure recommends verification in place
+
+- **GIVEN** `verifying → done` lacks current completed evidence
+- **WHEN** transition output renders `verification.current`
+- **THEN** it reports the failed check and actual unchanged or reconciled state
+- **AND** does not start, complete, retry, or select another transition
+
+#### Scenario: Repair command uses the real change name
+
+- **GIVEN** change `checkout-retry` needs in-place verification
+- **WHEN** transition renders its repair guide
+- **THEN** the command projected by the CLI guidance presenter contains `checkout-retry`
+- **AND** no literal `<name>` placeholder is emitted
+
+#### Scenario: Committed recovery is not rendered as an edge error
+
+- **GIVEN** pre-transition reconciliation commits a mandatory return
+- **WHEN** the originally requested edge becomes inapplicable
+- **THEN** output shows the committed blockers and next action
+- **AND** does not describe the failure solely as an invalid protocol edge
+
+#### Scenario: Committed recovery renders a repair guide from ReconciledOperationBlockedError
+
+- **GIVEN** `TransitionChange` fails with `ReconciledOperationBlockedError` after committing an automatic return to `designing`, with a skippable blocker and a next action mapped to a command
+- **WHEN** `specd change transition my-change implementing` renders the failure in text mode
+- **THEN** output shows the committed state, the blocker with its label and `checkId`, a `bypass:` line, and the projected next-action `command:` and reason
+- **AND** output contains no invalid-edge error line
+- **AND** in json mode the record carries `state`, `automaticReturn`, projected blockers (no raw `isSkippable`) and `nextAction` with `intent`, `action`, `command` and `guidance`
+
+#### Scenario: Every skippable blocker gets a bypass line
+
+- **GIVEN** a failed transition whose fresh status carries two skippable blockers with `checkId` `impl.linksInScope` and `spec.overlap`
+- **WHEN** the repair guide is rendered in text mode
+- **THEN** one `bypass:` line is printed per skippable blocker, matching each blocker's `bypassFlag` in json output
+
+#### Scenario: Skippable deps.consistent gets the generic bypass hint
+
+- **GIVEN** a failed transition on `deps.consistent` that is skippable
+- **WHEN** the CLI resolves hints
+- **THEN** the generic bypass hint is rendered and the dependency-extraction hint is not
+
+#### Scenario: Repair guide projects bypass flag from isSkippable and checkId
+
+- **GIVEN** a failed transition followed by `GetStatus` returning a blocker with `isSkippable: true` and `checkId: 'impl.linksInScope'`
+- **WHEN** `specd change transition my-change verifying` renders its repair guide
+- **THEN** the CLI projects `--skip-checks impl.linksInScope` from `isSkippable` and `checkId` via the guidance presenter
 
 ### Requirement: Delegates refresh policy to TransitionChange
 
@@ -84,23 +186,28 @@
 #### Scenario: Spec approval gate active
 
 - **GIVEN** `approvals.spec: true` and the change is in `ready` state
+- **AND** no spec approval is recorded
 - **WHEN** `specd change transition my-change implementing` is run
-- **THEN** the change transitions to `pending-spec-approval`
-- **AND** stdout shows `transitioned my-change: ready → pending-spec-approval`
+- **THEN** the command exits with code 1
+- **AND** the change remains in `ready`
+- **AND** stdout does not show a transition to `pending-spec-approval`
 
 #### Scenario: Signoff gate active
 
 - **GIVEN** `approvals.signoff: true` and the change is in `done` state
+- **AND** no signoff is recorded
 - **WHEN** `specd change transition my-change archivable` is run
-- **THEN** the change transitions to `pending-signoff`
-- **AND** stdout shows `transitioned my-change: done → pending-signoff`
+- **THEN** the command exits with code 1
+- **AND** the change remains in `done`
+- **AND** stdout does not show a transition to `pending-signoff`
 
 #### Scenario: Transition execute omits approval flags
 
 - **GIVEN** `config.approvals.spec: true`
 - **WHEN** `specd change transition my-change implementing` runs
-- **THEN** `TransitionChange.execute` is called with `{ name, to }` only
-- **AND** approval gate flags are not passed on the input object
+- **THEN** `TransitionChange.execute` is called without approval gate flags on the input
+- **AND** the input MAY include `skipHookPhases` (empty set when `--skip-hooks` is omitted)
+- **AND** the input MUST NOT include `allowOutOfScope` unless `--allow-out-of-scope` was passed
 
 ### Requirement: Output on success
 
@@ -128,27 +235,61 @@
 
 ### Requirement: Invalid transition error
 
-#### Scenario: Illegal state transition
+#### Scenario: CheckPredicateFailedError renders Repair Guide with command and bypass
 
-- **GIVEN** the change is in `drafting` state
-- **WHEN** `specd change transition my-change done` is run
-- **THEN** the command exits with code 1
-- **AND** stderr contains an `error:` message
+- **GIVEN** a failed skippable check `@security.code-scan` with action `{ kind: '@security.fix', guidance: 'pnpm audit:fix' }`
+- **WHEN** the command exits with failure
+- **THEN** the CLI Repair Guide renders the check label and error code
+- **AND** displays `guidance: pnpm audit:fix`
+- **AND** does not display `command: pnpm audit:fix`
+- **AND** displays `bypass: Retry with --skip-checks @security.code-scan if an exception is granted`
 
-#### Scenario: Approval-required reason is surfaced in stderr
+#### Scenario: Mandatory check failure does not offer bypass in Repair Guide
 
-- **GIVEN** the change is in `pending-signoff` state
-- **WHEN** `specd change transition my-change signed-off` is run
-- **THEN** the command exits with code 1
-- **AND** stderr contains an `error:` message explaining that the change is waiting for human signoff
+- **GIVEN** a failed mandatory check `protocol.edge`
+- **WHEN** the command renders the Repair Guide
+- **THEN** no `bypass:` line is printed
 
-#### Scenario: Transition failure renders Repair Guide
+#### Scenario: Built-in failures render context from details
 
-- **GIVEN** a transition to `ready` fails because an artifact is missing
-- **WHEN** the command is run in text mode
-- **THEN** it prints an error message to stderr
-- **AND** it renders a `repair guide:` section to stdout
-- **AND** the guide includes the blocker code (e.g., `! MISSING_ARTIFACT`) and the recommended command
+- **GIVEN** `CheckPredicateFailedError` for `workflow.requires` with `details.artifactId: 'design'` and `details.blockedBy: { artifactId: 'specs', status: 'pending-review' }` while attempting `ready → implementing`
+- **WHEN** the command renders the Repair Guide
+- **THEN** it shows the attempted transition, the check label and code, and names `design` blocked by `specs`
+
+#### Scenario: Missing approval shows the projected approval command
+
+- **GIVEN** `CheckPredicateFailedError` for `approval.spec` with `action.kind: 'approve-spec'`
+- **WHEN** the command renders the Repair Guide
+- **THEN** it shows `command: specd changes approve spec` projected by the presenter
+- **AND** no bypass is offered because the check is not skippable
+
+#### Scenario: Guidance-only check action falls back to the next-action command
+
+- **GIVEN** a failed check whose action is `{ kind: '@security.fix', guidance: 'pnpm audit:fix' }` and a fresh status `nextAction` that projects `command: /specd-verify`
+- **WHEN** the command renders the Repair Guide
+- **THEN** it prints `guidance: pnpm audit:fix` for the check action
+- **AND** it also prints `command: /specd-verify` projected from the next action, so both lines appear together
+
+#### Scenario: Repair guide prints the failed check diagnostic code
+
+- **GIVEN** a `CheckPredicateFailedError` with code `WORKFLOW_REQUIRES_FAILED` whose blocker is absent from the fresh status
+- **WHEN** the command renders the Repair Guide
+- **THEN** the failed check's diagnostic code `WORKFLOW_REQUIRES_FAILED` is printed
+
+#### Scenario: Failing status read does not mask the original transition error
+
+- **GIVEN** a transition fails with an error type that normally renders a repair guide, either `InvalidStateTransitionError` or `CheckPredicateFailedError`, and reading the fresh status for the repair guide also fails
+- **WHEN** the command handles the failure in text, json or toon mode
+- **THEN** only the original transition error is printed, for both error types
+- **AND** no repair guide, projected blockers or `nextAction` are rendered
+- **AND** in json and toon modes the failure record carries only the standard error fields and none of the repair-guide fields (`blockers`, `nextAction`, `state` or validity)
+- **AND** the exit code is 1
+
+#### Scenario: Structured failure blockers are projected
+
+- **GIVEN** a failed transition with a skippable blocker carrying `isSkippable: true` and `checkId`
+- **WHEN** the command renders json or toon output
+- **THEN** the blocker carries `label`, `checkId`, and `bypassFlag` and no raw `isSkippable`
 
 ### Requirement: Incomplete tasks error
 
@@ -158,6 +299,43 @@
 - **WHEN** `specd change transition my-change verifying` is run
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message naming the blocking artifact
+
+#### Scenario: Status omitted verifying before the failed transition
+
+- **GIVEN** incomplete tasks
+- **WHEN** `specd changes status` is run before the transition attempt
+- **THEN** `availableTransitions` already omits `verifying`
+
+### Requirement: Check progress rendering
+
+#### Scenario: Predicate progress uses gerund label
+
+- **GIVEN** transition execute emits `check-start` / `check-done` for `impl.linksInScope`
+- **WHEN** the command runs in text mode
+- **THEN** progress includes `Checking implementation links (impl.linksInScope)`
+- **AND** a `✓` or `✗` line repeats that label
+- **AND** no `Executing:` prefix appears
+
+#### Scenario: Hook progress uses Running hooks labels
+
+- **GIVEN** matching post hooks stream output
+- **WHEN** the command runs in text mode
+- **THEN** progress uses `Running post hooks (hook.post)`
+- **AND** streamed lines appear as `check-progress` under that check
+
+#### Scenario: Skipped hooks render as skipped
+
+- **GIVEN** `--skip-hooks all`
+- **WHEN** the transition succeeds and Core reports `hook.pre` and `hook.post` with `outcome: 'skip'`
+- **THEN** text output renders them with the skipped marker and a `--skip-hooks` reason
+- **AND** no `✓ Running pre hooks` or `✓ Running post hooks` line is printed
+
+#### Scenario: Re-check after hooks is shown only when hooks ran
+
+- **GIVEN** `--skip-hooks all`
+- **WHEN** Core re-evaluates predicates after the (skipped) hook phases
+- **THEN** the check list is printed once
+- **AND** when hooks did run, the second pass is labeled as a re-check
 
 ### Requirement: Hook execution
 
@@ -213,11 +391,11 @@
 
 #### Scenario: Structured formats emit progress on stdout
 
-- **GIVEN** a transition emits hook and lifecycle progress events
+- **GIVEN** a transition emits check and lifecycle progress events
 - **WHEN** `specd change transition my-change designing --format json` is run
 - **THEN** stdout emits newline-delimited structured records during the transition
-- **AND** hook lifecycle events use `stream: "hook-progress"`
-- **AND** transition lifecycle events use `stream: "change-transition"`
+- **AND** hook check events use `stream: "change-transition"`
+- **AND** no record uses `stream: "hook-progress"`
 
 ### Requirement: Transition hook observability
 
@@ -230,11 +408,11 @@
 
 ### Requirement: Shared hook progress presentation
 
-#### Scenario: Equivalent hook events render with the same presentation contract as run-hooks
+#### Scenario: Transition check bus does not share hook-progress stream
 
-- **GIVEN** `specd change transition` and `specd change run-hooks` observe the same sequence of hook events
-- **WHEN** both commands render hook progress in the same output format
-- **THEN** running status, recent output, liveness, and failed-hook output follow the same presentation rules
+- **WHEN** `specd change transition` emits structured progress
+- **THEN** records use `stream: "change-transition"`
+- **AND** they do not use `stream: "hook-progress"`
 
 ### Requirement: Post-hook failure warning
 
@@ -266,3 +444,18 @@
 - **WHEN** `specd change transition my-change <step>` is run in text mode
 - **THEN** the repair guide shows those blocker codes and that next action
 - **AND** the CLI does not invent an alternative repair route
+
+### Requirement: CLI-rendered transition error hints
+
+#### Scenario: HappyPathNextUnavailableError renders --next context in CLI
+
+- **GIVEN** `TransitionChange` throws `HappyPathNextUnavailableError`
+- **WHEN** `specd change transition <name> --next` renders the failure
+- **THEN** the CLI renders `--next` context via the centralized hint-resolution helper
+
+#### Scenario: impl.linksInScope failure renders bypass flag hint
+
+- **GIVEN** `impl.linksInScope` fails as a skippable check during `change transition`
+- **WHEN** `specd change transition` renders the failure
+- **THEN** the CLI renders `Retry with --skip-checks impl.linksInScope if an exception is granted` via the centralized hint-resolution helper
+- **AND** the hint does not mention `--allow-out-of-scope`

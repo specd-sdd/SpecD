@@ -4,5 +4,41 @@
     "version": 1
   },
   "dependsOn": ["default:_global/architecture", "core:schema-format"],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Reusable synchronous YAML/Zod structural parser returns typed raw schema data; callers own semantic validation and domain construction.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:eaaf65cc361ff0f1589fb22ae9a7746a878926e4e700f6b4f053abb5266aa91a",
+          "lastModified": "2026-08-25T15:37:19.325Z"
+        },
+        "verify.md": {
+          "hash": "sha256:f083318fe8ad8128576ef3dd657437e89131164d85782e79f20966ea18935c06",
+          "lastModified": "2026-08-25T15:37:19.325Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Parse Schema YAML\n## Rules\n- Export parseSchemaYaml(ref: string, yamlContent: string): SchemaYamlData from infrastructure/schema-yaml-parser.ts; ref only identifies errors.\n- Export Zod-inferred SchemaYamlData, ArtifactYaml, WorkflowStepRaw raw shapes with optional undefined; never domain entities.\n- Parse yaml; null/non-object/array throws SchemaValidationError with ref and YAML mapping message.\n- Validate SchemaYaml: name/version/kind/artifacts; schema-only extends; artifact fields; ids for hooks/rules/cleanup/extractors; workflow/metadataExtraction; strip unknown top fields. Reuse SelectorZodSchema/SelectorRaw.\n- Refinements: deltaValidations needs delta; delta forbidden change scope; schema-plugin forbids artifacts/workflow/metadataExtraction/extends.\n- Failure throws first SchemaValidationError issue with ref + exported formatZodPath dot-bracket path.\n- Never check duplicates, ID format, requires validity/cycles, optional deps; never construct Schema/ArtifactType/WorkflowStep/Selector.\n## Constraints\n- Infrastructure not fs; yaml/zod dependencies; SchemaValidationError sole domain import; synchronous strip mode.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:eaaf65cc361ff0f1589fb22ae9a7746a878926e4e700f6b4f053abb5266aa91a",
+          "lastModified": "2026-08-25T15:37:19.325Z"
+        },
+        "verify.md": {
+          "hash": "sha256:f083318fe8ad8128576ef3dd657437e89131164d85782e79f20966ea18935c06",
+          "lastModified": "2026-08-25T15:37:19.325Z"
+        }
+      }
+    }
+  }
 }

@@ -112,25 +112,25 @@ Some purpose.`
   content: |
     ### Requirement: Ports and constructor
 
-    #### Scenario: GetArtifactInstruction is constructed with LifecycleEngine
+    #### Scenario: GetArtifactInstruction is constructed without a lifecycle class
 
     - **WHEN** \`GetArtifactInstruction\` is assembled
-    - **THEN** it receives \`LifecycleEngine\` together with its repositories, parser registry, schema provider, and template expander
+    - **THEN** it receives repositories, parser registry, schema provider, and template expander
 
     ### Requirement: Input
 
-    #### Scenario: Omitted artifactId uses engine-derived readiness
+    #### Scenario: Omitted artifactId uses verdict-derived readiness
 
     - **GIVEN** \`proposal\` is effectively complete
     - **AND** \`specs\` is not effectively complete
-    - **AND** \`LifecycleEngine.evaluate\` reports \`specs\` as the first effectively ready incomplete artifact
+    - **AND** \`evaluateLifecycleVerdict\` reports \`specs\` as the first effectively ready incomplete artifact
     - **WHEN** \`GetArtifactInstruction.execute\` is called without \`artifactId\`
     - **THEN** the returned \`artifactId\` is \`specs\`
 
-    #### Scenario: Omitted artifactId ignores persisted complete when engine reports dependency blockage
+    #### Scenario: Omitted artifactId ignores persisted complete when the verdict reports dependency blockage
 
     - **GIVEN** an artifact's persisted state is \`complete\`
-    - **AND** \`LifecycleEngine.evaluate\` reports its effective status as \`pending-parent-artifact-review\`
+    - **AND** \`evaluateLifecycleVerdict\` reports its effective status as \`pending-parent-artifact-review\`
     - **WHEN** \`GetArtifactInstruction.execute\` is called without \`artifactId\`
     - **THEN** that artifact is not selected as complete/resolved by auto-resolution`
 
@@ -143,11 +143,11 @@ Some purpose.`
     expect(merged).toContain('### Requirement: Ports and constructor')
     expect(merged).toContain('### Requirement: Input')
     expect(merged).toContain(
-      '#### Scenario: GetArtifactInstruction is constructed with LifecycleEngine',
+      '#### Scenario: GetArtifactInstruction is constructed without a lifecycle class',
     )
-    expect(merged).toContain('#### Scenario: Omitted artifactId uses engine-derived readiness')
+    expect(merged).toContain('#### Scenario: Omitted artifactId uses verdict-derived readiness')
     expect(merged).toContain(
-      '#### Scenario: Omitted artifactId ignores persisted complete when engine reports dependency blockage',
+      '#### Scenario: Omitted artifactId ignores persisted complete when the verdict reports dependency blockage',
     )
     expect(merged).toContain('## Purpose')
   })

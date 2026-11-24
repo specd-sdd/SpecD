@@ -3,10 +3,12 @@ import path from 'node:path'
 import type { SpecdConfig } from '@specd/core'
 import {
   createSkillRepository,
+  addSharedOwner,
   injectSpecdBlock,
   removeSpecdBlock,
   renderBaseAgentInstruction,
   ResolveBundle,
+  splitTopLevelCommas,
 } from '@specd/skills'
 import type {
   AgentInstallOptions,
@@ -15,7 +17,7 @@ import type {
 } from '@specd/plugin-manager'
 import type { Frontmatter } from '../../domain/types/frontmatter.js'
 import { skillFrontmatter, agentFrontmatter } from '../../domain/frontmatter/index.js'
-import { resolveSharedFolder } from './shared-folder.js'
+import { resolveSharedFolder } from '@specd/skills'
 
 /**
  * Installs selected skills into Open Code's project-local skills directory.
@@ -45,7 +47,6 @@ export class InstallSkills {
     const requestedNames = [...requestedSkills, ...requestedAgents]
 
     const skillsTargetDir = path.join(config.projectRoot, '.opencode', 'skills')
-    const agentsTargetDir = path.join(config.projectRoot, '.opencode', 'agents')
     const resolvedSharedFolder = resolveSharedFolder(
       config.projectRoot,
       config.configPath,
@@ -54,15 +55,20 @@ export class InstallSkills {
         : undefined,
     )
     const sharedDir = resolvedSharedFolder.absolutePath
+    const capabilities = options?.capabilities ?? ['mcp', 'agents', 'frontmatter']
+    const supportsAgents = capabilities.includes('agents')
+    const agentsTargetDir = supportsAgents
+      ? path.join(config.projectRoot, '.opencode', 'agents')
+      : sharedDir
 
     await mkdir(skillsTargetDir, { recursive: true })
-    await mkdir(agentsTargetDir, { recursive: true })
+    if (supportsAgents) {
+      await mkdir(agentsTargetDir, { recursive: true })
+    }
 
     const installed: Array<{ skill: string; path: string }> = []
     const skipped: Array<{ skill: string; reason: string }> = []
-
-    // Open Code capabilities
-    const capabilities = ['mcp', 'agents', 'frontmatter']
+    let ownerRegistered = false
 
     for (const name of requestedNames) {
       const item = await repository.get(name)
@@ -75,18 +81,14 @@ export class InstallSkills {
       if (item.kind === 'agent') {
         const metadata =
           agentFrontmatter[name] ?? ({ name, description: item.description } satisfies Frontmatter)
-        let permissions: Record<string, string>[] | undefined = undefined
-        if (metadata.allowed_tools) {
-          permissions = metadata.allowed_tools.split(',').map((tool) => {
-            const baseTool = tool.trim().split('(')[0]?.toLowerCase() ?? tool.trim().toLowerCase()
-            return { [baseTool]: 'allow' }
-          })
-        }
+        const permission = metadata.allowed_tools
+          ? toOpenCodePermission(metadata.allowed_tools)
+          : undefined
         agentFrontmatterVars = {
           name: metadata.name ?? name,
           description: metadata.description ?? item.description,
           mode: 'subagent',
-          ...(permissions ? { permissions } : {}),
+          ...(permission ? { permission } : {}),
         }
       }
 
@@ -140,11 +142,15 @@ export class InstallSkills {
         const content = file.content
 
         if (isAgentInAgentsDir) {
-          // Open Code convention for agents: flattened in agents/ directory
-          finalFilename = `${name}.md`
+          finalFilename = supportsAgents ? `${name}.md` : `${name}.agent.md`
         }
 
         const outputPath = path.join(baseDir, finalFilename)
+        if ((file.shared === true || baseDir === sharedDir) && !ownerRegistered) {
+          // Register ownership before the first shared write so a partial failure still leaves the marker.
+          await addSharedOwner(sharedDir, 'opencode')
+          ownerRegistered = true
+        }
         await mkdir(path.dirname(outputPath), { recursive: true })
         await writeFile(outputPath, content, 'utf8')
       }
@@ -154,7 +160,7 @@ export class InstallSkills {
         path:
           item.kind === 'skill'
             ? path.join(skillsTargetDir, name)
-            : path.join(agentsTargetDir, `${name}.md`),
+            : path.join(agentsTargetDir, supportsAgents ? `${name}.md` : `${name}.agent.md`),
       })
     }
 
@@ -166,6 +172,53 @@ export class InstallSkills {
 
     return { installed, skipped }
   }
+}
+
+/**
+ * Maps a comma-separated allowed-tools list onto OpenCode's `permission` map.
+ *
+ * A bare tool becomes `"allow"`. Patterned tools become a nested pattern map.
+ * A bare tool listed with patterns of the same tool becomes the `"*"` pattern.
+ *
+ * @param allowedTools - Comma-separated tool list from agent metadata.
+ * @returns OpenCode permission map.
+ */
+export function toOpenCodePermission(
+  allowedTools: string,
+): Record<string, 'allow' | Record<string, 'allow'>> {
+  const grouped = new Map<string, { bare: boolean; patterns: string[] }>()
+  for (const raw of splitTopLevelCommas(allowedTools)) {
+    const tool = raw.trim()
+    if (tool.length === 0) {
+      continue
+    }
+    const match = /^([^(]+)\((.*)\)$/.exec(tool)
+    const toolName = (match?.[1] ?? tool).trim().toLowerCase()
+    const entry = grouped.get(toolName) ?? { bare: false, patterns: [] }
+    if (match?.[2] !== undefined) {
+      entry.patterns.push(match[2].trim())
+    } else {
+      entry.bare = true
+    }
+    grouped.set(toolName, entry)
+  }
+
+  const permission: Record<string, 'allow' | Record<string, 'allow'>> = {}
+  for (const [toolName, entry] of grouped) {
+    if (entry.patterns.length === 0) {
+      permission[toolName] = 'allow'
+      continue
+    }
+    const patterns: Record<string, 'allow'> = {}
+    if (entry.bare) {
+      patterns['*'] = 'allow'
+    }
+    for (const pattern of entry.patterns) {
+      patterns[pattern] = 'allow'
+    }
+    permission[toolName] = patterns
+  }
+  return permission
 }
 
 /**

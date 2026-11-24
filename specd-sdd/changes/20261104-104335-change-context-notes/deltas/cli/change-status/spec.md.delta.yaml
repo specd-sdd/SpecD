@@ -1,0 +1,16 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Text status omits duplicated review file lists$'
+  content: |
+    Text review output SHALL display only required; affected artifact detail already appears in artifacts (details). JSON/TOON review SHALL contain only required and affectedArtifacts. Remove review.reason/message/route/overlapDetail from help/schema/output and remove special overlap sections/local blocker filtering. Render Core blockers and nextAction unchanged. Render notes only as text (string array in structured output), without note ID, timestamp, actor or policy. Dedicated changes notes list/show exposes management detail.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Text-only notes across formats
+
+    Preserve multiline note text, including internal whitespace, in text and structured status. Do not enrich status notes with management metadata or inspect historical invalidation messages. If a raw Change is returned by Core internally, public serializers SHALL use the text-only projection and not leak its full note collection. Document list/show as the detail surface.

@@ -1,0 +1,13 @@
+- op: added
+  description: 'Ensure HappyPathNextUnavailableError is host-neutral without --next CLI flag'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: to next is the happy-path next state'
+  content: |
+    ### Requirement: Host-neutral HappyPathNextUnavailableError
+
+    When `TransitionChange` rejects `to: 'next'` with `HappyPathNextUnavailableError` (`HAPPY_PATH_NEXT_UNAVAILABLE`), the error `message` MUST describe why the `next` transition is unavailable from the current state in host-neutral terms without embedding CLI flags such as `--next`. The error MUST expose `state` as a structured metadata property.

@@ -524,9 +524,9 @@ Lists all schemas discoverable within this workspace. Does not load or validate 
 
 ## SchemaProvider
 
-A simplified schema port for use cases that need the fully-resolved schema for the current project but should not deal with reference routing or the extends-chain merge pipeline themselves.
+A schema provider port for use cases that need a fully-resolved schema for the current project or a sovereign change schema by reference, without dealing with reference routing or the extends-chain merge pipeline themselves.
 
-Unlike `SchemaRegistry`, `SchemaProvider` has no parameters — it returns the pre-resolved schema for the active project configuration. Implementations may resolve lazily and cache the result.
+Unlike `SchemaRegistry`, `SchemaProvider` provides a simplified lookup interface — returning either the pre-resolved schema for the active project configuration or resolving a specific schema by reference. Implementations (such as `LazySchemaProvider`) resolve on demand and cache resolved schemas per reference.
 
 ```typescript
 import { type SchemaProvider } from '@specd/core'
@@ -534,9 +534,12 @@ import { type SchemaProvider } from '@specd/core'
 
 ### Methods
 
-#### `get(): Promise<Schema>`
+#### `get(ref?: string): Promise<Schema>`
 
-Returns the fully-resolved schema for the current project configuration, including extends chains, plugins, and `schemaOverrides`.
+Returns the fully-resolved schema.
+
+- When `ref` is omitted or `undefined`, returns the active workspace project schema, including extends chains, plugins, and `schemaOverrides`.
+- When `ref` is specified (e.g., `change.schemaName`), returns the sovereign schema recorded for that change, resolving and caching the schema instance under that reference key.
 
 **Throws:** `SchemaNotFoundError` if the schema reference cannot be resolved. `SchemaValidationError` if the resolved schema is invalid.
 
@@ -705,6 +708,28 @@ abstract class ContentHasher {
 #### `hash(content: string): string`
 
 Computes a deterministic hash of the given string content. Returns a string in `algorithm:hex` format (e.g. `sha256:abc123…`).
+
+---
+
+## BinaryContentHasher
+
+Port for hashing raw bytes. Validity fingerprints use it for implementation files so the text-only `ContentHasher` contract stays unchanged. Artifact text still goes through `ContentHasher` after schema `preHashCleanup`.
+
+Plugin authors and `@specd/core` consumers import the port from `@specd/core`. Delivery hosts import the same contract from `@specd/sdk`. `NodeBinaryContentHasher` is infrastructure-internal and is not a public export. `CompositionResolver.getBinaryContentHasher()` returns one memoized instance for the composition session.
+
+```typescript
+import { BinaryContentHasher, type Sha256Digest } from '@specd/core'
+
+abstract class BinaryContentHasher {
+  abstract hash(content: Uint8Array): Sha256Digest
+}
+```
+
+### Methods
+
+#### `hash(content: Uint8Array): Sha256Digest`
+
+SHA-256 of the given bytes, returned as `` `sha256:${hex}` ``. Callers pass raw bytes for binary files (`bytes-v1`) and UTF-8 bytes after `text-v1` normalization for text. An empty binary file hashes zero bytes. A partial collection — any missing, unreadable, outside-project, or invalid path — yields a `null` fingerprint and must not authorize approval or verification.
 
 ---
 

@@ -31,11 +31,10 @@ describe('createTransitionChange', () => {
       changes: {} as never,
       actor: {} as never,
       schemaProvider: {} as never,
-      runStepHooks: {} as never,
       refreshImplementationTracking: {} as never,
       approvals: { spec: false, signoff: false },
-      lifecycle: {} as never,
-      countTasks: {} as never,
+      transitionBindings: [],
+      reconcile: {} as never,
     }
 
     expect(createTransitionChange(deps)).toBeInstanceOf(TransitionChange)
@@ -46,15 +45,28 @@ describe('createTransitionChange', () => {
       changes: {} as never,
       actor: {} as never,
       schemaProvider: {} as never,
-      runStepHooks: {} as never,
       refreshImplementationTracking: {} as never,
       approvals: { spec: false, signoff: false },
-      lifecycle: {} as never,
-      countTasks: {} as never,
+      transitionBindings: [],
+      reconcile: {} as never,
     }
 
     expect(() =>
       createTransitionChange(deps as unknown as SpecdConfig, { extraNodeModulesPaths: [] }),
     ).toThrow(InvalidCompositionFactoryArgumentsError)
+  })
+
+  it('rejects explicit deps without the canonical reconciler', () => {
+    const incomplete = {
+      changes: {},
+      actor: {},
+      schemaProvider: {},
+      refreshImplementationTracking: {},
+      approvals: { spec: false, signoff: false },
+      transitionBindings: [],
+    }
+    expect(() => createTransitionChange(incomplete as never)).toThrow(
+      InvalidCompositionFactoryArgumentsError,
+    )
   })
 })

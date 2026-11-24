@@ -4,17 +4,28 @@
 
 ### Requirement: resolveCliContext delegates to openSpecdHost
 
-#### Scenario: Host bootstrap uses SDK
+#### Scenario: Host bootstrap uses SDK through the helper
 
 - **WHEN** any CLI command calls `resolveCliContext`
-- **THEN** it invokes `openSpecdHost` from `@specd/sdk`
-- **AND** it returns `config`, `configFilePath`, and `kernel` from the host result
+- **THEN** the CLI host-opening helper invokes `openSpecdHost` from `@specd/sdk`
+- **AND** it returns the host as `CliContext` with `config`, `configFilePath`, `kernel`, `createGraphProvider` and `dispose`
 
 #### Scenario: Kernel options forwarded for verbosity
 
 - **GIVEN** the process argv includes `-vv` or `--verbose`
 - **WHEN** `resolveCliContext` runs
-- **THEN** `openSpecdHost` receives `kernelOptions` with elevated console log level
+- **THEN** `openSpecdHost` receives `options.kernel` with elevated console log level
+
+#### Scenario: Plugins enabled by default
+
+- **WHEN** `resolveCliContext` is called without a `plugins` option
+- **THEN** the SDK host is opened with plugins enabled
+
+#### Scenario: Plugins disabled for management commands
+
+- **WHEN** `resolveCliContext({ plugins: false })` is called
+- **THEN** `openSpecdHost` receives `options.plugins: false`
+- **AND** no plugin is loaded or initialized
 
 #### Scenario: CLI reads bootstrap warnings from config
 
@@ -35,15 +46,121 @@
 #### Scenario: Optional onLog callback wired
 
 - **GIVEN** `resolveCliContext` is called with an `onLog` callback
-- **WHEN** the kernel emits log entries
-- **THEN** the callback destination receives entries at the resolved log level
+- **WHEN** `resolveCliContext` builds the kernel options
+- **THEN** `options.kernel` carries the callback destination
+- **AND** a log entry emitted at the resolved level reaches the callback
 
 ### Requirement: Host bootstrap entry point
 
-#### Scenario: Commands use resolveCliContext
+#### Scenario: Commands use resolveCliContext or the helper
 
 - **WHEN** a configured-mode CLI command needs a kernel
-- **THEN** it obtains one through `resolveCliContext` or `openSpecdHost`
+- **THEN** it obtains one through `resolveCliContext` or the CLI host-opening helper
+
+#### Scenario: No direct SDK bootstrap in commands
+
+- **WHEN** the CLI sources outside tests and the graph index worker are inspected
+- **THEN** none of them call `openSpecdHost` or `createSdkContext` directly
+
+### Requirement: CLI host-opening helper
+
+#### Scenario: Helper registers the host for cleanup
+
+- **WHEN** the helper opens a host
+- **THEN** the host's `dispose` is registered in the CLI cleanup registry before the host is returned
+
+#### Scenario: Helper covers both bootstrap forms
+
+- **WHEN** a graph helper needs a host from an already-resolved config
+- **THEN** the same helper opens it through `createSdkContext` with the CLI kernel options and registers its `dispose`
+
+#### Scenario: Helper forwards the caller input unchanged
+
+- **WHEN** a caller opens a host with CLI kernel options in the input
+- **THEN** the helper passes that input to `openSpecdHost` (or `createSdkContext`) without altering it
+
+#### Scenario: A failed open registers nothing
+
+- **WHEN** the SDK bootstrap rejects
+- **THEN** the helper rejects with the same error and no cleanup is registered
+
+#### Scenario: No hand-built host context
+
+- **WHEN** the CLI sources outside tests are inspected
+- **THEN** no code builds an object literal of `kernel` plus `createGraphProvider` to stand in for a host
+- **AND** `resolveSdkHostContext` no longer exists
+
+### Requirement: CliContext exposes dispose
+
+#### Scenario: CliContext carries dispose
+
+- **WHEN** `resolveCliContext` resolves
+- **THEN** the result has `config`, `configFilePath`, `kernel`, `createGraphProvider`, `dispose` and `[Symbol.asyncDispose]`
+- **AND** calling `dispose` twice releases the host once
+
+#### Scenario: Commands do not need to call dispose
+
+- **GIVEN** a command that opens a host and never calls `dispose`
+- **WHEN** the process exits
+- **THEN** the host has been released by the cleanup registry
+
+### Requirement: CLI cleanup registry
+
+#### Scenario: Cleanups run in reverse order
+
+- **GIVEN** cleanups `a`, `b` and `c` registered in that order
+- **WHEN** `runCliCleanup()` is awaited
+- **THEN** they run as `c`, `b`, `a`, each awaited
+
+#### Scenario: Idempotent and concurrent
+
+- **WHEN** `runCliCleanup()` is called twice concurrently
+- **THEN** both calls return the same promise and each cleanup ran once
+
+#### Scenario: Cleanup registered after cleanup started runs immediately
+
+- **GIVEN** `runCliCleanup()` has started
+- **WHEN** `registerCliCleanup(fn)` is called
+- **THEN** `fn` is invoked immediately instead of being queued
+- **AND** if `fn` fails a `warning:` line is written to stderr and the exit code is unchanged
+
+#### Scenario: A failing cleanup does not stop the others or the exit code
+
+- **GIVEN** cleanups where one rejects
+- **WHEN** `runCliCleanup()` is awaited
+- **THEN** the remaining cleanups still ran
+- **AND** a `warning:` line was written to stderr
+- **AND** the process exit code is unchanged
+
+#### Scenario: Cleanup runs on error exit and on signals
+
+- **WHEN** a command fails with an error exit, or the process receives a termination signal
+- **THEN** `runCliCleanup()` is awaited before the process exits
+
+#### Scenario: Failure warning text
+
+- **GIVEN** a cleanup that rejects with message `boom`
+- **WHEN** `runCliCleanup()` is awaited
+- **THEN** stderr contains `warning: cleanup failed: boom`
+
+### Requirement: Graph index worker releases its host
+
+#### Scenario: Worker disposes on success
+
+- **WHEN** the graph index worker finishes successfully
+- **THEN** the host it opened was disposed before it finished
+
+#### Scenario: Worker disposes on failure
+
+- **WHEN** the graph index worker fails
+- **THEN** the host it opened was disposed in a `finally` block before the failure is reported
+
+#### Scenario: Worker opens its host without plugins
+
+- **WHEN** the graph index worker opens its host
+- **THEN** it passes `plugins: false`
+- **AND** a broken configured plugin does not fail indexing
+- **AND** the same holds when the worker opens its host from a bootstrap context without a resolved config
 
 ### Requirement: CLI package runtime dependencies
 

@@ -20,51 +20,121 @@ specd changes status <name> --format text
 ```
 
 Identify any high-visibility blockers from the **blockers:** section (e.g. `ARTIFACT_DRIFT`,
-`OVERLAP_CONFLICT`, `REVIEW_REQUIRED`) and inform the user. Follow the **next action:**
-command recommendation.
+`REVIEW_REQUIRED`) and inform the user.
+
+`OVERLAP_CONFLICT` is archive-only. Invalidation overlap is `review.reason:
+spec-overlap-conflict` → `/specd-design`, never bypassed with
+`--skip-checks spec.overlap` or `--allow-overlap`.
+
+If the only (or remaining) blocker is `IMPLEMENTATION_STATE` / open tracked files,
+**stay in this skill** — drain tracking (see `shared.md` — "Implementation tracking")
+then continue. Do **not** redirect to `/specd-implement` solely for open files.
+
+For other blockers, follow the **next action:** command recommendation.
 
 Extract the `path:` field from the "lifecycle:" section.
 
-If the status output shows `review: required: yes`, tell the user:
+### Schema-aware lifecycle routing
 
-> Artifacts need review before verification can continue. Run `/specd-design <name>`.
+Before entering verification or advancing afterwards, read fresh structured status:
 
-**Stop — do not continue.**
+```bash
+specd changes status <name> --format toon
+```
 
-If not in `implementing`, `verifying`, or `done`, this is the wrong skill.
-Redirect based on the **next action:** `target` recommendation.
+Treat `nextAction.command` as the preferred default recommendation and
+`lifecycle.availableTransitions` as the sole source of legal targets. When explicitly
+invoked, map `/specd-verify` to its intended target (`verifying` or the current verify-owned
+completion hop): if a different command is recommended, report that recommendation but
+continue toward the mapped target if it is present in `lifecycle.availableTransitions`.
+If the target is absent from `availableTransitions`, stop before running any hooks and
+report the blockers along with the recommended command. Lifecycle advancement remains a
+separate authorized action and follows the hop rules below. Refresh before each hop, stop if
+routing data is absent or stale, and execute hooks only for the actual source and target;
+never run verifying hooks when verification is disabled or bypassed.
 
-**Stop — do not continue.**
+Routed blocks (`<!-- route: target -->` … `<!-- /route -->`) use placeholders instead of
+fixed state names: `<target>` is the lifecycle step selected from a fresh
+`lifecycle.availableTransitions` (this skill's intended target when advertised,
+otherwise `nextAction.targetStep`) and `<source>` is the change's current `state`.
+Run `run-hooks` / `hook-instruction` only for the source (`--phase post`) and the
+selected target (`--phase pre`) of an actual hop, and never substitute a fixed state
+sequence.
+
+Trust the reconciled status. Do not calculate fingerprints or roll the lifecycle
+back yourself. See `shared.md` — "Canonical validity reconciliation".
+
+If required spec consent is stale or revoked, status returns the change to
+`designing`. Stop verification and route to `/specd-design` through
+`designing` → `ready` → human `approve spec`.
+
+If the status output shows `review: required: yes`:
+
+- `workflow: redesign` with unresolved non-task drift routes to `/specd-design`.
+  **Stop.**
+- `workflow: preserve` without mandatory spec recovery stays in the current
+  phase. Review drifted artifacts in place when that review is in this skill's
+  scope, then `specd changes validate`. Do not force `/specd-design` for every
+  drift. Structural validation is not semantic review or verification renewal.
+- `artifacts: none` waives reopening, not freshness.
+
+Verification evidence is state-independent. Record it from any active lifecycle
+state. Entering `verifying` does **not** capture a baseline and is not required
+merely to produce evidence. Lifecycle advancement
+remains a separate authorized action. It follows the hop rules below, with each
+target taken from a fresh `lifecycle.availableTransitions`.
+
+Verification staleness never moves lifecycle state. Before `verifying` it is
+contextual. At `verifying` or later it blocks until this skill renews evidence
+in place. A stale sign-off after `done` returns to `done`; it does not move an
+earlier state forward.
 
 ### 2. Enter verification (or resume)
 
-**If in `implementing`** (normal entry from `/specd-implement`):
+**If `verifying` is in `lifecycle.availableTransitions`** (normal entry from `/specd-implement`):
 
-Run pre-hooks and transition:
+Run pre-hooks and transition. Enter `verifying` and run its hooks **only** when it is
+advertised; when verification is disabled or bypassed, never enter it or run its hooks.
+Produce verification evidence only if fresh status reports it is required, then route
+forward from `nextAction.command`:
 
+<!-- route: target -->
 ```bash
-specd changes run-hooks <name> verifying --phase pre
-specd changes hook-instruction <name> verifying --phase pre --format text
+specd changes run-hooks <name> <target> --phase pre
+specd changes hook-instruction <name> <target> --phase pre --format text
 ```
+<!-- /route -->
 
 Follow guidance.
 
+<!-- route: target -->
 ```bash
-specd changes transition <name> verifying --skip-hooks all
+specd changes transition <name> <target> --skip-hooks all
 ```
+<!-- /route -->
 
-If it fails, follow the **Repair Guide** output.
+If it fails with `IMPLEMENTATION_STATE` / open tracked files: drain tracking using
+`shared.md` — "Implementation tracking" (`list` → `resolve` in-scope files, `ignore`
+incidental files, `add` links when a file actually implements a spec). Retry the
+transition. Do **not** stop and send the user to `/specd-implement` for this blocker
+alone.
 
-**If in `verifying`** (resuming): run pre-hooks but skip the transition:
+If it fails for any other reason, follow the **Repair Guide** output.
 
+**If already in `verifying`** (resuming): run pre-hooks but skip the transition:
+
+<!-- route: target -->
 ```bash
-specd changes run-hooks <name> verifying --phase pre
-specd changes hook-instruction <name> verifying --phase pre --format text
+specd changes run-hooks <name> <target> --phase pre
+specd changes hook-instruction <name> <target> --phase pre --format text
 ```
+<!-- /route -->
 
-**If in `done`**: skip directly to step 6a (transition to archivable path).
+**If in `done`**: skip the `verifying` entry transition. Continue with attempt
+ownership below when evidence must be renewed; otherwise continue at step 6b
+for the signoff gate. Entering `done` does not complete verification.
 
-Continue to step 2b.
+`verifying` → `verifying` is not a protocol hop. There is no restart-verification flag. Continue to step 2b whenever this invocation will check scenarios.
 
 ### 2b. Select verification mode
 
@@ -138,6 +208,33 @@ specd changes spec-preview <name> <specId> --artifact <artifactId> --format toon
 This merged view is what you should verify against. Raw delta inspection alone is not
 equivalent to merged preview review.
 
+### 3c. Start the verification attempt
+
+This skill owns the attempt, including full mode. Before any scenario check,
+compliance audit, verification report, or completion, run:
+
+```bash
+specd changes verification start <name> --format text
+```
+
+Store the returned attempt id. The command is explicit and works from any active
+state. It refreshes tracking and runs the registered implementation readiness
+checks before storing a baseline; entering `verifying` applies the same guards but
+never creates an attempt. Transitions and status never complete an unfinished attempt.
+
+If fingerprinted inputs changed, this start replaces the baseline. Repeat every
+scenario check and, in full mode, the delegated audit against that new baseline.
+Earlier results cannot complete the new attempt.
+
+```bash
+specd changes verification invalidate <name> --reason "<text>"
+```
+
+`verification invalidate` is a separate command. It only withdraws completed
+verification evidence. It does not start or restart an attempt. Do not use it
+instead of `verification start`. If evidence was already stale, trust the persisted
+reason returned by the command; a new request reason does not replace audit history.
+
 ### 4. Verify each scenario
 
 For each spec in the change, read the merged spec content from step 3b. Then verify
@@ -157,24 +254,33 @@ For each scenario:
 
 The moment all scenarios have been evaluated, run the post-verifying hooks:
 
+<!-- route: target -->
 ```bash
-specd changes run-hooks <name> verifying --phase post
-specd changes hook-instruction <name> verifying --phase post --format text
+specd changes run-hooks <name> <source> --phase post
+specd changes hook-instruction <name> <source> --phase post --format text
 ```
+<!-- /route -->
 
 Follow guidance. If hooks fail, fix and re-run.
 
 ### 5b. Compliance audit (full mode only)
 
-**Only if `verificationMode` is `full`:** run the compliance audit now, before any
-state transition or results display.
+**Only if `verificationMode` is `full`:** run the compliance audit now, before
+completion or any lifecycle transition.
 
-Execute the `specd-compliance` skill for the current change: `/specd-compliance --change <name>`
+Pass the attempt id from step 3c and a delegated marker. Delegated compliance
+participates in this attempt and must not run `verification start` or
+`verification complete`:
 
-Obtain the audit results and store them. They will be presented together with the
-verification results in step 6.
+`/specd-compliance --change <name> --delegated --attempt <attemptId>`
 
-**If `verificationMode` is `simple`:** skip this step entirely.
+An existing active attempt alone does not imply delegation. This skill already
+started the outer attempt. Obtain the audit results and store them. They are
+presented with the verification findings in step 6. Full mode completes only
+after scenario checks and this audit both succeed.
+
+**If `verificationMode` is `simple`:** skip compliance. This skill still owns
+start, scenario checks, and complete.
 
 Continue to step 6.
 
@@ -211,78 +317,115 @@ Before choosing a transition, reload status:
 specd changes status <name> --format text
 ```
 
-If the fresh status shows `review: required: yes`, do NOT route back to
-`implementing`. Tell the user to run `/specd-design <name>` and **stop**.
+If fresh status shows required spec recovery, or `workflow: redesign` with
+unresolved non-task drift, do NOT route back to `implementing`. Tell the user
+to run `/specd-design <name>` and **stop**. Under `workflow: preserve`, stay in
+phase for in-place review instead of forcing design.
 
-If this is an implementation-only failure:
+If this is an implementation-only failure (`<target>` is `implementing` when advertised):
 
+<!-- route: target -->
 ```bash
-specd changes transition <name> implementing --skip-hooks all
+specd changes transition <name> <target> --skip-hooks all
 ```
+<!-- /route -->
 
-Tell the user to run `/specd-implement <name>` to fix the implementation. **Stop.**
+Tell the user to continue with the command recommended by a fresh `nextAction.command` to fix the implementation. **Stop.**
 
-If this is artifact review required:
+If this is artifact review required (`<target>` is `designing`):
 
+<!-- route: target -->
 ```bash
-specd changes transition <name> designing --skip-hooks all
+specd changes transition <name> <target> --skip-hooks all
 ```
+<!-- /route -->
 
 Tell the user to run `/specd-design <name>` to update them. **Stop.**
 
-**If all pass:** transition through `done` and the signoff gate to reach `archivable`.
+Do not run `verification complete` after a failed scenario, an interrupted
+session, or a failed delegated audit. Leave the active attempt. There is no restart-verification flag.
+
+**If all scenario checks pass, applicable hooks pass, and (full mode) the
+delegated audit succeeds:** complete the attempt this skill started. Do this
+before any lifecycle transition. CLI completion records the declaration; it does
+not run the tests.
+
+```bash
+specd changes verification complete <name> --format text
+```
+
+If complete reports a fingerprint mismatch, do not complete with the previous
+results. Inspect the differences, run `specd changes verification start <name>`
+again, repeat all required verification work against the new baseline, then
+complete.
+
+Lifecycle advancement is separate. When the user authorizes it and current
+evidence exists, advance through the hops the fresh status advertises, honoring
+the sign-off gate, until it recommends archiving.
 
 #### 6a. Transition to done
 
 Run done pre-hooks, then transition:
 
+<!-- route: target -->
 ```bash
-specd changes run-hooks <name> done --phase pre
-specd changes hook-instruction <name> done --phase pre --format text
+specd changes run-hooks <name> <target> --phase pre
+specd changes hook-instruction <name> <target> --phase pre --format text
 ```
+<!-- /route -->
 
 Follow guidance.
 
+<!-- route: target -->
 ```bash
-specd changes transition <name> done --skip-hooks all
+specd changes transition <name> <target> --skip-hooks all
 ```
+<!-- /route -->
 
 Run done post-hooks:
 
+<!-- route: target -->
 ```bash
-specd changes run-hooks <name> done --phase post
-specd changes hook-instruction <name> done --phase post --format text
+specd changes run-hooks <name> <source> --phase post
+specd changes hook-instruction <name> <source> --phase post --format text
 ```
+<!-- /route -->
 
 #### 6b. Handle signoff gate
 
-Run `changes status <name> --format text` and check `approvals:` line.
+Read a fresh `specd changes status <name> --format toon` and use `lifecycle.approvals`.
 
 **If signoff=off:** no signoff needed — run archivable hooks and transition:
 
+<!-- route: target -->
 ```bash
-specd changes run-hooks <name> archivable --phase pre
-specd changes hook-instruction <name> archivable --phase pre --format text
+specd changes run-hooks <name> <target> --phase pre
+specd changes hook-instruction <name> <target> --phase pre --format text
 ```
+<!-- /route -->
 
 Follow guidance.
 
+<!-- route: target -->
 ```bash
-specd changes transition <name> archivable --skip-hooks all
+specd changes transition <name> <target> --skip-hooks all
 ```
+<!-- /route -->
 
+<!-- route: target -->
 ```bash
-specd changes run-hooks <name> archivable --phase post
-specd changes hook-instruction <name> archivable --phase post --format text
+specd changes run-hooks <name> <source> --phase post
+specd changes hook-instruction <name> <source> --phase post --format text
 ```
+<!-- /route -->
 
-**If signoff=on:** transition routes to `pending-signoff`. Tell user:
+**If signoff=on:** stay in `done`. Tell user:
 
 > Signoff required. Run: `specd changes approve signoff <name> --reason "..."`
-> Then: `/specd-archive <name>`
+> Then continue this skill for `done → archivable`.
 
 **Stop.**
-Do not invoke `/specd-archive` automatically; wait for explicit user confirmation.
+Do not invoke the recommended command (`nextAction.command`) automatically; wait for explicit user confirmation.
 
 ## Session tasks
 
@@ -297,20 +440,29 @@ Do not invoke `/specd-archive` automatically; wait for explicit user confirmatio
 ## Handling failed transitions
 
 When `changes transition` fails, it renders a **Repair Guide** in text mode.
-Follow the recommended repair command based on the target recommendation.
 
-**Stop — do not continue after redirecting.**
+If the blocker is `IMPLEMENTATION_STATE` / `impl.filesResolved`, drain tracking
+(`shared.md` — "Implementation tracking") and **retry** — do not redirect to
+`/specd-implement` solely for open files.
+
+For any other blocker, follow the recommended repair command based on the target
+recommendation.
+
+**Stop — do not continue after redirecting** (except the open-files drain-and-retry
+path above).
 
 ## Returning to design
 
 If during verification you discover that the artifacts need revision, stop and explain.
 If the user agrees:
 
+<!-- route: target -->
 ```bash
-specd changes transition <name> designing --skip-hooks all
+specd changes transition <name> <target> --skip-hooks all
 ```
+<!-- /route -->
 
-> Artifacts need revision. Run `/specd-design <name>` to update them.
+> Artifacts need revision. Continue with the command in `nextAction.command` (expected `/specd-design`).
 
 **Stop — do not continue verifying.**
 
@@ -318,6 +470,12 @@ specd changes transition <name> designing --skip-hooks all
 
 - Verify against scenarios from the compiled context
 - Run actual tests where applicable
-- Any time a fresh `changes status` shows `review: required: yes`, stop
-  verification and redirect to `/specd-design <name>`
+- On `review: required: yes`, follow canonical recovery: spec consent or
+  `workflow: redesign` goes to `/specd-design`; `workflow: preserve` stays in
+  phase for in-place review. Do not treat structural validation as approval
 - ALWAYS ask the user for the next action when full-mode audit finds issues
+- Own `verification start` and `verification complete` for both simple and full
+  mode. Pass `--delegated --attempt <attemptId>` in full mode. Do not let
+  compliance complete the outer attempt
+- Do not complete after a failed check, a failed delegated audit, or a
+  fingerprint mismatch until the repeated work succeeds

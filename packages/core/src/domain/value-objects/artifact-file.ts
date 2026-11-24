@@ -1,5 +1,6 @@
 import { type ArtifactStatus } from './artifact-status.js'
 import { type ArtifactDisplayStatus } from './artifact-display-status.js'
+import { InvalidChangeError } from '../errors/invalid-change-error.js'
 
 /**
  * Construction properties for an {@link ArtifactFile}.
@@ -48,6 +49,11 @@ export class ArtifactFile {
   constructor(props: ArtifactFileProps) {
     this._key = props.key
     this._filename = props.filename
+    if (props.status === 'pending-parent-artifact-review') {
+      throw new InvalidChangeError(
+        'pending-parent-artifact-review is verdict-derived and cannot be persisted on a file',
+      )
+    }
     this._status = props.status ?? 'missing'
     this._validatedHash = props.validatedHash
     this._hasDrift = props.hasDrift ?? false

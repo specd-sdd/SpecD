@@ -13,6 +13,7 @@ import type {
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
+import { CliExitError } from '../../helpers/cli-exit-error.js'
 
 /** Maximum number of skipped files listed in CLI text output. */
 /** Maximum number of workspace overlaps listed in text output. */
@@ -230,9 +231,8 @@ JSON/TOON output schema:
             })
           }
         }
-        // Ends the process explicitly after a successful run. It sits outside the try block so that
-        // a host which makes process.exit throw cannot route that exit into the error handler above.
-        process.exit(0)
+        // Reached only when indexing succeeded: end the process explicitly after cleanup.
+        throw new CliExitError(0)
       },
     )
 }

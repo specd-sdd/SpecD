@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { GetHookInstructions } from '../../../src/application/use-cases/get-hook-instructions.js'
+import { SchemaProviderIdentityMismatchError } from '../../../src/application/errors/schema-provider-identity-mismatch-error.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { HookNotFoundError } from '../../../src/domain/errors/hook-not-found-error.js'
 import { TemplateExpander } from '../../../src/application/template-expander.js'
@@ -194,5 +195,139 @@ describe('GetHookInstructions — archive fallback', () => {
 
     expect(result.instructions[0]!.text).toBe('vars=my-change')
     expect(result.instructions[0]!.text).not.toContain('workspace')
+  })
+
+  it('uses the recorded schema for active and archived instruction lookups', async () => {
+    const sovereign = makeSchema({
+      name: 'sovereign',
+      workflow: [
+        {
+          step: 'archiving',
+          requires: [],
+          requiresTaskCompletion: [],
+          hooks: {
+            pre: [],
+            post: [{ id: 'sovereign-hook', type: 'instruction', text: 'sovereign' }],
+          },
+        },
+      ],
+    })
+    const defaultSchema = makeArchivingSchema([
+      { id: 'default-hook', type: 'instruction', text: 'default' },
+    ])
+    const get = vi.fn(async (name?: string) => (name === 'sovereign' ? sovereign : defaultSchema))
+    const uc = new GetHookInstructions(
+      makeChangeRepository([makeChange('active', { schemaName: 'sovereign' })]),
+      makeArchiveRepository([makeArchivedChange('archived', { schemaName: 'sovereign' })]),
+      { get } as never,
+      makeExpander(),
+    )
+
+    await expect(
+      uc.execute({ name: 'active', step: 'archiving', phase: 'post' }),
+    ).resolves.toMatchObject({
+      instructions: [{ id: 'sovereign-hook', text: 'sovereign' }],
+    })
+    await expect(
+      uc.execute({ name: 'archived', step: 'archiving', phase: 'post' }),
+    ).resolves.toMatchObject({
+      instructions: [{ id: 'sovereign-hook', text: 'sovereign' }],
+    })
+    expect(get).toHaveBeenCalledWith('sovereign')
+  })
+})
+
+describe('GetHookInstructions — disabled steps', () => {
+  it('returns no instructions for a step the change schema marks disabled', async () => {
+    const schema = makeSchema({
+      workflow: [
+        {
+          step: 'verifying',
+          disabled: true,
+          requires: [],
+          requiresTaskCompletion: [],
+          hooks: {
+            pre: [{ id: 'pre-verify', type: 'instruction', text: 'Verify first' }],
+            post: [],
+          },
+        },
+      ],
+    })
+    const change = makeChange('my-change')
+    const uc = makeUseCase({ changes: makeChangeRepository([change]), schema })
+
+    const result = await uc.execute({ name: 'my-change', step: 'verifying', phase: 'pre' })
+
+    expect(result.instructions).toEqual([])
+  })
+  it('does not let --only surface an instruction of a disabled step', async () => {
+    const schema = makeSchema({
+      workflow: [
+        {
+          step: 'verifying',
+          disabled: true,
+          requires: [],
+          requiresTaskCompletion: [],
+          hooks: {
+            pre: [{ id: 'pre-verify', type: 'instruction', text: 'Verify first' }],
+            post: [],
+          },
+        },
+      ],
+    })
+    const uc = makeUseCase({
+      changes: makeChangeRepository([makeChange('my-change')]),
+      schema,
+    })
+
+    const result = await uc.execute({
+      name: 'my-change',
+      step: 'verifying',
+      phase: 'pre',
+      only: 'pre-verify',
+    })
+
+    expect(result.instructions).toEqual([])
+  })
+
+  it('returns no instructions for a disabled step in the post phase', async () => {
+    const schema = makeSchema({
+      workflow: [
+        {
+          step: 'verifying',
+          disabled: true,
+          requires: [],
+          requiresTaskCompletion: [],
+          hooks: {
+            pre: [],
+            post: [{ id: 'post-verify', type: 'instruction', text: 'Wrap up' }],
+          },
+        },
+      ],
+    })
+    const uc = makeUseCase({
+      changes: makeChangeRepository([makeChange('my-change')]),
+      schema,
+    })
+
+    const result = await uc.execute({ name: 'my-change', step: 'verifying', phase: 'post' })
+
+    expect(result.instructions).toEqual([])
+  })
+
+  it('fails closed on a provider identity mismatch instead of using the default schema', async () => {
+    const get = vi.fn(async (name?: string) =>
+      makeSchema({ name: name === 'custom-schema' ? 'other-schema' : 'default-schema' }),
+    )
+    const uc = new GetHookInstructions(
+      makeChangeRepository([makeChange('active', { schemaName: 'custom-schema' })]),
+      makeArchiveRepository(),
+      { get } as never,
+      makeExpander(),
+    )
+
+    await expect(
+      uc.execute({ name: 'active', step: 'archiving', phase: 'post' }),
+    ).rejects.toBeInstanceOf(SchemaProviderIdentityMismatchError)
   })
 })

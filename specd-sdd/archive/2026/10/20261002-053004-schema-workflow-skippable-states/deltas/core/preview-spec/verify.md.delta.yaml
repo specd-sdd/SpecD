@@ -1,0 +1,42 @@
+- op: removed
+  description: Replace renamed requirement section
+  selector:
+    type: section
+    matches: 'Requirement:\ Schema\ name\ guard'
+- op: added
+  description: Verify sovereign schema resolution when workspace default differs
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement:\ Error\ handling'
+  content: |
+    ### Requirement: Sovereign schema resolution
+
+    #### Scenario: Resolves sovereign schema when workspace default differs
+
+    - **GIVEN** a change with `schemaName: "custom-schema"` and a workspace default schema `"schema-std"`
+    - **WHEN** `PreviewSpec.execute` is called
+    - **THEN** it resolves `"custom-schema"` via `SchemaProvider.get("custom-schema")`
+    - **AND** previews the spec without throwing `SchemaMismatchError`
+- op: added
+  description: Schema errors propagate; content failures stay partial
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Error handling'
+  content: |
+    #### Scenario: Schema identity mismatch propagates instead of a partial result
+
+    - **GIVEN** a schema provider that returns a schema whose canonical name differs from `change.schemaName`
+    - **WHEN** `PreviewSpec.execute` runs
+    - **THEN** it throws `SchemaProviderIdentityMismatchError`
+    - **AND** it does not return a partial result with warnings
+
+    #### Scenario: Schema resolution failure propagates
+
+    - **GIVEN** resolving the change's schema fails
+    - **WHEN** `PreviewSpec.execute` runs
+    - **THEN** the resolution error propagates

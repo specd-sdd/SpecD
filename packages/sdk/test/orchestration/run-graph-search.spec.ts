@@ -127,6 +127,8 @@ describe('runGraphSearch', () => {
         },
       } as any,
       createGraphProvider: () => mockProvider,
+      dispose: async () => {},
+      [Symbol.asyncDispose]: async () => {},
     }
 
     const result = await runGraphSearch(ctx, { query: 'auth', provider: mockProvider })
@@ -176,6 +178,8 @@ describe('runGraphSearch', () => {
         },
       } as any,
       createGraphProvider: () => mockProvider,
+      dispose: async () => {},
+      [Symbol.asyncDispose]: async () => {},
     }
 
     await runGraphSearch(ctx, { query: 'auth' })
@@ -201,6 +205,8 @@ describe('runGraphSearch', () => {
         },
       } as any,
       createGraphProvider: () => mockProvider,
+      dispose: async () => {},
+      [Symbol.asyncDispose]: async () => {},
     }
 
     await runGraphSearch(ctx, { query: 'auth', provider: mockProvider })
@@ -224,6 +230,8 @@ describe('runGraphSearch', () => {
         },
       } as any,
       createGraphProvider: () => mockProvider,
+      dispose: async () => {},
+      [Symbol.asyncDispose]: async () => {},
     }
 
     await runGraphSearch(ctx, {
@@ -276,6 +284,8 @@ describe('runGraphSearch', () => {
         },
       } as any,
       createGraphProvider: () => mockProvider,
+      dispose: async () => {},
+      [Symbol.asyncDispose]: async () => {},
     }
 
     await runGraphSearch(ctx, {
@@ -353,6 +363,8 @@ describe('runGraphSearch', () => {
         },
       } as any,
       createGraphProvider: () => mockProvider,
+      dispose: async () => {},
+      [Symbol.asyncDispose]: async () => {},
     }
 
     const result = await runGraphSearch(ctx, {

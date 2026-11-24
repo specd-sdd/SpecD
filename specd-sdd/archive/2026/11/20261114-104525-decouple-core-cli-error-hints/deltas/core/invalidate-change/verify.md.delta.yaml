@@ -1,0 +1,36 @@
+- op: modified
+  description: 'Verify host-neutral target validation messages'
+  selector:
+    type: section
+    matches: 'Requirement: Policy-dependent target rules'
+  content: |
+    #### Scenario: Target required for downstream execution
+
+    - **WHEN** `InvalidateChange.execute` is called with effective policy `downstream` and no targets
+    - **THEN** execution fails before mutating the change
+    - **AND** the error message uses host-neutral terms without `--target`
+
+    #### Scenario: Target forbidden for global execution
+
+    - **WHEN** `InvalidateChange.execute` is called with effective policy `global` and any target
+    - **THEN** execution fails before mutating the change
+    - **AND** the error message uses host-neutral terms without `--target`
+- op: modified
+  description: 'Verify host-neutral InvalidateRequiresForceError message'
+  selector:
+    type: section
+    matches: 'Requirement: Approval guard'
+  content: |
+    Scenarios:
+
+    #### Scenario: Force is required only for current consent
+
+    - **GIVEN** a request affects valid approval
+    - **WHEN** force is absent
+    - **THEN** no mutation occurs and `InvalidateRequiresForceError` reports `gates` and `recoveries` with a host-neutral message that does not mention `--force`
+    - **AND** already-stale historical evidence does not trigger that guard
+
+    #### Scenario: Forced revocation commits evidence and recovery together
+
+    - **WHEN** force authorizes revoking valid consent
+    - **THEN** projection, audit event, artifact effects, and recovery are atomic

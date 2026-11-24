@@ -6,13 +6,10 @@
   "dependsOn": [
     "cli:entrypoint",
     "core:change",
+    "core:edit-change",
+    "core:config",
     "cli:change-create",
-    "core:spec-id-format",
-    "core:edit-change"
+    "core:spec-id-format"
   ],
-  "implementation": [
-    {
-      "file": "cli:src/commands/change/edit.ts"
-    }
-  ]
+  "implementation": []
 }

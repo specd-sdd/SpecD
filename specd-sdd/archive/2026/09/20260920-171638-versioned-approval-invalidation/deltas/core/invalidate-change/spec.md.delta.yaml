@@ -1,0 +1,57 @@
+- op: modified
+  description: 'Accept independent artifact and workflow overrides'
+  selector:
+    type: section
+    matches: '^Requirement: Input contract$'
+  content: |
+    `InvalidateChange.execute` MUST accept `name`, mandatory human-readable `reason`, optional structured `policyOverride`, optional repeated `targets`, and optional `force` confirmation.
+
+    `policyOverride` MAY set `artifacts: none | surgical | downstream | global` and `workflow: preserve | redesign` independently. Targets use `<artifactId>` or `<artifactId>@<specId>`. The override applies only to this execution and MUST NOT mutate the change's persisted default policy.
+
+- op: modified
+  description: 'Resolve a structured effective policy'
+  selector:
+    type: section
+    matches: '^Requirement: Effective policy resolution$'
+  content: |
+    The use case SHALL resolve one effective structured policy by overlaying the supplied override on the change's persisted `invalidation` policy. Target requirements are determined solely by the effective `artifacts` dimension. The `workflow` dimension does not alter target syntax or artifact expansion.
+
+- op: modified
+  description: 'Apply gate-safe recovery rather than unconditional redesign'
+  selector:
+    type: section
+    matches: '^Requirement: Change-level invalidation is unconditional$'
+  rename: 'Requirement: Canonical gate-safe invalidation and recovery'
+  content: |
+    When execution passes validation and approval guards, `InvalidateChange` SHALL delegate the complete mutation to the central reconciler. Manual invalidation appends audit evidence and applies the artifact policy. Lifecycle state is preserved or returned to `designing` according to the workflow policy unless mandatory gate recovery is stricter.
+
+    Explicit invalidation of a valid approval requires `force=true`. A forced spec-approval revocation returns the change to `designing`; a forced sign-off revocation returns a later change to `done`; when both are affected, spec recovery wins. The operation MUST commit projection changes and recovery together and MUST be idempotent.
+
+- op: modified
+  description: 'Guard only consent that the request would revoke'
+  selector:
+    type: section
+    matches: '^Requirement: Approval guard$'
+  content: |
+    Before mutation, the use case SHALL determine from the canonical verdict whether the requested invalidation would revoke a currently `valid` spec approval or sign-off. If so, it requires `force=true` and reports each affected gate and recovery target. Historical events and already stale or revoked projections do not by themselves trigger the guard.
+
+    Without force, no mutation occurs. With force, revocation, audit evidence, artifact effects, and recovery are applied atomically by the reconciler.
+
+- op: modified
+  description: 'Report structured policy and reconciliation result'
+  selector:
+    type: section
+    matches: '^Requirement: Output contract$'
+  content: |
+    On success the use case SHALL return the reconciled `Change`, the recorded human-readable `reason`, the effective structured invalidation policy, the deduplicated affected artifact/file set, all approval or verification projection changes, canonical blockers and next action, and any automatic lifecycle return committed by reconciliation. This result is authoritative for CLI reporting.
+
+- op: modified
+  description: 'Delegate orchestration to the reconciler rather than the entity alone'
+  selector:
+    type: section
+    matches: '^Constraints$'
+  content: |
+    - `InvalidateChange` does not perform filesystem drift detection.
+    - Target validation completes before approval/sign-off confirmation handling.
+    - The use case delegates complete invalidation and recovery orchestration to the central reconciler. Aggregate methods may apply domain state changes but are not an independent application path.
+    - Manual invalidation never invents or clears physical `hasDrift` evidence.

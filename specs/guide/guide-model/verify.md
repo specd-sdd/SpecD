@@ -56,6 +56,7 @@
 #### Scenario: The canonical identity is the composite collection-qualified form
 
 - **GIVEN** two collections each containing a topic `ports`
+- **WHEN** their canonical identities are formed
 - **THEN** their canonical identities MUST differ, being `core:ports` and `sdk:ports`
 - **AND** neither identity MUST be ambiguous
 

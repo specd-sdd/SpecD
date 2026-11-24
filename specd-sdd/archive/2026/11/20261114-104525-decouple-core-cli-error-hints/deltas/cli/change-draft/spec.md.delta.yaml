@@ -1,0 +1,13 @@
+- op: added
+  description: 'Document CLI-rendered --force hint for IMPLEMENTATION_DETECTED in change draft'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Error cases'
+  content: |
+    ### Requirement: CLI-rendered historical implementation guard hint
+
+    When `DraftChange` throws `HistoricalImplementationGuardError` (`IMPLEMENTATION_DETECTED`), `change draft` SHALL pass the `change.draft` command context to `handleError` so the centralized hint-resolution helper renders the `--force` bypass hint on stderr and as `hint` in `json`/`toon` output.

@@ -4,5 +4,17 @@
     "version": 1
   },
   "dependsOn": ["cli:entrypoint", "core:config"],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "cli:src/commands/config/show.ts",
+      "symbols": ["registerConfigShow"]
+    },
+    {
+      "file": "cli:test/commands/config-show.spec.ts"
+    },
+    {
+      "file": "cli:src/commands/config/config-shape.ts",
+      "symbols": ["renderConfigShapeHelp"]
+    }
+  ]
 }

@@ -1,3 +1,7 @@
+import {
+  resolveWorkflowPipeline,
+  type ApprovalGates,
+} from '../../domain/services/workflow-topology.js'
 import { type Schema } from '../../domain/value-objects/schema.js'
 import { type SchemaYamlData } from '../../domain/services/build-schema.js'
 import { type SchemaRegistry } from '../ports/schema-registry.js'
@@ -39,6 +43,7 @@ export class ValidateSchema {
     templates: ReadonlyMap<string, string>,
   ) => Schema
   private readonly _resolveSchema: ResolveSchema
+  private readonly _approvals: ApprovalGates | undefined
 
   /**
    * Creates a new ValidateSchema use case.
@@ -47,6 +52,7 @@ export class ValidateSchema {
    * @param schemaRef - The project's base schema reference
    * @param buildSchemaFn - Domain service for semantic validation
    * @param resolveSchema - Pre-wired ResolveSchema for project mode
+   * @param approvals - Optional approval gates used to validate workflow anchors
    */
   constructor(
     schemas: SchemaRegistry,
@@ -57,11 +63,25 @@ export class ValidateSchema {
       templates: ReadonlyMap<string, string>,
     ) => Schema,
     resolveSchema: ResolveSchema,
+    approvals?: ApprovalGates,
   ) {
+    this._approvals = approvals
     this._schemas = schemas
     this._schemaRef = schemaRef
     this._buildSchema = buildSchemaFn
     this._resolveSchema = resolveSchema
+  }
+
+  /**
+   * Validates workflow topology anchors against the configured approval gates.
+   *
+   * @param schema - Freshly built schema
+   * @throws SchemaValidationError when a bedrock or approval anchor is disabled
+   */
+  private _assertTopology(schema: Schema): void {
+    if (this._approvals !== undefined) {
+      resolveWorkflowPipeline(schema, this._approvals)
+    }
   }
 
   /**
@@ -120,6 +140,7 @@ export class ValidateSchema {
       }
 
       const schema = this._buildSchema(this._schemaRef, cascadedData, finalTemplates)
+      this._assertTopology(schema)
       return { valid: true, schema, warnings: [] }
     } catch (err) {
       return this._catchValidationError(err)
@@ -169,6 +190,7 @@ export class ValidateSchema {
       }
 
       const schema = this._buildSchema(filePath, cascadedData, finalTemplates)
+      this._assertTopology(schema)
       return { valid: true, schema, warnings }
     } catch (err) {
       return this._catchValidationError(err, warnings)
@@ -217,6 +239,7 @@ export class ValidateSchema {
       }
 
       const schema = this._buildSchema(ref, cascadedData, finalTemplates)
+      this._assertTopology(schema)
       return { valid: true, schema, warnings }
     } catch (err) {
       return this._catchValidationError(err, warnings)

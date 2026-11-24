@@ -1,46 +1,36 @@
-/**
- * Plugin declaration stored in project config.
- */
-export interface DeclaredPlugin {
-  /**
-   * Plugin package name.
-   */
-  readonly name: string
+import type { AddPluginOptions, ConfigDeclaredPlugin } from '@specd/core/ports'
 
-  /**
-   * Optional plugin-specific config block.
-   */
-  readonly config?: Record<string, unknown>
-}
+/** One declared plugin entry, identical to the core config-writer entry. */
+export type DeclaredPlugin = ConfigDeclaredPlugin
 
 /**
- * Storage port for plugin declarations.
+ * Persistence port for declared plugins.
+ *
+ * Method order matches `ConfigWriter`: `configPath` first.
  */
-export interface PluginRepository {
+export interface PluginRepositoryPort {
   /**
-   * Adds a plugin declaration to a plugin type.
+   * Merges a plugin entry into the project config.
    *
-   * @param type - Plugin type key (e.g. `agents`).
-   * @param name - Plugin package name.
-   * @param config - Optional plugin config.
-   * @returns A promise that resolves when persistence completes.
+   * @param configPath - Project config path
+   * @param name - Scoped plugin name
+   * @param options - Contributions and config to merge
    */
-  addPlugin(type: string, name: string, config?: Record<string, unknown>): Promise<void>
+  addPlugin(configPath: string, name: string, options?: AddPluginOptions): Promise<void>
 
   /**
-   * Removes a plugin declaration by name.
+   * Removes a declared plugin.
    *
-   * @param type - Plugin type key.
-   * @param name - Plugin package name.
-   * @returns A promise that resolves when persistence completes.
+   * @param configPath - Project config path
+   * @param name - Scoped plugin name
    */
-  removePlugin(type: string, name: string): Promise<void>
+  removePlugin(configPath: string, name: string): Promise<void>
 
   /**
-   * Lists plugin declarations, optionally filtered by type.
+   * Lists declared plugins.
    *
-   * @param type - Optional plugin type filter.
-   * @returns Declared plugins.
+   * @param configPath - Project config path
+   * @returns Declared plugin entries
    */
-  listPlugins(type?: string): Promise<readonly DeclaredPlugin[]>
+  listPlugins(configPath: string): Promise<readonly DeclaredPlugin[]>
 }

@@ -22,6 +22,9 @@ When `GetStatus` returns `draftView` for the requested name, the command MUST re
 - MUST NOT print actionable lifecycle transitions that would mutate the drafted change
 - MUST indicate the change is drafted (for example in text headers or JSON `isDrafted: true`)
 - MAY still show artifact effective statuses for inspection
+- Drafted text output MUST render blockers with the same check-label form as active status (`! <CODE> — <label>: <message>` when a label is present)
+- Drafted JSON and TOON MUST project blockers through the same CLI blocker projection as active status (`label`, `checkId`, `bypassFlag`) rather than passing raw `GetStatus` blockers through; `blocker.action` is emitted when present, exactly as for active status, and raw `isSkippable` is never leaked
+- Drafted JSON and TOON `artifacts` MUST apply the same display-status fallback as active status (`displayStatus`, then `effectiveStatus`, then the persisted state), so no artifact status is ever rendered as `undefined`
 
 When `GetStatus` returns an active `change`, behaviour is unchanged.
 
@@ -30,6 +33,8 @@ When `GetStatus` returns an active `change`, behaviour is unchanged.
 In `json` or `toon` mode, the `artifactDag` array MUST include the `hasTasks` field for every entry.
 
 The `state` field in the top-level `artifactDag` MUST reflect the drift-aware display state projection (e.g., `complete-with-drift`) rather than the raw canonical state, ensuring that agents can detect drift without manually comparing hashes.
+
+The `--help` JSON output schema MUST list every top-level and `lifecycle` field the command emits and MUST describe each field it lists. For an active change this includes `validity`, `verification`, `invalidation`, `implementationTracking` (emitted with `--implementation`), `approvalGates`, `lifecycle.checks` and `lifecycle.checksByTarget`, and, on each artifact and each artifact file, `displayStatus` and (on files) `hasDrift`. It MUST also list blocker `bypassFlag` and `action`, and `nextAction.intent`, `nextAction.action`, and `nextAction.guidance` alongside `command`. In particular, `schema.artifactDag` entries MUST list `optional`, `hasTasks`, and `output` in addition to the existing fields, and the `lifecycle` block (`validTransitions`, `blockers`, `approvals`, `nextArtifact`, `changePath`, `schemaInfo`, and `blockingArtifacts` on steps) MUST be documented completely. The blocker shape MUST list `code`, `message`, `label`, `checkId`, `details`, `action`, and `bypassFlag`; the `nextAction` shape MUST list `command`, `intent`, `action`, `guidance`, `actionType`, and `reason`; raw `isSkippable` MUST NOT appear in either.
 
 ### Requirement: Task completion display in DAG
 
@@ -51,17 +56,64 @@ Specifically:
 
 JSON/toon output SHALL include both canonical state and display-state fields when returned by GetStatus; text output SHALL prioritize the display state for human readability.
 
+### Requirement: Lifecycle projections come from GetStatus checks
+
+Displayed `validTransitions`, `availableTransitions`, `nextAction`, and repair-oriented blockers MUST be the check-derived projections from `GetStatus`. The CLI MUST NOT filter the protocol graph locally in a way that reintroduces a list execute would reject (for example advertising `verifying` while tasks are incomplete, or recommending `/specd-implement` when `verifying` is allowed).
+
+The command SHALL project the ordered workflow pipeline from `GetStatus`:
+
+- Show the pipeline in canonical lifecycle order as projected by Core, regardless of the order in which schema rows are declared.
+- Annotate optional steps with `[optional]` in text output, and expose the `optional` flag on each structured `availableSteps` entry; the `--help` JSON/TOON schema SHALL document that field.
+- Exclude steps marked `disabled: true` (Core omits them; the CLI MUST NOT re-add them).
+- Display shortcut and bypass paths in `availableTransitions` when step-skip checks allow bypassing intermediate optional steps.
+
+The artifact DAG rendered by the command (text `artifacts (DAG)` and structured `schema.artifactDag` / `artifactDag`) SHALL come from the change's sovereign schema, resolved through `ResolveChangeSchema` (directly or through `GetStatus`). The command MUST NOT render a change's DAG from the workspace default schema. When the change's schema cannot be resolved, the DAG SHALL be omitted and the `SCHEMA_RESOLUTION_FAILED` or `SCHEMA_IDENTITY_MISMATCH` blocker from `GetStatus` SHALL be shown.
+
+### Requirement: Reconciled validity and next-action output
+
+The command SHALL treat `GetStatus` as the sole source of current validity and routing. It MUST render the lifecycle state returned after reconciliation, not a state captured before the call, and MUST make any automatic return visible with its cause.
+
+Text and structured output SHALL distinguish absent, valid, stale, revoked, and legacy-unknown approval or verification evidence; show active verification attempts separately from completed evidence, including identity and freshness; show changed fingerprint inputs without dumping sensitive content; show non-blocking fingerprint diagnostic issues (from `validity.fingerprintIssues`) as diagnostic warnings rather than progress blockers; show structured artifact/workflow policy; and present the canonical blocker and next action. At verification-requiring boundaries, stale evidence recommends in-place start/checks/complete through the skill rather than mandatory phase movement. Status MUST NOT complete an attempt or imply that starting one means verification passed.
+
+Required stale spec consent SHALL display the committed return to `designing` and the path through review, `ready`, approval, and implementation. Stale sign-off alone SHALL show return to `done`, with verification first when stale. At earlier phases stale verification remains contextual and MUST NOT replace the normal next step. Under ungated `preserve`, in-place artifact review and revalidation SHALL be suggested without implying that validation renews approval.
+
+### Requirement: Text status omits duplicated review file lists
+
+When rendering `format=text` and `review.required` is true, the CLI MUST print a `review:` header with `required`, `route`, `reason`, and human `message` when Core supplies it. It MUST NOT print `review.affectedArtifacts` file paths. Those files already appear under `artifacts (details):` with `pending-review` and `[drift]`. Invalidation overlap MUST NOT appear as a `OVERLAP_CONFLICT` blocker line.
+
+When `review.reason` is `'spec-overlap-conflict'` and `overlapDetail` is non-empty, `format=text` MUST still print the overlap peers (archived change name and overlapping spec ids). Those peers are not present in `artifacts (details):`.
+
+JSON and TOON MUST still serialize the full `review` object, including `overlapDetail`. Command `--help` JSON schema for `review` MUST list `overlapDetail` alongside `affectedArtifacts`.
+
+### Requirement: Text blockers include check labels
+
+When a blocker comes from a failed predicate and carries a gerund `label`, `format=text` MUST render that label next to the code so agents can interpret opaque codes. Canonical shape:
+
+```text
+! <CODE> — <label>: <message>
+```
+
+Example: `! DEPS_INCONSISTENT — Checking spec dependencies: Extracted dependsOn disagrees with persisted values for: cli:change-archive`.
+
+JSON/TOON MUST serialize `label` (and `checkId` when present) on those blocker objects. Review-only blockers without a check `label` keep `! <CODE>: <message>`.
+
+### Requirement: Archive bypass hints come from resolved bindings
+
+When a blocker returned by `GetStatus` has `isSkippable: true` and `checkId`, the CLI MUST project the `--skip-checks <checkId>` bypass via the centralized CLI guidance presenter — in text mode as an indented line `    bypass: --skip-checks <checkId>` directly under the blocker line, and in JSON or TOON as the blocker's `bypassFlag` property. The CLI MUST NOT invent a bypass when `isSkippable` is `false` or `checkId` is absent. `GetStatus` derives `isSkippable` from the resolved bindings (see [`core:transition-checks`](../../core/transition-checks/spec.md)), so a bypass appears only for a skippable binding and always uses the `--skip-checks <checkId>` form. For archive blockers, that flag is accepted by `changes archive`; the same `    bypass: --skip-checks <checkId>` format also appears on skippable transition blockers (such as `impl.linksInScope`), where it is accepted by `changes transition`.
+
+When the resolved binding is not skippable (for example a locked built-in check such as `workspace.readOnly`, or `spec.overlap` made non-skippable by the schema), no `bypass:` line or `bypassFlag` is shown in text, JSON, or TOON output, and the next-action reason MUST NOT suggest one. Core's `nextAction.reason` for a live `OVERLAP_CONFLICT` is host-neutral (it carries no flag). When a skippable `OVERLAP_CONFLICT` blocker is present while `nextAction.intent === 'archive'`, the CLI presenter SHALL append ` Use --skip-checks <checkId> to archive anyway.` to the displayed `nextAction.reason`. The suffix is appended only when the next action intent is `archive`; because Core keeps the archive intent for live overlap only when overlap is the sole blocker, the suffix never appears while another blocker (for example stale verification, whose next action intent is `verify`) points at a different next step. Every command that projects `nextAction` with blockers through the CLI guidance presenter (including `change invalidate`) follows the same rule.
+
+In text, JSON, and TOON outputs, the CLI SHALL project `nextAction.command` from Core's host-neutral `nextAction.intent` (and optional `nextAction.action`) via the centralized CLI guidance presenter. The presenter resolves `intent` first when it is non-null (`design` → `/specd-design`, `implement` → `/specd-implement`, `verify` → `/specd-verify`, `archive` → `/specd-archive`) and otherwise maps `action` (`approve-spec` → `specd changes approve spec`, `approve-signoff` → `specd changes approve signoff`, `start-verification` / `refresh-status` → the verification-start / status command with the real change name). An unknown action kind (or a built-in kind whose required `changeName` is unavailable) resolves to `command: null` and exposes the action's host-neutral `guidance` in a separate `guidance` field; the presenter MUST NOT place guidance prose in `command`, and the CLI never invents syntax.
+
+JSON and TOON keep `nextAction.command` and `blocker.bypassFlag` computed at the CLI boundary for compatibility with existing skills, and additionally expose `nextAction.intent`, `nextAction.action`, `nextAction.guidance` (only when the action's kind has no command mapping), and `blocker.action` when present (drafted results expose no `nextAction.intent`/`nextAction.action`, see the drafted requirement). In text output the guidance is printed as a plain line without a command. For a drafted change (`draftView`), `nextAction.command` is `null` and neither `intent` nor `action` is exposed.
+
 ### Requirement: Schema version warning
 
-If the change's recorded `schemaName`/`schemaVersion` differs from the currently active schema, the command prints a warning to stderr:
+Schema version drift SHALL be reported only through the advisories `GetStatus` returns in `schemaWarnings`, which come from `ResolveChangeSchema` comparing the change's recorded schema version with the resolved same-name schema. A different workspace default schema is not drift and MUST NOT produce a warning.
 
-```
-warning: change was created with schema <recorded> but active schema is <current>
-```
+In text mode, when `schemaWarnings` is non-empty, the command SHALL render a `warnings:` section on stdout with one line per advisory in the form `! <code>: <message>` (for example `! SCHEMA_VERSION_DRIFT: …`). In `json` / `toon` mode the result SHALL include `schemaWarnings` as an array of `{ code, changeName, schemaName, recordedVersion, resolvedVersion, message }`; the array is empty when there is no drift.
 
-The command still exits with code 0.
-
-The CLI command MUST NOT resolve the schema independently. It SHALL compare `change.schemaName`/`change.schemaVersion` against `lifecycle.schemaInfo` from the `GetStatusResult`. If `lifecycle.schemaInfo` is `null` (schema resolution failed), the warning is skipped.
+The command MUST NOT print a schema-mismatch warning to stderr and MUST NOT compute drift itself by comparing the change against the workspace default. It still exits with code 0 when advisories are present. When the change's schema cannot be resolved, no version advisory is shown; the resolution blocker from `GetStatus` is shown instead.
 
 ### Requirement: Change not found
 
@@ -97,7 +149,7 @@ Text-mode DAG node labels MUST use each artifact's **display status** from `GetS
 
 When the DAG has convergent edges (one artifact required by multiple parents), the text tree MUST render each artifact type id **at most once**. Dependents reached again via another branch MUST NOT repeat the full subtree; the renderer MAY omit duplicate child expansion or annotate with a short reference (for example `└── (see <id> above)`).
 
-When the CLI has resolved the active `Schema` instance, structured and text DAG derivation MUST use `schema.artifactDag()` (cached) rather than rebuilding `ArtifactDag.from` on a detached artifact list, so ordering matches every other consumer.
+The `Schema` instance used for DAG derivation SHALL be the change's schema resolved through `ResolveChangeSchema` (the kernel's shared resolver). Structured and text DAG derivation MUST use `schema.artifactDag()` (cached) rather than rebuilding `ArtifactDag.from` on a detached artifact list, so ordering matches every other consumer.
 
 This allows design/implement skills to replace `schema show` calls.
 
@@ -138,13 +190,20 @@ specs and dependencies:
 
 In structured output (JSON/toon), the `specDependsOn` object from the change manifest SHALL be included in the top-level response.
 
+### Requirement: Stable display status and drafted JSON compatibility
+
+Change-status text and structured output MUST render an artifact or file display status from `displayStatus`, then `effectiveStatus`, then canonical `state`; they MUST NOT render `undefined`. Active status MUST expose lifecycle transition guidance under `lifecycle`. Drafted inspection MUST retain empty legacy top-level transition arrays and omit an artifact DAG, because it is read-only and has no active schema lifecycle projection.
+
 ## Constraints
 
 - The output includes all artifacts declared by the schema, not only those present on disk.
 - `effectiveStatus` reflects dependency cascading.
 - The CLI serializes lifecycle and tracking state returned by Core and symbol-resolution state returned by the SDK; it recomputes neither.
 - The CLI MUST NOT call `SchemaRegistry`, `config show`, or another use case to recompute lifecycle data.
-- Lifecycle semantics remain projections of `GetStatus` and `LifecycleEngine`.
+- Lifecycle semantics remain projections of `GetStatus` and transition-check evaluation (`evaluateLifecycle`).
+- Drafted status MUST suppress `nextAction.command` (print `(none)` / JSON `null`) even if Core attached a command.
+- Drafted JSON MUST set `availableTransitions` and `availableSteps` to empty arrays even if Core leaked protocol hops.
+- The CLI MUST NOT apply a second `VALID_TRANSITIONS`-only filter that drops or adds steps relative to `GetStatus.availableTransitions`.
 
 ## Examples
 
@@ -152,28 +211,29 @@ In structured output (JSON/toon), the `specDependsOn` object from the change man
 $ specd change status add-oauth-login
 change:      add-oauth-login
 state:       designing
-specs:       auth/oauth
 description: Add OAuth2 login via Google
 
-artifacts:
-  proposal   complete
-  specs      in-progress
-  verify     missing
-  design     missing
-  tasks      missing
+artifacts (DAG):
+  [✓] proposal
+  └── [?] specs
+
+next action:
+  target:  designing
+  command: /specd-design
+  reason:  ...
 
 lifecycle:
   next artifact: specs
   approvals:     spec=off  signoff=off
   path:          .specd/changes/20260310-140000-add-oauth-login
-
-blockers:
-  → ready: requires — specs, verify, design, tasks
 ```
 
 ## Spec Dependencies
 
-- `cli:entrypoint` — output conventions
-- `core:change` — change state model
-- `core:get-status` — lifecycle status projection
-- `sdk:build-implementation-review` — shared implementation resolution projection
+- [`cli:entrypoint`](../entrypoint/spec.md) — output conventions
+- [`core:change`](../../core/change/spec.md) — change state model
+- [`core:get-status`](../../core/get-status/spec.md) — lifecycle status projection
+- [`sdk:build-implementation-review`](../../sdk/build-implementation-review/spec.md) — shared implementation resolution projection
+- [`core:transition-checks`](../../core/transition-checks/spec.md) — check-derived projections and gerund labels
+- [`core:lifecycle-engine`](../../core/lifecycle-engine/spec.md) — lifecycle evaluation and verdict projection
+- [`core:resolve-change-schema`](../../core/resolve-change-schema/spec.md) — sovereign change schema for the artifact DAG

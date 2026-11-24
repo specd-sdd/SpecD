@@ -1,0 +1,69 @@
+- op: modified
+  description: 'Define the version 2 manifest structure'
+  selector:
+    type: section
+    matches: '^Requirement: Manifest structure$'
+  content: |
+    Each new active change SHALL be persisted as `manifest.json` with top-level `manifestVersion: 2`. This version is independent of `schema.name` and `schema.version`.
+
+    Version 2 retains the existing identity, timestamps, schema identity, `specIds`, optional `specDependsOn`, artifact/file state, implementation tracking and links, and append-only `history`. It replaces `invalidationPolicy` with:
+
+    ```jsonc
+    "invalidation": { "artifacts": "downstream", "workflow": "preserve" }
+    ```
+
+    It additionally persists optional current `specApproval`, `signoff`, and `verification` projections. Approval records SHALL contain `status` (`valid`, `stale`, or `revoked`), actor, reason, decision time, and optional invalidation metadata. A spec-approval fingerprint SHALL contain the exact sorted, deduplicated canonical `specIds` approved together with the artifact fingerprint. Sign-off and verification SHALL persist their artifact fingerprint and the implementation fingerprint when known. Each fingerprint SHALL record its algorithm identifiers and a deterministically ordered map of canonical input keys or project-relative implementation paths to hashes.
+
+    A verification record SHALL distinguish the attempt baseline from completed evidence and record completion actor/time when valid or stale. For native v2 changes, absence means never completed or never approved. Missing or `null` implementation fingerprints are permitted only as adapted legacy unknown evidence; an observed empty map is a valid current snapshot.
+
+    Artifact files retain explicit state, `validatedHash`, and `hasDrift`. `history` remains append-only and lifecycle state remains derived from transition events. Projection updates MUST NOT remove, rewrite, or reorder prior events.
+
+- op: added
+  description: 'Read legacy manifests and reject unsupported future versions'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Manifest structure$'
+  content: |
+    ### Requirement: Manifest format compatibility
+
+    A missing `manifestVersion` SHALL be interpreted as v1. The loader SHALL validate the v1 shape, preserve its complete history, and adapt it in memory to the v2 domain projection. Legacy `invalidationPolicy` maps to `{ artifacts: <legacy value>, workflow: redesign }`; a missing legacy value maps to `{ artifacts: downstream, workflow: redesign }`.
+
+    Legacy approval and verification events SHALL produce the best historical projection available without inventing fingerprints or approved scope from current files. A v1 approval, or a transitional v2 approval record without its canonical `specIds` snapshot, has unknown scope freshness and cannot authorize a required spec gate until renewed. Legacy sign-off or verification without implementation evidence is unknown freshness and cannot authorize active forward progress or archive where current evidence is required.
+
+    Plain reads and archived inspection MUST NOT rewrite a v1 manifest. Its next actual mutation, including status reconciliation that detects invalidity, MAY write v2. A `manifestVersion` newer than the maximum supported version SHALL fail with a typed unsupported-manifest-version error before hydration.
+
+- op: added
+  description: 'Persist deterministic fingerprint records'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    before:
+      type: section
+      matches: '^Requirement: Atomic writes$'
+  content: |
+    ### Requirement: Fingerprint serialization
+
+    Spec-approval scope entries SHALL be canonical, deduplicated, and serialized in deterministic lexical order. Artifact fingerprint keys SHALL remain stable and include artifact type plus file key. Implementation entries SHALL use normalized project-relative paths, be deduplicated, and serialize in deterministic lexical order. Equality includes the complete key set as well as each hash. Spec-approval equality additionally includes the complete canonical spec set; additions and removals SHALL remain distinguishable as `spec-added` and `spec-removed`, while reordering alone is equal.
+
+    Text entries SHALL identify `text-v1`; binary entries SHALL identify the byte-hash algorithm. Invalidity records SHALL retain the original approved or verified baseline and record the mismatch cause. Restoring matching bytes MUST NOT silently change a persisted `stale` or `revoked` projection back to `valid`.
+
+- op: added
+  description: 'Serialize explicit verification attempt evidence'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    before:
+      type: section
+      matches: '^Requirement: Atomic writes$'
+  content: |
+    ### Requirement: Verification attempt event serialization
+
+    `verification-attempt-started` SHALL serialize actor, timestamp, current lifecycle state, attempt identity, and fingerprint algorithm identifiers for explicit verification start from any active state. Superseding an attempt preserves its baseline and identity in audit evidence. Successful completion records actor, time, attempt identity, and the verified fingerprint independently of lifecycle transitions. `verification-invalidated` SHALL serialize actor, timestamp, mandatory reason, and completed verification identity while leaving its persisted fingerprint untouched. Events MUST NOT serialize source contents.
+
+    Capturing the current attempt projection never removes earlier attempt, completion, invalidation, or approval events from `history`. No attempt event or manifest shape may represent `verifying → verifying`.

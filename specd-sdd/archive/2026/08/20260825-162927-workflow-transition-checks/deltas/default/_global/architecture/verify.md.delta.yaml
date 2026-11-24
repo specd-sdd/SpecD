@@ -1,0 +1,31 @@
+- op: added
+  description: 'Domain may import ambient Logger'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Domain layer is pure$'
+    after:
+      type: section
+      matches: '^Scenario: Domain imports node:fs$'
+  content: |
+    #### Scenario: Domain imports ambient Logger
+
+    - **WHEN** a file in `domain/` imports the ambient `Logger`
+    - **THEN** the import is permitted for diagnostic logging
+    - **AND** it remains the sole cross-layer import exception
+
+- op: added
+  description: 'Application may import ambient Logger'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Application layer uses ports only$'
+    after:
+      type: section
+      matches: '^Scenario: Use case receives port via constructor$'
+  content: |
+    #### Scenario: Application imports ambient Logger
+
+    - **WHEN** a use case imports the ambient `Logger` for diagnostics
+    - **THEN** the import is permitted
+    - **AND** it is not treated as importing an infrastructure adapter

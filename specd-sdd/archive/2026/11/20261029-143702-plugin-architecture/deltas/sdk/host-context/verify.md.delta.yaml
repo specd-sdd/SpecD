@@ -1,0 +1,114 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Provider factory uses same config as kernel'
+  content: |
+    - **WHEN** `await createSdkContext(config)` is called
+    - **THEN** the kernel builder is created from `config`
+    - **AND** each `createGraphProvider()` call invokes `createCodeGraphProvider` with the same `config` reference
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: createSdkContext'
+    after:
+      type: section
+      matches: 'Scenario: Context disposal delegates to the kernel'
+  content: |
+    #### Scenario: Kernel options are forwarded to the builder
+
+    - **WHEN** `createSdkContext(config, { kernel: { onLog } })` is called
+    - **THEN** the kernel builder is created from `config` and `options.kernel`, so `onLog` is the logger of the resulting kernel
+    - **AND** a `callback` destination in `options.kernel.additionalDestinations` receives entries emitted through the kernel logger
+
+    #### Scenario: Plugins registered before build
+
+    - **GIVEN** a config with one configured plugin
+    - **WHEN** `createSdkContext(config)` is called
+    - **THEN** `registerPlugins` completes before `builder.build()` is invoked
+
+    #### Scenario: Plugins disabled
+
+    - **GIVEN** a config with a configured plugin
+    - **WHEN** `createSdkContext(config, { plugins: false })` is called
+    - **THEN** no plugin is loaded, no `init` is called and no plugin disposer is registered
+
+    #### Scenario: Plugins enabled by default
+
+    - **WHEN** `createSdkContext(config)` is called without a `plugins` option
+    - **THEN** configured plugins are registered
+
+    #### Scenario: Plugins enabled with an empty plugin list
+
+    - **GIVEN** a config without `plugins`
+    - **WHEN** `createSdkContext(config)` is called
+    - **THEN** no plugin is loaded and no disposer is registered
+
+    #### Scenario: openSpecdHost forwards the plugins option
+
+    - **WHEN** `openSpecdHost({ options: { plugins: false } })` is called
+    - **THEN** the underlying `createSdkContext` receives `plugins: false`
+
+    #### Scenario: Broken plugin fails context creation
+
+    - **GIVEN** a configured plugin whose `init` throws
+    - **WHEN** `createSdkContext(config)` is called
+    - **THEN** it rejects with `PluginInitError` naming the plugin
+    - **AND** already initialized plugins were destroyed
+    - **AND** no kernel was built
+
+    #### Scenario: Build failure disposes plugins
+
+    - **GIVEN** a configured plugin and `builder.build()` rejecting
+    - **WHEN** `createSdkContext(config)` is called
+    - **THEN** it rejects with the build error and the registration was disposed
+
+    #### Scenario: Build failure is not masked by a dispose failure
+
+    - **GIVEN** `builder.build()` rejects with error E and the registration `dispose` also throws
+    - **WHEN** `createSdkContext(config)` is called
+    - **THEN** it rejects with E
+    - **AND** the dispose errors are attached as `rollbackErrors` on E
+
+    #### Scenario: Primitive build error is not masked
+
+    - **GIVEN** `builder.build()` rejects with a string and the registration `dispose` also throws
+    - **WHEN** `createSdkContext(config)` is called
+    - **THEN** it rejects with that same string
+    - **AND** the dispose errors are logged at `warn`
+
+    #### Scenario: End to end with real plugin-manager and kernel builder
+
+    - **GIVEN** a real plugin-manager and kernel builder with plugins `a` and `b`
+    - **WHEN** a context is created and then disposed
+    - **THEN** `init` ran on `a` then `b` before the kernel existed, and `destroy` runs on `b` then `a` on dispose
+
+    #### Scenario: Extra handlers are forwarded
+
+    - **WHEN** `createSdkContext(config, { pluginHandlers: [h] })` is called
+    - **THEN** `h` is available to `registerPlugins`
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Host disposal'
+    after:
+      type: section
+      matches: 'Scenario: dispose shares the kernel disposal'
+  content: |
+    #### Scenario: dispose destroys plugins in reverse order
+
+    - **GIVEN** a host with plugins `a` and `b` initialized in that order
+    - **WHEN** `host.dispose()` is awaited
+    - **THEN** `b.destroy` runs before `a.destroy`
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: SDK composition options are forwarded'
+  content: |
+    - **WHEN** openSpecdHost({ options: { kernel: { ... }, graph: { graphStoreId: 'sqlite' } } }) is called
+    - **THEN** the kernel builder is created with the provided `options.kernel`
+    - **AND** createGraphProvider forwards the provided graph options to createCodeGraphProvider

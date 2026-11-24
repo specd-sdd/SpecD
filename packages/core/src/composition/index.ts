@@ -5,6 +5,7 @@ export {
   type CompositionResolutionOptions,
 } from './composition-resolver.js'
 export { createKernel, type Kernel, type KernelOptions } from './kernel.js'
+export { type KernelDisposer } from './kernel-disposal.js'
 export { createKernelBuilder, type KernelBuilder } from './kernel-builder.js'
 export {
   type ActorProvider,
@@ -12,6 +13,7 @@ export {
   type ChangeStorageFactory,
   type CompositionRegistryInput,
   type CompositionRegistryView,
+  type PluginCheckRegistration,
   type SchemaStorageFactory,
   type SpecStorageFactory,
   type VcsProvider,

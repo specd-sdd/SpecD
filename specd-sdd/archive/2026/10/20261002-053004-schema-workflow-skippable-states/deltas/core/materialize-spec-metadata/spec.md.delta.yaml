@@ -1,0 +1,30 @@
+- op: modified
+  description: Optional schemaName passthrough so change-bound callers materialize with the change schema
+  selector:
+    type: section
+    matches: 'Requirement: Input and result contract'
+  content: |
+    `MaterializeSpecMetadata.execute()` MUST accept a `MaterializeSpecMetadataInput`:
+
+    - `specId` — the canonical spec identity to materialize metadata for
+    - `policy` — optional, `'if-needed'` (default) or `'force'`
+    - `schemaName` — optional name of the schema governing the spec in the caller's change context. When present it MUST be forwarded unchanged to `GenerateSpecMetadata`, and the same schema selection (see [`core:generate-metadata`](../generate-metadata/spec.md) Requirement: Schema resolution) MUST be used for the freshness comparison of step 4 and the source re-read of step 6. Callers acting inside a change (including `ArchiveChange` after publication) MUST pass the change's sovereign schema name resolved through `ResolveChangeSchema`; callers outside a change MUST omit it.
+
+    It MUST return a `MaterializeSpecMetadataResult`:
+
+    - `metadata` — the usable `SpecMetadata` projection
+    - `metadataFingerprint` — the semantic fingerprint of the returned projection
+    - `source` — `'persisted'` when reused unchanged, `'generated'` when produced during this call
+    - `regenerated` — `true` when generation occurred during this call
+    - `warnings` — structured `SpecMetadataGenerationWarning` entries, if any
+
+    `MaterializeSpecMetadata` MUST NOT select a schema itself; it SHALL NOT substitute the project default for a supplied `schemaName`.
+
+- op: added
+  description: Declare the sovereign change schema dependency
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [`core:resolve-change-schema`](../resolve-change-schema/spec.md) — change-bound callers supply the sovereign schema name it resolves

@@ -1,0 +1,8 @@
+- op: added
+  description: Clarify optional initialization and plugin configuration.
+  position:
+    parent: { type: section, matches: '^Requirements$' }
+  content: |
+    ### Requirement: Optional initialization and plugin configuration
+
+    `ConfigWriter.initProject` and plugin operations MUST validate only the configuration they require. Optional plugin configuration MUST remain absent unless the selected plugin contract requires it; initialization MUST NOT synthesize unrelated plugin entries.

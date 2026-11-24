@@ -78,3 +78,11 @@
 - **WHEN** `specd change draft my-change --format json` succeeds
 - **THEN** stdout is valid JSON with `result` equal to `"ok"` and `name` equal to `"my-change"`
 - **AND** the process exits with code 0
+
+### Requirement: CLI-rendered historical implementation guard hint
+
+#### Scenario: IMPLEMENTATION_DETECTED renders --force hint in change draft
+
+- **GIVEN** `DraftChange` throws `HistoricalImplementationGuardError`
+- **WHEN** `specd change draft` handles the error without `--force`
+- **THEN** `handleError` receives the `change.draft` context and renders a `--force` hint on stderr and as `hint` in `json`/`toon` output

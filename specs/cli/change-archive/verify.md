@@ -20,14 +20,78 @@
 - **WHEN** `specd change archive my-change` is run
 - **THEN** it is accepted as an alias of `specd changes archive my-change`
 
+#### Scenario: --skip-checks accepts a comma-separated list
+
+- **WHEN** the user runs `specd changes archive my-change --skip-checks spec.overlap,impl.linksInScope`
+- **THEN** `ArchiveChangeInput.skipChecks` contains both ids
+
+#### Scenario: --skip-checks is repeatable
+
+- **WHEN** the user runs `specd changes archive my-change --skip-checks spec.overlap --skip-checks '@security.code-scan'`
+- **THEN** `ArchiveChangeInput.skipChecks` contains both ids
+
+#### Scenario: --allow-overlap is translated to the spec.overlap id
+
+- **WHEN** the user runs `specd changes archive my-change --allow-overlap`
+- **THEN** the CLI calls the use case with `skipChecks` containing `spec.overlap`
+- **AND** it passes no other bypass field
+
+#### Scenario: --allow-out-of-scope is translated to the impl.linksInScope id
+
+- **WHEN** the user runs `specd changes archive my-change --allow-out-of-scope`
+- **THEN** the CLI calls the use case with `skipChecks` containing `impl.linksInScope`
+
+#### Scenario: The CLI does not validate skippability itself
+
+- **WHEN** the user runs `specd changes archive my-change --skip-checks workspace.readOnly`
+- **THEN** the CLI forwards the id and reports the use case's `CheckNotSkippableError`
+
+#### Scenario: Whitespace and empty entries are ignored
+
+- **WHEN** the user runs `specd changes archive my-change --skip-checks "spec.overlap, ,impl.linksInScope"`
+- **THEN** `skipChecks` contains exactly `spec.overlap` and `impl.linksInScope`
+
+#### Scenario: Duplicate ids across flag and alias collapse
+
+- **WHEN** the user runs `specd changes archive my-change --skip-checks spec.overlap --allow-overlap`
+- **THEN** `spec.overlap` is bypassed once and the command does not fail
+
+#### Scenario: Singular alias accepts the same flags
+
+- **WHEN** the user runs `specd change archive my-change --skip-checks spec.overlap`
+- **THEN** the command behaves exactly like `specd changes archive`
+
+#### Scenario: --skip-checks without a value is a usage error
+
+- **WHEN** the user runs `specd changes archive my-change --skip-checks`
+- **THEN** the command exits with code 1 and prints a usage error
+- **AND** nothing is archived
+
+#### Scenario: --skip-checks combines with --skip-hooks
+
+- **WHEN** the user runs `specd changes archive my-change --skip-hooks all --skip-checks spec.overlap`
+- **THEN** both are applied independently: hooks are skipped and the overlap bypass is validated
+
+#### Scenario: Help documents the flags
+
+- **WHEN** the user runs `specd changes archive --help`
+- **THEN** the output lists `--skip-checks <ids>`, `--allow-overlap`, and `--allow-out-of-scope`
+- **AND** the aliases are described as equivalent to the corresponding `--skip-checks` id
+
 ### Requirement: Prerequisites
 
 #### Scenario: Change not in archivable state
 
-- **GIVEN** a change `my-change` in `done` state (not yet `archivable`)
+- **GIVEN** a change `my-change` in `done` state (not yet `archivable` or `archiving`)
 - **WHEN** `specd change archive my-change` is run
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message mentioning the current state
+
+#### Scenario: Change in archiving may retry archive
+
+- **GIVEN** a change `my-change` in `archiving` state
+- **WHEN** `specd change archive my-change` is run
+- **THEN** the CLI forwards to `ArchiveChange` without a CLI-only archivable-only gate
 
 ### Requirement: Behaviour
 
@@ -59,6 +123,23 @@
 - **THEN** post-archive hooks are skipped
 - **AND** pre-archive hooks remain enabled
 
+### Requirement: Check progress rendering
+
+#### Scenario: Text shows gerund label then pass mark
+
+- **GIVEN** archive execute emits `check-start` / `check-done` pass for `workspace.readOnly`
+- **WHEN** `specd changes archive <name>` runs in text mode
+- **THEN** stderr or stdout progress includes `Checking workspace ownership (workspace.readOnly)`
+- **AND** a subsequent `✓ Checking workspace ownership` line
+- **AND** no `Executing:` prefix appears
+
+#### Scenario: Hook progress rides the same bus
+
+- **GIVEN** archive `hook.pre` emits streaming hook output
+- **WHEN** archive runs in text mode
+- **THEN** progress uses label `Running pre hooks` with id `hook.pre`
+- **AND** streamed lines appear under that check before `check-done`
+
 ### Requirement: Post-archive hooks
 
 #### Scenario: Post-hook failure
@@ -83,6 +164,113 @@
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message
 
+#### Scenario: Unknown check id
+
+- **WHEN** the user runs `specd changes archive my-change --skip-checks nope.check`
+- **THEN** the command exits with code 1 and reports `UnknownCheckError`
+
+#### Scenario: Non-skippable check id
+
+- **WHEN** the user runs `specd changes archive my-change --skip-checks verification.current`
+- **THEN** the command exits with code 1 and reports `CheckNotSkippableError`
+
+#### Scenario: Hook check id
+
+- **WHEN** the user runs `specd changes archive my-change --skip-checks hook.pre`
+- **THEN** the command exits with code 1 and the message points to `--skip-hooks`
+
+#### Scenario: Overlap error suggests the canonical bypass
+
+- **GIVEN** archive is blocked by spec overlap and `spec.overlap` is skippable
+- **WHEN** the command fails
+- **THEN** stderr lists the overlapping specs and peers and ends with `Retry with --skip-checks spec.overlap if an exception is granted`
+
+#### Scenario: No bypass suggestion when spec.overlap is not skippable
+
+- **GIVEN** the schema declares `spec.overlap` with `skippable: false`
+- **WHEN** archive is blocked by overlap
+- **THEN** the error message does not suggest `--skip-checks` or `--allow-overlap`
+
+#### Scenario: Skippable plugin check failure suggests the bypass
+
+- **GIVEN** `@security.code-scan` fails on archive and its resolved binding is skippable
+- **WHEN** the user runs `specd changes archive my-change` in text mode
+- **THEN** the command exits with code 1 and reports the check id, label, and message
+- **AND** it prints `bypass:  Retry with --skip-checks @security.code-scan if an exception is granted`
+
+#### Scenario: Non-skippable plugin check failure suggests no bypass
+
+- **GIVEN** the check fails and its resolved binding is not skippable
+- **WHEN** the user runs `specd changes archive my-change`
+- **THEN** the command exits with code 1 and prints no bypass suggestion
+
+#### Scenario: Plugin check failure in structured output
+
+- **WHEN** the same failure occurs with `--format json`
+- **THEN** the command emits the structured error record with the check's failure code and exit code 1
+
+#### Scenario: Check ids are case-sensitive
+
+- **WHEN** the user runs `specd changes archive my-change --skip-checks Spec.Overlap`
+- **THEN** the command exits with code 1 and reports `UnknownCheckError`
+
+#### Scenario: Structured error output
+
+- **WHEN** `--format json` is used and the bypass is rejected with `CheckNotSkippableError`
+- **THEN** the command emits the structured error record with the error code and exit code 1
+
+#### Scenario: Invalid state still fails with skip flags present
+
+- **GIVEN** the change is in `designing`
+- **WHEN** the user runs `specd changes archive my-change --skip-checks spec.overlap`
+- **THEN** the command exits with code 1 naming the current state
+
+#### Scenario: Alias for a non-skippable check fails
+
+- **GIVEN** the schema makes `impl.linksInScope` non-skippable
+- **WHEN** the user runs `specd changes archive my-change --allow-out-of-scope`
+- **THEN** the command exits with code 1 and reports `CheckNotSkippableError`
+
+#### Scenario: Dependency mismatch lists every mismatching spec
+
+- **GIVEN** archive fails with `CheckPredicateFailedError` for `deps.consistent` with three entries in `details.mismatches`
+- **WHEN** the command renders the failure
+- **THEN** stderr lists the three specs with their extracted and persisted dependencies
+- **AND** the CLI adds the hint to re-run dependency extraction or update the change dependencies
+
+#### Scenario: Read-only workspace failure lists affected specs
+
+- **GIVEN** archive fails with `CheckPredicateFailedError` for `workspace.readOnly` with `details.specs`
+- **WHEN** the command renders the failure
+- **THEN** stderr lists every affected spec and its workspace
+- **AND** no bypass is suggested
+
+#### Scenario: Committed recovery is not rendered as an edge error
+
+- **GIVEN** `ArchiveChange` fails with `ReconciledOperationBlockedError` after committing a return to `designing`
+- **WHEN** `specd changes archive` renders the failure in text mode
+- **THEN** output shows the committed state, the projected blockers with label and `checkId`, and the projected next-action command or guidance with its reason
+- **AND** no invalid-edge error line is printed
+- **AND** json output carries `state`, `automaticReturn`, projected blockers without raw `isSkippable`, and `nextAction` with `intent`, `action`, `command` and `guidance`
+
+#### Scenario: Skippable deps.consistent gets the generic bypass hint
+
+- **GIVEN** archive fails on a skippable `deps.consistent`
+- **WHEN** the command renders the failure
+- **THEN** the generic bypass hint is printed and the dependency-extraction hint is not
+
+#### Scenario: Skipped hooks report the user-skip reason
+
+- **GIVEN** archive runs with `--skip-hooks`
+- **WHEN** the progress presenter renders the skipped hook checks
+- **THEN** they report the user-skip reason derived from the effective `skipHooks`
+
+#### Scenario: Stale verification suggests the verification action
+
+- **GIVEN** archive fails with `CheckPredicateFailedError` for `verification.current` with a `start-verification` action
+- **WHEN** the command renders the failure
+- **THEN** stderr reports the check and shows the command projected from the action by the presenter
+
 ### Requirement: Output on success (extended)
 
 #### Scenario: Text output shows invalidated changes when overlap occurred
@@ -105,10 +293,35 @@
 - **WHEN** `specd change archive <name> --allow-overlap --format json` succeeds
 - **THEN** the JSON output includes `invalidatedChanges` with the entry's `name` and `specIds`
 
+#### Scenario: --skip-checks spec.overlap reports invalidated peers
+
+- **GIVEN** archiving with `--skip-checks spec.overlap` invalidates `beta`
+- **WHEN** the command succeeds in text mode
+- **THEN** the output includes the `invalidated 1 overlapping change` section listing `beta` and its specs
+- **AND** `--format json` includes the same `invalidatedChanges` entries
+
 ### Requirement: JSON output on success
 
 #### Scenario: JSON output on success
 
 - **WHEN** `specd change archive my-change --format json` succeeds
-- **THEN** stdout is valid JSON with `result` equal to `"ok"`, `name` equal to `"my-change"`, and `archivePath` containing the archive path
+- **THEN** stdout is a structured stream whose terminal record has `stream` equal to `change-archive`, `event.type` equal to `complete`, and `event.result.result` equal to `"ok"`
+- **AND** that result includes `name` equal to `"my-change"` and `archivePath` containing the archive path
+- **AND** callers do not receive a second unwrapped JSON object after the stream
 - **AND** the process exits with code 0
+
+### Requirement: Canonical archive command naming
+
+#### Scenario: Singular alias preserves archive semantics
+
+- **WHEN** an actor invokes the supported singular archive alias
+- **THEN** it follows the same archive behavior as the canonical plural command
+
+### Requirement: CLI-rendered out-of-scope implementation hint
+
+#### Scenario: impl.linksInScope failure renders CLI bypass hint
+
+- **GIVEN** `ArchiveChange` fails on `impl.linksInScope` as a skippable check
+- **WHEN** `specd changes archive` renders the failure
+- **THEN** the CLI renders `Retry with --skip-checks impl.linksInScope if an exception is granted` via the centralized hint-resolution helper
+- **AND** the hint does not mention `--allow-out-of-scope`

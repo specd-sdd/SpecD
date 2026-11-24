@@ -1,0 +1,39 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Layer merge semantics'
+  content: |
+    #### Scenario: Later scalar overrides earlier scalar
+    - **GIVEN** two active layers define different values for the same scalar field
+    - **WHEN** the chain is merged
+    - **THEN** the later layer's scalar value wins
+
+    #### Scenario: Object keys deep-merge by path
+    - **GIVEN** a base layer defines `workspaces.default.codeRoot`
+    - **AND** a later layer defines `workspaces.default.ownership`
+    - **WHEN** the chain is merged
+    - **THEN** both keys are present in the merged object
+
+    #### Scenario: Nested record of records deep merge preserves untouched leaves
+    - **GIVEN** a base layer defining `{ options: { strict: true, timeout: 5000 }, mode: 'fast' }`
+    - **AND** a later layer defining `{ options: { timeout: 10000 } }`
+    - **WHEN** the chain is merged via `deepMergeConfig`
+    - **THEN** the merged object contains `options.strict: true`, `options.timeout: 10000`, and `mode: 'fast'`
+
+    #### Scenario: Inherited arrays append by default
+    - **GIVEN** a base layer defines `context: [{ instruction: 'base' }]`
+    - **AND** a later layer defines `context: [{ instruction: 'overlay' }]`
+    - **WHEN** the chain is merged
+    - **THEN** the merged config contains both context entries in chain order
+
+    #### Scenario: Array removal deletes inherited context by id
+    - **GIVEN** a base layer defines `context: [{ id: bootstrap, file: specd-bootstrap.md }]`
+    - **AND** a later layer declares `remove: { context: [{ id: bootstrap }] }`
+    - **WHEN** the chain is merged
+    - **THEN** the inherited `bootstrap` context entry is absent from the final config
+
+    #### Scenario: Standalone layer discards earlier inherited state
+    - **GIVEN** earlier shared layers are active
+    - **AND** a later discovered layer has no `extends`
+    - **WHEN** the chain is resolved
+    - **THEN** that standalone layer becomes the new root for subsequent layers

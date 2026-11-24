@@ -7,6 +7,7 @@ import {
   makeProgram,
   mockProcessExit,
   ExitSentinel,
+  makeMockHost,
 } from './helpers.js'
 
 vi.mock('@specd/sdk', async () => {
@@ -79,17 +80,20 @@ function setup(
       })),
     )
   }
-  vi.mocked(openSpecdHost).mockResolvedValue({
-    config,
-    configFilePath: mode === 'configured' ? '/project/specd.yaml' : null,
-    kernel: kernel ?? makeMockKernel(),
-    createGraphProvider: vi.fn(),
-  })
+  vi.mocked(openSpecdHost).mockResolvedValue(
+    makeMockHost({
+      config,
+      configFilePath: mode === 'configured' ? '/project/specd.yaml' : null,
+      kernel: kernel ?? makeMockKernel(),
+      createGraphProvider: vi.fn(),
+    }),
+  )
   vi.mocked(resolveGraphCliContext).mockResolvedValue({
     mode,
     config,
     configFilePath: mode === 'configured' ? '/project/specd.yaml' : null,
     kernel,
+    host: kernel === null ? null : makeMockHost({ config, kernel }),
     projectRoot: config.projectRoot,
     vcsRoot: config.projectRoot,
   })
@@ -246,7 +250,7 @@ describe('graph stats', () => {
       config,
       'text',
       expect.any(Function),
-      expect.objectContaining({ kernel: expect.anything() }),
+      expect.objectContaining({ host: expect.anything() }),
     )
   })
 
@@ -294,6 +298,7 @@ describe('graph stats', () => {
       config,
       configFilePath: '/tmp/non-vcs-project/specd.yaml',
       kernel: makeMockKernel(),
+      host: makeMockHost({ config }),
       projectRoot: '/tmp/non-vcs-project',
       vcsRoot: null,
     })
@@ -305,7 +310,7 @@ describe('graph stats', () => {
       config,
       'text',
       expect.any(Function),
-      expect.objectContaining({ kernel: expect.anything() }),
+      expect.objectContaining({ host: expect.anything() }),
     )
     expect(mockProvider.getGraphHealth).toHaveBeenCalledTimes(1)
     expect(getStderr()).not.toContain('not inside a Git repository')

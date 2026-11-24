@@ -108,6 +108,14 @@ Manages the core unit of work in SpecD from proposal to verification and archive
   specd changes status add-oauth
   ```
 - **`specd changes transition <name> <state>`**: Advances change state (`designing`, `ready`, `implementing`, `verifying`, `done`, `archivable`).
+  Evaluates in-memory transition checks and step hooks. On predicate failure, formats an actionable Text Repair Guide with suggested remediation commands and bypass guidance. Supports bypassing skippable checks via `--skip-checks <id1,id2>`:
+  ```bash
+  specd changes transition add-oauth verifying --skip-checks @security.code-scan,impl.linksInScope
+  ```
+- **`specd changes archive <name>`**: Archives an `archivable` change. Archive checks are resolved like transition checks (built-ins, host and plugin checks, and the schema's `archiveChecks`). Bypass a skippable check with `--skip-checks`; only checks that `specd changes status` shows a bypass flag for can be skipped.
+  ```bash
+  specd changes archive add-oauth --skip-checks spec.overlap
+  ```
 - **`specd changes validate <name>`**: Validates change artifacts structurally and checks cross-artifact relational integrity.
 - **`specd changes spec-preview <name> <specId>`**: Previews unified spec content after applying delta patches.
   ```bash

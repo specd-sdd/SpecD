@@ -57,7 +57,10 @@ export interface ArtifactTypeProps {
   readonly optional?: boolean
   /**
    * When `true`, the artifact is explicitly marked as containing trackable tasks.
-   * This is the master switch for task capability.
+   * This is the master switch for task capability and the authoritative marker for
+   * excluding task content from approval/verification validity fingerprints and
+   * drift-driven invalidation propagation, while preserving task syntax validation
+   * and completion gating.
    */
   readonly hasTasks?: boolean
   /**
@@ -200,7 +203,13 @@ export class ArtifactType {
     return this._optional
   }
 
-  /** `true` if the artifact is explicitly marked as containing trackable tasks. */
+  /**
+   * `true` if the artifact is explicitly marked as containing trackable tasks.
+   * This is the master switch for task capability and the authoritative marker for
+   * excluding task content from approval/verification validity fingerprints and
+   * drift-driven invalidation propagation, while preserving task syntax validation
+   * and completion gating.
+   */
   get hasTasks(): boolean {
     return this._hasTasks
   }

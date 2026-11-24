@@ -1,0 +1,24 @@
+# Batch F - round 14 closure (non get-status)
+
+Suites run: core archive-batch-snapshot + invalidate-change-gates-audit: 2 files / 37 tests pass. cli transition + run: 2 files / 100 tests pass.
+
+## Corrupt-manifest safety (no HIGH found)
+
+- archive-batch-snapshot.ts:69-97: corrupt() is thrown only before `_restoreSpec`/`_removeBackupDir`; the auto-restore branch (l.~104) is reachable only after the object+string changeName guard passes. A corrupt manifest cannot restore.
+- Only call site of detectOrphans: use-cases/archive-change.ts:597, inside try whose catch does \_recordArchiveFailure + rethrow BEFORE snapshot()/transition to archiving. restoreBatch (l.1161) is only reached from \_handleCommitFailure (commit phase, after archiving). So archive never proceeds. Composition wrapper (composition/use-cases/archive-change.ts:91) and noop port just delegate.
+- No consumer of ARCHIVE_ORPHAN_BACKUP / foreignChangeName in cli, sdk, mcp src (grep: none). No error-hints entry, no archive.ts special rendering -> generic handleError prints the message: "Cannot archive - corrupt orphan backup manifest at <spec>. Remove .specd-archive-backup manually and retry." Correct; no "foreign" wording.
+- Before round 14 (HEAD): JSON.parse failure threw with foreignChangeName=true, message "corrupt orphan backup at"; null/array/lacking-changeName manifests either TypeError'd on `null.changeName` or became foreign-abort with manifestChangeName undefined ("foreign ... \"undefined\""). Now strictly better.
+
+## Findings
+
+1. LOW (confirmed) archive-orphan-backup-error.ts:19-26 + snapshot.ts:75-80: a corrupt error is structurally identical to the "Recovered orphan backup" error (foreignChangeName=false, changeName=current); only the message differs. Any future programmatic consumer (sdk/mcp) keying on foreignChangeName===false would read corrupt as "recovered, retry". Today no consumer exists. JSDoc "Change name recorded in the orphan manifest" / "Whether the orphan belongs to a different change" is now inaccurate for the corrupt case. tasks.md:711 mentions asserting `isCorrupt`, but no such property exists and tests assert via foreignChangeName/message (spec/tasks drift; either add a `corrupt` flag or fix the task text).
+2. LOW (suspected, pre-existing) snapshot.ts:56-64: unreadable manifest (e.g. EACCES) is skipped, then snapshot() would overwrite manifest.json and backup files in that dir, destroying a possibly valid orphan backup. Defensible per task statement but arguably should abort like corrupt.
+3. LOW archive-batch-snapshot.spec.ts:147-172 expectCorrupt: no assertion that the corrupt path leaves canonical files and the backup dir untouched (the "never auto-restore" guarantee is asserted only indirectly via foreign=false/message). Add: spec.md unchanged and backup dir still exists. Tests do discriminate JSON/null/array/primitive/missing/non-string changeName (each would fail pre-round-14), log order ['log','throw'] is checked, exact log payload equals toEqual.
+4. LOW run.spec.ts:304-329 guard: only scans src/commands and src/helpers (not handle-error.ts, run.ts, program.ts, guidance-presenter.ts, errors/); `//.*$` comment stripping also truncates lines containing `://` in strings (false negative only if a `.catch(` follows on same line; no false positives seen); `['catch']` and `.then(_, handler)` not detected. Allowlist counts are exact (toEqual) and match src: transition.ts:536 (1), graph impact/search/hotspots/stats/why (1 each), all rendering via cliError; verified.
+
+## Checked, nothing found
+
+- EISDIR trick: readFile on a directory yields EISDIR on Linux and macOS (also as root); non-ENOENT so 'unreadable' discriminates. Unknown-workspace test checks both outcomes in order. Temp dirs removed in afterEach; vi.restoreAllMocks restores Logger spies; no leaks.
+- invalidate-change-gates-audit.spec.ts: re-enable tests (reconcile with gate re-enabled keeps 'revoked', returns to designing/ready/done as expected) are non-vacuous. Mixed-consent test: asserts both specApproval and signoff stay 'valid' after the rejected call plus no approval-invalidated event after `before`; the repo hands out the same Change object (other tests rely on it), so a mutation that revokes the disabled consent on a rejected call would flip signoff to 'revoked' and fail. Strong enough.
+- transition.spec.ts describe.each: the `.catch(() => {})` in the local run helper does swallow, but assertions are on process.exit called exactly once with 1 (afterEach restoreAllMocks resets), output contains code/message, excludes 'status exploded', repair-guide lines and structured keys; both error types x text/json/toon. Not vacuous.
+- docs/cli/cli-reference.md new sentence ("prints only the original error (text, JSON and TOON) and no repair guide") matches transition.ts:531-536 (`if (status === undefined) throw err`) and the tests.

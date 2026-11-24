@@ -1,0 +1,19 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Automatic explanatory notes
+
+    New drift/review consequences, overlap invalidation, stale/revoked spec/signoff recovery and failed archive SHALL request explanatory SYSTEM_ACTOR notes atomically with their consequences. Successful effective recovery creates context after its hop/cleanup; a same-destination observation does not repeat recovery. New same-state consequences may request notes independently of needsArtifactReview reopening. Repeat observation alone MUST NOT issue new add requests or resurrect a removed note. Share isolated note creation/policy evaluation without coupling the contract to persistConsequences or designing a future consequence framework. Deleting a note SHALL not change validity.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Recovery note cleanup policies
+
+    Use forward-only alternatives: D = leave designing OR enter ready/implementing/verifying/done/archivable; I = leave implementing OR enter verifying/done/archivable; S = leave done OR enter archivable. Each also permits successful archive. Drift/review, overlap and spec-consent recovery into designing use D; signoff recovery uses S OR D OR I; archive-failure notes use D OR I OR archive success and survive retry into archiving/rollback. Preserve-in-place uses the handling phase completion alternatives (D, I, verifying exit or done/archivable entry, S); archivable/archiving retain through retry until repair completion or archive success. Respect sovereign topology, optional-step bypasses, direction classification and legacy drain forward exits. Persist explicit anyOf rules, not shorthand labels. No recovery/backward/redesign hop matches forward rules.

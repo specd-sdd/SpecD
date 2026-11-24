@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'The shared hook execution contract already covers collection and execution; the normative portability wording belongs to hook-execution-model.'

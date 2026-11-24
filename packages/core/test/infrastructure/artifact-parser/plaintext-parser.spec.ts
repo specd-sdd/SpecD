@@ -176,4 +176,41 @@ describe('PlaintextParser', () => {
       expect(parser.parseDelta('')).toEqual([])
     })
   })
+
+  describe('paragraph value and rename semantics', () => {
+    it('modifies paragraph via value and serializes updated text', () => {
+      const ast = parser.parse('Old paragraph line.\n\nUntouched paragraph.')
+      const res = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'paragraph', contains: 'Old paragraph' },
+          value: 'New paragraph line.',
+        },
+      ])
+      const serialized = parser.serialize(res.ast)
+      expect(serialized).toBe('New paragraph line.\n\nUntouched paragraph.')
+    })
+
+    it('rejects rename on contains-only paragraph and line nodes', () => {
+      const ast = parser.parse('Old paragraph line.')
+      expect(() =>
+        parser.apply(ast, [
+          {
+            op: 'modified',
+            selector: { type: 'paragraph', contains: 'Old paragraph' },
+            rename: 'New label',
+          },
+        ]),
+      ).toThrow(DeltaApplicationError)
+      expect(() =>
+        parser.apply(ast, [
+          {
+            op: 'modified',
+            selector: { type: 'line', contains: 'Old paragraph' },
+            rename: 'New label',
+          },
+        ]),
+      ).toThrow(DeltaApplicationError)
+    })
+  })
 })

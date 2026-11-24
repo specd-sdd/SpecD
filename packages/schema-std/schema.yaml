@@ -661,6 +661,8 @@ metadataExtraction:
 
 workflow:
   - step: designing
+    optional: false
+    disabled: false
     requires: []
     hooks:
       pre:
@@ -681,6 +683,8 @@ workflow:
             If any issues are found, fix them before proceeding to the next step.
 
   - step: ready
+    optional: false
+    disabled: false
     requires: [proposal, specs, verify, design, tasks]
     hooks:
       pre:
@@ -692,6 +696,8 @@ workflow:
             work items. This is a gate — do not proceed until everything is in place.
 
   - step: implementing
+    optional: false
+    disabled: false
     requires: [proposal, specs, verify, design, tasks]
     hooks:
       pre:
@@ -721,6 +727,8 @@ workflow:
             constraints while writing code — they are as binding as the change specs.
 
   - step: verifying
+    optional: false
+    disabled: false
     requires: [proposal, specs, verify, design, tasks]
     requiresTaskCompletion: [tasks]
     hooks:
@@ -732,6 +740,8 @@ workflow:
             fails, return to implementing — do not mark verifying complete until all scenarios pass.
 
   - step: archiving
+    optional: false
+    disabled: false
     requires: [proposal, specs, verify, design, tasks]
     requiresTaskCompletion: [tasks]
     hooks:

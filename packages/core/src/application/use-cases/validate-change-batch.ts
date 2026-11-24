@@ -1,7 +1,10 @@
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
-import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
+import {
+  type ChangeSchemaVersionAdvisory,
+  ResolveChangeSchema,
+} from '../services/resolve-change-schema.js'
 import {
   type ValidateArtifacts,
   type ValidationFailure,
@@ -50,26 +53,34 @@ export interface ValidateChangeBatchResult {
   readonly total: number
   /** Ordered list of individual step outcomes preserving DAG topological order. */
   readonly results: readonly ValidateChangeBatchStepResult[]
+  /** Schema resolution advisories (e.g. version drift). */
+  readonly warnings?: readonly ChangeSchemaVersionAdvisory[]
 }
 
 /**
  * Canonical application use case that orchestrates batch change validation
- * by walking the active schema's artifact DAG in topological order and delegating
+ * by walking the change's sovereign schema artifact DAG in topological order and delegating
  * each change- or spec-scoped step to {@link ValidateArtifacts}.
  */
 export class ValidateChangeBatch {
+  private readonly _resolveChangeSchema: ResolveChangeSchema
+
   /**
    * Constructs a new `ValidateChangeBatch` instance.
    *
    * @param _changes - The change repository
-   * @param _schemaProvider - Provider to retrieve the active schema
+   * @param _schemaProvider - Provider to retrieve the change's schema
    * @param _validateArtifacts - Use case to execute artifact validation
+   * @param resolveChangeSchema - Shared sovereign change schema resolver
    */
   constructor(
     private readonly _changes: ChangeRepository,
     private readonly _schemaProvider: SchemaProvider,
     private readonly _validateArtifacts: ValidateArtifacts,
-  ) {}
+    resolveChangeSchema?: ResolveChangeSchema,
+  ) {
+    this._resolveChangeSchema = resolveChangeSchema ?? new ResolveChangeSchema(_schemaProvider)
+  }
 
   /**
    * Executes batch validation for the requested change across all scheduled DAG steps.
@@ -77,7 +88,7 @@ export class ValidateChangeBatch {
    * @param input - The batch validation options
    * @returns Aggregated batch validation results
    * @throws {@link ChangeNotFoundError} When the requested change does not exist
-   * @throws {@link SchemaMismatchError} When the change schema does not match the active schema
+   * @throws {@link SchemaProviderIdentityMismatchError} When the provider returns a different schema identity
    */
   async execute(input: ValidateChangeBatchInput): Promise<ValidateChangeBatchResult> {
     const change = await this._changes.get(input.name)
@@ -85,13 +96,19 @@ export class ValidateChangeBatch {
       throw new ChangeNotFoundError(input.name)
     }
 
-    const schema = await this._schemaProvider.get()
-    if (schema.name() !== change.schemaName) {
-      throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
-    }
+    const { schema, warnings: schemaWarnings } = await this._resolveChangeSchema.execute({
+      changeName: change.name,
+      schemaName: change.schemaName,
+      schemaVersion: change.schemaVersion,
+    })
 
     if (change.specIds.length === 0) {
-      return { passed: true, total: 0, results: [] }
+      return {
+        passed: true,
+        total: 0,
+        results: [],
+        ...(schemaWarnings.length > 0 ? { warnings: schemaWarnings } : {}),
+      }
     }
 
     const dag = schema.artifactDag()
@@ -145,6 +162,7 @@ export class ValidateChangeBatch {
       passed: allPassed,
       total: results.length,
       results,
+      ...(schemaWarnings.length > 0 ? { warnings: schemaWarnings } : {}),
     }
   }
 }

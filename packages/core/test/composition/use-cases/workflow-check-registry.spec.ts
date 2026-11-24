@@ -1,0 +1,380 @@
+import { describe, expect, it } from 'vitest'
+import { resolveWorkflowCheckRegistry } from '../../../src/composition/use-cases/workflow-check-registry.js'
+import { resolveGetStatusDeps } from '../../../src/composition/use-cases/get-status.js'
+import { type CompositionResolver } from '../../../src/composition/composition-resolver.js'
+import { ResolveChangeSchema } from '../../../src/application/services/resolve-change-schema.js'
+import { CheckRegistry } from '../../../src/domain/services/check-registry.js'
+import { Change } from '../../../src/domain/entities/change.js'
+import { type ChangeValidityVerdict } from '../../../src/domain/services/change-validity.js'
+import { type CheckExecutionContext } from '../../../src/domain/services/transition-checks.js'
+import {
+  makeChangeRepository,
+  makeListWorkspaces,
+  makeNoopParsers,
+  makeRunStepHooks,
+  makeSchema,
+  makeSchemaProvider,
+  testActor,
+} from '../../application/use-cases/helpers.js'
+
+function makeChange(name: string, specIds: readonly string[]): Change {
+  return new Change({
+    name,
+    createdAt: new Date('2024-01-01T00:00:00Z'),
+    specIds: [...specIds],
+    schemaName: '@specd/schema-std',
+    schemaVersion: 1,
+    history: [
+      {
+        type: 'created',
+        at: new Date('2024-01-01T00:00:00Z'),
+        by: testActor,
+        specIds: [...specIds],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
+      },
+    ],
+  })
+}
+
+function makeResolver(changes: Change[]): CompositionResolver {
+  const repo = makeChangeRepository(changes)
+  const schemaProvider = makeSchemaProvider(makeSchema())
+  return {
+    getChangeRepository: () => repo,
+    getSchemaProvider: () => schemaProvider,
+    getListWorkspaces: () => makeListWorkspaces(),
+    getArtifactParserRegistry: () => makeNoopParsers(),
+    getExtractorTransforms: () => new Map(),
+    getSpecWorkspaceRoutes: () => [],
+    getRunStepHooks: () => makeRunStepHooks(),
+    getContentHasher: () => ({ hash: () => 'sha256:test' }),
+    getResolveChangeSchema: () => new ResolveChangeSchema(schemaProvider),
+  } as unknown as CompositionResolver
+}
+
+function archiveCtx(change: Change): CheckExecutionContext {
+  return {
+    change,
+    schema: makeSchema(),
+    attempt: { scope: 'archive' },
+    approvals: { spec: false, signoff: false },
+    effectiveStatusByArtifact: new Map(),
+  }
+}
+
+describe('resolveWorkflowCheckRegistry', () => {
+  it('keeps overlap detection in production GetStatus archive bindings', async () => {
+    const alpha = makeChange('alpha', ['core:core/config'])
+    const beta = makeChange('beta', ['core:core/config'])
+    const resolver = makeResolver([alpha, beta])
+    Object.assign(resolver, {
+      config: { approvals: { spec: false, signoff: false } },
+      getRefreshImplementationTracking: () => ({ execute: async () => undefined }),
+      getReconcileChangeValidity: () => ({ execute: async () => undefined }),
+    })
+
+    const deps = resolveGetStatusDeps(resolver)
+    const overlap = deps.archiveBindings.find((binding) => binding.check.id === 'spec.overlap')
+    expect(overlap).toBeDefined()
+    await expect(overlap!.check.execute(archiveCtx(alpha))).resolves.toMatchObject({
+      outcome: 'fail',
+    })
+  })
+
+  it('wires spec.overlap peers when includeOverlapDetection is true', async () => {
+    const alpha = makeChange('alpha', ['core:core/config'])
+    const beta = makeChange('beta', ['core:core/config'])
+    const registry = resolveWorkflowCheckRegistry(makeResolver([alpha, beta]), {
+      includeOverlapDetection: true,
+    })
+    const overlap = registry.archiveBindings.find((binding) => binding.check.id === 'spec.overlap')
+    expect(overlap).toBeDefined()
+
+    const result = await overlap!.check.execute(archiveCtx(alpha))
+
+    expect(result.outcome).toBe('fail')
+    if (result.outcome !== 'fail') return
+    expect(result.message).toContain('beta (core:core/config)')
+    expect(result.details).toMatchObject({
+      peers: [{ changeName: 'beta', overlappingSpecIds: ['core:core/config'] }],
+    })
+  })
+
+  it('does not block overlap when includeOverlapDetection is omitted', async () => {
+    const alpha = makeChange('alpha', ['core:core/config'])
+    const beta = makeChange('beta', ['core:core/config'])
+    const registry = resolveWorkflowCheckRegistry(makeResolver([alpha, beta]))
+    const overlap = registry.archiveBindings.find((binding) => binding.check.id === 'spec.overlap')
+    expect(overlap).toBeDefined()
+
+    const result = await overlap!.check.execute(archiveCtx(alpha))
+
+    expect(result.outcome).toBe('pass')
+  })
+
+  it('appends plugin archive bindings after the built-in ones and keeps archive locks', () => {
+    const checks = new CheckRegistry()
+    checks.register(
+      '@acme/sec',
+      {
+        id: 'scan',
+        label: 'Scanning',
+        execute: async () => ({
+          id: '@acme/sec.scan',
+          label: 'Scanning',
+          kind: 'predicate',
+          outcome: 'pass',
+        }),
+      },
+      [{ scope: 'archive', skippable: true }],
+    )
+    const resolver = makeResolver([])
+    Object.assign(resolver, { registry: { checks } })
+
+    const registry = resolveWorkflowCheckRegistry(resolver)
+
+    const ids = registry.archiveBindings.map((binding) => binding.check.id)
+    expect(ids.at(-1)).toBe('@acme/sec.scan')
+    expect(ids.indexOf('@acme/sec.scan')).toBeGreaterThan(ids.indexOf('impl.linksInScope'))
+    expect(registry.archiveBindings.at(-1)?.skippable).toBe(true)
+    const readOnly = registry.checkRegistry
+      ?.getBindings('workspace.readOnly')
+      .find((binding) => binding.applicability.some((row) => row.scope === 'archive'))
+    expect(readOnly?.allowBindingOverride).toBe(false)
+    expect(
+      registry.transitionBindings.some((binding) => binding.check.id === '@acme/sec.scan'),
+    ).toBe(false)
+  })
+
+  it('binds verification.current on verification-requiring exits and reuses it for archive', () => {
+    const registry = resolveWorkflowCheckRegistry(makeResolver([]))
+    const transitionRows = registry.transitionBindings.filter(
+      (binding) => binding.check.id === 'verification.current',
+    )
+    expect(transitionRows).toHaveLength(1)
+    expect(transitionRows[0]?.applicability).toEqual([
+      { scope: 'transition', from: 'verifying', to: 'done', along: 'forward' },
+      { scope: 'transition', from: 'done', to: 'archivable', along: 'forward' },
+      { scope: 'transition', from: 'pending-signoff', to: 'archivable', along: 'forward' },
+      { scope: 'transition', from: 'signed-off', to: 'archivable', along: 'forward' },
+    ])
+    expect(
+      registry.archiveBindings.some((binding) => binding.check.id === 'verification.current'),
+    ).toBe(true)
+    expect(
+      registry.transitionBindings.some(
+        (binding) =>
+          binding.check.id === 'verification.current' &&
+          binding.applicability.some(
+            (row) => row.scope === 'transition' && row.to !== 'done' && row.to !== 'archivable',
+          ),
+      ),
+    ).toBe(false)
+  })
+
+  it('binds implementation readiness to exit, entry, operation, and archive boundaries', () => {
+    const registry = resolveWorkflowCheckRegistry(makeResolver([]))
+    for (const id of ['impl.filesResolved', 'impl.linksInScope'] as const) {
+      const transition = registry.transitionBindings.find((binding) => binding.check.id === id)
+      expect(transition?.applicability).toEqual([
+        { scope: 'transition', from: 'implementing', to: '*', along: 'forward' },
+        { scope: 'transition', from: '*', to: 'verifying', along: '*' },
+        { scope: 'operation', operation: 'verification-start' },
+        { scope: 'step-skip', step: 'implementing' },
+      ])
+      expect(registry.archiveBindings.some((binding) => binding.check.id === id)).toBe(true)
+    }
+  })
+
+  it('reuses a stale verdict in sign-off and archive verification checks', async () => {
+    const change = makeChange('alpha', ['core:core/config'])
+    const registry = resolveWorkflowCheckRegistry(makeResolver([change]))
+    const stale: ChangeValidityVerdict = {
+      artifactReviewRequired: false,
+      affectedArtifacts: [],
+      projectionChanges: [],
+      specApproval: 'not-required',
+      signoff: 'stale',
+      verification: 'stale',
+      blockers: [],
+      recovery: null,
+    }
+    const signoff = registry.transitionBindings.find(
+      (binding) => binding.check.id === 'approval.signoff',
+    )
+    const verification = registry.archiveBindings.find(
+      (binding) => binding.check.id === 'verification.current',
+    )
+    const base = archiveCtx(change)
+    await expect(
+      signoff!.check.execute({
+        ...base,
+        approvals: { spec: false, signoff: true },
+        validity: stale,
+      }),
+    ).resolves.toMatchObject({ outcome: 'fail', code: 'APPROVAL_STALE' })
+    await expect(verification!.check.execute({ ...base, validity: stale })).resolves.toMatchObject({
+      outcome: 'fail',
+      code: 'VERIFICATION_STALE',
+    })
+  })
+
+  it('skips approval predicates when the gates are disabled', async () => {
+    const change = makeChange('alpha', ['core:core/config'])
+    const registry = resolveWorkflowCheckRegistry(makeResolver([change]))
+    const spec = registry.transitionBindings.find((binding) => binding.check.id === 'approval.spec')
+    const signoff = registry.transitionBindings.find(
+      (binding) => binding.check.id === 'approval.signoff',
+    )
+    const ctx = archiveCtx(change)
+    await expect(spec!.check.execute(ctx)).resolves.toMatchObject({ outcome: 'skip' })
+    await expect(signoff!.check.execute(ctx)).resolves.toMatchObject({ outcome: 'skip' })
+  })
+
+  it('fails hook.post when the hook runner reports a mismatch', async () => {
+    const change = makeChange('alpha', ['core:core/config'])
+    const resolver = makeResolver([change])
+    Object.assign(resolver, {
+      getRunStepHooks: () =>
+        makeRunStepHooks({
+          execute: async () => ({
+            success: false,
+            hooks: [
+              {
+                id: 'summarise',
+                command: 'echo drift',
+                success: false,
+                exitCode: 1,
+                stdout: '',
+                stderr: 'drift',
+              },
+            ],
+            failedHooks: [
+              {
+                id: 'summarise',
+                command: 'echo drift',
+                success: false,
+                exitCode: 1,
+                stdout: '',
+                stderr: 'drift',
+              },
+            ],
+            warnings: [],
+          }),
+        }),
+    })
+    const registry = resolveWorkflowCheckRegistry(resolver)
+    const hook = registry.archiveBindings.find((binding) => binding.check.id === 'hook.post')
+    const result = await hook!.check.execute(archiveCtx(change))
+    expect(result.outcome).toBe('fail')
+    if (result.outcome !== 'fail') return
+    expect(result.code).toBe('HOOK_FAILED')
+    expect(result.message).toContain('echo drift')
+  })
+
+  it('filters out non-@ checks from custom registry to guarantee internal checks are never clobbered or shadowed', () => {
+    const resolver = makeResolver([])
+    const rogueBinding = {
+      check: {
+        id: 'protocol.edge',
+        label: 'Rogue Clobbered Protocol Edge',
+        kind: 'predicate' as const,
+        execute: async () => ({
+          id: 'protocol.edge',
+          label: 'Rogue',
+          kind: 'predicate' as const,
+          outcome: 'pass' as const,
+        }),
+      },
+      applicability: [
+        { scope: 'transition' as const, from: '*' as const, to: '*' as const, along: '*' as const },
+      ],
+      skippable: true,
+    }
+    const legitCustomBinding = {
+      check: {
+        id: '@security.audit',
+        label: 'Legitimate Security Audit',
+        kind: 'predicate' as const,
+        execute: async () => ({
+          id: '@security.audit',
+          label: 'Security Audit',
+          kind: 'predicate' as const,
+          outcome: 'pass' as const,
+        }),
+      },
+      applicability: [
+        { scope: 'transition' as const, from: '*' as const, to: '*' as const, along: '*' as const },
+      ],
+      skippable: true,
+    }
+
+    Object.assign(resolver, {
+      registry: {
+        checks: {
+          bindings: () => [rogueBinding, legitCustomBinding],
+          withExecutableBuiltins: () => undefined,
+        },
+      },
+    })
+
+    const registry = resolveWorkflowCheckRegistry(resolver)
+
+    const protocolBindings = registry.transitionBindings.filter(
+      (b) => b.check.id === 'protocol.edge',
+    )
+    expect(protocolBindings).toHaveLength(1)
+    expect(protocolBindings[0]!.check.label).not.toBe('Rogue Clobbered Protocol Edge')
+    expect(protocolBindings[0]!.skippable).toBe(false)
+
+    const custom = registry.transitionBindings.find((b) => b.check.id === '@security.audit')
+    expect(custom).toBeDefined()
+    expect(custom!.check.label).toBe('Legitimate Security Audit')
+  })
+
+  it('includes plugin step-skip default bindings in the transition base table', () => {
+    const checks = new CheckRegistry()
+    checks.register(
+      '@acme/qa',
+      {
+        id: 'freeze',
+        label: 'Freezing',
+        execute: async () => ({
+          id: '@acme/qa.freeze',
+          label: 'x',
+          kind: 'predicate',
+          outcome: 'pass',
+        }),
+      },
+      [{ scope: 'step-skip', step: 'implementing', skippable: false }],
+    )
+    const resolver = makeResolver([])
+    Object.assign(resolver, { registry: { checks } })
+
+    const registry = resolveWorkflowCheckRegistry(resolver)
+
+    const binding = registry.transitionBindings.find((b) => b.check.id === '@acme/qa.freeze')
+    expect(binding?.applicability).toEqual([{ scope: 'step-skip', step: 'implementing' }])
+  })
+  it('exposes a registry whose built-ins are the executable instances', () => {
+    const checks = new CheckRegistry()
+    const stub = checks.get('impl.linksInScope')
+    const resolver = makeResolver([])
+    Object.assign(resolver, { registry: { checks } })
+
+    const registry = resolveWorkflowCheckRegistry(resolver)
+
+    const executable = registry.checkRegistry?.get('impl.linksInScope')
+    expect(executable).toBe(registry.checks['impl.linksInScope'])
+    expect(executable).not.toBe(stub)
+    expect(registry.checkRegistry?.getGovernance('impl.linksInScope')).toEqual(
+      checks.getGovernance('impl.linksInScope'),
+    )
+  })
+
+  it('returns no executable registry when the composition has none', () => {
+    const registry = resolveWorkflowCheckRegistry(makeResolver([]))
+    expect(registry.checkRegistry).toBeUndefined()
+  })
+})

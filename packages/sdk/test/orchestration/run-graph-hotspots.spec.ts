@@ -52,6 +52,8 @@ describe('runGraphHotspots', () => {
         },
       } as any,
       createGraphProvider: () => mockProvider,
+      dispose: async () => {},
+      [Symbol.asyncDispose]: async () => {},
     }
 
     const result = await runGraphHotspots(ctx, { provider: mockProvider })
@@ -84,6 +86,8 @@ describe('runGraphHotspots', () => {
         },
       } as any,
       createGraphProvider: () => mockProvider,
+      dispose: async () => {},
+      [Symbol.asyncDispose]: async () => {},
     }
 
     await runGraphHotspots(ctx)
@@ -109,6 +113,8 @@ describe('runGraphHotspots', () => {
         },
       } as any,
       createGraphProvider: () => mockProvider,
+      dispose: async () => {},
+      [Symbol.asyncDispose]: async () => {},
     }
 
     await runGraphHotspots(ctx, { provider: mockProvider })
@@ -132,6 +138,8 @@ describe('runGraphHotspots', () => {
         },
       } as any,
       createGraphProvider: () => mockProvider,
+      dispose: async () => {},
+      [Symbol.asyncDispose]: async () => {},
     }
 
     await runGraphHotspots(ctx, {
@@ -204,6 +212,8 @@ describe('runGraphHotspots', () => {
         },
       } as any,
       createGraphProvider: () => mockProvider,
+      dispose: async () => {},
+      [Symbol.asyncDispose]: async () => {},
     }
 
     const result = await runGraphHotspots(ctx, { provider: mockProvider })

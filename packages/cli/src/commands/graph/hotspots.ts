@@ -162,7 +162,7 @@ Exclude examples:
             cliError(err instanceof Error ? err.message : 'invalid --kind value', opts.format, 1)
           }
         })()
-        const { config, kernel } = await resolveGraphCliContext({
+        const { config, kernel, host } = await resolveGraphCliContext({
           configPath: opts.config,
           repoPath: opts.path,
         }).catch((err: unknown) =>
@@ -258,7 +258,7 @@ Exclude examples:
               output(result, fmt)
             }
           },
-          { kernel },
+          { host },
         )
       },
     )
